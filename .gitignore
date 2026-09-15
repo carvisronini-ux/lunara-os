@@ -7,6 +7,7 @@ node_modules/
 .next/
 out/
 build/
+.vercel
 
 # Environment variables
 .env
@@ -31,3 +32,14 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+*~
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# Temporary files
+tmp/
+temp/
