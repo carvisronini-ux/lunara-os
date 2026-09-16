@@ -1,361 +1,379 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import '@/styles/pixel.css';
 
-const TILE_SIZE = 64;
-const MAP_WIDTH = 29;
-const MAP_HEIGHT = 16;
-
-interface Tile {
-  id: string;
-  x: number;
-  y: number;
-}
-
-interface Layer {
-  name: string;
-  tiles: Tile[];
-  collider: boolean;
-}
-
-interface TilemapData {
-  tileSize: number;
-  mapWidth: number;
-  mapHeight: number;
-  layers: Layer[];
-}
-
 const departments = [
-  { id: 'exec', name: 'executive_core', displayName: 'EXECUTIVE CORE', x: 12, y: 1, description: 'Strategic coordination' },
-  { id: 'intel', name: 'intelligence', displayName: 'INTELLIGENCE', x: 4, y: 4, description: 'Trend research' },
-  { id: 'strat', name: 'strategy', displayName: 'STRATEGY', x: 18, y: 7, description: 'Strategic planning' },
-  { id: 'content', name: 'content', displayName: 'CONTENT', x: 8, y: 2, description: 'Content creation' },
-  { id: 'creative', name: 'creative', displayName: 'CREATIVE', x: 14, y: 7, description: 'Creative direction' },
-  { id: 'resources', name: 'resources', displayName: 'RESOURCES', x: 21, y: 10, description: 'Resource management' },
-  { id: 'quality', name: 'quality', displayName: 'QUALITY', x: 1, y: 14, description: 'Quality control' },
-  { id: 'dist', name: 'distribution', displayName: 'DISTRIBUTION', x: 13, y: 14, description: 'Publishing' },
-  { id: 'analytics', name: 'analytics', displayName: 'ANALYTICS', x: 23, y: 8, description: 'Performance analytics' },
-  { id: 'learning', name: 'learning', displayName: 'LEARNING', x: 25, y: 14, description: 'Learning & evolution' },
+  { 
+    id: 'exec', 
+    name: 'executive_core', 
+    displayName: 'EXECUTIVE CORE', 
+    emoji: '👑',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Castle.png',
+    color: 'from-purple-600 to-purple-800',
+    position: { x: 80, y: 80 },
+    description: 'Strategic coordination & priorities'
+  },
+  { 
+    id: 'intel', 
+    name: 'intelligence', 
+    displayName: 'INTELLIGENCE', 
+    emoji: '🔬',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Tower.png',
+    color: 'from-blue-600 to-blue-800',
+    position: { x: 280, y: 180 },
+    description: 'Trend research & market intelligence'
+  },
+  { 
+    id: 'strat', 
+    name: 'strategy', 
+    displayName: 'STRATEGY', 
+    emoji: '🎯',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Monastery.png',
+    color: 'from-indigo-600 to-indigo-800',
+    position: { x: 500, y: 120 },
+    description: 'Strategic planning & decisions'
+  },
+  { 
+    id: 'content', 
+    name: 'content', 
+    displayName: 'CONTENT', 
+    emoji: '✍️',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/House1.png',
+    color: 'from-pink-600 to-pink-800',
+    position: { x: 150, y: 320 },
+    description: 'Content creation & writing'
+  },
+  { 
+    id: 'creative', 
+    name: 'creative', 
+    displayName: 'CREATIVE', 
+    emoji: '🎨',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/House2.png',
+    color: 'from-rose-600 to-rose-800',
+    position: { x: 380, y: 340 },
+    description: 'Creative direction & design'
+  },
+  { 
+    id: 'resources', 
+    name: 'resources', 
+    displayName: 'RESOURCES', 
+    emoji: '🔐',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Barracks.png',
+    color: 'from-emerald-600 to-emerald-800',
+    position: { x: 620, y: 280 },
+    description: 'Resource & credential management'
+  },
+  { 
+    id: 'quality', 
+    name: 'quality', 
+    displayName: 'QUALITY', 
+    emoji: '🛡️',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Archery.png',
+    color: 'from-amber-600 to-amber-800',
+    position: { x: 200, y: 480 },
+    description: 'Quality control & governance'
+  },
+  { 
+    id: 'dist', 
+    name: 'distribution', 
+    displayName: 'DISTRIBUTION', 
+    emoji: '📡',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/House3.png',
+    color: 'from-cyan-600 to-cyan-800',
+    position: { x: 420, y: 500 },
+    description: 'Publishing & distribution'
+  },
+  { 
+    id: 'analytics', 
+    name: 'analytics', 
+    displayName: 'ANALYTICS', 
+    emoji: '📊',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Tower.png',
+    color: 'from-teal-600 to-teal-800',
+    position: { x: 650, y: 450 },
+    description: 'Performance analytics'
+  },
+  { 
+    id: 'learning', 
+    name: 'learning', 
+    displayName: 'LEARNING', 
+    emoji: '🧬',
+    building: '/assets/tiny-swords/Buildings/Black Buildings/Monastery.png',
+    color: 'from-violet-600 to-violet-800',
+    position: { x: 520, y: 600 },
+    description: 'Learning & evolution'
+  },
+];
+
+const agents = [
+  { name: 'Astra', dept: 'executive_core', emoji: '👑', status: 'WORKING' },
+  { name: 'Nyx', dept: 'intelligence', emoji: '', status: 'WORKING' },
+  { name: 'Sage', dept: 'strategy', emoji: '🎯', status: 'IDLE' },
+  { name: 'Muse', dept: 'content', emoji: '✏️', status: 'WORKING' },
+  { name: 'Vega', dept: 'creative', emoji: '', status: 'WAITING' },
+  { name: 'Atlas', dept: 'resources', emoji: '🔑', status: 'WORKING' },
+  { name: 'Cipher', dept: 'resources', emoji: '🔒', status: 'IDLE' },
+  { name: 'Aegis', dept: 'quality', emoji: '🛡️', status: 'WORKING' },
+  { name: 'Echo', dept: 'distribution', emoji: '📢', status: 'WORKING' },
+  { name: 'Nova', dept: 'analytics', emoji: '📈', status: 'IDLE' },
 ];
 
 export default function VirtualOfficePage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [tilemap, setTilemap] = useState<TilemapData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [hoveredDept, setHoveredDept] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [selectedDept, setSelectedDept] = useState<string | null>(null);
+  const [liveEvents, setLiveEvents] = useState<Array<{id: string, text: string, time: string}>>([]);
   const router = useRouter();
 
-  // 1. Load tilemap JSON
   useEffect(() => {
-    const loadTilemap = async () => {
-      try {
-        console.log('🔄 Loading tilemap...');
-        const response = await fetch('/assets/RPGLand/map.json');
-        if (!response.ok) {
-          throw new Error(`Failed to load map.json: ${response.status} ${response.statusText}`);
-        }
-        const data = await response.json();
-        console.log('✅ Tilemap loaded successfully:', data);
-        setTilemap(data);
-        setLoading(false);
-      } catch (err) {
-        console.error('❌ Error loading tilemap:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setLoading(false);
-      }
-    };
+    const events = [
+      ' Nyx discovered new trend: "relationship tarot"',
+      '✍️ Muse writing 3 new scripts',
+      '🎨 Vega waiting for image generation',
+      '🔑 Cipher verifying API credentials',
+      '🛡️ Aegis reviewing 2 posts for QA',
+      '📢 Echo publishing to Telegram',
+      '📈 Nova analyzing performance metrics',
+      '🎯 Sage evaluating new opportunity',
+      '🧬 Iris extracting learning patterns',
+      '👑 Astra coordinating departments',
+    ];
 
-    loadTilemap();
+    let index = 0;
+    const interval = setInterval(() => {
+      const newEvent = {
+        id: `evt_${Date.now()}`,
+        text: events[index % events.length],
+        time: new Date().toLocaleTimeString(),
+      };
+      setLiveEvents(prev => [newEvent, ...prev].slice(0, 8));
+      index++;
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, []);
 
-  // 2. Render map on canvas
-  useEffect(() => {
-    if (!canvasRef.current || !tilemap) {
-      console.log('⏳ Waiting for canvas or tilemap...', { canvas: !!canvasRef.current, tilemap: !!tilemap });
-      return;
-    }
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setError('Failed to get 2D context');
-      return;
-    }
-
-    console.log('🎨 Starting canvas rendering...', { width: canvas.width, height: canvas.height });
-
-    const spritesheet = new Image();
-    spritesheet.src = '/assets/RPGLand/spritesheet.png';
-    spritesheet.crossOrigin = 'anonymous';
-    
-    spritesheet.onload = () => {
-      console.log('✅ Spritesheet loaded successfully!', { 
-        width: spritesheet.width, 
-        height: spritesheet.height 
-      });
-      
-      // 1. Clear canvas with water color
-      ctx.fillStyle = '#4a90c4';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // 🔴 TEST: Draw a red square AFTER clearing to prove we are inside onload
-      ctx.fillStyle = 'red';
-      ctx.fillRect(30, 30, 60, 60);
-      console.log('🔴 Drew test red rectangle at (30, 30) AFTER clearing');
-
-      const tilesPerRow = Math.floor(spritesheet.width / TILE_SIZE);
-      console.log('📐 Calculated tilesPerRow:', tilesPerRow);
-
-      if (tilesPerRow === 0) {
-        console.error('❌ tilesPerRow is 0! Spritesheet width might be smaller than TILE_SIZE (64px)');
-        setError('Spritesheet is too small or not loaded correctly');
-        return;
-      }
-
-      let tilesRendered = 0;
-      tilemap.layers.forEach((layer, layerIndex) => {
-        console.log(`📦 Rendering layer ${layerIndex}: ${layer.name} with ${layer.tiles.length} tiles`);
-        
-        layer.tiles.forEach(tile => {
-          const tileId = parseInt(tile.id, 10);
-          
-          const sourceX = (tileId % tilesPerRow) * TILE_SIZE;
-          const sourceY = Math.floor(tileId / tilesPerRow) * TILE_SIZE;
-          
-          const destX = tile.x * TILE_SIZE;
-          const destY = tile.y * TILE_SIZE;
-
-          // Draw tile
-          ctx.drawImage(
-            spritesheet,
-            sourceX, sourceY, TILE_SIZE, TILE_SIZE,
-            destX, destY, TILE_SIZE, TILE_SIZE
-          );
-          
-          tilesRendered++;
-        });
-      });
-
-      console.log(`✅ Total tiles rendered: ${tilesRendered}`);
-
-      // Draw department markers (Golden highlight)
-      departments.forEach(dept => {
-        const x = dept.x * TILE_SIZE;
-        const y = dept.y * TILE_SIZE;
-
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
-        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-        
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
-        
-        ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 12px "Press Start 2P", monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(dept.displayName, x + TILE_SIZE / 2, y - 8);
-      });
-
-      console.log('🏁 Map rendering complete!');
-    };
-
-    spritesheet.onerror = (e) => {
-      console.error('❌ Spritesheet load error:', e);
-      setError('Failed to load spritesheet.png - check file path and case sensitivity!');
-    };
-  }, [tilemap]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    const tileX = Math.floor(x / TILE_SIZE);
-    const tileY = Math.floor(y / TILE_SIZE);
-
-    const dept = departments.find(d => d.x === tileX && d.y === tileY);
-    if (dept) {
-      router.push(`/virtual-office?dept=${dept.name}`);
-    }
+  const handleDeptClick = (deptName: string) => {
+    setSelectedDept(deptName);
+    router.push(`/virtual-office?dept=${deptName}`);
   };
 
-  const handleCanvasMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    const tileX = Math.floor(x / TILE_SIZE);
-    const tileY = Math.floor(y / TILE_SIZE);
-
-    const dept = departments.find(d => d.x === tileX && d.y === tileY);
-    setHoveredDept(dept?.name || null);
-    setMousePos({ x: e.clientX, y: e.clientY });
+  const getDeptAgents = (deptName: string) => {
+    return agents.filter(a => a.dept === deptName);
   };
 
-  const hoveredDeptData = departments.find(d => d.name === hoveredDept);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#1a0f2e] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">⏳</div>
-          <div className="text-[#f5e6d3] lunara-font text-xl">Loading Lunara OS...</div>
-          <div className="text-[#a1887f] text-sm mt-2">Please wait</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#1a0f2e] flex items-center justify-center p-8">
-        <div className="bg-red-900/50 border-4 border-red-500 rounded-lg p-6 max-w-2xl">
-          <div className="text-4xl mb-4">❌</div>
-          <h2 className="text-2xl text-red-400 lunara-font mb-4">Error Loading Map</h2>
-          <div className="text-red-300 mb-4 font-mono text-sm">{error}</div>
-          <div className="text-sm text-red-400/70 space-y-2">
-            <p>შეამოწმეთ:</p>
-            <ul className="list-disc list-inside ml-4">
-              <li>ფაილი არსებობს: `public/assets/RPGLand/map.json`</li>
-              <li>ფაილი არსებობს: `public/assets/RPGLand/spritesheet.png`</li>
-              <li>სახელი ზუსტად ემთხვევა (Case-sensitive!)</li>
-              <li>გახსენით ბრაუზერის Console (F12) დეტალებისთვის</li>
-            </ul>
-          </div>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-4 bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded font-bold"
-          >
-            🔄 Reload Page
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'WORKING': return 'bg-green-400';
+      case 'IDLE': return 'bg-blue-400';
+      case 'WAITING': return 'bg-yellow-400';
+      default: return 'bg-gray-400';
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#1a0f2e] pixel-font">
-      <header className="bg-[#0f0518] border-b-4 border-[#4a3728] p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#1a0f2e] via-[#2d1b4e] to-[#1a0f2e] pixel-font">
+      {/* Header */}
+      <header className="bg-[#0f0518]/90 backdrop-blur-sm border-b-4 border-[#4a3728] p-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-3xl text-[#f5e6d3] lunara-font tracking-wider">LUNARA OS</h1>
             <p className="text-[10px] text-[#a1887f] mt-1">Virtual Office — Real-time Operations</p>
           </div>
-          <div className="bg-[#1b5e20] border-2 border-[#4caf50] px-4 py-2 text-[10px] text-[#a5d6a7] flex items-center gap-2">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            LIVE
+          <div className="flex items-center gap-4">
+            <div className="bg-[#1b5e20] border-2 border-[#4caf50] px-4 py-2 text-[10px] text-[#a5d6a7] flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              LIVE
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto p-6">
-        <div className="relative rounded-lg overflow-hidden border-4 border-[#2c1810] bg-[#4a90c4]">
-          <div className="relative">
-            <canvas
-              ref={canvasRef}
-              width={MAP_WIDTH * TILE_SIZE}
-              height={MAP_HEIGHT * TILE_SIZE}
-              onClick={handleCanvasClick}
-              onMouseMove={handleCanvasMove}
-              onMouseLeave={() => setHoveredDept(null)}
-              className="cursor-pointer w-full"
-              style={{ imageRendering: 'pixelated', maxHeight: '700px' }}
-            />
+        {/* Main Office Map */}
+        <div className="relative rounded-lg overflow-hidden border-4 border-[#2c1810] bg-gradient-to-br from-[#2d5a7b] via-[#3d7a9b] to-[#4a90c4]" style={{ height: '750px' }}>
+          
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute inset-0" style={{
+              backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)',
+              backgroundSize: '30px 30px'
+            }} />
+          </div>
 
-            {hoveredDeptData && (
+          {/* Decorative Elements */}
+          <div className="absolute top-10 left-10 text-6xl opacity-20">🌲</div>
+          <div className="absolute top-20 right-20 text-5xl opacity-20"></div>
+          <div className="absolute bottom-20 left-20 text-5xl opacity-20">🌲</div>
+          <div className="absolute bottom-10 right-10 text-6xl opacity-20"></div>
+          <div className="absolute top-1/2 left-5 text-4xl opacity-20">🌲</div>
+          <div className="absolute top-1/3 right-10 text-4xl opacity-20">☁️</div>
+
+          {/* Department Buildings with Real Images */}
+          {departments.map((dept) => {
+            const deptAgents = getDeptAgents(dept.name);
+            const activeAgents = deptAgents.filter(a => a.status === 'WORKING').length;
+            
+            return (
               <div
-                className="fixed pointer-events-none bg-[#2c1810] border-2 border-[#f5e6d3] px-3 py-2 rounded shadow-lg z-50"
+                key={dept.id}
+                className="absolute cursor-pointer group"
                 style={{
-                  left: `${mousePos.x + 15}px`,
-                  top: `${mousePos.y + 15}px`,
+                  left: `${dept.position.x}px`,
+                  top: `${dept.position.y}px`,
                 }}
+                onMouseEnter={(e) => {
+                  setHoveredDept(dept.name);
+                  setMousePos({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseLeave={() => setHoveredDept(null)}
+                onClick={() => handleDeptClick(dept.name)}
               >
-                <div className="text-[10px] text-[#f5e6d3] font-bold">
-                  {hoveredDeptData.displayName}
+                {/* Building Container */}
+                <div className="relative w-32 h-32 transition-all duration-300 group-hover:scale-110 group-hover:drop-shadow-2xl">
+                  {/* Real Building Image */}
+                  <img 
+                    src={dept.building} 
+                    alt={dept.displayName}
+                    className="w-full h-full object-contain pixel-art"
+                    style={{ 
+                      filter: 'drop-shadow(4px 6px 0 rgba(0,0,0,0.4))',
+                      imageRendering: 'pixelated'
+                    }}
+                  />
+                  
+                  {/* Active Agents Badge */}
+                  {activeAgents > 0 && (
+                    <div className="absolute -top-2 -right-2 bg-green-500 border-2 border-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] text-white font-bold shadow-lg">
+                      {activeAgents}
+                    </div>
+                  )}
+
+                  {/* Hover Glow Effect */}
+                  <div className="absolute inset-0 bg-yellow-400/0 group-hover:bg-yellow-400/20 rounded-lg transition-all duration-300" />
                 </div>
-                <div className="text-[8px] text-[#a1887f]">
-                  {hoveredDeptData.description}
+
+                {/* Department Name Label */}
+                <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#2c1810] border-2 border-[#FFD700] px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
+                  <span className="text-[9px] text-[#f5e6d3] font-bold">{dept.displayName}</span>
                 </div>
-                <div className="text-[7px] text-[#FFD700] mt-1">
-                  Click to enter →
+
+                {/* Agents Inside Building */}
+                <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {deptAgents.slice(0, 3).map((agent, idx) => (
+                    <div key={idx} className="relative">
+                      <div className="text-2xl">{agent.emoji}</div>
+                      <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${getStatusColor(agent.status)}`} />
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+            );
+          })}
 
-            <div
-              className="absolute"
-              style={{
-                top: '20px',
-                right: '20px',
-                background: 'linear-gradient(135deg, #f5e6d3 0%, #e8d5b7 100%)',
-                border: '5px solid #4a3728',
-                borderRadius: '12px',
-                padding: '16px 32px',
-                boxShadow: '0 8px 0 #2c1810, inset 0 3px 0 rgba(255,255,255,0.4)',
-                transform: 'rotate(-2deg)',
-                zIndex: 20,
-              }}
-            >
-              <h2 className="text-3xl text-[#8b0000] lunara-font text-center tracking-wider" style={{ fontFamily: 'Cinzel, serif', fontWeight: 900 }}>
-                Lunara World
-              </h2>
-              <p className="text-[8px] text-[#4a3728] text-center mt-2 font-bold tracking-wide">
-                Click a golden building to enter
-              </p>
+          {/* Lunara World Banner */}
+          <div className="absolute top-6 right-6 bg-gradient-to-br from-[#f5e6d3] to-[#e8d5b7] border-4 border-[#4a3728] rounded-lg p-4 shadow-xl transform rotate-[-2deg]">
+            <h2 className="text-2xl text-[#8b0000] lunara-font text-center tracking-wider">Lunara World</h2>
+            <p className="text-[8px] text-[#4a3728] text-center mt-1 font-bold">Click a building to enter</p>
+          </div>
+
+          {/* Live Events Feed */}
+          <div className="absolute bottom-6 left-6 w-80 bg-[#1a0f1a]/90 backdrop-blur-sm border-2 border-[#4a3728] rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] text-[#f5e6d3] lunara-font">📯 LIVE EVENTS</h3>
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+            </div>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {liveEvents.map((event) => (
+                <div key={event.id} className="text-[8px] text-[#a1887f] border-l-2 border-[#FFD700] pl-2">
+                  <div>{event.text}</div>
+                  <div className="text-[6px] text-[#666]">{event.time}</div>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
-              <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider">SYSTEM STATUS</h3>
-              <div className="space-y-2 text-[9px]">
-                <div className="flex justify-between">
-                  <span className="text-[#a1887f]">Map Size:</span>
-                  <span className="text-white font-bold">{MAP_WIDTH}×{MAP_HEIGHT}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#a1887f]">Departments:</span>
-                  <span className="text-white font-bold">{departments.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#a1887f]">Tile Size:</span>
-                  <span className="text-white font-bold">{TILE_SIZE}px</span>
-                </div>
+          {/* System Status */}
+          <div className="absolute top-6 left-6 bg-[#1a0f1a]/90 backdrop-blur-sm border-2 border-[#4a3728] rounded-lg p-3">
+            <h3 className="text-[10px] text-[#f5e6d3] lunara-font mb-2"> SYSTEM STATUS</h3>
+            <div className="space-y-1 text-[8px]">
+              <div className="flex justify-between gap-4">
+                <span className="text-[#a1887f]">Agents:</span>
+                <span className="text-white font-bold">{agents.length}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#a1887f]">Active:</span>
+                <span className="text-green-400 font-bold">{agents.filter(a => a.status === 'WORKING').length}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[#a1887f]">Departments:</span>
+                <span className="text-white font-bold">{departments.length}</span>
               </div>
             </div>
+          </div>
 
-            <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
-              <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider">QUICK ACTIONS</h3>
-              <div className="space-y-2">
-                <button onClick={() => router.push('/virtual-office')} className="w-full bg-[#8b0000] border-2 border-[#f5e6d3] px-3 py-2 text-[9px] text-[#f5e6d3] hover:bg-[#a00000] transition-colors font-bold">
-                  ⚔️ Enter Virtual Office
-                </button>
-                <button className="w-full bg-[#1b5e20] border-2 border-[#4caf50] px-3 py-2 text-[9px] text-[#a5d6a7] hover:bg-[#2e7d32] transition-colors font-bold">
-                  📊 View Dashboard
-                </button>
+          {/* Hover Tooltip */}
+          {hoveredDept && (
+            <div
+              className="fixed pointer-events-none bg-[#2c1810] border-2 border-[#f5e6d3] px-3 py-2 rounded shadow-lg z-50"
+              style={{ left: `${mousePos.x + 15}px`, top: `${mousePos.y + 15}px` }}
+            >
+              <div className="text-[10px] text-[#f5e6d3] font-bold">
+                {departments.find(d => d.name === hoveredDept)?.displayName}
               </div>
+              <div className="text-[8px] text-[#a1887f]">
+                {departments.find(d => d.name === hoveredDept)?.description}
+              </div>
+              <div className="text-[7px] text-[#FFD700] mt-1">Click to enter →</div>
             </div>
+          )}
+        </div>
 
-            <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
-              <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider">ABOUT</h3>
-              <p className="text-[9px] text-[#a1887f] leading-relaxed">
-                Click golden buildings to enter departments. Golden borders indicate interactive areas.
+        {/* Bottom Panels */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Quick Actions */}
+          <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
+            <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider">⚡ QUICK ACTIONS</h3>
+            <div className="space-y-2">
+              <button onClick={() => router.push('/virtual-office')} className="w-full bg-[#8b0000] border-2 border-[#f5e6d3] px-3 py-2 text-[9px] text-[#f5e6d3] hover:bg-[#a00000] transition-colors font-bold">
+                🏢 Enter Virtual Office
+              </button>
+              <button className="w-full bg-[#1b5e20] border-2 border-[#4caf50] px-3 py-2 text-[9px] text-[#a5d6a7] hover:bg-[#2e7d32] transition-colors font-bold">
+                📊 View Dashboard
+              </button>
+              <button className="w-full bg-[#E65100] border-2 border-[#FF9800] px-3 py-2 text-[9px] text-[#FFE0B2] hover:bg-[#F57C00] transition-colors font-bold">
+                🛡️ Emergency Stop
+              </button>
+            </div>
+          </div>
+
+          {/* Agent Roster */}
+          <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
+            <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider">👥 AGENT ROSTER</h3>
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {agents.map((agent, idx) => (
+                <div key={idx} className="flex items-center justify-between text-[8px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{agent.emoji}</span>
+                    <span className="text-[#f5e6d3]">{agent.name}</span>
+                  </div>
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(agent.status)}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* About */}
+          <div className="bg-[#3e2723] border-3 border-[#8d6e63] p-4 rounded-lg">
+            <h3 className="text-[11px] text-[#f5e6d3] lunara-font mb-3 tracking-wider"> ABOUT</h3>
+            <p className="text-[9px] text-[#a1887f] leading-relaxed">
+              Lunara OS is the autonomous operating organization. Click any building to enter that department&apos;s Virtual Office.
+            </p>
+            <div className="mt-3 pt-3 border-t border-[#8d6e63]">
+              <p className="text-[8px] text-[#FFD700]">
+                ⚠️ Section 102: This is LIVE mode. Virtual Office reflects real system state.
               </p>
             </div>
           </div>
