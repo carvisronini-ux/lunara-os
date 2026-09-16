@@ -1,42 +1,61 @@
 {
-    "compilerOptions": {
-      "target": "es2022",
-      "lib": ["dom", "dom.iterable", "esnext"],
-      "allowJs": true,
-      "skipLibCheck": true,
-      "strict": true,
-      "noEmit": true,
-      "esModuleInterop": true,
-      "module": "esnext",
-      "moduleResolution": "bundler",
-      "resolveJsonModule": true,
-      "isolatedModules": true,
-      "jsx": "preserve",
-      "incremental": true,
-      "forceConsistentCasingInFileNames": true,
-      "noUnusedLocals": true,
-      "noUnusedParameters": true,
-      "noImplicitReturns": true,
-      "noFallthroughCasesInSwitch": true,
-      "plugins": [
-        {
-          "name": "next"
-        }
-      ],
-      "paths": {
-        "@/*": ["./*"],
-        "@/core/*": ["./core/*"],
-        "@/services/*": ["./services/*"],
-        "@/agents/*": ["./agents/*"],
-        "@/components/*": ["./components/*"],
-        "@/app/*": ["./app/*"]
-      }
-    },
-    "include": [
-      "next-env.d.ts",
-      "**/*.ts",
-      "**/*.tsx",
-      ".next/types/**/*.ts"
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
     ],
-    "exclude": ["node_modules", "supabase/functions"]
-  }
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@/core/*": [
+        "./core/*"
+      ],
+      "@/services/*": [
+        "./services/*"
+      ],
+      "@/agents/*": [
+        "./agents/*"
+      ],
+      "@/components/*": [
+        "./components/*"
+      ],
+      "@/app/*": [
+        "./app/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase/functions"
+  ]
+}
