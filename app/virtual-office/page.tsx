@@ -5,6 +5,7 @@ import { PixelRoom, type DepartmentData } from '@/components/virtual-office/Pixe
 import { PixelEventFeed, type EventData } from '@/components/virtual-office/PixelEventFeed';
 import { PixelModeIndicator } from '@/components/virtual-office/PixelModeIndicator';
 import { type AgentStatus } from '@/components/virtual-office/PixelAgent';
+import { DebugButton } from '@/components/debug/DebugButton';
 import '@/styles/pixel.css';
 
 // Initial departments with positions
@@ -60,7 +61,7 @@ export default function VirtualOfficePage() {
   const [mode, setMode] = useState<'LIVE' | 'SIMULATION'>('SIMULATION');
   const [departments, setDepartments] = useState<DepartmentData[]>(initialDepartments);
   const [events, setEvents] = useState<EventData[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   // Initialize simulation
   useEffect(() => {
@@ -131,9 +132,13 @@ export default function VirtualOfficePage() {
   }, [mode]);
 
   const handleAgentClick = (agentId: string) => {
-    setSelectedAgent(agentId);
-    console.log('Agent clicked:', agentId);
+    setSelectedAgentId(agentId);
   };
+
+  // Find selected agent details for the info panel dynamically
+  const selectedAgentDetails = departments
+    .flatMap(dept => dept.agents)
+    .find(agent => agent.agent_id === selectedAgentId);
 
   return (
     <div className="min-h-screen bg-black text-white pixel-font">
@@ -213,18 +218,31 @@ export default function VirtualOfficePage() {
             <div className="border-b border-white pb-2 mb-2">
               <span className="text-[10px] text-yellow-400 pixel-font">AGENT INFO</span>
             </div>
-            {selectedAgent ? (
+            {selectedAgentDetails ? (
               <div className="text-[8px] text-white pixel-font space-y-2">
                 <div>
-                  <span className="text-gray-400">ID:</span> {selectedAgent}
+                  <span className="text-gray-400">NAME:</span> {selectedAgentDetails.display_name}
                 </div>
                 <div>
-                  <span className="text-gray-400">Status:</span>{' '}
-                  <span className="text-green-400">WORKING</span>
+                  <span className="text-gray-400">ID:</span> {selectedAgentDetails.agent_id}
                 </div>
                 <div>
-                  <span className="text-gray-400">Mission:</span> Executive coordination
+                  <span className="text-gray-400">STATUS:</span>{' '}
+                  <span className={selectedAgentDetails.status === 'WORKING' ? 'text-green-400' : 'text-yellow-400'}>
+                    {selectedAgentDetails.status}
+                  </span>
                 </div>
+                <div>
+                  <span className="text-gray-400">HP:</span> {selectedAgentDetails.hp}/100
+                </div>
+                <div>
+                  <span className="text-gray-400">MP:</span> {selectedAgentDetails.mp}/100
+                </div>
+                {selectedAgentDetails.current_task && (
+                  <div>
+                    <span className="text-gray-400">TASK:</span> {selectedAgentDetails.current_task}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-[8px] text-gray-500 pixel-font text-center py-4">
@@ -241,6 +259,9 @@ export default function VirtualOfficePage() {
           </p>
         </div>
       </main>
+
+      {/* Debug Button (Bottom Right Corner) */}
+      <DebugButton />
     </div>
   );
 }
