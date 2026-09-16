@@ -20,6 +20,11 @@
   line-height: 1.5;
 }
 
+@keyframes agent-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
 @keyframes water-ripple {
   0%, 100% { transform: translateX(0); opacity: 0.8; }
   50% { transform: translateX(-10px); opacity: 1; }
@@ -28,15 +33,6 @@
 @keyframes cloud-float {
   0% { transform: translateX(-150px); }
   100% { transform: translateX(calc(100vw + 150px)); }
-}
-
-@keyframes agent-idle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-.agent-idle {
-  animation: agent-idle 2s ease-in-out infinite;
 }
 
 /* Custom scrollbar */
