@@ -9,6 +9,7 @@ export interface DepartmentData {
   agents: Array<{
     agent_id: string;
     display_name: string;
+    department: string;
     status: AgentStatus;
     hp: number;
     mp: number;
@@ -22,58 +23,61 @@ interface PixelRoomProps {
   onAgentClick?: (agentId: string) => void;
 }
 
-const buildingColors: Record<string, string> = {
-  executive_core: '#8b5cf6',
-  intelligence: '#3b82f6',
-  strategy: '#6366f1',
-  content: '#ec4899',
-  creative: '#f59e0b',
-  production: '#ef4444',
-  resources: '#10b981',
-  knowledge: '#8b5cf6',
-  quality: '#64748b',
-  distribution: '#06b6d4',
-  analytics: '#14b8a6',
-  learning: '#a855f7',
+// Mapping departments to Tiny Swords Buildings
+const getBuildingImage = (name: string): string => {
+  const base = '/assets/tiny-swords/Buildings/';
+  switch (name) {
+    case 'executive_core': return `${base}Castle.png`;
+    case 'intelligence': return `${base}Tower.png`;
+    case 'strategy': return `${base}Monastery.png`;
+    case 'content': return `${base}House1.png`;
+    case 'creative': return `${base}House2.png`;
+    case 'resources': return `${base}Barracks.png`;
+    case 'quality': return `${base}Archery.png`;
+    case 'distribution': return `${base}House3.png`;
+    case 'analytics': return `${base}House1.png`;
+    case 'learning': return `${base}Monastery.png`;
+    default: return `${base}House1.png`;
+  }
 };
 
 export function PixelRoom({ department, position, onAgentClick }: PixelRoomProps) {
-  const buildingColor = buildingColors[department.name] || '#8b6f47';
+  const buildingImage = getBuildingImage(department.name);
   const activeAgents = department.agents.filter(a => a.status === 'WORKING').length;
 
   return (
-    <div
-      className="absolute pixel-building"
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        width: '120px',
-        height: '100px',
-        background: buildingColor,
-      }}
+    <div 
+      className="absolute pixel-building-container"
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
     >
       {/* Building Label */}
-      <div className="absolute -top-8 left-0 right-0 text-center">
-        <div className="bg-black border-2 border-white px-2 py-1 inline-block">
-          <span className="text-[8px] text-white pixel-font">
-            {department.display_name}
-          </span>
+      <div className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap z-10">
+        <div className="bg-black border-2 border-white px-2 py-1">
+          <span className="text-[8px] text-yellow-400 pixel-font">{department.display_name}</span>
         </div>
       </div>
 
-      {/* Active Count */}
-      <div className="absolute top-2 right-2 bg-black border border-white px-1 py-0.5">
+      {/* Active Count Badge */}
+      <div className="absolute top-0 right-0 bg-black border-2 border-white px-1.5 py-0.5 z-10">
         <span className="text-[7px] text-green-400 pixel-font">
           {activeAgents}/{department.agents.length}
         </span>
       </div>
 
-      {/* Agents Inside Building */}
-      <div className="absolute bottom-2 left-2 right-2 flex flex-wrap gap-1 justify-center">
+      {/* Building Image */}
+      <img 
+        src={buildingImage} 
+        alt={department.display_name}
+        className="pixel-building-img w-32 h-32 object-contain mb-[-10px]"
+      />
+
+      {/* Agents positioned in front of the building */}
+      <div className="flex flex-wrap gap-1 justify-center w-32 mt-[-20px] z-20">
         {department.agents.slice(0, 4).map(agent => (
           <PixelAgent
             key={agent.agent_id}
             name={agent.display_name}
+            department={agent.department}
             status={agent.status}
             hp={agent.hp}
             mp={agent.mp}
@@ -81,11 +85,6 @@ export function PixelRoom({ department, position, onAgentClick }: PixelRoomProps
             onClick={() => onAgentClick?.(agent.agent_id)}
           />
         ))}
-      </div>
-
-      {/* Door */}
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-12 bg-yellow-900 border-2 border-black">
-        <div className="absolute top-4 right-1 w-1 h-1 bg-yellow-400 rounded-full" />
       </div>
     </div>
   );
