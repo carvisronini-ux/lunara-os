@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { osEngine } from "@/core/engine";
 import { resourceManager } from "@/core/resource";
-import { knowledgeManager } from "@/core/knowledge"; // Phase 4 Integration
+import { knowledgeManager } from "@/core/knowledge";
+import { qualityManager } from "@/core/quality";
+import { learningManager } from "@/core/learning"; // Phase 6 Integration
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
+import type { ContentPassport, QualityScore } from "@/core/quality";
+import type { LearningRecord, AgentVersion } from "@/core/learning"; // Phase 6 Types
 
 /* =========================================================
-   LUNARA OS — Virtual Office (Phase 1, 3 & 4 Integrated)
-   Foundation §104, §85, §101-102, §29-30, §32, §33, §36-45, §53
+   LUNARA OS — Virtual Office (Phase 1, 3, 4, 5 & 6 Integrated)
+   Foundation §9, §10, §12, §13, §14, §15, §47, §48, §82, §86, §87, §104, §85, §101-102
    ========================================================= */
 
 type Department = {
@@ -199,6 +203,90 @@ const initialKnowledge: KnowledgeDocument[] = [
   }
 ];
 
+const initialPassports: ContentPassport[] = [
+  {
+    content_id: "content-001",
+    campaign_id: "camp-love-signal",
+    concept_id: "concept-pick-a-card",
+    version: "1.0",
+    creator_agent: "muse",
+    reviewers: ["aegis"],
+    knowledge_versions: ["brand_bible", "content_bible"],
+    assets: ["asset-img-001", "asset-vid-001"],
+    platforms: ["TikTok", "Instagram Reels"],
+    status: "FINAL_QUALITY_GATE",
+    current_stage: "FINAL_QUALITY_GATE",
+    quality_scores: {
+      hook: 92, retentionPotential: 88, originality: 95, clarity: 90,
+      emotionalImpact: 85, shareability: 89, visualStrength: 91,
+      brandFit: 94, platformFit: 93, cta: 87, safety: 100
+    },
+    total_score: 91,
+    review_notes: ["[aegis]: Strong hook, excellent brand fit. Minor CTA tweak recommended."],
+    created_at: Date.now() - 1000 * 60 * 60,
+    updated_at: Date.now() - 1000 * 60 * 30
+  },
+  {
+    content_id: "content-002",
+    campaign_id: "camp-zodiac",
+    concept_id: "concept-scorpio",
+    version: "1.0",
+    creator_agent: "muse",
+    reviewers: [],
+    knowledge_versions: ["brand_bible"],
+    assets: ["asset-img-002"],
+    platforms: ["Instagram Reels"],
+    status: "BRAND_CHECK",
+    current_stage: "BRAND_CHECK",
+    quality_scores: {
+      hook: 75, retentionPotential: 70, originality: 65, clarity: 80,
+      emotionalImpact: 72, shareability: 68, visualStrength: 78,
+      brandFit: 60, platformFit: 85, cta: 70, safety: 100
+    },
+    total_score: 75,
+    review_notes: ["[aegis]: Visuals feel too generic. Needs more distinctive Lunara branding."],
+    created_at: Date.now() - 1000 * 60 * 120,
+    updated_at: Date.now() - 1000 * 60 * 60
+  }
+];
+
+const initialLearningRecords: LearningRecord[] = [
+  {
+    record_id: "learn-001",
+    agent_id: "iris",
+    content_id: "content-001",
+    campaign_id: "camp-love-signal",
+    stage: "RECOMMENDATION",
+    observation: "Hooks with 'stop scrolling' pattern showed 15% higher retention in first 3 seconds.",
+    pattern: "Direct command + curiosity gap increases initial retention.",
+    hypothesis: "Applying this pattern to Zodiac content will improve average view duration.",
+    experiment_id: "exp-001",
+    evidence: "A/B test showed 12% increase in completion rate for command-based hooks.",
+    recommendation: "Update Muse v1.1 prompt to prioritize direct command hooks for first 3 seconds.",
+    created_at: Date.now() - 1000 * 60 * 60 * 24,
+    updated_at: Date.now() - 1000 * 60 * 60 * 2
+  }
+];
+
+const initialAgentVersions: AgentVersion[] = [
+  {
+    agent_id: "muse",
+    version: "1.1.0",
+    state: "CANDIDATE",
+    changes_summary: "Integrated direct command hook pattern. Improved originality scoring by 8%.",
+    benchmark_results: {
+      agent_id: "muse",
+      version: "1.1.0",
+      metrics: { hook_quality: 92, originality: 88, cost_efficiency: 95 },
+      evaluated_at: Date.now() - 1000 * 60 * 60,
+      evaluator: "aegis"
+    },
+    created_at: Date.now() - 1000 * 60 * 60,
+    approved_by: undefined,
+    active_since: undefined
+  }
+];
+
 /* =========================================================
    HELPERS
    ========================================================= */
@@ -263,6 +351,8 @@ function mapEngineTypeToUI(type: EventType): EventLog["type"] {
   if (type.includes("EMERGENCY")) return "emergency";
   if (type.includes("RESOURCE")) return "resource";
   if (type.includes("KNOWLEDGE")) return "learning";
+  if (type.includes("CONTENT")) return "quality";
+  if (type.includes("PATTERN") || type.includes("LEARNING")) return "learning";
   return "system";
 }
 
@@ -278,6 +368,13 @@ function generateMessageFromEvent(event: any): string {
     case "RESOURCE_GRANTED": return `✅ Access granted to ${event.resource_id}`;
     case "KNOWLEDGE_VERSION_CREATED": return `📚 Knowledge updated: ${event.payload?.title} (v${event.payload?.version})`;
     case "KNOWLEDGE_UPDATED": return `🔄 Knowledge status changed: ${event.payload?.knowledge_id} → ${event.payload?.newStatus}`;
+    case "CONTENT_REVIEW_REQUESTED": return `🛡️ Content ${event.content_id} entered ${event.payload?.newStage} stage`;
+    case "CONTENT_APPROVED": return `✅ Content ${event.content_id} APPROVED for publication (Score: ${event.payload?.totalScore})`;
+    case "CONTENT_REJECTED": return `❌ Content ${event.content_id} REJECTED by ${event.agent_id}`;
+    case "PATTERN_DISCOVERED": return `🧬 Iris discovered pattern: ${event.payload?.observation?.substring(0, 50)}...`;
+    case "AGENT_VERSION_CREATED": return `⚙️ New agent version proposed: ${event.agent_id} v${event.payload?.version}`;
+    case "AGENT_PROMOTED": return `✅ ${event.agent_id} promoted to v${event.payload?.version} by ${event.payload?.approvedBy}`;
+    case "AGENT_EVALUATED": return `⚠️ ${event.agent_id} v${event.payload?.version} evaluation completed (State: ${event.payload?.state})`;
     default: return `System event: ${event.type}`;
   }
 }
@@ -291,6 +388,9 @@ export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [resources, setResources] = useState<Resource[]>(initialResources);
   const [approvals, setApprovals] = useState<ApprovalItem[]>(initialApprovals);
+  const [passports, setPassports] = useState<ContentPassport[]>(initialPassports);
+  const [learningRecords, setLearningRecords] = useState<LearningRecord[]>(initialLearningRecords);
+  const [agentVersions, setAgentVersions] = useState<AgentVersion[]>(initialAgentVersions);
   
   const [events, setEvents] = useState<EventLog[]>([
     { id: "e1", timestamp: "--:--:--", type: "system", message: "🟢 Lunara OS Core Engine initialized" },
@@ -309,12 +409,11 @@ export default function HomePage() {
     accessRevoked: false,
   });
   
-  // Added "knowledge" to activePanel
-  const [activePanel, setActivePanel] = useState<"overview" | "approvals" | "emergency" | "knowledge">("overview");
+  const [activePanel, setActivePanel] = useState<"overview" | "approvals" | "quality" | "learning" | "emergency" | "knowledge">("overview");
   const timersRef = useRef<number[]>([]);
 
   /* =====================================================
-     CORE ENGINE, RESOURCE & KNOWLEDGE INTEGRATION
+     CORE ENGINE, RESOURCE, KNOWLEDGE, QUALITY & LEARNING
      ===================================================== */
 
   useEffect(() => {
@@ -386,12 +485,33 @@ export default function HomePage() {
       knowledgeManager.registerKnowledge(knowledge);
     });
 
-    // 4. Subscribe to Engine Events
+    // 4. Register Content Passports (Phase 5)
+    initialPassports.forEach(passport => {
+      qualityManager.createPassport(passport);
+    });
+
+    // 5. Register Learning Records & Agent Versions (Phase 6)
+    initialLearningRecords.forEach(record => {
+      learningManager.createLearningRecord(record.agent_id, record.observation, record.content_id, record.campaign_id);
+      learningManager.advanceLearningStage(record.record_id, "RECOMMENDATION", {
+        pattern: record.pattern,
+        hypothesis: record.hypothesis,
+        recommendation: record.recommendation
+      });
+    });
+
+    initialAgentVersions.forEach(version => {
+      learningManager.proposeAgentVersion(version.agent_id, version.version, version.changes_summary, "iris");
+    });
+
+    // 6. Subscribe to Engine Events
     const eventTypes: EventType[] = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
       "TASK_RETRIED", "TASK_ESCALATED", "AGENT_REGISTERED", "EMERGENCY_ACTIVATED",
       "RESOURCE_REQUESTED", "RESOURCE_GRANTED", "RESOURCE_REVOKED",
-      "KNOWLEDGE_VERSION_CREATED", "KNOWLEDGE_UPDATED"
+      "KNOWLEDGE_VERSION_CREATED", "KNOWLEDGE_UPDATED",
+      "CONTENT_CREATED", "CONTENT_REVIEW_REQUESTED", "CONTENT_APPROVED", "CONTENT_REJECTED",
+      "PATTERN_DISCOVERED", "AGENT_VERSION_CREATED", "AGENT_PROMOTED", "AGENT_EVALUATED"
     ];
 
     eventTypes.forEach(type => {
@@ -408,7 +528,7 @@ export default function HomePage() {
       });
     });
 
-    // 5. Simulation Loop
+    // 7. Simulation Loop
     const simTimer = window.setInterval(() => {
       if (emergencyState.allAgentsPaused) return;
       
@@ -569,20 +689,22 @@ export default function HomePage() {
         </div>
 
         <div className="px-6 py-3 border-t border-white/5 bg-slate-900/50">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 Overview</button>
-            <button onClick={() => setActivePanel("approvals")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all relative ${activePanel === "approvals" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 Overview</button>
+            <button onClick={() => setActivePanel("approvals")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap relative ${activePanel === "approvals" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
               ✋ Approvals
               {pendingApprovals > 0 && <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">{pendingApprovals}</span>}
             </button>
-            <button onClick={() => setActivePanel("knowledge")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all ${activePanel === "knowledge" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>📚 Knowledge</button>
-            <button onClick={() => setActivePanel("emergency")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all ${activePanel === "emergency" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚨 Emergency</button>
+            <button onClick={() => setActivePanel("quality")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "quality" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🛡️ Quality Review</button>
+            <button onClick={() => setActivePanel("learning")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "learning" ? "bg-teal-500/20 text-teal-400 border border-teal-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🧬 Learning</button>
+            <button onClick={() => setActivePanel("knowledge")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "knowledge" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>📚 Knowledge</button>
+            <button onClick={() => setActivePanel("emergency")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "emergency" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚨 Emergency</button>
           </div>
         </div>
       </nav>
 
       <div className="relative z-10 flex">
-        <aside className="w-80 border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)]">
+        <aside className="w-80 border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden lg:block">
           <div className="p-6">
             <h2 className="text-2xl font-black mb-6 tracking-wide">📂 DEPARTMENTS</h2>
             <div className="space-y-2">
@@ -728,6 +850,215 @@ export default function HomePage() {
                 </div>
               </div>
             </>
+          )}
+
+          {activePanel === "learning" && (
+            <div>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">🧬 LEARNING & EVOLUTION</h2>
+              <p className="text-base text-slate-400 mb-6">
+                Foundation §12, §82 — Evidence-based agent improvement and version control
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Active Learning Records */}
+                <div className="rounded-2xl border border-teal-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
+                  <h3 className="text-lg font-black mb-4 text-teal-400">🔍 Active Learning Records</h3>
+                  <div className="space-y-4">
+                    {learningManager.getActiveLearningRecords().map(record => {
+                      const agent = agents.find(a => a.id === record.agent_id);
+                      return (
+                        <div key={record.record_id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-white">{agent?.name} ({agent?.role})</span>
+                            <span className="text-xs font-mono text-teal-400">{record.stage.replace(/_/g, " ")}</span>
+                          </div>
+                          <p className="text-sm text-slate-300 mb-3">{record.observation}</p>
+                          {record.recommendation && (
+                            <div className="rounded-lg bg-teal-500/10 p-3 border border-teal-500/20">
+                              <div className="text-xs font-bold text-teal-400 mb-1">RECOMMENDATION</div>
+                              <p className="text-sm text-slate-300">{record.recommendation}</p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {learningManager.getActiveLearningRecords().length === 0 && (
+                      <div className="text-center text-slate-500 py-8">No active learning records.</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Pending Agent Version Approvals */}
+                <div className="rounded-2xl border border-purple-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
+                  <h3 className="text-lg font-black mb-4 text-purple-400">⚙️ Pending Agent Upgrades</h3>
+                  <div className="space-y-4">
+                    {learningManager.getPendingVersionApprovals().map(version => {
+                      const agent = agents.find(a => a.id === version.agent_id);
+                      return (
+                        <div key={`${version.agent_id}-${version.version}`} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{agent?.icon}</span>
+                              <span className="text-base font-bold text-white">{agent?.name} <span className="text-purple-400">v{version.version}</span></span>
+                            </div>
+                            <span className="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded">CANDIDATE</span>
+                          </div>
+                          <p className="text-sm text-slate-300 mb-3">{version.changes_summary}</p>
+                          
+                          {version.benchmark_results && (
+                            <div className="grid grid-cols-3 gap-2 mb-4">
+                              {Object.entries(version.benchmark_results.metrics).slice(0, 3).map(([key, value]) => (
+                                <div key={key} className="rounded-lg bg-white/5 p-2 text-center">
+                                  <div className="text-[10px] uppercase text-slate-400">{key.replace(/_/g, " ")}</div>
+                                  <div className="text-lg font-black text-emerald-400">{value}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex gap-3">
+                            <button 
+                              onClick={() => {
+                                learningManager.approveAgentVersion(version.agent_id, version.version, "human_executive");
+                                setAgentVersions([...learningManager.getAgentVersions(version.agent_id)]);
+                                pushEvent("learning", `✅ Human Executive APPROVED ${agent?.name} v${version.version}`);
+                              }}
+                              className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/20 py-2 text-sm font-bold text-emerald-400 transition hover:bg-emerald-500/30"
+                            >
+                              ✅ APPROVE & DEPLOY
+                            </button>
+                            <button 
+                              onClick={() => {
+                                learningManager.rejectAgentVersion(version.agent_id, version.version, "human_executive");
+                                setAgentVersions([...learningManager.getAgentVersions(version.agent_id)]);
+                                pushEvent("learning", `❌ Human Executive REJECTED ${agent?.name} v${version.version}`);
+                              }}
+                              className="flex-1 rounded-lg border border-red-500/40 bg-red-500/20 py-2 text-sm font-bold text-red-400 transition hover:bg-red-500/30"
+                            >
+                              ❌ REJECT
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {learningManager.getPendingVersionApprovals().length === 0 && (
+                      <div className="text-center text-slate-500 py-8">No pending agent upgrades.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePanel === "quality" && (
+            <div>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">🛡️ QUALITY REVIEW QUEUE</h2>
+              <p className="text-base text-slate-400 mb-6">
+                Foundation §47, §86 — Multi-stage QA pipeline and 11-dimensional scoring
+              </p>
+
+              <div className="space-y-6">
+                {qualityManager.getPendingReviews().map(passport => {
+                  const creator = agents.find(a => a.id === passport.creator_agent);
+                  return (
+                    <div key={passport.content_id} className="rounded-2xl border border-cyan-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
+                      <div className="flex items-start justify-between mb-6">
+                        <div>
+                          <h3 className="text-xl font-black text-white">Content ID: {passport.content_id}</h3>
+                          <p className="text-sm text-slate-400 mt-1">
+                            Creator: <span className="font-bold text-white">{creator?.name || passport.creator_agent}</span> • 
+                            Platforms: <span className="text-cyan-400">{passport.platforms.join(", ")}</span> • 
+                            Version: <span className="font-mono text-cyan-400">{passport.version}</span>
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="rounded-lg bg-cyan-500/20 px-4 py-2 text-center">
+                            <div className="text-xs font-bold text-cyan-400">TOTAL SCORE</div>
+                            <div className="text-3xl font-black text-white">{passport.total_score ?? "N/A"}</div>
+                          </div>
+                          <div className={`rounded-lg px-3 py-1 text-xs font-black ${
+                            passport.current_stage === "FINAL_QUALITY_GATE" ? "bg-yellow-500/20 text-yellow-400" :
+                            passport.current_stage === "REJECTED" ? "bg-red-500/20 text-red-400" :
+                            "bg-blue-500/20 text-blue-400"
+                          }`}>
+                            {passport.current_stage.replace(/_/g, " ")}
+                          </div>
+                        </div>
+                      </div>
+
+                      {passport.quality_scores && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-6">
+                          {Object.entries(passport.quality_scores).map(([key, value]) => (
+                            <div key={key} className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                {key.replace(/([A-Z])/g, ' $1').trim()}
+                              </div>
+                              <div className={`text-2xl font-black ${
+                                value >= 90 ? "text-emerald-400" : value >= 75 ? "text-yellow-400" : "text-red-400"
+                              }`}>
+                                {value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-6">
+                        <div className="text-xs font-bold text-slate-400 mb-2">REVIEW NOTES</div>
+                        <ul className="space-y-2">
+                          {passport.review_notes.map((note, idx) => (
+                            <li key={idx} className="text-sm text-slate-300 flex gap-2">
+                              <span className="text-cyan-400">▸</span> {note}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => {
+                            qualityManager.makeFinalDecision(passport.content_id, "APPROVE", "human_executive", true);
+                            setPassports([...qualityManager.getAllPassports()]);
+                            pushEvent("quality", `✅ Human Executive APPROVED content ${passport.content_id}`);
+                          }}
+                          className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30"
+                        >
+                          ✅ APPROVE & PUBLISH
+                        </button>
+                        <button 
+                          onClick={() => {
+                            qualityManager.makeFinalDecision(passport.content_id, "REVISE", "human_executive", true);
+                            setPassports([...qualityManager.getAllPassports()]);
+                            pushEvent("quality", `🔄 Human Executive requested REVISION for ${passport.content_id}`);
+                          }}
+                          className="flex-1 rounded-xl border border-blue-500/40 bg-blue-500/20 py-3 text-base font-bold text-blue-400 transition hover:bg-blue-500/30"
+                        >
+                          🔄 REQUEST REVISION
+                        </button>
+                        <button 
+                          onClick={() => {
+                            qualityManager.makeFinalDecision(passport.content_id, "REJECT", "human_executive", true);
+                            setPassports([...qualityManager.getAllPassports()]);
+                            pushEvent("quality", `❌ Human Executive REJECTED content ${passport.content_id}`);
+                          }}
+                          className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30"
+                        >
+                          ❌ REJECT
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {qualityManager.getPendingReviews().length === 0 && (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
+                    <div className="text-4xl mb-4">🎉</div>
+                    <h3 className="text-xl font-black text-white mb-2">All Clear!</h3>
+                    <p className="text-slate-400">No content is currently pending quality review.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {activePanel === "knowledge" && (
@@ -898,7 +1229,7 @@ export default function HomePage() {
           )}
         </section>
 
-        <aside className="w-96 border-l border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)]">
+        <aside className="w-96 border-l border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden xl:block">
           <div className="p-6">
             <div className="mb-8">
               <div className="mb-4 flex items-center justify-between">
