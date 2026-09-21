@@ -5,14 +5,16 @@ import { osEngine } from "@/core/engine";
 import { resourceManager } from "@/core/resource";
 import { knowledgeManager } from "@/core/knowledge";
 import { qualityManager } from "@/core/quality";
-import { learningManager } from "@/core/learning"; // Phase 6 Integration
+import { learningManager } from "@/core/learning";
+import { orchestrator } from "@/core/orchestration/orchestrator"; // Phase 7 Integration
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
 import type { ContentPassport, QualityScore } from "@/core/quality";
-import type { LearningRecord, AgentVersion } from "@/core/learning"; // Phase 6 Types
+import type { LearningRecord, AgentVersion } from "@/core/learning";
+import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
 
 /* =========================================================
-   LUNARA OS — Virtual Office (Phase 1, 3, 4, 5 & 6 Integrated)
-   Foundation §9, §10, §12, §13, §14, §15, §47, §48, §82, §86, §87, §104, §85, §101-102
+   LUNARA OS — Virtual Office (Phase 1-7 Integrated)
+   Foundation §9, §10, §12, §13, §14, §15, §47, §48, §62, §65, §82, §86, §87, §104, §85, §101-102, §116
    ========================================================= */
 
 type Department = {
@@ -392,6 +394,10 @@ export default function HomePage() {
   const [learningRecords, setLearningRecords] = useState<LearningRecord[]>(initialLearningRecords);
   const [agentVersions, setAgentVersions] = useState<AgentVersion[]>(initialAgentVersions);
   
+  // Phase 7 State
+  const [activePipelines, setActivePipelines] = useState<ActivePipelineInstance[]>([]);
+  const [pipelineDef, setPipelineDef] = useState<PipelineDefinition | null>(null);
+  
   const [events, setEvents] = useState<EventLog[]>([
     { id: "e1", timestamp: "--:--:--", type: "system", message: "🟢 Lunara OS Core Engine initialized" },
   ]);
@@ -409,11 +415,12 @@ export default function HomePage() {
     accessRevoked: false,
   });
   
-  const [activePanel, setActivePanel] = useState<"overview" | "approvals" | "quality" | "learning" | "emergency" | "knowledge">("overview");
+  // Added "pipeline" to activePanel
+  const [activePanel, setActivePanel] = useState<"overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge">("overview");
   const timersRef = useRef<number[]>([]);
 
   /* =====================================================
-     CORE ENGINE, RESOURCE, KNOWLEDGE, QUALITY & LEARNING
+     CORE ENGINE, RESOURCE, KNOWLEDGE, QUALITY, LEARNING & ORCHESTRATION
      ===================================================== */
 
   useEffect(() => {
@@ -504,7 +511,11 @@ export default function HomePage() {
       learningManager.proposeAgentVersion(version.agent_id, version.version, version.changes_summary, "iris");
     });
 
-    // 6. Subscribe to Engine Events
+    // 6. Initialize Orchestrator (Phase 7)
+    setPipelineDef(orchestrator.getPipelineDefinition());
+    setActivePipelines(orchestrator.getActivePipelines());
+
+    // 7. Subscribe to Engine Events
     const eventTypes: EventType[] = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
       "TASK_RETRIED", "TASK_ESCALATED", "AGENT_REGISTERED", "EMERGENCY_ACTIVATED",
@@ -525,10 +536,15 @@ export default function HomePage() {
           },
           ...prev
         ].slice(0, 50));
+        
+        // Update pipeline UI when tasks change
+        if (type === "TASK_CREATED" || type === "TASK_COMPLETED" || type === "TASK_FAILED") {
+          setActivePipelines([...orchestrator.getActivePipelines()]);
+        }
       });
     });
 
-    // 7. Simulation Loop
+    // 8. Simulation Loop
     const simTimer = window.setInterval(() => {
       if (emergencyState.allAgentsPaused) return;
       
@@ -642,7 +658,7 @@ export default function HomePage() {
      ===================================================== */
 
   return (
-    <main className="min-h-screen w-full bg-slate-950 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <main className="lunara-readable min-h-screen w-full bg-slate-950 text-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-3xl" />
@@ -655,8 +671,8 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-3xl font-black shadow-2xl" style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 0 40px rgba(139,92,246,0.5)" }}>◈</div>
               <div>
-                <h1 className="text-3xl font-black tracking-tight">LUNARA OS</h1>
-                <p className="text-sm font-medium text-slate-400 tracking-wide">VIRTUAL OFFICE — Autonomous Digital Organization</p>
+                <h1 className="text-4xl font-black tracking-tight lg:text-[42px]">LUNARA OS</h1>
+                <p className="text-base font-medium text-slate-400 tracking-wide">VIRTUAL OFFICE — Autonomous Digital Organization</p>
               </div>
             </div>
 
@@ -691,6 +707,7 @@ export default function HomePage() {
         <div className="px-6 py-3 border-t border-white/5 bg-slate-900/50">
           <div className="flex items-center gap-3 overflow-x-auto">
             <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 Overview</button>
+            <button onClick={() => setActivePanel("pipeline")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "pipeline" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🔄 Active Pipeline</button>
             <button onClick={() => setActivePanel("approvals")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap relative ${activePanel === "approvals" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
               ✋ Approvals
               {pendingApprovals > 0 && <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">{pendingApprovals}</span>}
@@ -704,7 +721,7 @@ export default function HomePage() {
       </nav>
 
       <div className="relative z-10 flex">
-        <aside className="w-80 border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden lg:block">
+        <aside className="w-[340px] border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden lg:block">
           <div className="p-6">
             <h2 className="text-2xl font-black mb-6 tracking-wide">📂 DEPARTMENTS</h2>
             <div className="space-y-2">
@@ -754,7 +771,7 @@ export default function HomePage() {
           </div>
         </aside>
 
-        <section className="flex-1 p-6 overflow-y-auto min-h-[calc(100vh-140px)]">
+        <section className="flex-1 p-8 lg:p-10 overflow-y-auto min-h-[calc(100vh-140px)]">
           {activePanel === "overview" && (
             <>
               <div className="mb-8">
@@ -850,6 +867,110 @@ export default function HomePage() {
                 </div>
               </div>
             </>
+          )}
+
+          {activePanel === "pipeline" && pipelineDef && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-black tracking-wide">🔄 ACTIVE PIPELINE</h2>
+                  <p className="text-base text-slate-400 mt-1">
+                    Foundation §116 — First End-to-End Demonstration
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    orchestrator.triggerFirstPipeline({ campaign: "Love Signal Ep.12" });
+                    setActivePipelines([...orchestrator.getActivePipelines()]);
+                    pushEvent("system", "🚀 Human Executive triggered End-to-End Pipeline");
+                  }}
+                  className="rounded-xl bg-indigo-500/20 border border-indigo-500/40 px-6 py-3 text-base font-bold text-indigo-400 transition hover:bg-indigo-500/30"
+                >
+                  ▶️ START NEW PIPELINE
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {activePipelines.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
+                    <div className="text-4xl mb-4">⏸️</div>
+                    <h3 className="text-xl font-black text-white mb-2">No Active Pipelines</h3>
+                    <p className="text-slate-400 mb-6">Click "START NEW PIPELINE" to initiate the end-to-end content creation flow.</p>
+                  </div>
+                ) : (
+                  activePipelines.map(instance => {
+                    const currentStage = pipelineDef.stages[instance.currentStageIndex];
+                    const progress = Math.round((instance.currentStageIndex / pipelineDef.stages.length) * 100);
+                    
+                    return (
+                      <div key={instance.instanceId} className="rounded-2xl border border-indigo-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-black text-white">Instance: {instance.instanceId}</h3>
+                            <p className="text-sm text-slate-400">Campaign: {(instance.context.campaign as string) || "Unknown"}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-3xl font-black text-indigo-400">{progress}%</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase">Overall Progress</div>
+                          </div>
+                        </div>
+
+                        {/* Overall Progress Bar */}
+                        <div className="h-3 overflow-hidden rounded-full bg-slate-700 mb-8">
+                          <div 
+                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+
+                        {/* Stages Visualization */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {pipelineDef.stages.map((stage, index) => {
+                            const agent = agents.find(a => a.id === stage.agentId);
+                            const isCompleted = index < instance.currentStageIndex;
+                            const isCurrent = index === instance.currentStageIndex;
+                            const isPending = index > instance.currentStageIndex;
+
+                            return (
+                              <div 
+                                key={stage.name} 
+                                className={`rounded-xl border p-4 transition-all ${
+                                  isCompleted ? "border-emerald-500/30 bg-emerald-500/10" :
+                                  isCurrent ? "border-indigo-500/50 bg-indigo-500/20 shadow-[0_0_20px_rgba(99,102,241,0.3)]" :
+                                  "border-white/5 bg-white/5 opacity-50"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-black ${
+                                    isCompleted ? "bg-emerald-500 text-white" :
+                                    isCurrent ? "bg-indigo-500 text-white animate-pulse" :
+                                    "bg-slate-700 text-slate-400"
+                                  }`}>
+                                    {isCompleted ? "✓" : index + 1}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-xs font-bold uppercase tracking-wider text-slate-400">{stage.name}</div>
+                                    <div className="text-sm font-bold text-white">{agent?.name}</div>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-300 leading-relaxed">{stage.description}</p>
+                                
+                                {isCurrent && (
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />
+                                    <span className="text-xs font-bold text-indigo-400">EXECUTING...</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           )}
 
           {activePanel === "learning" && (
@@ -1327,6 +1448,40 @@ export default function HomePage() {
           from { opacity: 0; transform: translateY(-20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        /* =====================================================
+           LUNARA OS — READABILITY SYSTEM
+           The original information architecture remains intact.
+           This layer increases legibility without flattening density.
+           ===================================================== */
+        .lunara-readable .text-xs {
+          font-size: 0.8125rem !important;
+          line-height: 1.35 !important;
+        }
+        .lunara-readable .text-sm {
+          font-size: 0.9375rem !important;
+          line-height: 1.5 !important;
+        }
+        .lunara-readable .text-base {
+          font-size: 1rem !important;
+          line-height: 1.55 !important;
+        }
+        .lunara-readable [class*="text-[10px]"] {
+          font-size: 0.75rem !important;
+          line-height: 1.3 !important;
+        }
+        .lunara-readable p {
+          line-height: 1.6;
+        }
+        .lunara-readable h2 {
+          line-height: 1.15;
+        }
+        .lunara-readable h3 {
+          line-height: 1.2;
+        }
+        .lunara-readable button {
+          line-height: 1.35;
+        }
+
         ::-webkit-scrollbar { width: 8px !important; height: 8px !important; }
         ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05) !important; }
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15) !important; border-radius: 4px !important; }
