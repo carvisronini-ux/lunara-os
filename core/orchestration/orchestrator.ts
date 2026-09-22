@@ -75,7 +75,7 @@ export class LunaraOrchestrator {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "TASK_CREATED", // Using existing type for pipeline start
+      type: "TASK_CREATED",
       timestamp: Date.now(),
       agent_id: null,
       task_id: null,
@@ -101,7 +101,7 @@ export class LunaraOrchestrator {
         event_id: `evt_${Date.now()}_${Math.random()}`,
         type: "TASK_COMPLETED",
         timestamp: Date.now(),
-        agent_id: "astra", // Executive core marks pipeline complete
+        agent_id: "astra",
         task_id: null,
         resource_id: null,
         content_id: null,
@@ -111,14 +111,13 @@ export class LunaraOrchestrator {
       return;
     }
 
-    // §67: Select agent based on capability
     const agentId = stage.agentId;
     const taskId = `task_pipe_${instance.instanceId}_${stage.name.toLowerCase()}`;
 
-    // §34: Idempotency check - ensure we don't create duplicate tasks
+    // §34: Idempotency check
     const existingTask = osEngine.getTask(taskId);
-    if (existingTask && existingTask.status !== "completed" && existingTask.status !== "failed") {
-      return; // Already queued or running
+    if (existingTask && existingTask.status !== "COMPLETED" && existingTask.status !== "FAILED") {
+      return;
     }
 
     // §62: Create the next task in the dependency chain
@@ -127,10 +126,10 @@ export class LunaraOrchestrator {
       idempotency_key: `pipeline:${instance.instanceId}:${stage.name}`,
       title: `${pipeline.name} - ${stage.name}`,
       description: stage.description,
-      status: "queued" as TaskStatus,
+      status: "QUEUED" as TaskStatus,
       priority: "high",
       agent_id: agentId,
-      department: "executive", // Simplified for demo routing
+      department: "executive",
       required_capability: stage.capability as any,
       payload: { 
         pipelineInstanceId: instance.instanceId, 
@@ -147,7 +146,7 @@ export class LunaraOrchestrator {
       created_at: Date.now(),
       started_at: null,
       completed_at: null,
-      deadline: Date.now() + 1000 * 60 * 10 // 10 min deadline
+      deadline: Date.now() + 1000 * 60 * 10
     });
 
     osEngine.emitEvent({
@@ -165,12 +164,13 @@ export class LunaraOrchestrator {
 
   private handleTaskCompleted(event: any) {
     const taskId = event.task_id;
-    if (!taskId || !taskId.includes("pipeline_inst_")) return;
+    if (!taskId) return;
 
-    // Extract instance ID from task ID format: task_pipe_[instanceId]_[stage]
-    const parts = taskId.split("_");
-    const instanceId = parts[2] + "_" + parts[3]; 
+    // ✅ BULLETPROOF FIX: Exact regex matching the instanceId format
+    const match = taskId.match(/^task_pipe_(pipeline_inst_\d+_[a-z0-9]+)_([a-z_]+)$/);
+    if (!match) return;
     
+    const instanceId = match[1]; // This is now 100% guaranteed to be correct
     const instance = this.activePipelines.get(instanceId);
     if (!instance) return;
 
@@ -196,11 +196,13 @@ export class LunaraOrchestrator {
 
   private handleTaskFailed(event: any) {
     const taskId = event.task_id;
-    if (!taskId || !taskId.includes("pipeline_inst_")) return;
+    if (!taskId) return;
 
-    const parts = taskId.split("_");
-    const instanceId = parts[2] + "_" + parts[3];
+    // ✅ BULLETPROOF FIX: Exact regex matching the instanceId format
+    const match = taskId.match(/^task_pipe_(pipeline_inst_\d+_[a-z0-9]+)_([a-z_]+)$/);
+    if (!match) return;
     
+    const instanceId = match[1];
     const instance = this.activePipelines.get(instanceId);
     if (!instance) return;
 

@@ -7,14 +7,14 @@ import { knowledgeManager } from "@/core/knowledge";
 import { qualityManager } from "@/core/quality";
 import { learningManager } from "@/core/learning";
 import { orchestrator } from "@/core/orchestration/orchestrator";
-import { agentRuntime } from "@/core/agents/agent-runtime"; // <-- ახალი იმპორტი: Agent Runtime
+import { agentRuntime } from "@/core/agents/agent-runtime";
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
 import type { ContentPassport, QualityScore } from "@/core/quality";
 import type { LearningRecord, AgentVersion } from "@/core/learning";
 import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
 
 /* =========================================================
-   LUNARA OS — Virtual Office (Phase 1-7 Integrated)
+   LUNARA OS — ვირტუალური ოფისი (ფაზა 1-7 ინტეგრირებული)
    Foundation §9, §10, §12, §13, §14, §15, §47, §48, §62, §65, §82, §86, §87, §104, §85, §101-102, §116
    ========================================================= */
 
@@ -92,64 +92,63 @@ type EmergencyState = {
 };
 
 /* =========================================================
-   INITIAL DATA
+   საწყისი მონაცემები
    ========================================================= */
 
 const departments: Department[] = [
-  { id: "executive", name: "Executive Core", icon: "👑", color: "#8b5cf6", description: "Strategy & Coordination" },
-  { id: "intelligence", name: "Intelligence", icon: "🔍", color: "#3b82f6", description: "Trend & Market Research" },
-  { id: "strategy", name: "Strategy", icon: "🎯", color: "#a855f7", description: "Planning & Decisions" },
-  { id: "content", name: "Content", icon: "✍️", color: "#f59e0b", description: "Scripts & Copy" },
-  { id: "creative", name: "Creative", icon: "🎨", color: "#ec4899", description: "Visual Direction" },
-  { id: "production", name: "Production", icon: "🎬", color: "#ef4444", description: "Asset Generation" },
-  { id: "resources", name: "Resources", icon: "🔐", color: "#10b981", description: "Credentials & Access" },
-  { id: "quality", name: "Quality Control", icon: "🛡️", color: "#06b6d4", description: "QA & Governance" },
-  { id: "distribution", name: "Distribution", icon: "📡", color: "#84cc16", description: "Publishing" },
-  { id: "analytics", name: "Analytics", icon: "📊", color: "#f97316", description: "Performance Data" },
-  { id: "learning", name: "Learning", icon: "🧬", color: "#14b8a6", description: "Evolution & Training" },
+  { id: "executive", name: "აღმასრულებელი ცენტრი", icon: "👑", color: "#8b5cf6", description: "სტრატეგია და კოორდინაცია" },
+  { id: "intelligence", name: "დაზვერვა", icon: "🔍", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
+  { id: "strategy", name: "სტრატეგია", icon: "🎯", color: "#a855f7", description: "დაგეგმვა და გადაწყვეტილებები" },
+  { id: "content", name: "კონტენტი", icon: "✍️", color: "#f59e0b", description: "სცენარები და ტექსტები" },
+  { id: "creative", name: "კრეატივი", icon: "🎨", color: "#ec4899", description: "ვიზუალური მიმართულება" },
+  { id: "production", name: "წარმოება", icon: "🎬", color: "#ef4444", description: "აქტივების გენერაცია" },
+  { id: "resources", name: "რესურსები", icon: "🔐", color: "#10b981", description: "მონაცემები და წვდომა" },
+  { id: "quality", name: "ხარისხის კონტროლი", icon: "🛡️", color: "#06b6d4", description: "QA და მმართველობა" },
+  { id: "distribution", name: "გავრცელება", icon: "📡", color: "#84cc16", description: "გამოქვეყნება" },
+  { id: "analytics", name: "ანალიტიკა", icon: "📊", color: "#f97316", description: "ეფექტურობის მონაცემები" },
+  { id: "learning", name: "სწავლა", icon: "🧬", color: "#14b8a6", description: "ევოლუცია და ტრენინგი" },
 ];
 
 const initialAgents: Agent[] = [
-  { id: "astra", name: "Astra", role: "Executive Coordinator", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "idle", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "Monitoring system priorities" },
-  { id: "nyx", name: "Nyx", role: "Trend Intelligence", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "working", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "Analyzing TikTok trends" },
-  { id: "orion", name: "Orion", role: "Competitor Intelligence", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "idle", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "Awaiting assignment" },
-  { id: "sage", name: "Sage", role: "Chief Strategist", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "waiting_for_review", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "Strategy proposal pending approval" },
-  { id: "muse", name: "Muse", role: "Head of Content", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "working", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "Writing 3 script variants" },
-  { id: "vega", name: "Vega", role: "Creative Director", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "waiting", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "Waiting for script approval" },
-  { id: "atlas", name: "Atlas", role: "Resource Director", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "working", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "Verifying API credentials" },
-  { id: "cipher", name: "Cipher", role: "Credential Manager", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "idle", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "Monitoring access leases" },
-  { id: "aegis", name: "Aegis", role: "Quality Director", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "working", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "Reviewing 2 content items" },
-  { id: "echo", name: "Echo", role: "Distribution Manager", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "completed", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "Published to Telegram" },
-  { id: "nova", name: "Nova", role: "Performance Analyst", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "idle", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "Awaiting new data" },
-  { id: "iris", name: "Iris", role: "Learning Director", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "working", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "Analyzing performance patterns" },
+  { id: "astra", name: "Astra", role: "აღმასრულებელი კოორდინატორი", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "idle", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "სისტემის პრიორიტეტების მონიტორინგი" },
+  { id: "nyx", name: "Nyx", role: "ტრენდების დაზვერვა", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "working", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "TikTok-ის ტრენდების ანალიზი" },
+  { id: "orion", name: "Orion", role: "კონკურენტების დაზვერვა", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "idle", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "დანაწილების მოლოდინში" },
+  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "waiting_for_review", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
+  { id: "muse", name: "Muse", role: "კონტენტის ხელმძღვანელი", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "working", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "3 სცენარის ვარიანტის წერა" },
+  { id: "vega", name: "Vega", role: "კრეატიული დირექტორი", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "waiting", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "სცენარის დამტკიცების მოლოდინში" },
+  { id: "atlas", name: "Atlas", role: "რესურსების დირექტორი", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "working", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "API მონაცემების გადამოწმება" },
+  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "idle", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
+  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "working", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
+  { id: "echo", name: "Echo", role: "გავრცელების მენეჯერი", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "completed", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "გამოქვეყნებულია Telegram-ზე" },
+  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "idle", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
+  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "working", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
 ];
 
-// NOTE: Changed initial statuses to "queued" and progress to 0 so AgentRuntime can pick them up from the start.
 const initialTasks: Task[] = [
-  { id: "task-001", title: "Analyze TikTok trend signals", agentId: "nyx", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
-  { id: "task-002", title: "Develop Q4 content strategy", agentId: "sage", status: "queued", progress: 0, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
-  { id: "task-003", title: "Write 3 hook variants for Love Signal", agentId: "muse", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
-  { id: "task-004", title: "Create visual concept for new series", agentId: "vega", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
-  { id: "task-005", title: "Verify OpenAI API health", agentId: "atlas", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
-  { id: "task-006", title: "QA review: 2 pending posts", agentId: "aegis", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
-  { id: "task-007", title: "Publish to Telegram channel", agentId: "echo", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
-  { id: "task-008", title: "Extract patterns from last week", agentId: "iris", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
+  { id: "task-001", title: "TikTok-ის ტრენდების სიგნალების ანალიზი", agentId: "nyx", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
+  { id: "task-002", title: "Q4 კონტენტის სტრატეგიის შემუშავება", agentId: "sage", status: "queued", progress: 0, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
+  { id: "task-003", title: "Love Signal-ისთვის 3 ჰუკის ვარიანტის დაწერა", agentId: "muse", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
+  { id: "task-004", title: "ახალი სერიის ვიზუალური კონცეფციის შექმნა", agentId: "vega", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
+  { id: "task-005", title: "OpenAI API-ის ჯანმრთელობის გადამოწმება", agentId: "atlas", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
+  { id: "task-006", title: "QA გადახედვა: 2 მოლოდინში მყოფი პოსტი", agentId: "aegis", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
+  { id: "task-007", title: "Telegram არხზე გამოქვეყნება", agentId: "echo", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
+  { id: "task-008", title: "გასული კვირის კანონზომიერებების ამოღება", agentId: "iris", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
 ];
 
 const initialApprovals: ApprovalItem[] = [
-  { id: "approval-001", type: "content", title: "Love Signal Episode 12 — Hook Variant A", description: "If you're single, stop scrolling. One of these cards knows what happens next.", agentId: "muse", platform: "TikTok", riskLevel: "medium", qaScore: 87, preview: "🎴 Love Signal Ep.12", status: "pending", createdAt: Date.now() - 1000 * 60 * 15, recommendedAction: "approve" },
-  { id: "approval-002", type: "publish", title: "Publish Q4 Strategy Document", description: "Strategic document outlining content pillars for Q4 2026.", agentId: "sage", platform: "Telegram", riskLevel: "high", qaScore: 92, status: "pending", createdAt: Date.now() - 1000 * 60 * 30, recommendedAction: "approve" },
-  { id: "approval-003", type: "resource_access", title: "OpenAI GPT-4 Access Request", description: "Image Producer requests temporary access for visual concept generation.", agentId: "atlas", riskLevel: "low", qaScore: 95, status: "pending", createdAt: Date.now() - 1000 * 60 * 5, recommendedAction: "approve" },
-  { id: "approval-004", type: "content", title: "Zodiac Unlocked — Scorpio Season", description: "Scorpio season is here. Three secrets about your sign.", agentId: "muse", platform: "Instagram Reels", riskLevel: "low", qaScore: 78, preview: "🦂 Scorpio Season", status: "pending", createdAt: Date.now() - 1000 * 60 * 45, recommendedAction: "revise" },
+  { id: "approval-001", type: "content", title: "Love Signal ეპიზოდი 12 — ჰუკის ვარიანტი A", description: "თუ მარტოხელა ხარ, გაჩერდი. ამ ბარათებიდან ერთმა იცის, რა მოხდება შემდეგ შენს სასიყვარულო ისტორიაში.", agentId: "muse", platform: "TikTok", riskLevel: "medium", qaScore: 87, preview: "🎴 Love Signal ეპ.12", status: "pending", createdAt: Date.now() - 1000 * 60 * 15, recommendedAction: "approve" },
+  { id: "approval-002", type: "publish", title: "Q4 სტრატეგიის დოკუმენტის გამოქვეყნება", description: "სტრატეგიული დოკუმენტი, რომელიც აღწერს 2026 წლის Q4 კონტენტის ბურჯებს.", agentId: "sage", platform: "Telegram", riskLevel: "high", qaScore: 92, status: "pending", createdAt: Date.now() - 1000 * 60 * 30, recommendedAction: "approve" },
+  { id: "approval-003", type: "resource_access", title: "OpenAI GPT-4 წვდომის მოთხოვნა", description: "ვიზუალური კონცეფციის გენერაციისთვის გამოსახულების შემქმნელი ითხოვს დროებით წვდომას.", agentId: "atlas", riskLevel: "low", qaScore: 95, status: "pending", createdAt: Date.now() - 1000 * 60 * 5, recommendedAction: "approve" },
+  { id: "approval-004", type: "content", title: "ზოდიაქო განბლოკილი — მორიელის სეზონი", description: "მორიელის სეზონი აქ არის. სამი საიდუმლო შენი ნიშნის შესახებ.", agentId: "muse", platform: "Instagram Reels", riskLevel: "low", qaScore: 78, preview: "🦂 მორიელის სეზონი", status: "pending", createdAt: Date.now() - 1000 * 60 * 45, recommendedAction: "revise" },
 ];
 
 const initialResources: Resource[] = [
-  { id: "res-1", name: "OpenAI GPT-4", type: "AI Provider", status: "healthy", usage: 742, quota: 1000 },
-  { id: "res-2", name: "Anthropic Claude", type: "AI Provider", status: "healthy", usage: 328, quota: 1000 },
-  { id: "res-3", name: "Telegram Bot API", type: "Platform", status: "healthy", usage: 156, quota: 500 },
-  { id: "res-4", name: "Cloudflare R2", type: "Storage", status: "degraded", usage: 892, quota: 1000 },
-  { id: "res-5", name: "Supabase OS", type: "Database", status: "healthy", usage: 234, quota: 5000 },
-  { id: "res-6", name: "TikTok API", type: "Platform", status: "unavailable", usage: 0, quota: 100 },
+  { id: "res-1", name: "OpenAI GPT-4", type: "AI პროვაიდერი", status: "healthy", usage: 742, quota: 1000 },
+  { id: "res-2", name: "Anthropic Claude", type: "AI პროვაიდერი", status: "healthy", usage: 328, quota: 1000 },
+  { id: "res-3", name: "Telegram Bot API", type: "პლატფორმა", status: "healthy", usage: 156, quota: 500 },
+  { id: "res-4", name: "Cloudflare R2", type: "საცავი", status: "degraded", usage: 892, quota: 1000 },
+  { id: "res-5", name: "Supabase OS", type: "მონაცემთა ბაზა", status: "healthy", usage: 234, quota: 5000 },
+  { id: "res-6", name: "TikTok API", type: "პლატფორმა", status: "unavailable", usage: 0, quota: 100 },
 ];
 
 const initialKnowledge: KnowledgeDocument[] = [
@@ -157,9 +156,9 @@ const initialKnowledge: KnowledgeDocument[] = [
     knowledge_id: "brand_bible" as KnowledgeId,
     version: "1.0.0",
     status: "active",
-    source: "Executive Core",
-    title: "Lunara Brand Bible",
-    content: "Dark editorial, premium, mystical but modern. Restrained palette, strong typography, distinctive symbols. Avoid generic 'AI woman + galaxy' imagery.",
+    source: "აღმასრულებელი ცენტრი",
+    title: "Lunara ბრენდის ბიბლია",
+    content: "მუქი ედიტორიალი, პრემიუმ, მისტიკური მაგრამ თანამედროვე. შეკავებული პალიტრა, ძლიერი ტიპოგრაფია, გამორჩეული სიმბოლოები. თავიდან აიცილეთ ზოგადი 'AI ქალი + გალაქტიკა' გამოსახულებები.",
     confidence: 0.95,
     owner: "astra",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 30,
@@ -170,9 +169,9 @@ const initialKnowledge: KnowledgeDocument[] = [
     knowledge_id: "content_bible" as KnowledgeId,
     version: "1.0.0",
     status: "active",
-    source: "Strategy Department",
-    title: "Content Strategy & Pillars",
-    content: "30% Love/relationships, 20% interactive/pick-a-card, 15% zodiac psychology, 15% daily cosmic signal, 10% mystery, 10% education. Focus on originality, retention, and shareability.",
+    source: "სტრატეგიის დეპარტამენტი",
+    title: "კონტენტის სტრატეგია და ბურჯები",
+    content: "30% სიყვარული/ურთიერთობები, 20% ინტერაქტიული/აირჩიე ბარათი, 15% ზოდიაქოს ფსიქოლოგია, 15% ყოველდღიური კოსმოსური სიგნალი, 10% მისტიკა, 10% განათლება. ფოკუსი ორიგინალობაზე, შენარჩუნებასა და გაზიარებადობაზე.",
     confidence: 0.90,
     owner: "sage",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 20,
@@ -183,9 +182,9 @@ const initialKnowledge: KnowledgeDocument[] = [
     knowledge_id: "platform_rules" as KnowledgeId,
     version: "1.0.0",
     status: "active",
-    source: "Intelligence Department",
-    title: "Platform-Specific Rules",
-    content: "TikTok: Fast hooks, trend-native language, rawer presentation. YouTube Shorts: Clear premise, retention analysis. Instagram Reels: Visual identity, shareability. Telegram: Interaction, polls, community.",
+    source: "დაზვერვის დეპარტამენტი",
+    title: "პლატფორმის სპეციფიკური წესები",
+    content: "TikTok: სწრაფი ჰუკები, ტრენდებზე მორგებული ენა, უფრო ნედლი პრეზენტაცია. YouTube Shorts: ნათელი პრემისა, შენარჩუნების ანალიზი. Instagram Reels: ვიზუალური იდენტობა, გაზიარებადობა. Telegram: ინტერაქცია, გამოკითხვები, საზოგადოება.",
     confidence: 0.85,
     owner: "nyx",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 15,
@@ -196,9 +195,9 @@ const initialKnowledge: KnowledgeDocument[] = [
     knowledge_id: "audience_knowledge" as KnowledgeId,
     version: "1.0.0",
     status: "active",
-    source: "Analytics Department",
-    title: "Audience Insights",
-    content: "Primary audience: 18-34, relationship-focused, curious about self-discovery. Peak engagement: 7-9 PM weekdays. High share motivation for identity-relevant content.",
+    source: "ანალიტიკის დეპარტამენტი",
+    title: "აუდიტორიის შეხედულებები",
+    content: "ძირითადი აუდიტორია: 18-34, ურთიერთობებზე ორიენტირებული, დაინტერესებული თვითაღმოჩენით. პიკური ჩართულობა: 19:00-21:00 სამუშაო დღეებში. მაღალი გაზიარების მოტივაცია იდენტობასთან დაკავშირებული კონტენტისთვის.",
     confidence: 0.80,
     owner: "nova",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 10,
@@ -226,7 +225,7 @@ const initialPassports: ContentPassport[] = [
       brandFit: 94, platformFit: 93, cta: 87, safety: 100
     },
     total_score: 91,
-    review_notes: ["[aegis]: Strong hook, excellent brand fit. Minor CTA tweak recommended."],
+    review_notes: ["[aegis]: ძლიერი ჰუკი, შესანიშნავი ბრენდის შესაბამისობა. რეკომენდებულია მცირე CTA კორექტირება."],
     created_at: Date.now() - 1000 * 60 * 60,
     updated_at: Date.now() - 1000 * 60 * 30
   },
@@ -248,7 +247,7 @@ const initialPassports: ContentPassport[] = [
       brandFit: 60, platformFit: 85, cta: 70, safety: 100
     },
     total_score: 75,
-    review_notes: ["[aegis]: Visuals feel too generic. Needs more distinctive Lunara branding."],
+    review_notes: ["[aegis]: ვიზუალი ზედმეტად ზოგადია. საჭიროებს უფრო გამორჩეულ Lunara ბრენდინგს."],
     created_at: Date.now() - 1000 * 60 * 120,
     updated_at: Date.now() - 1000 * 60 * 60
   }
@@ -261,12 +260,12 @@ const initialLearningRecords: LearningRecord[] = [
     content_id: "content-001",
     campaign_id: "camp-love-signal",
     stage: "RECOMMENDATION",
-    observation: "Hooks with 'stop scrolling' pattern showed 15% higher retention in first 3 seconds.",
-    pattern: "Direct command + curiosity gap increases initial retention.",
-    hypothesis: "Applying this pattern to Zodiac content will improve average view duration.",
+    observation: "ჰუკებმა 'გაჩერდი სქროლვა' პატერნით აჩვენა 15%-ით მაღალი შენარჩუნება პირველ 3 წამში.",
+    pattern: "პირდაპირი ბრძანება + ცნობისმოყვარეობის სიცარიელე ზრდის საწყის შენარჩუნებას.",
+    hypothesis: "ამ პატერნის ზოდიაქოს კონტენტზე გამოყენება გააუმჯობესებს საშუალო ნახვის ხანგრძლივობას.",
     experiment_id: "exp-001",
-    evidence: "A/B test showed 12% increase in completion rate for command-based hooks.",
-    recommendation: "Update Muse v1.1 prompt to prioritize direct command hooks for first 3 seconds.",
+    evidence: "A/B ტესტმა აჩვენა 12%-იანი ზრდა დასრულების მაჩვენებელში ბრძანებაზე დაფუძნებული ჰუკებისთვის.",
+    recommendation: "განაახლეთ Muse v1.1 პრომპტი, რათა პრიორიტეტი მიანიჭოს პირდაპირი ბრძანების ჰუკებს პირველი 3 წამისთვის.",
     created_at: Date.now() - 1000 * 60 * 60 * 24,
     updated_at: Date.now() - 1000 * 60 * 60 * 2
   }
@@ -277,7 +276,7 @@ const initialAgentVersions: AgentVersion[] = [
     agent_id: "muse",
     version: "1.1.0",
     state: "CANDIDATE",
-    changes_summary: "Integrated direct command hook pattern. Improved originality scoring by 8%.",
+    changes_summary: "ინტეგრირებული პირდაპირი ბრძანების ჰუკის პატერნი. ორიგინალობის ქულის გაუმჯობესება 8%-ით.",
     benchmark_results: {
       agent_id: "muse",
       version: "1.1.0",
@@ -292,7 +291,7 @@ const initialAgentVersions: AgentVersion[] = [
 ];
 
 /* =========================================================
-   HELPERS
+   დამხმარე ფუნქციები
    ========================================================= */
 
 function formatTime(timestamp = Date.now()) {
@@ -304,7 +303,7 @@ function getStatusColor(status: AgentStatus): string {
     case "idle": return "#94a3b8";
     case "working": return "#facc15";
     case "waiting": return "#60a5fa";
-    case "queued": return "#60a5fa"; // Added for initial state
+    case "queued": return "#60a5fa";
     case "waiting_for_resource": return "#f97316";
     case "waiting_for_review": return "#a855f7";
     case "completed": return "#34d399";
@@ -319,18 +318,18 @@ function getStatusColor(status: AgentStatus): string {
 
 function getStatusLabel(status: AgentStatus): string {
   switch (status) {
-    case "idle": return "⏸️ IDLE";
-    case "working": return "⚡ WORKING";
-    case "waiting": return "⏳ WAITING";
-    case "queued": return "⏳ QUEUED"; // Added for initial state
-    case "waiting_for_resource": return "🔐 WAITING RESOURCE";
-    case "waiting_for_review": return "🔍 WAITING REVIEW";
-    case "completed": return "✅ COMPLETED";
-    case "error": return "❌ ERROR";
-    case "paused": return "⏸️ PAUSED";
-    case "suspended": return "🚫 SUSPENDED";
-    case "starting": return "🚀 STARTING";
-    case "offline": return "⚫ OFFLINE";
+    case "idle": return "⏸️ უმოქმედო";
+    case "working": return "⚡ მუშაობს";
+    case "waiting": return "⏳ მოლოდინში";
+    case "queued": return "⏳ რიგში";
+    case "waiting_for_resource": return "🔐 რესურსის მოლოდინში";
+    case "waiting_for_review": return "🔍 გადახედვის მოლოდინში";
+    case "completed": return "✅ დასრულებული";
+    case "error": return "❌ შეცდომა";
+    case "paused": return "⏸️ შეჩერებული";
+    case "suspended": return "🚫 შეწყვეტილი";
+    case "starting": return "🚀 იწყება";
+    case "offline": return "⚫ ოფლაინ";
     default: return status.toUpperCase();
   }
 }
@@ -364,29 +363,29 @@ function mapEngineTypeToUI(type: EventType): EventLog["type"] {
 
 function generateMessageFromEvent(event: any): string {
   switch (event.type) {
-    case "TASK_CREATED": return `📋 Task created: ${event.payload?.title}`;
-    case "TASK_STARTED": return `⚡ Task started by agent ${event.agent_id}`;
-    case "TASK_COMPLETED": return `✅ Task completed by agent ${event.agent_id}`;
-    case "TASK_FAILED": return `❌ Task failed for agent ${event.agent_id}`;
-    case "AGENT_REGISTERED": return `🤖 Agent ${event.payload?.name} registered in ${event.payload?.department}`;
-    case "EMERGENCY_ACTIVATED": return `🚨 Emergency protocol activated by Human Executive`;
-    case "RESOURCE_REQUESTED": return `🔐 Access requested for ${event.resource_id} by ${event.agent_id}`;
-    case "RESOURCE_GRANTED": return `✅ Access granted to ${event.resource_id}`;
-    case "KNOWLEDGE_VERSION_CREATED": return `📚 Knowledge updated: ${event.payload?.title} (v${event.payload?.version})`;
-    case "KNOWLEDGE_UPDATED": return `🔄 Knowledge status changed: ${event.payload?.knowledge_id} → ${event.payload?.newStatus}`;
-    case "CONTENT_REVIEW_REQUESTED": return `🛡️ Content ${event.content_id} entered ${event.payload?.newStage} stage`;
-    case "CONTENT_APPROVED": return `✅ Content ${event.content_id} APPROVED for publication (Score: ${event.payload?.totalScore})`;
-    case "CONTENT_REJECTED": return `❌ Content ${event.content_id} REJECTED by ${event.agent_id}`;
-    case "PATTERN_DISCOVERED": return `🧬 Iris discovered pattern: ${event.payload?.observation?.substring(0, 50)}...`;
-    case "AGENT_VERSION_CREATED": return `⚙️ New agent version proposed: ${event.agent_id} v${event.payload?.version}`;
-    case "AGENT_PROMOTED": return `✅ ${event.agent_id} promoted to v${event.payload?.version} by ${event.payload?.approvedBy}`;
-    case "AGENT_EVALUATED": return `⚠️ ${event.agent_id} v${event.payload?.version} evaluation completed (State: ${event.payload?.state})`;
-    default: return `System event: ${event.type}`;
+    case "TASK_CREATED": return `📋 ამოცანა შექმნილია: ${event.payload?.title}`;
+    case "TASK_STARTED": return `⚡ ამოცანა დაიწყო აგენტმა ${event.agent_id}`;
+    case "TASK_COMPLETED": return `✅ ამოცანა დაასრულა აგენტმა ${event.agent_id}`;
+    case "TASK_FAILED": return `❌ ამოცანა ჩავარდა აგენტისთვის ${event.agent_id}`;
+    case "AGENT_REGISTERED": return `🤖 აგენტი ${event.payload?.name} დარეგისტრირდა ${event.payload?.department}-ში`;
+    case "EMERGENCY_ACTIVATED": return `🚨 საგანგებო პროტოკოლი გაააქტიურა ადამიანმა აღმასრულებელმა`;
+    case "RESOURCE_REQUESTED": return `🔐 წვდომა მოითხოვა აგენტმა ${event.agent_id} რესურსისთვის ${event.resource_id}`;
+    case "RESOURCE_GRANTED": return `✅ წვდომა მინიჭებულია ${event.resource_id}`;
+    case "KNOWLEDGE_VERSION_CREATED": return `📚 ცოდნა განახლდა: ${event.payload?.title} (v${event.payload?.version})`;
+    case "KNOWLEDGE_UPDATED": return `🔄 ცოდნის სტატუსი შეიცვალა: ${event.payload?.knowledge_id} → ${event.payload?.newStatus}`;
+    case "CONTENT_REVIEW_REQUESTED": return `🛡️ კონტენტი ${event.content_id} შევიდა ეტაპზე ${event.payload?.newStage}`;
+    case "CONTENT_APPROVED": return `✅ კონტენტი ${event.content_id} დამტკიცებულია გამოქვეყნებისთვის (ქულა: ${event.payload?.totalScore})`;
+    case "CONTENT_REJECTED": return `❌ კონტენტი ${event.content_id} უარყოფილია აგენტის მიერ ${event.agent_id}`;
+    case "PATTERN_DISCOVERED": return `🧬 Iris-მა აღმოაჩინა კანონზომიერება: ${event.payload?.observation?.substring(0, 50)}...`;
+    case "AGENT_VERSION_CREATED": return `⚙️ შემოთავაზებულია აგენტის ახალი ვერსია: ${event.agent_id} v${event.payload?.version}`;
+    case "AGENT_PROMOTED": return `✅ აგენტი ${event.agent_id} დაწინაურდა ვერსიაზე ${event.payload?.version} ადამიანის მიერ ${event.payload?.approvedBy}`;
+    case "AGENT_EVALUATED": return `⚠️ შეფასება დასრულდა: ${event.agent_id} v${event.payload?.version} (მდგომარეობა: ${event.payload?.state})`;
+    default: return `სისტემური მოვლენა: ${event.type}`;
   }
 }
 
 /* =========================================================
-   MAIN COMPONENT
+   მთავარი კომპონენტი
    ========================================================= */
 
 export default function HomePage() {
@@ -398,12 +397,12 @@ export default function HomePage() {
   const [learningRecords, setLearningRecords] = useState<LearningRecord[]>(initialLearningRecords);
   const [agentVersions, setAgentVersions] = useState<AgentVersion[]>(initialAgentVersions);
   
-  // Phase 7 State
+  // ფაზა 7 მდგომარეობა
   const [activePipelines, setActivePipelines] = useState<ActivePipelineInstance[]>([]);
   const [pipelineDef, setPipelineDef] = useState<PipelineDefinition | null>(null);
   
   const [events, setEvents] = useState<EventLog[]>([
-    { id: "e1", timestamp: "--:--:--", type: "system", message: "🟢 Lunara OS Core Engine initialized" },
+    { id: "e1", timestamp: "--:--:--", type: "system", message: "🟢 Lunara OS ძირითადი ძრავა ინიციალიზებულია" },
   ]);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>("astra");
@@ -423,14 +422,14 @@ export default function HomePage() {
   const timersRef = useRef<number[]>([]);
 
   /* =====================================================
-     CORE ENGINE, RESOURCE, KNOWLEDGE, QUALITY, LEARNING & ORCHESTRATION
+     ძირითადი ძრავა, რესურსები, ცოდნა, ხარისხი, სწავლა და ორკესტრაცია
      ===================================================== */
 
   useEffect(() => {
     const currentTime = formatTime();
     setClock(currentTime);
 
-    // 1. Register Agents & Tasks into Core Engine AND Agent Runtime
+    // 1. აგენტებისა და ამოცანების რეგისტრაცია ძირითად ძრავში და Agent Runtime-ში
     initialAgents.forEach(agent => {
       osEngine.registerAgent(
         {
@@ -438,7 +437,7 @@ export default function HomePage() {
           display_name: agent.name,
           version: "1.0.0",
           department: agent.department as any,
-          mission: agent.currentTask || "Operational duties",
+          mission: agent.currentTask || "ოპერაციული მოვალეობები",
           responsibilities: [agent.role],
           inputs: [], outputs: [], capabilities: [], allowed_tools: [],
           allowed_resources: [], knowledge_sources: [], rules: [],
@@ -457,7 +456,7 @@ export default function HomePage() {
         }
       );
       
-      // Register agent in the Runtime so it can "work" on assigned tasks
+      // აგენტის რეგისტრაცია Runtime-ში, რათა მან შეძლოს მისთვის განკუთვნილი ამოცანების აღება
       agentRuntime.registerAgent(agent.id);
     });
 
@@ -475,7 +474,7 @@ export default function HomePage() {
         required_capability: "research.trends" as any,
         payload: {}, expected_outputs: [], depends_on: [],
         progress: task.progress, retry_count: 0, max_retries: 3,
-        error_category: null, error_message: null,
+        last_error_category: null, last_error_message: null,
         created_at: task.createdAt,
         started_at: task.status === "running" ? task.createdAt : null,
         completed_at: task.status === "completed" ? task.createdAt : null,
@@ -483,7 +482,7 @@ export default function HomePage() {
       });
     });
 
-    // 2. Register Resources into Resource Manager (Phase 3)
+    // 2. რესურსების რეგისტრაცია რესურსების მენეჯერში (ფაზა 3)
     initialResources.forEach(res => {
       resourceManager.registerResource({
         provider_id: res.id as any,
@@ -498,17 +497,17 @@ export default function HomePage() {
       });
     });
 
-    // 3. Register Knowledge Documents (Phase 4)
+    // 3. ცოდნის დოკუმენტების რეგისტრაცია (ფაზა 4)
     initialKnowledge.forEach(knowledge => {
       knowledgeManager.registerKnowledge(knowledge);
     });
 
-    // 4. Register Content Passports (Phase 5)
+    // 4. კონტენტის პასპორტების რეგისტრაცია (ფაზა 5)
     initialPassports.forEach(passport => {
       qualityManager.createPassport(passport);
     });
 
-    // 5. Register Learning Records & Agent Versions (Phase 6)
+    // 5. სწავლის ჩანაწერებისა და აგენტის ვერსიების რეგისტრაცია (ფაზა 6)
     initialLearningRecords.forEach(record => {
       learningManager.createLearningRecord(record.agent_id, record.observation, record.content_id, record.campaign_id);
       learningManager.advanceLearningStage(record.record_id, "RECOMMENDATION", {
@@ -522,11 +521,11 @@ export default function HomePage() {
       learningManager.proposeAgentVersion(version.agent_id, version.version, version.changes_summary, "iris");
     });
 
-    // 6. Initialize Orchestrator (Phase 7)
+    // 6. ორკესტრატორის ინიციალიზაცია (ფაზა 7)
     setPipelineDef(orchestrator.getPipelineDefinition());
     setActivePipelines(orchestrator.getActivePipelines());
 
-    // 7. Subscribe to Engine Events
+    // 7. ძრავის მოვლენებზე გამოწერა
     const eventTypes: EventType[] = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
       "TASK_RETRIED", "TASK_ESCALATED", "AGENT_REGISTERED", "EMERGENCY_ACTIVATED",
@@ -548,15 +547,12 @@ export default function HomePage() {
           ...prev
         ].slice(0, 50));
         
-        // Update pipeline UI when tasks change
+        // პაიპლაინის UI-ის განახლება ამოცანების ცვლილებისას
         if (type === "TASK_CREATED" || type === "TASK_COMPLETED" || type === "TASK_FAILED") {
           setActivePipelines([...orchestrator.getActivePipelines()]);
         }
       });
     });
-
-    // NOTE: The blind random `simTimer` has been REMOVED. 
-    // Tasks are now executed realistically by the `agentRuntime` based on agent assignment and duration.
 
     return () => {
       timersRef.current.forEach(t => window.clearTimeout(t));
@@ -564,7 +560,7 @@ export default function HomePage() {
   }, [emergencyState.allAgentsPaused]);
 
   /* =====================================================
-     DERIVED DATA
+     წარმოებული მონაცემები
      ===================================================== */
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId) ?? null;
@@ -580,58 +576,58 @@ export default function HomePage() {
   const departmentAgents = (deptId: string) => agents.filter(a => a.department === deptId);
 
   /* =====================================================
-     ACTIONS
+     მოქმედებები
      ===================================================== */
 
   const pauseAllAgents = () => {
     setAgents(prev => prev.map(a => a.status === "working" || a.status === "starting" ? { ...a, status: "paused" as AgentStatus } : a));
     setEmergencyState(prev => ({ ...prev, allAgentsPaused: true }));
-    pushEvent("emergency", "🚨 EMERGENCY: All agents paused by Human Executive");
+    pushEvent("emergency", "🚨 საგანგებო: ყველა აგენტი შეაჩერა ადამიანმა აღმასრულებელმა");
   };
 
   const resumeAllAgents = () => {
     setAgents(prev => prev.map(a => a.status === "paused" ? { ...a, status: "idle" as AgentStatus } : a));
     setEmergencyState(prev => ({ ...prev, allAgentsPaused: false }));
-    pushEvent("system", "✅ All agents resumed by Human Executive");
+    pushEvent("system", "✅ ყველა აგენტი აღადგინა ადამიანმა აღმასრულებელმა");
   };
 
   const pausePublishing = () => {
     setEmergencyState(prev => ({ ...prev, publishingPaused: true }));
-    pushEvent("emergency", "⚠️ Publishing paused by Human Executive");
+    pushEvent("emergency", "⚠️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
   };
 
   const resumePublishing = () => {
     setEmergencyState(prev => ({ ...prev, publishingPaused: false }));
-    pushEvent("system", "✅ Publishing resumed by Human Executive");
+    pushEvent("system", "✅ გამოქვეყნება აღადგინა ადამიანმა აღმასრულებელმა");
   };
 
   const stopExpensiveTasks = () => {
     setTasks(prev => prev.map(t => t.priority === "critical" || t.priority === "high" ? { ...t, status: "failed" as TaskStatus } : t));
     setEmergencyState(prev => ({ ...prev, expensiveTasksStopped: true }));
-    pushEvent("emergency", "🛑 Expensive tasks stopped by Human Executive");
+    pushEvent("emergency", "🛑 ძვირადღირებული ამოცანები შეაჩერა ადამიანმა აღმასრულებელმა");
   };
 
   const revokeAccess = () => {
     setEmergencyState(prev => ({ ...prev, accessRevoked: true }));
-    pushEvent("emergency", "🔐 Temporary access revoked by Human Executive");
+    pushEvent("emergency", "🔐 დროებითი წვდომა გააუქმა ადამიანმა აღმასრულებელმა");
   };
 
   const approveItem = (approvalId: string) => {
     setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "approved" } : a));
     const item = approvals.find(a => a.id === approvalId);
-    if (item) pushEvent("approval", `✅ Approved: ${item.title} by Human Executive`);
+    if (item) pushEvent("approval", `✅ დამტკიცებულია: ${item.title} ადამიანის მიერ`);
   };
 
   const rejectItem = (approvalId: string) => {
     setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "rejected" } : a));
     const item = approvals.find(a => a.id === approvalId);
-    if (item) pushEvent("approval", `❌ Rejected: ${item.title} by Human Executive`);
+    if (item) pushEvent("approval", `❌ უარყოფილია: ${item.title} ადამიანის მიერ`);
   };
 
   const reviseItem = (approvalId: string) => {
     setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "revised" } : a));
     const item = approvals.find(a => a.id === approvalId);
-    if (item) pushEvent("approval", `🔄 Revision requested: ${item.title} by Human Executive`);
+    if (item) pushEvent("approval", `🔄 შესწორება მოთხოვნილია: ${item.title} ადამიანის მიერ`);
   };
 
   const pushEvent = (type: EventLog["type"], message: string) => {
@@ -642,7 +638,7 @@ export default function HomePage() {
   };
 
   /* =====================================================
-     RENDER
+     ვიზუალიზაცია (Render)
      ===================================================== */
 
   return (
@@ -660,21 +656,21 @@ export default function HomePage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-3xl font-black shadow-2xl" style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 0 40px rgba(139,92,246,0.5)" }}>◈</div>
               <div>
                 <h1 className="text-4xl font-black tracking-tight lg:text-[42px]">LUNARA OS</h1>
-                <p className="text-base font-medium text-slate-400 tracking-wide">VIRTUAL OFFICE — Autonomous Digital Organization</p>
+                <p className="text-base font-medium text-slate-400 tracking-wide">ვირტუალური ოფისი — ავტონომიური ციფრული ორგანიზაცია</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <StatBadge label="Agents" value={agents.length} icon="👥" color="blue" />
-              <StatBadge label="Active" value={activeAgents} icon="⚡" color="yellow" />
-              <StatBadge label="Tasks" value={runningTasks} icon="🚀" color="purple" />
-              <StatBadge label="Done" value={completedTasks} icon="✅" color="emerald" />
-              <StatBadge label="XP" value={totalXP} icon="⭐" color="pink" />
+              <StatBadge label="აგენტები" value={agents.length} icon="👥" color="blue" />
+              <StatBadge label="აქტიური" value={activeAgents} icon="⚡" color="yellow" />
+              <StatBadge label="ამოცანები" value={runningTasks} icon="🚀" color="purple" />
+              <StatBadge label="დასრულებული" value={completedTasks} icon="✅" color="emerald" />
+              <StatBadge label="გამოცდილება" value={totalXP} icon="⭐" color="pink" />
 
               {simulationMode && (
                 <div className="flex items-center gap-2 rounded-2xl border border-yellow-500/40 bg-yellow-500/20 px-4 py-2">
                   <span className="text-xl">🧪</span>
-                  <span className="text-base font-black tracking-wide text-yellow-400">SIMULATION</span>
+                  <span className="text-base font-black tracking-wide text-yellow-400">სიმულაცია</span>
                 </div>
               )}
 
@@ -682,7 +678,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <div className={`h-3 w-3 animate-pulse rounded-full ${systemStatus === "healthy" ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]" : systemStatus === "degraded" ? "bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)]" : "bg-red-400 shadow-[0_0_15px_rgba(248,113,113,0.8)]"}`} />
                   <span className={`text-base font-bold tracking-wide ${systemStatus === "healthy" ? "text-emerald-400" : systemStatus === "degraded" ? "text-yellow-400" : "text-red-400"}`}>
-                    {systemStatus === "healthy" ? "ONLINE" : systemStatus === "degraded" ? "DEGRADED" : "OUTAGE"}
+                    {systemStatus === "healthy" ? "ონლაინ" : systemStatus === "degraded" ? "გაუარესებული" : "გათიშვა"}
                   </span>
                 </div>
                 <div className="h-8 w-px bg-white/10" />
@@ -694,16 +690,16 @@ export default function HomePage() {
 
         <div className="px-6 py-3 border-t border-white/5 bg-slate-900/50">
           <div className="flex items-center gap-3 overflow-x-auto">
-            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 Overview</button>
-            <button onClick={() => setActivePanel("pipeline")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "pipeline" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🔄 Active Pipeline</button>
+            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 მიმოხილვა</button>
+            <button onClick={() => setActivePanel("pipeline")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "pipeline" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🔄 აქტიური პაიპლაინი</button>
             <button onClick={() => setActivePanel("approvals")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap relative ${activePanel === "approvals" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              ✋ Approvals
+              ✋ დამტკიცებები
               {pendingApprovals > 0 && <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-black text-white">{pendingApprovals}</span>}
             </button>
-            <button onClick={() => setActivePanel("quality")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "quality" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🛡️ Quality Review</button>
-            <button onClick={() => setActivePanel("learning")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "learning" ? "bg-teal-500/20 text-teal-400 border border-teal-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🧬 Learning</button>
-            <button onClick={() => setActivePanel("knowledge")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "knowledge" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>📚 Knowledge</button>
-            <button onClick={() => setActivePanel("emergency")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "emergency" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚨 Emergency</button>
+            <button onClick={() => setActivePanel("quality")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "quality" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🛡️ ხარისხის გადახედვა</button>
+            <button onClick={() => setActivePanel("learning")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "learning" ? "bg-teal-500/20 text-teal-400 border border-teal-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🧬 სწავლა</button>
+            <button onClick={() => setActivePanel("knowledge")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "knowledge" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>📚 ცოდნა</button>
+            <button onClick={() => setActivePanel("emergency")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "emergency" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚨 საგანგებო</button>
           </div>
         </div>
       </nav>
@@ -711,11 +707,11 @@ export default function HomePage() {
       <div className="relative z-10 flex">
         <aside className="w-[340px] border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden lg:block">
           <div className="p-6">
-            <h2 className="text-2xl font-black mb-6 tracking-wide">📂 DEPARTMENTS</h2>
+            <h2 className="text-2xl font-black mb-6 tracking-wide">📂 დეპარტამენტები</h2>
             <div className="space-y-2">
               <button onClick={() => setSelectedDepartment(null)} className={`w-full rounded-xl border p-3 text-left transition-all ${!selectedDepartment ? "border-white/30 bg-white/10" : "border-white/5 bg-white/5 hover:bg-white/10"}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-bold">🏢 All Departments</span>
+                  <span className="text-base font-bold">🏢 ყველა დეპარტამენტი</span>
                   <span className="text-sm text-slate-400">{agents.length}</span>
                 </div>
               </button>
@@ -732,7 +728,7 @@ export default function HomePage() {
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold">{deptAgents.length}</div>
-                        {activeCount > 0 && <div className="text-xs text-emerald-400">{activeCount} active</div>}
+                        {activeCount > 0 && <div className="text-xs text-emerald-400">{activeCount} აქტიური</div>}
                       </div>
                     </div>
                   </button>
@@ -741,9 +737,9 @@ export default function HomePage() {
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <h3 className="text-lg font-black mb-4">💚 SYSTEM HEALTH</h3>
+              <h3 className="text-lg font-black mb-4">💚 სისტემის ჯანმრთელობა</h3>
               <div className="space-y-3">
-                {[{ name: "Agent Bus", value: 100, color: "bg-emerald-500" }, { name: "Task Engine", value: 100, color: "bg-emerald-500" }, { name: "Event Bus", value: 98, color: "bg-blue-500" }, { name: "Quality Gate", value: 100, color: "bg-emerald-500" }, { name: "Learning Loop", value: 95, color: "bg-purple-500" }].map(item => (
+                {[{ name: "აგენტების ბუსი", value: 100, color: "bg-emerald-500" }, { name: "ამოცანების ძრავა", value: 100, color: "bg-emerald-500" }, { name: "მოვლენების ბუსი", value: 98, color: "bg-blue-500" }, { name: "ხარისხის კარიბჭე", value: 100, color: "bg-emerald-500" }, { name: "სწავლის ციკლი", value: 95, color: "bg-purple-500" }].map(item => (
                   <div key={item.name}>
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-sm font-bold text-slate-300">{item.name}</span>
@@ -763,7 +759,7 @@ export default function HomePage() {
           {activePanel === "overview" && (
             <>
               <div className="mb-8">
-                <h2 className="text-2xl font-black mb-6 tracking-wide">🏢 VIRTUAL OFFICE MAP</h2>
+                <h2 className="text-2xl font-black mb-6 tracking-wide">🏢 ვირტუალური ოფისის რუკა</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {departments.map(dept => {
                     const deptAgents = departmentAgents(dept.id);
@@ -780,9 +776,9 @@ export default function HomePage() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">Working</span><span className="font-bold text-yellow-400">{workingCount}</span></div>
-                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">Waiting</span><span className="font-bold text-blue-400">{waitingCount}</span></div>
-                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">Idle</span><span className="font-bold text-slate-400">{idleCount}</span></div>
+                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">მუშაობს</span><span className="font-bold text-yellow-400">{workingCount}</span></div>
+                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">მოლოდინში</span><span className="font-bold text-blue-400">{waitingCount}</span></div>
+                          <div className="flex items-center justify-between text-sm"><span className="text-slate-400">უმოქმედო</span><span className="font-bold text-slate-400">{idleCount}</span></div>
                         </div>
                         <div className="mt-4 flex -space-x-2">
                           {deptAgents.slice(0, 4).map(agent => (
@@ -797,7 +793,7 @@ export default function HomePage() {
               </div>
 
               <div className="mb-8">
-                <h2 className="text-2xl font-black mb-6 tracking-wide">👥 AGENTS <span className="text-lg font-medium text-slate-400 ml-3">({filteredAgents.length} agents{selectedDepartment ? ` in ${selectedDept?.name}` : ""})</span></h2>
+                <h2 className="text-2xl font-black mb-6 tracking-wide">👥 აგენტები <span className="text-lg font-medium text-slate-400 ml-3">({filteredAgents.length} აგენტი{selectedDepartment ? ` დეპარტამენტში ${selectedDept?.name}` : ""})</span></h2>
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {filteredAgents.map(agent => {
                     const agentTasks = tasks.filter(t => t.agentId === agent.id);
@@ -819,19 +815,19 @@ export default function HomePage() {
                         </div>
                         {agent.currentTask && (
                           <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-3">
-                            <div className="text-xs font-bold text-slate-400 mb-1">CURRENT ACTIVITY</div>
+                            <div className="text-xs font-bold text-slate-400 mb-1">მიმდინარე აქტივობა</div>
                             <div className="text-base font-bold">{agent.currentTask}</div>
                           </div>
                         )}
                         <div className="grid grid-cols-4 gap-3 mb-4">
-                          <StatBox label="LEVEL" value={agent.level} color={agent.accent} />
-                          <StatBox label="XP" value={agent.xp} color={agent.accent} />
-                          <StatBox label="DONE" value={agent.missionsCompleted} color={agent.accent} />
-                          <StatBox label="AUTO" value={`L${agent.autonomyLevel}`} color={agent.accent} />
+                          <StatBox label="დონე" value={agent.level} color={agent.accent} />
+                          <StatBox label="გამოცდილება" value={agent.xp} color={agent.accent} />
+                          <StatBox label="დასრულებული" value={agent.missionsCompleted} color={agent.accent} />
+                          <StatBox label="ავტო" value={`L${agent.autonomyLevel}`} color={agent.accent} />
                         </div>
                         <div className="mb-4">
                           <div className="mb-1 flex items-center justify-between">
-                            <span className="text-sm font-bold text-slate-400">EXPERIENCE</span>
+                            <span className="text-sm font-bold text-slate-400">გამოცდილება</span>
                             <span className="text-sm font-mono font-bold">{agent.xp} / {agent.xpToNext}</span>
                           </div>
                           <div className="h-3 overflow-hidden rounded-full bg-slate-700">
@@ -861,20 +857,20 @@ export default function HomePage() {
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-2xl font-black tracking-wide">🔄 ACTIVE PIPELINE</h2>
+                  <h2 className="text-2xl font-black tracking-wide">🔄 აქტიური პაიპლაინი</h2>
                   <p className="text-base text-slate-400 mt-1">
-                    Foundation §116 — First End-to-End Demonstration
+                    Foundation §116 — პირველი ბოლომდე მიყვანილი დემონსტრაცია
                   </p>
                 </div>
                 <button
                   onClick={() => {
-                    orchestrator.triggerFirstPipeline({ campaign: "Love Signal Ep.12" });
+                    orchestrator.triggerFirstPipeline({ campaign: "Love Signal ეპ.12" });
                     setActivePipelines([...orchestrator.getActivePipelines()]);
-                    pushEvent("system", "🚀 Human Executive triggered End-to-End Pipeline");
+                    pushEvent("system", "🚀 ადამიანმა აღმასრულებელმა გაუშვა ბოლომდე მიყვანილი პაიპლაინი");
                   }}
                   className="rounded-xl bg-indigo-500/20 border border-indigo-500/40 px-6 py-3 text-base font-bold text-indigo-400 transition hover:bg-indigo-500/30"
                 >
-                  ▶️ START NEW PIPELINE
+                  ▶️ ახალი პაიპლაინის დაწყება
                 </button>
               </div>
 
@@ -882,8 +878,8 @@ export default function HomePage() {
                 {activePipelines.length === 0 ? (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
                     <div className="text-4xl mb-4">⏸️</div>
-                    <h3 className="text-xl font-black text-white mb-2">No Active Pipelines</h3>
-                    <p className="text-slate-400 mb-6">Click "START NEW PIPELINE" to initiate the end-to-end content creation flow.</p>
+                    <h3 className="text-xl font-black text-white mb-2">აქტიური პაიპლაინი არ არის</h3>
+                    <p className="text-slate-400 mb-6">დააჭირეთ 'ახალი პაიპლაინის დაწყებას' ბოლომდე მიყვანილი კონტენტის შექმნის ნაკადის დასაწყებად.</p>
                   </div>
                 ) : (
                   activePipelines.map(instance => {
@@ -894,16 +890,16 @@ export default function HomePage() {
                       <div key={instance.instanceId} className="rounded-2xl border border-indigo-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-black text-white">Instance: {instance.instanceId}</h3>
-                            <p className="text-sm text-slate-400">Campaign: {(instance.context.campaign as string) || "Unknown"}</p>
+                            <h3 className="text-xl font-black text-white">ინსტანცია: {instance.instanceId}</h3>
+                            <p className="text-sm text-slate-400">კამპანია: {(instance.context.campaign as string) || "უცნობი"}</p>
                           </div>
                           <div className="text-right">
                             <div className="text-3xl font-black text-indigo-400">{progress}%</div>
-                            <div className="text-xs font-bold text-slate-400 uppercase">Overall Progress</div>
+                            <div className="text-xs font-bold text-slate-400 uppercase">საერთო პროგრესი</div>
                           </div>
                         </div>
 
-                        {/* Overall Progress Bar */}
+                        {/* საერთო პროგრესის ზოლი */}
                         <div className="h-3 overflow-hidden rounded-full bg-slate-700 mb-8">
                           <div 
                             className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700"
@@ -911,7 +907,7 @@ export default function HomePage() {
                           />
                         </div>
 
-                        {/* Stages Visualization */}
+                        {/* ეტაპების ვიზუალიზაცია */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                           {pipelineDef.stages.map((stage, index) => {
                             const agent = agents.find(a => a.id === stage.agentId);
@@ -945,7 +941,7 @@ export default function HomePage() {
                                 {isCurrent && (
                                   <div className="mt-3 flex items-center gap-2">
                                     <div className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />
-                                    <span className="text-xs font-bold text-indigo-400">EXECUTING...</span>
+                                    <span className="text-xs font-bold text-indigo-400">სრულდება...</span>
                                   </div>
                                 )}
                               </div>
@@ -962,15 +958,15 @@ export default function HomePage() {
 
           {activePanel === "learning" && (
             <div>
-              <h2 className="text-2xl font-black mb-6 tracking-wide">🧬 LEARNING & EVOLUTION</h2>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">🧬 სწავლა და ევოლუცია</h2>
               <p className="text-base text-slate-400 mb-6">
-                Foundation §12, §82 — Evidence-based agent improvement and version control
+                Foundation §12, §82 — მტკიცებულებებზე დაფუძნებული აგენტების გაუმჯობესება და ვერსიების კონტროლი
               </p>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Active Learning Records */}
+                {/* აქტიური სწავლის ჩანაწერები */}
                 <div className="rounded-2xl border border-teal-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
-                  <h3 className="text-lg font-black mb-4 text-teal-400">🔍 Active Learning Records</h3>
+                  <h3 className="text-lg font-black mb-4 text-teal-400">🔍 აქტიური სწავლის ჩანაწერები</h3>
                   <div className="space-y-4">
                     {learningManager.getActiveLearningRecords().map(record => {
                       const agent = agents.find(a => a.id === record.agent_id);
@@ -978,12 +974,12 @@ export default function HomePage() {
                         <div key={record.record_id} className="rounded-xl border border-white/10 bg-white/5 p-4">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-bold text-white">{agent?.name} ({agent?.role})</span>
-                            <span className="text-xs font-mono text-teal-400">{record.stage.replace(/_/g, " ")}</span>
+                            <span className="text-xs font-mono text-teal-400">{record.stage === "RECOMMENDATION" ? "რეკომენდაცია" : record.stage}</span>
                           </div>
                           <p className="text-sm text-slate-300 mb-3">{record.observation}</p>
                           {record.recommendation && (
                             <div className="rounded-lg bg-teal-500/10 p-3 border border-teal-500/20">
-                              <div className="text-xs font-bold text-teal-400 mb-1">RECOMMENDATION</div>
+                              <div className="text-xs font-bold text-teal-400 mb-1">რეკომენდაცია</div>
                               <p className="text-sm text-slate-300">{record.recommendation}</p>
                             </div>
                           )}
@@ -991,14 +987,14 @@ export default function HomePage() {
                       );
                     })}
                     {learningManager.getActiveLearningRecords().length === 0 && (
-                      <div className="text-center text-slate-500 py-8">No active learning records.</div>
+                      <div className="text-center text-slate-500 py-8">აქტიური სწავლის ჩანაწერი არ არის.</div>
                     )}
                   </div>
                 </div>
 
-                {/* Pending Agent Version Approvals */}
+                {/* ლოდინში მყოფი აგენტის განახლებები */}
                 <div className="rounded-2xl border border-purple-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
-                  <h3 className="text-lg font-black mb-4 text-purple-400">⚙️ Pending Agent Upgrades</h3>
+                  <h3 className="text-lg font-black mb-4 text-purple-400">⚙️ ლოდინში მყოფი აგენტის განახლებები</h3>
                   <div className="space-y-4">
                     {learningManager.getPendingVersionApprovals().map(version => {
                       const agent = agents.find(a => a.id === version.agent_id);
@@ -1009,7 +1005,7 @@ export default function HomePage() {
                               <span className="text-xl">{agent?.icon}</span>
                               <span className="text-base font-bold text-white">{agent?.name} <span className="text-purple-400">v{version.version}</span></span>
                             </div>
-                            <span className="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded">CANDIDATE</span>
+                            <span className="text-xs font-mono text-yellow-400 bg-yellow-500/10 px-2 py-1 rounded">კანდიდატი</span>
                           </div>
                           <p className="text-sm text-slate-300 mb-3">{version.changes_summary}</p>
                           
@@ -1029,28 +1025,28 @@ export default function HomePage() {
                               onClick={() => {
                                 learningManager.approveAgentVersion(version.agent_id, version.version, "human_executive");
                                 setAgentVersions([...learningManager.getAgentVersions(version.agent_id)]);
-                                pushEvent("learning", `✅ Human Executive APPROVED ${agent?.name} v${version.version}`);
+                                pushEvent("learning", `✅ ადამიანმა აღმასრულებელმა დაამტკიცა ${agent?.name} v${version.version}`);
                               }}
                               className="flex-1 rounded-lg border border-emerald-500/40 bg-emerald-500/20 py-2 text-sm font-bold text-emerald-400 transition hover:bg-emerald-500/30"
                             >
-                              ✅ APPROVE & DEPLOY
+                              ✅ დამტკიცება და განთავსება
                             </button>
                             <button 
                               onClick={() => {
                                 learningManager.rejectAgentVersion(version.agent_id, version.version, "human_executive");
                                 setAgentVersions([...learningManager.getAgentVersions(version.agent_id)]);
-                                pushEvent("learning", `❌ Human Executive REJECTED ${agent?.name} v${version.version}`);
+                                pushEvent("learning", `❌ ადამიანმა აღმასრულებელმა უარყო ${agent?.name} v${version.version}`);
                               }}
                               className="flex-1 rounded-lg border border-red-500/40 bg-red-500/20 py-2 text-sm font-bold text-red-400 transition hover:bg-red-500/30"
                             >
-                              ❌ REJECT
+                              ❌ უარყოფა
                             </button>
                           </div>
                         </div>
                       );
                     })}
                     {learningManager.getPendingVersionApprovals().length === 0 && (
-                      <div className="text-center text-slate-500 py-8">No pending agent upgrades.</div>
+                      <div className="text-center text-slate-500 py-8">ლოდინში მყოფი აგენტის განახლება არ არის.</div>
                     )}
                   </div>
                 </div>
@@ -1060,9 +1056,9 @@ export default function HomePage() {
 
           {activePanel === "quality" && (
             <div>
-              <h2 className="text-2xl font-black mb-6 tracking-wide">🛡️ QUALITY REVIEW QUEUE</h2>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">🛡️ ხარისხის გადახედვის რიგი</h2>
               <p className="text-base text-slate-400 mb-6">
-                Foundation §47, §86 — Multi-stage QA pipeline and 11-dimensional scoring
+                Foundation §47, §86 — მრავალეტაპიანი QA პაიპლაინი და 11-განზომილებიანი ქულების სისტემა
               </p>
 
               <div className="space-y-6">
@@ -1072,16 +1068,16 @@ export default function HomePage() {
                     <div key={passport.content_id} className="rounded-2xl border border-cyan-500/30 bg-slate-900/50 backdrop-blur-xl p-6">
                       <div className="flex items-start justify-between mb-6">
                         <div>
-                          <h3 className="text-xl font-black text-white">Content ID: {passport.content_id}</h3>
+                          <h3 className="text-xl font-black text-white">კონტენტის ID: {passport.content_id}</h3>
                           <p className="text-sm text-slate-400 mt-1">
-                            Creator: <span className="font-bold text-white">{creator?.name || passport.creator_agent}</span> • 
-                            Platforms: <span className="text-cyan-400">{passport.platforms.join(", ")}</span> • 
-                            Version: <span className="font-mono text-cyan-400">{passport.version}</span>
+                            შემქმნელი: <span className="font-bold text-white">{creator?.name || passport.creator_agent}</span> • 
+                            პლატფორმები: <span className="text-cyan-400">{passport.platforms.join(", ")}</span> • 
+                            ვერსია: <span className="font-mono text-cyan-400">{passport.version}</span>
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
                           <div className="rounded-lg bg-cyan-500/20 px-4 py-2 text-center">
-                            <div className="text-xs font-bold text-cyan-400">TOTAL SCORE</div>
+                            <div className="text-xs font-bold text-cyan-400">საერთო ქულა</div>
                             <div className="text-3xl font-black text-white">{passport.total_score ?? "N/A"}</div>
                           </div>
                           <div className={`rounded-lg px-3 py-1 text-xs font-black ${
@@ -1089,7 +1085,7 @@ export default function HomePage() {
                             passport.current_stage === "REJECTED" ? "bg-red-500/20 text-red-400" :
                             "bg-blue-500/20 text-blue-400"
                           }`}>
-                            {passport.current_stage.replace(/_/g, " ")}
+                            {passport.current_stage === "FINAL_QUALITY_GATE" ? "საბოლოო ხარისხის კარიბჭე" : passport.current_stage === "REJECTED" ? "უარყოფილი" : passport.current_stage}
                           </div>
                         </div>
                       </div>
@@ -1099,7 +1095,7 @@ export default function HomePage() {
                           {Object.entries(passport.quality_scores).map(([key, value]) => (
                             <div key={key} className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
                               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                {key.replace(/([A-Z])/g, ' $1').trim()}
+                                {key === "hook" ? "ჰუკი" : key === "retentionPotential" ? "შენარჩუნება" : key === "originality" ? "ორიგინალობა" : key === "clarity" ? "სიცხადე" : key === "emotionalImpact" ? "ემოციური გავლენა" : key === "shareability" ? "გაზიარებადობა" : key === "visualStrength" ? "ვიზუალური სიძლიერე" : key === "brandFit" ? "ბრენდის შესაბამისობა" : key === "platformFit" ? "პლატფორმის შესაბამისობა" : key === "cta" ? "CTA" : key === "safety" ? "უსაფრთხოება" : key}
                               </div>
                               <div className={`text-2xl font-black ${
                                 value >= 90 ? "text-emerald-400" : value >= 75 ? "text-yellow-400" : "text-red-400"
@@ -1112,7 +1108,7 @@ export default function HomePage() {
                       )}
 
                       <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-6">
-                        <div className="text-xs font-bold text-slate-400 mb-2">REVIEW NOTES</div>
+                        <div className="text-xs font-bold text-slate-400 mb-2">გადახედვის შენიშვნები</div>
                         <ul className="space-y-2">
                           {passport.review_notes.map((note, idx) => (
                             <li key={idx} className="text-sm text-slate-300 flex gap-2">
@@ -1127,31 +1123,31 @@ export default function HomePage() {
                           onClick={() => {
                             qualityManager.makeFinalDecision(passport.content_id, "APPROVE", "human_executive", true);
                             setPassports([...qualityManager.getAllPassports()]);
-                            pushEvent("quality", `✅ Human Executive APPROVED content ${passport.content_id}`);
+                            pushEvent("quality", `✅ ადამიანმა აღმასრულებელმა დაამტკიცა კონტენტი ${passport.content_id}`);
                           }}
                           className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30"
                         >
-                          ✅ APPROVE & PUBLISH
+                          ✅ დამტკიცება და გამოქვეყნება
                         </button>
                         <button 
                           onClick={() => {
                             qualityManager.makeFinalDecision(passport.content_id, "REVISE", "human_executive", true);
                             setPassports([...qualityManager.getAllPassports()]);
-                            pushEvent("quality", `🔄 Human Executive requested REVISION for ${passport.content_id}`);
+                            pushEvent("quality", `🔄 ადამიანმა აღმასრულებელმა მოითხოვა შესწორება ${passport.content_id}-ისთვის`);
                           }}
                           className="flex-1 rounded-xl border border-blue-500/40 bg-blue-500/20 py-3 text-base font-bold text-blue-400 transition hover:bg-blue-500/30"
                         >
-                          🔄 REQUEST REVISION
+                          🔄 შესწორების მოთხოვნა
                         </button>
                         <button 
                           onClick={() => {
                             qualityManager.makeFinalDecision(passport.content_id, "REJECT", "human_executive", true);
                             setPassports([...qualityManager.getAllPassports()]);
-                            pushEvent("quality", `❌ Human Executive REJECTED content ${passport.content_id}`);
+                            pushEvent("quality", `❌ ადამიანმა აღმასრულებელმა უარყო კონტენტი ${passport.content_id}`);
                           }}
                           className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30"
                         >
-                          ❌ REJECT
+                          ❌ უარყოფა
                         </button>
                       </div>
                     </div>
@@ -1161,8 +1157,8 @@ export default function HomePage() {
                 {qualityManager.getPendingReviews().length === 0 && (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
                     <div className="text-4xl mb-4">🎉</div>
-                    <h3 className="text-xl font-black text-white mb-2">All Clear!</h3>
-                    <p className="text-slate-400">No content is currently pending quality review.</p>
+                    <h3 className="text-xl font-black text-white mb-2">ყველაფერი რიგზეა!</h3>
+                    <p className="text-slate-400">ამჟამად კონტენტი ხარისხის გადახედვის მოლოდინში არ არის.</p>
                   </div>
                 )}
               </div>
@@ -1171,16 +1167,16 @@ export default function HomePage() {
 
           {activePanel === "knowledge" && (
             <div>
-              <h2 className="text-2xl font-black mb-6 tracking-wide">📚 KNOWLEDGE BASE</h2>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">📚 ცოდნის ბაზა</h2>
               <p className="text-base text-slate-400 mb-6">
-                Foundation §29-30 — Centralized, versioned organizational memory
+                Foundation §29-30 — ცენტრალიზებული, ვერსიებზე დაფუძნებული ორგანიზაციული მეხსიერება
               </p>
 
               <div className="grid grid-cols-4 gap-4 mb-8">
-                <StatBox label="TOTAL" value={knowledgeManager.getKnowledgeStats().totalDocuments} color="#06b6d4" />
-                <StatBox label="ACTIVE" value={knowledgeManager.getKnowledgeStats().activeDocuments} color="#10b981" />
-                <StatBox label="OUTDATED" value={knowledgeManager.getKnowledgeStats().outdatedDocuments} color="#f59e0b" />
-                <StatBox label="DRAFT" value={knowledgeManager.getKnowledgeStats().draftDocuments} color="#64748b" />
+                <StatBox label="სულ" value={knowledgeManager.getKnowledgeStats().totalDocuments} color="#06b6d4" />
+                <StatBox label="აქტიური" value={knowledgeManager.getKnowledgeStats().activeDocuments} color="#10b981" />
+                <StatBox label="მოძველებული" value={knowledgeManager.getKnowledgeStats().outdatedDocuments} color="#f59e0b" />
+                <StatBox label="მონახაზი" value={knowledgeManager.getKnowledgeStats().draftDocuments} color="#64748b" />
               </div>
 
               <div className="space-y-4">
@@ -1191,8 +1187,8 @@ export default function HomePage() {
                         <h3 className="text-xl font-black">{doc.title}</h3>
                         <p className="text-sm text-slate-400 mt-1">
                           ID: <span className="font-mono text-cyan-400">{doc.knowledge_id}</span> • 
-                          Version: <span className="font-mono text-cyan-400">{doc.version}</span> • 
-                          Owner: <span className="font-bold text-white">{agents.find(a => a.id === doc.owner)?.name || doc.owner}</span>
+                          ვერსია: <span className="font-mono text-cyan-400">{doc.version}</span> • 
+                          მფლობელი: <span className="font-bold text-white">{agents.find(a => a.id === doc.owner)?.name || doc.owner}</span>
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1202,30 +1198,30 @@ export default function HomePage() {
                           doc.status === "draft" ? "bg-slate-500/20 text-slate-400" :
                           "bg-red-500/20 text-red-400"
                         }`}>
-                          {doc.status.toUpperCase()}
+                          {doc.status === "active" ? "აქტიური" : doc.status === "outdated" ? "მოძველებული" : doc.status === "draft" ? "მონახაზი" : "უარყოფილი"}
                         </div>
                         <div className="rounded-lg bg-cyan-500/20 px-3 py-1 text-xs font-black text-cyan-400">
-                          {Math.round(doc.confidence * 100)}% CONFIDENCE
+                          {Math.round(doc.confidence * 100)}% სანდოობა
                         </div>
                       </div>
                     </div>
 
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-4">
-                      <div className="text-xs font-bold text-slate-400 mb-2">CONTENT</div>
+                      <div className="text-xs font-bold text-slate-400 mb-2">შინაარსი</div>
                       <p className="text-base text-slate-300 leading-relaxed">{doc.content}</p>
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs font-bold text-slate-400">SOURCE</div>
+                        <div className="text-xs font-bold text-slate-400">წყარო</div>
                         <div className="text-base font-bold text-white">{doc.source}</div>
                       </div>
                       <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs font-bold text-slate-400">CREATED</div>
+                        <div className="text-xs font-bold text-slate-400">შექმნილი</div>
                         <div className="text-base font-bold text-white">{formatTime(doc.created_at)}</div>
                       </div>
                       <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                        <div className="text-xs font-bold text-slate-400">UPDATED</div>
+                        <div className="text-xs font-bold text-slate-400">განახლებული</div>
                         <div className="text-base font-bold text-white">{formatTime(doc.updated_at)}</div>
                       </div>
                     </div>
@@ -1237,13 +1233,13 @@ export default function HomePage() {
                           style={{ width: `${doc.confidence * 100}%` }}
                         />
                       </div>
-                      <span className="text-xs font-bold text-slate-400">FRESHNESS</span>
+                      <span className="text-xs font-bold text-slate-400">სიახლე</span>
                       <div className={`rounded-lg px-2 py-1 text-xs font-black ${
                         knowledgeManager.isKnowledgeFresh(doc.knowledge_id) 
                           ? "bg-emerald-500/20 text-emerald-400" 
                           : "bg-yellow-500/20 text-yellow-400"
                       }`}>
-                        {knowledgeManager.isKnowledgeFresh(doc.knowledge_id) ? "FRESH" : "AGING"}
+                        {knowledgeManager.isKnowledgeFresh(doc.knowledge_id) ? "ახალი" : "ძველდება"}
                       </div>
                     </div>
                   </div>
@@ -1254,8 +1250,8 @@ export default function HomePage() {
 
           {activePanel === "approvals" && (
             <div>
-              <h2 className="text-2xl font-black mb-6 tracking-wide">✋ HUMAN APPROVAL QUEUE</h2>
-              <p className="text-base text-slate-400 mb-6">Foundation §85 — All high-risk actions require Human Executive approval</p>
+              <h2 className="text-2xl font-black mb-6 tracking-wide">✋ ადამიანის დამტკიცების რიგი</h2>
+              <p className="text-base text-slate-400 mb-6">Foundation §85 — ყველა მაღალი რისკის მოქმედებას სჭირდება ადამიანი აღმასრულებლის დამტკიცება</p>
               <div className="space-y-4">
                 {approvals.map(item => {
                   const agent = agents.find(a => a.id === item.agentId);
@@ -1267,44 +1263,44 @@ export default function HomePage() {
                           <div className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl" style={{ background: `${agent.accent}30` }}>{agent.icon}</div>
                           <div>
                             <h3 className="text-xl font-black">{item.title}</h3>
-                            <p className="text-sm text-slate-400">Requested by <span className="font-bold text-white">{agent.name}</span> • {formatTime(item.createdAt)}</p>
+                            <p className="text-sm text-slate-400">მოითხოვა <span className="font-bold text-white">{agent.name}</span> • {formatTime(item.createdAt)}</p>
                           </div>
                         </div>
-                        <div className={`rounded-xl border px-4 py-2 text-sm font-black ${getRiskColor(item.riskLevel)}`}>{item.riskLevel.toUpperCase()} RISK</div>
+                        <div className={`rounded-xl border px-4 py-2 text-sm font-black ${getRiskColor(item.riskLevel)}`}>{item.riskLevel === "critical" ? "კრიტიკული" : item.riskLevel === "high" ? "მაღალი" : item.riskLevel === "medium" ? "საშუალო" : "დაბალი"} რისკი</div>
                       </div>
                       <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4">
-                        <div className="text-xs font-bold text-slate-400 mb-2">DESCRIPTION</div>
+                        <div className="text-xs font-bold text-slate-400 mb-2">აღწერა</div>
                         <p className="text-base text-slate-300">{item.description}</p>
                         {item.preview && (
                           <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
-                            <div className="text-xs font-bold text-slate-400 mb-1">PREVIEW</div>
+                            <div className="text-xs font-bold text-slate-400 mb-1">წინასწარი ნახვა</div>
                             <div className="text-base font-bold text-white">{item.preview}</div>
                           </div>
                         )}
                       </div>
                       <div className="grid grid-cols-3 gap-4 mb-4">
                         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                          <div className="text-xs font-bold text-slate-400">TYPE</div>
-                          <div className="text-base font-bold text-white">{item.type.toUpperCase()}</div>
+                          <div className="text-xs font-bold text-slate-400">ტიპი</div>
+                          <div className="text-base font-bold text-white">{item.type === "content" ? "კონტენტი" : item.type === "publish" ? "გამოქვეყნება" : item.type === "resource_access" ? "რესურსის წვდომა" : item.type === "policy_change" ? "პოლიტიკის ცვლილება" : "აგენტის მოქმედება"}</div>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                          <div className="text-xs font-bold text-slate-400">PLATFORM</div>
+                          <div className="text-xs font-bold text-slate-400">პლატფორმა</div>
                           <div className="text-base font-bold text-white">{item.platform || "N/A"}</div>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                          <div className="text-xs font-bold text-slate-400">QA SCORE</div>
+                          <div className="text-xs font-bold text-slate-400">QA ქულა</div>
                           <div className={`text-2xl font-black ${getQAScoreColor(item.qaScore)}`}>{item.qaScore}</div>
                         </div>
                       </div>
                       {item.status === "pending" ? (
                         <div className="flex items-center gap-3">
-                          <button onClick={() => approveItem(item.id)} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30">✅ APPROVE</button>
-                          <button onClick={() => reviseItem(item.id)} className="flex-1 rounded-xl border border-blue-500/40 bg-blue-500/20 py-3 text-base font-bold text-blue-400 transition hover:bg-blue-500/30">🔄 REQUEST REVISION</button>
-                          <button onClick={() => rejectItem(item.id)} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ REJECT</button>
+                          <button onClick={() => approveItem(item.id)} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30">✅ დამტკიცება</button>
+                          <button onClick={() => reviseItem(item.id)} className="flex-1 rounded-xl border border-blue-500/40 bg-blue-500/20 py-3 text-base font-bold text-blue-400 transition hover:bg-blue-500/30">🔄 შესწორების მოთხოვნა</button>
+                          <button onClick={() => rejectItem(item.id)} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ უარყოფა</button>
                         </div>
                       ) : (
                         <div className={`rounded-xl border px-4 py-3 text-center text-base font-black ${item.status === "approved" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : item.status === "rejected" ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-blue-500/20 border-blue-500/40 text-blue-400"}`}>
-                          {item.status === "approved" ? "✅ APPROVED" : item.status === "rejected" ? "❌ REJECTED" : "🔄 REVISION REQUESTED"}
+                          {item.status === "approved" ? "✅ დამტკიცებული" : item.status === "rejected" ? "❌ უარყოფილი" : "🔄 შესწორება მოთხოვნილია"}
                         </div>
                       )}
                     </div>
@@ -1316,21 +1312,21 @@ export default function HomePage() {
 
           {activePanel === "emergency" && (
             <div>
-              <h2 className="text-2xl font-black mb-6 tracking-wide text-red-400">🚨 EMERGENCY CONTROLS</h2>
-              <p className="text-base text-slate-400 mb-6">Foundation §104 — Global emergency controls for Human Executive override</p>
+              <h2 className="text-2xl font-black mb-6 tracking-wide text-red-400">🚨 საგანგებო კონტროლი</h2>
+              <p className="text-base text-slate-400 mb-6">Foundation §104 — გლობალური საგანგებო კონტროლი ადამიანი აღმასრულებლის გადაფარვისთვის</p>
               <div className="grid grid-cols-2 gap-6 mb-8">
-                <EmergencyButton label="PAUSE ALL AGENTS" description="Immediately pause all working agents" icon="⏸️" active={emergencyState.allAgentsPaused} onActivate={pauseAllAgents} onDeactivate={resumeAllAgents} color="red" />
-                <EmergencyButton label="PAUSE PUBLISHING" description="Stop all publishing operations" icon="📡" active={emergencyState.publishingPaused} onActivate={pausePublishing} onDeactivate={resumePublishing} color="orange" />
-                <EmergencyButton label="STOP EXPENSIVE TASKS" description="Halt all high-priority resource-intensive tasks" icon="🛑" active={emergencyState.expensiveTasksStopped} onActivate={stopExpensiveTasks} onDeactivate={() => setEmergencyState(prev => ({ ...prev, expensiveTasksStopped: false }))} color="yellow" />
-                <EmergencyButton label="REVOKE TEMPORARY ACCESS" description="Revoke all active access leases" icon="🔐" active={emergencyState.accessRevoked} onActivate={revokeAccess} onDeactivate={() => setEmergencyState(prev => ({ ...prev, accessRevoked: false }))} color="purple" />
+                <EmergencyButton label="ყველა აგენტის შეჩერება" description="მყისიერად შეაჩერე ყველა მომუშავე აგენტი" icon="⏸️" active={emergencyState.allAgentsPaused} onActivate={pauseAllAgents} onDeactivate={resumeAllAgents} color="red" />
+                <EmergencyButton label="გამოქვეყნების შეჩერება" description="შეაჩერე ყველა გამოქვეყნების ოპერაცია" icon="📡" active={emergencyState.publishingPaused} onActivate={pausePublishing} onDeactivate={resumePublishing} color="orange" />
+                <EmergencyButton label="ძვირადღირებული ამოცანების შეჩერება" description="შეაჩერე ყველა მაღალი პრიორიტეტის რესურსზე მომთხოვნი ამოცანა" icon="🛑" active={emergencyState.expensiveTasksStopped} onActivate={stopExpensiveTasks} onDeactivate={() => setEmergencyState(prev => ({ ...prev, expensiveTasksStopped: false }))} color="yellow" />
+                <EmergencyButton label="დროებითი წვდომის გაუქმება" description="გააუქმე ყველა აქტიური წვდომის ლიზინგი" icon="🔐" active={emergencyState.accessRevoked} onActivate={revokeAccess} onDeactivate={() => setEmergencyState(prev => ({ ...prev, accessRevoked: false }))} color="purple" />
               </div>
               <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6">
-                <h3 className="text-xl font-black text-red-400 mb-4">⚠️ EMERGENCY STATE</h3>
+                <h3 className="text-xl font-black text-red-400 mb-4">⚠️ საგანგებო მდგომარეობა</h3>
                 <div className="space-y-3">
-                  <EmergencyStatusItem label="All Agents Paused" active={emergencyState.allAgentsPaused} />
-                  <EmergencyStatusItem label="Publishing Paused" active={emergencyState.publishingPaused} />
-                  <EmergencyStatusItem label="Expensive Tasks Stopped" active={emergencyState.expensiveTasksStopped} />
-                  <EmergencyStatusItem label="Access Revoked" active={emergencyState.accessRevoked} />
+                  <EmergencyStatusItem label="ყველა აგენტი შეჩერებულია" active={emergencyState.allAgentsPaused} />
+                  <EmergencyStatusItem label="გამოქვეყნება შეჩერებულია" active={emergencyState.publishingPaused} />
+                  <EmergencyStatusItem label="ძვირადღირებული ამოცანები შეჩერებულია" active={emergencyState.expensiveTasksStopped} />
+                  <EmergencyStatusItem label="წვდომა გაუქმებულია" active={emergencyState.accessRevoked} />
                 </div>
               </div>
             </div>
@@ -1341,10 +1337,10 @@ export default function HomePage() {
           <div className="p-6">
             <div className="mb-8">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-black tracking-wide">📡 EVENT FEED</h2>
+                <h2 className="text-2xl font-black tracking-wide">📡 მოვლენების ნაკადი</h2>
                 <div className="flex items-center gap-2">
                   <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-400" />
-                  <span className="text-sm font-bold text-emerald-400">LIVE</span>
+                  <span className="text-sm font-bold text-emerald-400">პირდაპირი</span>
                 </div>
               </div>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -1352,7 +1348,7 @@ export default function HomePage() {
                   <div key={event.id} className="rounded-xl border border-white/5 bg-white/5 p-3 transition-all hover:bg-white/10" style={{ animation: index === 0 ? "slideIn 0.4s ease-out" : undefined }}>
                     <div className="mb-1 flex items-center justify-between">
                       <span className="text-xs font-black tracking-wider" style={{ color: event.type === "success" ? "#34d399" : event.type === "warning" ? "#fbbf24" : event.type === "error" ? "#f87171" : event.type === "agent" ? "#60a5fa" : event.type === "task" ? "#c084fc" : event.type === "resource" ? "#f97316" : event.type === "quality" ? "#06b6d4" : event.type === "learning" ? "#14b8a6" : event.type === "emergency" ? "#ef4444" : event.type === "approval" ? "#fbbf24" : "#94a3b8" }}>
-                        {event.type.toUpperCase()}
+                        {event.type === "system" ? "სისტემა" : event.type === "task" ? "ამოცანა" : event.type === "agent" ? "აგენტი" : event.type === "success" ? "წარმატება" : event.type === "warning" ? "გაფრთხილება" : event.type === "error" ? "შეცდომა" : event.type === "resource" ? "რესურსი" : event.type === "quality" ? "ხარისხი" : event.type === "learning" ? "სწავლა" : event.type === "emergency" ? "საგანგებო" : event.type === "approval" ? "დამტკიცება" : event.type}
                       </span>
                       <span className="font-mono text-xs text-slate-500">{event.timestamp}</span>
                     </div>
@@ -1363,7 +1359,7 @@ export default function HomePage() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-black mb-4 tracking-wide">🔐 RESOURCES</h2>
+              <h2 className="text-2xl font-black mb-4 tracking-wide">🔐 რესურსები</h2>
               <div className="space-y-3">
                 {resources.map(resource => (
                   <div key={resource.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -1373,11 +1369,11 @@ export default function HomePage() {
                         <div className="text-xs text-slate-400">{resource.type}</div>
                       </div>
                       <div className={`rounded-lg px-3 py-1 text-xs font-black ${resource.status === "healthy" ? "bg-emerald-500/20 text-emerald-400" : resource.status === "degraded" ? "bg-yellow-500/20 text-yellow-400" : "bg-red-500/20 text-red-400"}`}>
-                        {resource.status.toUpperCase()}
+                        {resource.status === "healthy" ? "ჯანმრთელი" : resource.status === "degraded" ? "გაუარესებული" : "მიუწვდომელი"}
                       </div>
                     </div>
                     <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-slate-400">Usage</span>
+                      <span className="text-slate-400">გამოყენება</span>
                       <span className="font-mono font-bold">{resource.usage} / {resource.quota}</span>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-slate-700">
@@ -1407,22 +1403,22 @@ export default function HomePage() {
           </div>
           <div className="p-5 space-y-4">
             <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-xs font-bold text-slate-400 mb-2">STATUS</div>
+              <div className="text-xs font-bold text-slate-400 mb-2">სტატუსი</div>
               <div className="text-xl font-black" style={{ color: getStatusColor(selectedAgent.status) }}>{getStatusLabel(selectedAgent.status)}</div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs font-bold text-slate-400">LEVEL</div>
+                <div className="text-xs font-bold text-slate-400">დონე</div>
                 <div className="text-2xl font-black">{selectedAgent.level}</div>
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs font-bold text-slate-400">AUTONOMY</div>
+                <div className="text-xs font-bold text-slate-400">ავტონომია</div>
                 <div className="text-2xl font-black">L{selectedAgent.autonomyLevel}</div>
               </div>
             </div>
             {selectedAgent.currentTask && (
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-bold text-slate-400 mb-2">CURRENT ACTIVITY</div>
+                <div className="text-xs font-bold text-slate-400 mb-2">მიმდინარე აქტივობა</div>
                 <div className="text-base font-bold">{selectedAgent.currentTask}</div>
               </div>
             )}
@@ -1436,9 +1432,9 @@ export default function HomePage() {
           to { opacity: 1; transform: translateY(0); }
         }
         /* =====================================================
-           LUNARA OS — READABILITY SYSTEM
-           The original information architecture remains intact.
-           This layer increases legibility without flattening density.
+           LUNARA OS — წაკითხვადობის სისტემა
+           ორიგინალური ინფორმაციული არქიტექტურა უცვლელი რჩება.
+           ეს შრე ზრდის წაკითხვადობას სიმკვრივის დაკარგვის გარეშე.
            ===================================================== */
         .lunara-readable .text-xs {
           font-size: 0.8125rem !important;
@@ -1479,7 +1475,7 @@ export default function HomePage() {
 }
 
 /* =========================================================
-   SUB-COMPONENTS
+   ქვე-კომპონენტები
    ========================================================= */
 
 function StatBadge({ label, value, icon, color }: { label: string; value: number; icon: string; color: string }) {
@@ -1519,7 +1515,7 @@ function EmergencyButton({ label, description, icon, active, onActivate, onDeact
       </div>
       <p className="text-sm text-slate-400 mb-4">{description}</p>
       <div className={`rounded-xl px-4 py-2 text-sm font-black ${active ? "bg-white/20 text-white" : "bg-white/10 text-white/60"}`}>
-        {active ? "✅ ACTIVE" : "⏸️ INACTIVE"}
+        {active ? "✅ აქტიური" : "⏸️ არააქტიური"}
       </div>
     </button>
   );
@@ -1530,7 +1526,7 @@ function EmergencyStatusItem({ label, active }: { label: string; active: boolean
     <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
       <span className="text-base font-bold text-white">{label}</span>
       <div className={`rounded-lg px-3 py-1 text-sm font-black ${active ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"}`}>
-        {active ? "ACTIVE" : "INACTIVE"}
+        {active ? "აქტიური" : "არააქტიური"}
       </div>
     </div>
   );
