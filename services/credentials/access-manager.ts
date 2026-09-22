@@ -1,0 +1,151 @@
+// ============================================================
+// LUNARA OS — Access Manager (Lease Lifecycle)
+// Foundation: §38-39, §68-69
+// Purpose: Manage access leases for credentials
+// ============================================================
+
+import { credentialVault } from './credential-vault';
+import { osEngine } from '../../core/engine';
+
+export type LeaseStatus = "REQUESTED" | "APPROVED" | "ACTIVE" | "EXPIRED" | "REVOKED";
+
+export interface AccessLease {
+  lease_id: string;
+  agent_id: string;
+  credential_id: string;
+  provider: string;
+  permission: string;
+  purpose: string;
+  task_id: string | null;
+  status: LeaseStatus;
+  created_at: number;
+  approved_at: number | null;
+  activated_at: number | null;
+  expires_at: number;
+  revoked_at: number | null;
+  approved_by: string;
+}
+
+export class AccessManager {
+  private leases: Map<string, AccessLease> = new Map();
+
+  constructor() {
+    console.log('[AccessManager] Initialized');
+  }
+
+  public requestAccess(
+    agentId: string,
+    provider: string,
+    permission: string,
+    purpose: string,
+    taskId: string | null,
+    durationSeconds: number = 300
+  ): string {
+    const credential = credentialVault.getCredentialByProvider(provider, permission);
+    
+    if (!credential) {
+      console.error(`[AccessManager] No credential found for ${provider} with scope ${permission}`);
+      return "";
+    }
+
+    if (credential.status !== "active") {
+      console.error(`[AccessManager] Credential ${credential.credential_id} is not active`);
+      return "";
+    }
+
+    const leaseId = `lease_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
+
+    const lease: AccessLease = {
+      lease_id: leaseId,
+      agent_id: agentId,
+      credential_id: credential.credential_id,
+      provider,
+      permission,
+      purpose,
+      task_id: taskId,
+      status: "APPROVED",
+      created_at: now,
+      approved_at: now,
+      activated_at: now,
+      expires_at: now + (durationSeconds * 1000),
+      revoked_at: null,
+      approved_by: "policy_engine"
+    };
+
+    this.leases.set(leaseId, lease);
+
+    osEngine.emitEvent({
+      event_id: `evt_lease_${Date.now()}`,
+      type: "LEASE_CREATED",
+      timestamp: now,
+      agent_id: agentId,
+      task_id: taskId,
+      resource_id: credential.credential_id,
+      content_id: null,
+      payload: { leaseId, provider, permission, durationSeconds },
+      severity: "info"
+    });
+
+    console.log(`[AccessManager] ✅ Lease created: ${leaseId} for ${agentId} → ${provider}`);
+    return leaseId;
+  }
+
+  public validateLease(leaseId: string): boolean {
+    const lease = this.leases.get(leaseId);
+    if (!lease) return false;
+
+    if (lease.status !== "ACTIVE" && lease.status !== "APPROVED") return false;
+    if (Date.now() > lease.expires_at) {
+      lease.status = "EXPIRED";
+      return false;
+    }
+
+    return true;
+  }
+
+  public revokeLease(leaseId: string, revokedBy: string): boolean {
+    const lease = this.leases.get(leaseId);
+    if (!lease) return false;
+
+    lease.status = "REVOKED";
+    lease.revoked_at = Date.now();
+
+    osEngine.emitEvent({
+      event_id: `evt_lease_revoked_${Date.now()}`,
+      type: "LEASE_REVOKED",
+      timestamp: Date.now(),
+      agent_id: lease.agent_id,
+      task_id: lease.task_id,
+      resource_id: lease.credential_id,
+      content_id: null,
+      payload: { leaseId, revokedBy },
+      severity: "warning"
+    });
+
+    return true;
+  }
+
+  public revokeAllLeases(revokedBy: string): number {
+    let count = 0;
+    this.leases.forEach(lease => {
+      if (lease.status === "ACTIVE" || lease.status === "APPROVED") {
+        this.revokeLease(lease.lease_id, revokedBy);
+        count++;
+      }
+    });
+    return count;
+  }
+
+  public getActiveLeases(): AccessLease[] {
+    return Array.from(this.leases.values()).filter(
+      l => l.status === "ACTIVE" || l.status === "APPROVED"
+    );
+  }
+
+  public getAllLeases(): AccessLease[] {
+    return Array.from(this.leases.values());
+  }
+}
+
+export const accessManager = new AccessManager();

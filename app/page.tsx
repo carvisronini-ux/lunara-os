@@ -6,7 +6,8 @@ import { resourceManager } from "@/core/resource";
 import { knowledgeManager } from "@/core/knowledge";
 import { qualityManager } from "@/core/quality";
 import { learningManager } from "@/core/learning";
-import { orchestrator } from "@/core/orchestration/orchestrator"; // Phase 7 Integration
+import { orchestrator } from "@/core/orchestration/orchestrator";
+import { agentRuntime } from "@/core/agents/agent-runtime"; // <-- ახალი იმპორტი: Agent Runtime
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
 import type { ContentPassport, QualityScore } from "@/core/quality";
 import type { LearningRecord, AgentVersion } from "@/core/learning";
@@ -123,15 +124,16 @@ const initialAgents: Agent[] = [
   { id: "iris", name: "Iris", role: "Learning Director", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "working", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "Analyzing performance patterns" },
 ];
 
+// NOTE: Changed initial statuses to "queued" and progress to 0 so AgentRuntime can pick them up from the start.
 const initialTasks: Task[] = [
-  { id: "task-001", title: "Analyze TikTok trend signals", agentId: "nyx", status: "running", progress: 65, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
-  { id: "task-002", title: "Develop Q4 content strategy", agentId: "sage", status: "review", progress: 90, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
-  { id: "task-003", title: "Write 3 hook variants for Love Signal", agentId: "muse", status: "running", progress: 45, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
-  { id: "task-004", title: "Create visual concept for new series", agentId: "vega", status: "waiting", progress: 20, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
-  { id: "task-005", title: "Verify OpenAI API health", agentId: "atlas", status: "running", progress: 80, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
-  { id: "task-006", title: "QA review: 2 pending posts", agentId: "aegis", status: "running", progress: 55, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
-  { id: "task-007", title: "Publish to Telegram channel", agentId: "echo", status: "completed", progress: 100, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
-  { id: "task-008", title: "Extract patterns from last week", agentId: "iris", status: "running", progress: 70, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
+  { id: "task-001", title: "Analyze TikTok trend signals", agentId: "nyx", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
+  { id: "task-002", title: "Develop Q4 content strategy", agentId: "sage", status: "queued", progress: 0, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
+  { id: "task-003", title: "Write 3 hook variants for Love Signal", agentId: "muse", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
+  { id: "task-004", title: "Create visual concept for new series", agentId: "vega", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
+  { id: "task-005", title: "Verify OpenAI API health", agentId: "atlas", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
+  { id: "task-006", title: "QA review: 2 pending posts", agentId: "aegis", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
+  { id: "task-007", title: "Publish to Telegram channel", agentId: "echo", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
+  { id: "task-008", title: "Extract patterns from last week", agentId: "iris", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
 ];
 
 const initialApprovals: ApprovalItem[] = [
@@ -302,6 +304,7 @@ function getStatusColor(status: AgentStatus): string {
     case "idle": return "#94a3b8";
     case "working": return "#facc15";
     case "waiting": return "#60a5fa";
+    case "queued": return "#60a5fa"; // Added for initial state
     case "waiting_for_resource": return "#f97316";
     case "waiting_for_review": return "#a855f7";
     case "completed": return "#34d399";
@@ -319,6 +322,7 @@ function getStatusLabel(status: AgentStatus): string {
     case "idle": return "⏸️ IDLE";
     case "working": return "⚡ WORKING";
     case "waiting": return "⏳ WAITING";
+    case "queued": return "⏳ QUEUED"; // Added for initial state
     case "waiting_for_resource": return "🔐 WAITING RESOURCE";
     case "waiting_for_review": return "🔍 WAITING REVIEW";
     case "completed": return "✅ COMPLETED";
@@ -415,7 +419,6 @@ export default function HomePage() {
     accessRevoked: false,
   });
   
-  // Added "pipeline" to activePanel
   const [activePanel, setActivePanel] = useState<"overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge">("overview");
   const timersRef = useRef<number[]>([]);
 
@@ -427,7 +430,7 @@ export default function HomePage() {
     const currentTime = formatTime();
     setClock(currentTime);
 
-    // 1. Register Agents & Tasks into Core Engine
+    // 1. Register Agents & Tasks into Core Engine AND Agent Runtime
     initialAgents.forEach(agent => {
       osEngine.registerAgent(
         {
@@ -445,8 +448,17 @@ export default function HomePage() {
           autonomy_level: agent.autonomyLevel as any,
           failure_policy: { max_retries: 3, retry_delay_ms: 5000, escalation_path: ["astra"], notify_human: true }
         },
-        agent.status as AgentStatus
+        {
+          agent_id: agent.id,
+          status: agent.status as any,
+          current_task_id: agent.taskId,
+          last_heartbeat: Date.now(),
+          health_score: 100
+        }
       );
+      
+      // Register agent in the Runtime so it can "work" on assigned tasks
+      agentRuntime.registerAgent(agent.id);
     });
 
     initialTasks.forEach(task => {
@@ -457,12 +469,13 @@ export default function HomePage() {
         description: task.title,
         status: task.status as TaskStatus,
         priority: task.priority,
-        agent_id: task.agentId,
+        creator_agent_id: "astra",
+        assigned_agent_id: task.agentId,
         department: "executive" as any,
         required_capability: "research.trends" as any,
         payload: {}, expected_outputs: [], depends_on: [],
         progress: task.progress, retry_count: 0, max_retries: 3,
-        last_error_category: null, last_error_message: null,
+        error_category: null, error_message: null,
         created_at: task.createdAt,
         started_at: task.status === "running" ? task.createdAt : null,
         completed_at: task.status === "completed" ? task.createdAt : null,
@@ -473,17 +486,15 @@ export default function HomePage() {
     // 2. Register Resources into Resource Manager (Phase 3)
     initialResources.forEach(res => {
       resourceManager.registerResource({
-        resource_id: res.id as any,
+        provider_id: res.id as any,
         name: res.name,
         type: res.type as any,
-        provider: res.name,
-        health: res.status === "healthy" ? "healthy" : res.status === "degraded" ? "degraded" : "unavailable",
-        usage: res.usage,
-        quota: res.quota,
+        health: res.status === "healthy" ? "HEALTHY" : res.status === "degraded" ? "DEGRADED" : "UNAVAILABLE",
         capabilities: [],
+        quota_limit: res.quota,
+        quota_used: res.usage,
         cost_per_unit: 0.001,
-        last_health_check: Date.now(),
-        config: {}
+        last_health_check: Date.now()
       });
     });
 
@@ -544,33 +555,10 @@ export default function HomePage() {
       });
     });
 
-    // 8. Simulation Loop
-    const simTimer = window.setInterval(() => {
-      if (emergencyState.allAgentsPaused) return;
-      
-      const engineTasks = osEngine.getAllTasks();
-      engineTasks.forEach(task => {
-        if (task.status === "running" && Math.random() > 0.7) {
-          const newProgress = Math.min(100, task.progress + Math.floor(Math.random() * 15));
-          const newStatus = newProgress >= 100 ? "completed" : "running";
-          
-          osEngine.updateTaskStatus(task.task_id, newStatus as TaskStatus, task.agent_id || undefined);
-          
-          setTasks(prev => prev.map(t => 
-            t.id === task.task_id ? { ...t, progress: newProgress, status: newStatus as TaskStatus } : t
-          ));
-          
-          if (newProgress >= 100) {
-             setAgents(prev => prev.map(a => 
-               a.id === task.agent_id ? { ...a, status: "idle" as AgentStatus, taskId: null } : a
-             ));
-          }
-        }
-      });
-    }, 3000);
+    // NOTE: The blind random `simTimer` has been REMOVED. 
+    // Tasks are now executed realistically by the `agentRuntime` based on agent assignment and duration.
 
     return () => {
-      window.clearInterval(simTimer);
       timersRef.current.forEach(t => window.clearTimeout(t));
     };
   }, [emergencyState.allAgentsPaused]);
@@ -929,7 +917,6 @@ export default function HomePage() {
                             const agent = agents.find(a => a.id === stage.agentId);
                             const isCompleted = index < instance.currentStageIndex;
                             const isCurrent = index === instance.currentStageIndex;
-                            const isPending = index > instance.currentStageIndex;
 
                             return (
                               <div 
