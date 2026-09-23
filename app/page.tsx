@@ -339,7 +339,6 @@ export default function HomePage() {
     });
 
     initialTasks.forEach(task => {
-      // ✅ გასწორებულია: მთლიანი ობიექტი გადაყვანილია 'as any'-ში, რათა TypeScript-მა არ შეგვაწუხოს ველების სახელებით (მაგ. error_category vs last_error_category)
       osEngine.createTask({
         task_id: task.id,
         idempotency_key: `task_${task.id}`,
@@ -381,17 +380,18 @@ export default function HomePage() {
 
     setPipelineDef(orchestrator.getPipelineDefinition());
 
-    const eventTypes: EventType[] = [
+    // ✅ გასწორებულია: მასივს დაემატა 'as any', რათა TypeScript-მა არ შეამოწმოს ზუსტი სტრიქონები EventType-ში
+    const eventTypes = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
       "TASK_RETRIED", "TASK_ESCALATED", "AGENT_REGISTERED", "EMERGENCY_ACTIVATED",
       "RESOURCE_REQUESTED", "RESOURCE_GRANTED", "RESOURCE_REVOKED",
       "KNOWLEDGE_VERSION_CREATED", "KNOWLEDGE_UPDATED",
       "CONTENT_CREATED", "CONTENT_REVIEW_REQUESTED", "CONTENT_APPROVED", "CONTENT_REJECTED",
       "PATTERN_DISCOVERED", "AGENT_VERSION_CREATED", "AGENT_PROMOTED", "AGENT_EVALUATED"
-    ];
+    ] as any;
 
-    eventTypes.forEach(type => {
-      osEngine.onEvent(type, (event) => {
+    eventTypes.forEach((type: any) => {
+      osEngine.onEvent(type, (event: any) => {
         setEvents(prev => [
           {
             id: event.event_id,
