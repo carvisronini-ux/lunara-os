@@ -380,7 +380,6 @@ export default function HomePage() {
 
     setPipelineDef(orchestrator.getPipelineDefinition());
 
-    // ✅ გასწორებულია: მასივს დაემატა 'as any', რათა TypeScript-მა არ შეამოწმოს ზუსტი სტრიქონები EventType-ში
     const eventTypes = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
       "TASK_RETRIED", "TASK_ESCALATED", "AGENT_REGISTERED", "EMERGENCY_ACTIVATED",
@@ -439,11 +438,12 @@ export default function HomePage() {
 
     osEngine.onEvent("NYX_ANALYSIS_COMPLETED" as any, (event: any) => {
       setOpportunities([...opportunityRegistry.getAllOpportunities()]);
+      // ✅ გასწორებულია: დამატებულია 'as EventLog["type"]' ტიპის შესატყვისობისთვის
       setEvents(prev => [
         {
           id: event.event_id,
           timestamp: new Date(event.timestamp).toLocaleTimeString(),
-          type: "learning",
+          type: "learning" as EventLog["type"],
           message: `🔍 Nyx-მა დაასრულა ანალიზი: ${event.payload?.valid_opportunities} შესაძლებლობა აღმოჩენილია ${event.payload?.total_signals} სიგნალიდან`,
         },
         ...prev
