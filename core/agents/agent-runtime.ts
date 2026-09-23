@@ -1,16 +1,18 @@
 // ============================================================
-// LUNARA OS — Agent Runtime (Simplified & Bulletproof)
-// Purpose: Prove the end-to-end chain works without external dependencies
+// LUNARA OS — Agent Runtime (With Specialized Agent Logic)
+// Foundation: LUNARA MASTER BIBLE v2.0, §33, §38-39, §101
+// Purpose: Execute tasks with agent-specific logic
 // ============================================================
 
 import { osEngine } from '../engine';
+import { nyxAgent } from './nyx';
 
 export class AgentRuntime {
   private activeAgents: Set<string> = new Set();
   private processingTasks: Set<string> = new Set();
 
   constructor() {
-    console.log('[AgentRuntime] Initialized (Simple Mode)');
+    console.log('[AgentRuntime] Initialized with specialized agent logic');
     osEngine.onEvent("TASK_CREATED", (event) => this.handleNewTask(event));
   }
 
@@ -18,44 +20,62 @@ export class AgentRuntime {
     this.activeAgents.add(agentId);
   }
 
-  private handleNewTask(event: any) {
+  private async handleNewTask(event: any) {
     const taskId = event.task_id;
     const agentId = event.agent_id;
 
-    // Ignore if not for a registered agent or already processing
     if (!taskId || !agentId || !this.activeAgents.has(agentId)) return;
     if (this.processingTasks.has(taskId)) return;
 
     this.processingTasks.add(taskId);
     console.log(`[AgentRuntime] 🤖 ${agentId} started working on ${taskId}`);
     
-    // 1. Mark as RUNNING
+    // Mark as RUNNING
     osEngine.updateTaskStatus(taskId, "RUNNING", agentId);
 
-    // 2. Simulate work duration
-    const workDuration = this.getWorkDuration(agentId);
+    // Check if this is a specialized task
+    if (agentId === "nyx" && taskId.includes("trend_research")) {
+      // Nyx-ის სპეციალური ლოგიკა
+      await this.executeNyxAnalysis(taskId, agentId);
+    } else {
+      // სხვა აგენტებისთვის — სიმულაცია
+      const workDuration = this.getWorkDuration(agentId);
+      setTimeout(() => {
+        console.log(`[AgentRuntime] ✅ ${agentId} COMPLETED ${taskId}`);
+        osEngine.updateTaskStatus(taskId, "COMPLETED", agentId);
+        this.processingTasks.delete(taskId);
+      }, workDuration);
+    }
+  }
 
-    // 3. Complete the task after duration
-    setTimeout(() => {
-      console.log(`[AgentRuntime] ✅ ${agentId} COMPLETED ${taskId}`);
+  // Nyx-ის სპეციალური ლოგიკა
+  private async executeNyxAnalysis(taskId: string, agentId: string) {
+    console.log(`[AgentRuntime] 🔍 Nyx executing trend analysis for ${taskId}`);
+    
+    try {
+      // Nyx ანალიზს უკეთებს ტრენდებს
+      await nyxAgent.analyzeTrends();
       
-      // This is the CRITICAL step that triggers the Orchestrator's next stage
+      console.log(`[AgentRuntime] ✅ Nyx completed trend analysis for ${taskId}`);
       osEngine.updateTaskStatus(taskId, "COMPLETED", agentId);
-      
-      this.processingTasks.delete(taskId);
-    }, workDuration);
+    } catch (error) {
+      console.error(`[AgentRuntime] ❌ Nyx failed:`, error);
+      osEngine.updateTaskStatus(taskId, "FAILED", agentId);
+    }
+    
+    this.processingTasks.delete(taskId);
   }
 
   private getWorkDuration(agentId: string): number {
     const durations: Record<string, number> = {
-      'nyx': 2500,   // 2.5 წამი
-      'sage': 3000,  // 3.0 წამი
-      'muse': 3500,  // 3.5 წამი
-      'vega': 2000,  // 2.0 წამი
-      'aegis': 1500, // 1.5 წამი
-      'echo': 1000,  // 1.0 წამი
-      'nova': 2000,  // 2.0 წამი
-      'iris': 2500   // 2.5 წამი
+      'nyx': 2500,
+      'sage': 3000,
+      'muse': 3500,
+      'vega': 2000,
+      'aegis': 1500,
+      'echo': 1000,
+      'nova': 2000,
+      'iris': 2500
     };
     return durations[agentId] || 2000;
   }
