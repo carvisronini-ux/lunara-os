@@ -13,7 +13,7 @@ import { generateContentFamily, type ContentFamily } from "@/core/content/conten
 import { aegisAgent, type QualityReview } from "@/core/agents/aegis";
 import { echoAgent, type DistributionPlan } from "@/core/agents/echo";
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
-import type { ContentPassport, QualityScore } from "@/core/quality";
+import type { ContentPassport } from "@/core/quality";
 import type { LearningRecord, AgentVersion } from "@/core/learning";
 import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
