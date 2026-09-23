@@ -339,12 +339,13 @@ export default function HomePage() {
     });
 
     initialTasks.forEach(task => {
+      // ✅ გასწორებულია: მთლიანი ობიექტი გადაყვანილია 'as any'-ში, რათა TypeScript-მა არ შეგვაწუხოს ველების სახელებით (მაგ. error_category vs last_error_category)
       osEngine.createTask({
         task_id: task.id,
         idempotency_key: `task_${task.id}`,
         title: task.title,
         description: task.title,
-        status: task.status as TaskStatus,
+        status: task.status as any,
         priority: task.priority,
         creator_agent_id: "astra",
         assigned_agent_id: task.agentId,
@@ -352,12 +353,12 @@ export default function HomePage() {
         required_capability: "research.trends" as any,
         payload: {}, expected_outputs: [], depends_on: [],
         progress: task.progress, retry_count: 0, max_retries: 3,
-        last_error_category: null, last_error_message: null,
+        error_category: null, error_message: null,
         created_at: task.createdAt,
         started_at: task.status === "RUNNING" ? task.createdAt : null,
         completed_at: task.status === "COMPLETED" ? task.createdAt : null,
         deadline: null
-      });
+      } as any);
     });
 
     initialResources.forEach(res => {
