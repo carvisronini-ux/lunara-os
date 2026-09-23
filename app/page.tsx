@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { osEngine } from "@/core/engine";
 import { resourceManager } from "@/core/resource";
 import { knowledgeManager } from "@/core/knowledge";
-import { qualityManager } from "@/core/quality";
 import { learningManager } from "@/core/learning";
 import { orchestrator } from "@/core/orchestration/orchestrator";
 import { agentRuntime } from "@/core/agents/agent-runtime";
