@@ -291,7 +291,6 @@ export default function HomePage() {
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [clock, setClock] = useState<string | null>(null);
   
-  // ✅ გასწორებულია: წაშლილია გამოუყენებელი setter ფუნქციები
   const [systemStatus] = useState<"healthy" | "degraded" | "partial_outage">("healthy");
   const [simulationMode] = useState(true);
   
@@ -321,10 +320,12 @@ export default function HomePage() {
           inputs: [], outputs: [], capabilities: [], allowed_tools: [],
           allowed_resources: [], knowledge_sources: [], rules: [],
           forbidden_actions: [], quality_criteria: [], kpis: [],
-          supervisor: "astra", controller: "astra", reviewer: "aegis",
-          escalation_path: ["astra"],
+          supervisor: "astra" as any,
+          controller: "astra" as any,
+          reviewer: "aegis" as any,
+          escalation_path: ["astra"] as any,
           autonomy_level: agent.autonomyLevel as any,
-          failure_policy: { max_retries: 3, retry_delay_ms: 5000, escalation_path: ["astra"], notify_human: true }
+          failure_policy: { max_retries: 3, retry_delay_ms: 5000, escalation_path: ["astra"] as any, notify_human: true }
         },
         {
           agent_id: agent.id,
