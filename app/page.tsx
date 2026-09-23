@@ -274,7 +274,6 @@ export default function HomePage() {
   const [resources] = useState<Resource[]>(initialResources);
   const [approvals, setApprovals] = useState<ApprovalItem[]>(initialApprovals);
   
-  // ✅ გასწორებულია: activePipelines state ამოღებულია, pipelineDef დარჩა
   const [pipelineDef, setPipelineDef] = useState<PipelineDefinition | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [contentFamilies, setContentFamilies] = useState<ContentFamily[]>([]);
@@ -291,8 +290,10 @@ export default function HomePage() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>("astra");
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [clock, setClock] = useState<string | null>(null);
-  const [systemStatus, setSystemStatus] = useState<"healthy" | "degraded" | "partial_outage">("healthy");
-  const [simulationMode, setSimulationMode] = useState(true);
+  
+  // ✅ გასწორებულია: წაშლილია გამოუყენებელი setter ფუნქციები
+  const [systemStatus] = useState<"healthy" | "degraded" | "partial_outage">("healthy");
+  const [simulationMode] = useState(true);
   
   const [emergencyState, setEmergencyState] = useState<EmergencyState>({
     allAgentsPaused: false,
