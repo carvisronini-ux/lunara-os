@@ -113,30 +113,31 @@ const departments: Department[] = [
   { id: "learning", name: "სწავლა", icon: "🧬", color: "#14b8a6", description: "ევოლუცია და ტრენინგი" },
 ];
 
+// ✅ გასწორებულია: სტატუსები დიდი ასოებით (AgentStatus-ის შესაბამისად)
 const initialAgents: Agent[] = [
-  { id: "astra", name: "Astra", role: "აღმასრულებელი კოორდინატორი", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "idle", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "სისტემის პრიორიტეტების მონიტორინგი" },
-  { id: "nyx", name: "Nyx", role: "ტრენდების დაზვერვა", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "working", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "TikTok-ის ტრენდების ანალიზი" },
-  { id: "orion", name: "Orion", role: "კონკურენტების დაზვერვა", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "idle", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "დანაწილების მოლოდინში" },
-  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "waiting_for_review", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
-  { id: "muse", name: "Muse", role: "კონტენტის ხელმძღვანელი", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "working", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "3 სცენარის ვარიანტის წერა" },
-  { id: "vega", name: "Vega", role: "კრეატიული დირექტორი", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "waiting", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "სცენარის დამტკიცების მოლოდინში" },
-  { id: "atlas", name: "Atlas", role: "რესურსების დირექტორი", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "working", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "API მონაცემების გადამოწმება" },
-  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "idle", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
-  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "working", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
-  { id: "echo", name: "Echo", role: "გავრცელების მენეჯერი", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "completed", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "გამოქვეყნებულია Telegram-ზე" },
-  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "idle", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
-  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "working", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
+  { id: "astra", name: "Astra", role: "აღმასრულებელი კოორდინატორი", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "სისტემის პრიორიტეტების მონიტორინგი" },
+  { id: "nyx", name: "Nyx", role: "ტრენდების დაზვერვა", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "WORKING", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "TikTok-ის ტრენდების ანალიზი" },
+  { id: "orion", name: "Orion", role: "კონკურენტების დაზვერვა", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "დანაწილების მოლოდინში" },
+  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "WAITING_FOR_REVIEW", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
+  { id: "muse", name: "Muse", role: "კონტენტის ხელმძღვანელი", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "WORKING", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "3 სცენარის ვარიანტის წერა" },
+  { id: "vega", name: "Vega", role: "კრეატიული დირექტორი", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "WAITING", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "სცენარის დამტკიცების მოლოდინში" },
+  { id: "atlas", name: "Atlas", role: "რესურსების დირექტორი", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "WORKING", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "API მონაცემების გადამოწმება" },
+  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
+  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "WORKING", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
+  { id: "echo", name: "Echo", role: "გავრცელების მენეჯერი", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "COMPLETED", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "გამოქვეყნებულია Telegram-ზე" },
+  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
+  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "WORKING", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
 ];
 
 const initialTasks: Task[] = [
-  { id: "task-001", title: "TikTok-ის ტრენდების სიგნალების ანალიზი", agentId: "nyx", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
-  { id: "task-002", title: "Q4 კონტენტის სტრატეგიის შემუშავება", agentId: "sage", status: "queued", progress: 0, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
-  { id: "task-003", title: "Love Signal-ისთვის 3 ჰუკის ვარიანტის დაწერა", agentId: "muse", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
-  { id: "task-004", title: "ახალი სერიის ვიზუალური კონცეფციის შექმნა", agentId: "vega", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
-  { id: "task-005", title: "OpenAI API-ის ჯანმრთელობის გადამოწმება", agentId: "atlas", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
-  { id: "task-006", title: "QA გადახედვა: 2 მოლოდინში მყოფი პოსტი", agentId: "aegis", status: "queued", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
-  { id: "task-007", title: "Telegram არხზე გამოქვეყნება", agentId: "echo", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
-  { id: "task-008", title: "გასული კვირის კანონზომიერებების ამოღება", agentId: "iris", status: "queued", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
+  { id: "task-001", title: "TikTok-ის ტრენდების სიგნალების ანალიზი", agentId: "nyx", status: "QUEUED", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 30 },
+  { id: "task-002", title: "Q4 კონტენტის სტრატეგიის შემუშავება", agentId: "sage", status: "QUEUED", progress: 0, priority: "critical", createdAt: Date.now() - 1000 * 60 * 60 },
+  { id: "task-003", title: "Love Signal-ისთვის 3 ჰუკის ვარიანტის დაწერა", agentId: "muse", status: "QUEUED", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 20 },
+  { id: "task-004", title: "ახალი სერიის ვიზუალური კონცეფციის შექმნა", agentId: "vega", status: "QUEUED", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 15 },
+  { id: "task-005", title: "OpenAI API-ის ჯანმრთელობის გადამოწმება", agentId: "atlas", status: "QUEUED", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 10 },
+  { id: "task-006", title: "QA გადახედვა: 2 მოლოდინში მყოფი პოსტი", agentId: "aegis", status: "QUEUED", progress: 0, priority: "high", createdAt: Date.now() - 1000 * 60 * 25 },
+  { id: "task-007", title: "Telegram არხზე გამოქვეყნება", agentId: "echo", status: "QUEUED", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 45 },
+  { id: "task-008", title: "გასული კვირის კანონზომიერებების ამოღება", agentId: "iris", status: "QUEUED", progress: 0, priority: "normal", createdAt: Date.now() - 1000 * 60 * 35 },
 ];
 
 const initialApprovals: ApprovalItem[] = [];
@@ -216,39 +217,40 @@ function formatTime(timestamp = Date.now()) {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+// ✅ გასწორებულია: დიდი ასოები AgentStatus-ის შესაბამისად
 function getStatusColor(status: AgentStatus): string {
   switch (status) {
-    case "idle": return "#94a3b8";
-    case "working": return "#facc15";
-    case "waiting": return "#60a5fa";
-    case "queued": return "#60a5fa";
-    case "waiting_for_resource": return "#f97316";
-    case "waiting_for_review": return "#a855f7";
-    case "completed": return "#34d399";
-    case "error": return "#f87171";
-    case "paused": return "#fbbf24";
-    case "suspended": return "#ef4444";
-    case "starting": return "#c084fc";
-    case "offline": return "#475569";
+    case "IDLE": return "#94a3b8";
+    case "WORKING": return "#facc15";
+    case "WAITING": return "#60a5fa";
+    case "QUEUED": return "#60a5fa";
+    case "WAITING_FOR_RESOURCE": return "#f97316";
+    case "WAITING_FOR_REVIEW": return "#a855f7";
+    case "COMPLETED": return "#34d399";
+    case "ERROR": return "#f87171";
+    case "PAUSED": return "#fbbf24";
+    case "SUSPENDED": return "#ef4444";
+    case "STARTING": return "#c084fc";
+    case "OFFLINE": return "#475569";
     default: return "#94a3b8";
   }
 }
 
 function getStatusLabel(status: AgentStatus): string {
   switch (status) {
-    case "idle": return "⏸️ უმოქმედო";
-    case "working": return "⚡ მუშაობს";
-    case "waiting": return "⏳ მოლოდინში";
-    case "queued": return "⏳ რიგში";
-    case "waiting_for_resource": return "🔐 რესურსის მოლოდინში";
-    case "waiting_for_review": return "🔍 გადახედვის მოლოდინში";
-    case "completed": return "✅ დასრულებული";
-    case "error": return "❌ შეცდომა";
-    case "paused": return "⏸️ შეჩერებული";
-    case "suspended": return "🚫 შეწყვეტილი";
-    case "starting": return "🚀 იწყება";
-    case "offline": return "⚫ ოფლაინ";
-    default: return status.toUpperCase();
+    case "IDLE": return "⏸️ უმოქმედო";
+    case "WORKING": return "⚡ მუშაობს";
+    case "WAITING": return "⏳ მოლოდინში";
+    case "QUEUED": return "⏳ რიგში";
+    case "WAITING_FOR_RESOURCE": return "🔐 რესურსის მოლოდინში";
+    case "WAITING_FOR_REVIEW": return "🔍 გადახედვის მოლოდინში";
+    case "COMPLETED": return "✅ დასრულებული";
+    case "ERROR": return "❌ შეცდომა";
+    case "PAUSED": return "⏸️ შეჩერებული";
+    case "SUSPENDED": return "🚫 შეწყვეტილი";
+    case "STARTING": return "🚀 იწყება";
+    case "OFFLINE": return "⚫ ოფლაინ";
+    default: return status;
   }
 }
 
@@ -370,8 +372,8 @@ export default function HomePage() {
         progress: task.progress, retry_count: 0, max_retries: 3,
         last_error_category: null, last_error_message: null,
         created_at: task.createdAt,
-        started_at: task.status === "running" ? task.createdAt : null,
-        completed_at: task.status === "completed" ? task.createdAt : null,
+        started_at: task.status === "RUNNING" ? task.createdAt : null,
+        completed_at: task.status === "COMPLETED" ? task.createdAt : null,
         deadline: null
       });
     });
@@ -507,9 +509,10 @@ export default function HomePage() {
   const selectedAgent = agents.find(a => a.id === selectedAgentId) ?? null;
   const selectedDept = departments.find(d => d.id === selectedDepartment);
   
-  const activeAgents = agents.filter(a => a.status === "working" || a.status === "starting").length;
-  const completedTasks = tasks.filter(t => t.status === "completed").length;
-  const runningTasks = tasks.filter(t => t.status === "running").length;
+  // ✅ გასწორებულია: დიდი ასოები
+  const activeAgents = agents.filter(a => a.status === "WORKING" || a.status === "STARTING").length;
+  const completedTasks = tasks.filter(t => t.status === "COMPLETED").length;
+  const runningTasks = tasks.filter(t => t.status === "RUNNING").length;
   const totalXP = agents.reduce((sum, a) => sum + a.xp, 0);
   const pendingApprovals = approvals.filter(a => a.status === "pending").length;
 
@@ -576,6 +579,58 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
       { id: `event-${Date.now()}-${Math.random()}`, timestamp: formatTime(), type, message },
       ...previous,
     ].slice(0, 50));
+  };
+
+  // ✅ გასწორებულია: დიდი ასოები AgentStatus-ში
+  const pauseAllAgents = () => {
+    setAgents(prev => prev.map(a => a.status === "WORKING" || a.status === "STARTING" ? { ...a, status: "PAUSED" as AgentStatus } : a));
+    setEmergencyState(prev => ({ ...prev, allAgentsPaused: true }));
+    pushEvent("emergency", "🚨 საგანგებო: ყველა აგენტი შეაჩერა ადამიანმა აღმასრულებელმა");
+  };
+
+  const resumeAllAgents = () => {
+    setAgents(prev => prev.map(a => a.status === "PAUSED" ? { ...a, status: "IDLE" as AgentStatus } : a));
+    setEmergencyState(prev => ({ ...prev, allAgentsPaused: false }));
+    pushEvent("system", "✅ ყველა აგენტი აღადგინა ადამიანმა აღმასრულებელმა");
+  };
+
+  const pausePublishing = () => {
+    setEmergencyState(prev => ({ ...prev, publishingPaused: true }));
+    pushEvent("emergency", "⚠️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
+  };
+
+  const resumePublishing = () => {
+    setEmergencyState(prev => ({ ...prev, publishingPaused: false }));
+    pushEvent("system", "✅ გამოქვეყნება აღადგინა ადამიანმა აღმასრულებელმა");
+  };
+
+  const stopExpensiveTasks = () => {
+    setTasks(prev => prev.map(t => t.priority === "critical" || t.priority === "high" ? { ...t, status: "FAILED" as TaskStatus } : t));
+    setEmergencyState(prev => ({ ...prev, expensiveTasksStopped: true }));
+    pushEvent("emergency", "🛑 ძვირადღირებული ამოცანები შეაჩერა ადამიანმა აღმასრულებელმა");
+  };
+
+  const revokeAccess = () => {
+    setEmergencyState(prev => ({ ...prev, accessRevoked: true }));
+    pushEvent("emergency", "🔐 დროებითი წვდომა გააუქმა ადამიანმა აღმასრულებელმა");
+  };
+
+  const approveItem = (approvalId: string) => {
+    setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "approved" } : a));
+    const item = approvals.find(a => a.id === approvalId);
+    if (item) pushEvent("approval", `✅ დამტკიცებულია: ${item.title} ადამიანის მიერ`);
+  };
+
+  const rejectItem = (approvalId: string) => {
+    setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "rejected" } : a));
+    const item = approvals.find(a => a.id === approvalId);
+    if (item) pushEvent("approval", `❌ უარყოფილია: ${item.title} ადამიანის მიერ`);
+  };
+
+  const reviseItem = (approvalId: string) => {
+    setApprovals(prev => prev.map(a => a.id === approvalId ? { ...a, status: "revised" } : a));
+    const item = approvals.find(a => a.id === approvalId);
+    if (item) pushEvent("approval", `🔄 შესწორება მოთხოვნილია: ${item.title} ადამიანის მიერ`);
   };
 
   /* =====================================================
@@ -685,7 +740,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               </button>
               {departments.map(dept => {
                 const deptAgents = departmentAgents(dept.id);
-                const activeCount = deptAgents.filter(a => a.status === "working").length;
+                const activeCount = deptAgents.filter(a => a.status === "WORKING").length;
                 return (
                   <button key={dept.id} onClick={() => setSelectedDepartment(dept.id)} className={`w-full rounded-xl border p-3 text-left transition-all ${selectedDepartment === dept.id ? "border-white/30 bg-white/10" : "border-white/5 bg-white/5 hover:bg-white/10"}`} style={{ borderColor: selectedDepartment === dept.id ? dept.color : undefined }}>
                     <div className="flex items-center gap-3">
@@ -1089,6 +1144,45 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
           </div>
         </aside>
       </div>
+
+      {selectedAgent && (
+        <div className="fixed bottom-6 right-6 z-[1000] w-[450px] rounded-3xl border border-white/10 bg-slate-900/95 backdrop-blur-2xl shadow-2xl">
+          <div className="border-b border-white/10 p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-3xl" style={{ background: `${selectedAgent.accent}30` }}>{selectedAgent.icon}</div>
+                <div>
+                  <h3 className="text-2xl font-black">{selectedAgent.name}</h3>
+                  <p className="text-sm text-slate-400">{selectedAgent.role}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedAgentId(null)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl hover:bg-white/10">×</button>
+            </div>
+          </div>
+          <div className="p-5 space-y-4">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="text-xs font-bold text-slate-400 mb-2">სტატუსი</div>
+              <div className="text-xl font-black" style={{ color: getStatusColor(selectedAgent.status) }}>{getStatusLabel(selectedAgent.status)}</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="text-xs font-bold text-slate-400">დონე</div>
+                <div className="text-2xl font-black">{selectedAgent.level}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="text-xs font-bold text-slate-400">ავტონომია</div>
+                <div className="text-2xl font-black">L{selectedAgent.autonomyLevel}</div>
+              </div>
+            </div>
+            {selectedAgent.currentTask && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="text-xs font-bold text-slate-400 mb-2">მიმდინარე აქტივობა</div>
+                <div className="text-base font-bold">{selectedAgent.currentTask}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes slideIn {
