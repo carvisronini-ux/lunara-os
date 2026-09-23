@@ -216,7 +216,6 @@ function formatTime(timestamp = Date.now()) {
   return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
-// ✅ გასწორებულია: "QUEUED" ამოღებულია, რადგან ის TaskStatus-ია და არა AgentStatus
 function getStatusColor(status: AgentStatus): string {
   switch (status) {
     case "IDLE": return "#94a3b8";
@@ -279,10 +278,11 @@ function generateMessageFromEvent(event: any): string {
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [resources, setResources] = useState<Resource[]>(initialResources);
+  // ✅ გასწორებულია: ამოღებულია გამოუყენებელი setResources და setLearningRecords
+  const [resources] = useState<Resource[]>(initialResources);
   const [approvals, setApprovals] = useState<ApprovalItem[]>(initialApprovals);
   const [passports, setPassports] = useState<ContentPassport[]>(initialPassports);
-  const [learningRecords, setLearningRecords] = useState<LearningRecord[]>(initialLearningRecords);
+  const [learningRecords] = useState<LearningRecord[]>(initialLearningRecords);
   const [agentVersions, setAgentVersions] = useState<AgentVersion[]>(initialAgentVersions);
   
   const [activePipelines, setActivePipelines] = useState<ActivePipelineInstance[]>([]);
