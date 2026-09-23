@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { osEngine } from "@/core/engine";
 import { resourceManager } from "@/core/resource";
 import { knowledgeManager } from "@/core/knowledge";
-import { learningManager } from "@/core/learning";
 import { orchestrator } from "@/core/orchestration/orchestrator";
 import { agentRuntime } from "@/core/agents/agent-runtime";
 import { opportunityRegistry } from "@/core/intelligence/opportunity";
@@ -13,7 +12,6 @@ import { generateContentFamily, type ContentFamily } from "@/core/content/conten
 import { aegisAgent, type QualityReview } from "@/core/agents/aegis";
 import { echoAgent, type DistributionPlan } from "@/core/agents/echo";
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
-import type { LearningRecord, AgentVersion } from "@/core/learning";
 import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
 
@@ -271,7 +269,6 @@ function generateMessageFromEvent(event: any): string {
    ========================================================= */
 
 export default function HomePage() {
-  // ✅ გასწორებულია: ამოღებულია ყველა გამოუყენებელი state ცვლადი (passports, learningRecords, agentVersions)
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [resources] = useState<Resource[]>(initialResources);
