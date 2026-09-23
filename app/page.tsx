@@ -13,7 +13,6 @@ import { generateContentFamily, type ContentFamily } from "@/core/content/conten
 import { aegisAgent, type QualityReview } from "@/core/agents/aegis";
 import { echoAgent, type DistributionPlan } from "@/core/agents/echo";
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
-import type { ContentPassport } from "@/core/quality";
 import type { LearningRecord, AgentVersion } from "@/core/learning";
 import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
@@ -204,10 +203,6 @@ const initialKnowledge: KnowledgeDocument[] = [
   }
 ];
 
-const initialPassports: ContentPassport[] = [];
-const initialLearningRecords: LearningRecord[] = [];
-const initialAgentVersions: AgentVersion[] = [];
-
 /* =========================================================
    დამხმარე ფუნქციები
    ========================================================= */
@@ -276,14 +271,11 @@ function generateMessageFromEvent(event: any): string {
    ========================================================= */
 
 export default function HomePage() {
+  // ✅ გასწორებულია: ამოღებულია ყველა გამოუყენებელი state ცვლადი (passports, learningRecords, agentVersions)
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  // ✅ გასწორებულია: ამოღებულია გამოუყენებელი setResources და setLearningRecords
   const [resources] = useState<Resource[]>(initialResources);
   const [approvals, setApprovals] = useState<ApprovalItem[]>(initialApprovals);
-  const [passports, setPassports] = useState<ContentPassport[]>(initialPassports);
-  const [learningRecords] = useState<LearningRecord[]>(initialLearningRecords);
-  const [agentVersions, setAgentVersions] = useState<AgentVersion[]>(initialAgentVersions);
   
   const [activePipelines, setActivePipelines] = useState<ActivePipelineInstance[]>([]);
   const [pipelineDef, setPipelineDef] = useState<PipelineDefinition | null>(null);
@@ -385,19 +377,6 @@ export default function HomePage() {
 
     initialKnowledge.forEach(knowledge => {
       knowledgeManager.registerKnowledge(knowledge);
-    });
-
-    initialLearningRecords.forEach(record => {
-      learningManager.createLearningRecord(record.agent_id, record.observation, record.content_id, record.campaign_id);
-      learningManager.advanceLearningStage(record.record_id, "RECOMMENDATION", {
-        pattern: record.pattern,
-        hypothesis: record.hypothesis,
-        recommendation: record.recommendation
-      });
-    });
-
-    initialAgentVersions.forEach(version => {
-      learningManager.proposeAgentVersion(version.agent_id, version.version, version.changes_summary, "iris");
     });
 
     setPipelineDef(orchestrator.getPipelineDefinition());
