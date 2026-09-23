@@ -12,7 +12,7 @@ import { generateContentFamily, type ContentFamily } from "@/core/content/conten
 import { aegisAgent, type QualityReview } from "@/core/agents/aegis";
 import { echoAgent, type DistributionPlan } from "@/core/agents/echo";
 import type { EventType, TaskStatus, AgentStatus, KnowledgeId, KnowledgeDocument } from "@/core/contracts";
-import type { ActivePipelineInstance, PipelineDefinition } from "@/core/orchestration/orchestrator";
+import type { PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
 
 /* =========================================================
@@ -274,7 +274,7 @@ export default function HomePage() {
   const [resources] = useState<Resource[]>(initialResources);
   const [approvals, setApprovals] = useState<ApprovalItem[]>(initialApprovals);
   
-  const [activePipelines, setActivePipelines] = useState<ActivePipelineInstance[]>([]);
+  // ✅ გასწორებულია: activePipelines state ამოღებულია, pipelineDef დარჩა
   const [pipelineDef, setPipelineDef] = useState<PipelineDefinition | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [contentFamilies, setContentFamilies] = useState<ContentFamily[]>([]);
@@ -377,7 +377,6 @@ export default function HomePage() {
     });
 
     setPipelineDef(orchestrator.getPipelineDefinition());
-    setActivePipelines(orchestrator.getActivePipelines());
 
     const eventTypes: EventType[] = [
       "TASK_CREATED", "TASK_STARTED", "TASK_COMPLETED", "TASK_FAILED",
@@ -399,10 +398,6 @@ export default function HomePage() {
           },
           ...prev
         ].slice(0, 50));
-        
-        if (type === "TASK_CREATED" || type === "TASK_COMPLETED" || type === "TASK_FAILED") {
-          setActivePipelines([...orchestrator.getActivePipelines()]);
-        }
       });
     });
 
