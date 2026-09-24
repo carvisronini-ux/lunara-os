@@ -113,7 +113,7 @@ export class OpportunityRegistry {
         confidence, 
         priority 
       },
-      severity: "info"
+      severity: "info" as any
     });
 
     console.log(`[OpportunityRegistry] ✨ Nyx discovered: "${topic}" (confidence: ${confidence}, priority: ${priority})`);
@@ -138,7 +138,7 @@ export class OpportunityRegistry {
       resource_id: null,
       content_id: null,
       payload: { opportunityId },
-      severity: "info"
+      severity: "info" as any
     });
 
     console.log(`[OpportunityRegistry] ✅ Orion validated: "${opp.topic}"`);
@@ -163,7 +163,7 @@ export class OpportunityRegistry {
       resource_id: null,
       content_id: null,
       payload: { opportunityId },
-      severity: "success"
+      severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე
     });
 
     console.log(`[OpportunityRegistry] 🎯 Sage approved: "${opp.topic}"`);
