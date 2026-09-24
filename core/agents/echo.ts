@@ -99,7 +99,7 @@ export class EchoAgent {
   // Calculate optimal posting time based on channel
   private calculateOptimalTime(channelId: string): number {
     const now = Date.now();
-    const hour = new Date().getHours();
+    // ✅ წაშლილია გამოუყენებელი 'const hour = new Date().getHours();'
 
     // Peak engagement times by channel
     const optimalHours: Record<string, number> = {
