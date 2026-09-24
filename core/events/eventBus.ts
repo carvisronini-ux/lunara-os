@@ -92,8 +92,8 @@ export async function getEvents(filters: {
       throw new Error(`Event fetch failed: ${error.message}`);
     }
 
-    // ვალიდაცია
-    const validatedEvents = data.map(event => EventSchema.parse(event));
+    // ✅ გასწორებულია: დამატებულია explicit 'any' ტიპი event პარამეტრზე
+    const validatedEvents = (data || []).map((event: any) => EventSchema.parse(event));
     
     return validatedEvents;
   } catch (error) {
