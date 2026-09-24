@@ -6,7 +6,6 @@
 
 import type { AgentConstitution, AgentStatus } from '../contracts';
 
-// ლოკალური ტიპის განსაზღვრა, რადგან AgentState შესაძლოა არ იყოს ექსპორტირებული
 type AgentState = {
   agent_id: string;
   status: AgentStatus;
@@ -46,15 +45,15 @@ export const initialAgents: { constitution: AgentConstitution; state: AgentState
         { name: 'Task Success Rate', description: '% of tasks completed successfully', target: 95, current: 0, unit: 'percent' },
         { name: 'Escalation Rate', description: '% of tasks requiring human intervention', target: 5, current: 0, unit: 'percent' }
       ],
-      supervisor: 'human_executive',
-      controller: 'human_executive',
-      reviewer: 'human_executive',
-      escalation_path: ['human_executive'],
+      supervisor: 'human_executive' as any,
+      controller: 'human_executive' as any,
+      reviewer: 'human_executive' as any,
+      escalation_path: ['human_executive'] as any,
       autonomy_level: 3,
       failure_policy: {
         max_retries: 2,
         retry_delay_ms: 10000,
-        escalation_path: ['human_executive'],
+        escalation_path: ['human_executive'] as any,
         notify_human: true
       }
     },
@@ -96,15 +95,15 @@ export const initialAgents: { constitution: AgentConstitution; state: AgentState
         { name: 'Trend Accuracy', description: '% of identified trends that went viral within 7 days', target: 70, current: 0, unit: 'percent' },
         { name: 'Research Speed', description: 'Average time to complete trend analysis', target: 300, current: 0, unit: 'seconds' }
       ],
-      supervisor: 'astra',
-      controller: 'astra',
-      reviewer: 'astra',
-      escalation_path: ['astra', 'human_executive'],
+      supervisor: 'astra' as any,
+      controller: 'astra' as any,
+      reviewer: 'astra' as any,
+      escalation_path: ['astra', 'human_executive'] as any,
       autonomy_level: 3,
       failure_policy: {
         max_retries: 3,
         retry_delay_ms: 30000,
-        escalation_path: ['astra', 'human_executive'],
+        escalation_path: ['astra', 'human_executive'] as any,
         notify_human: true
       }
     },
@@ -146,15 +145,15 @@ export const initialAgents: { constitution: AgentConstitution; state: AgentState
         { name: 'QA Accuracy', description: '% of approved content that performs above average', target: 75, current: 0, unit: 'percent' },
         { name: 'Review Speed', description: 'Average time to complete quality review', target: 120, current: 0, unit: 'seconds' }
       ],
-      supervisor: 'astra',
-      controller: 'astra',
-      reviewer: 'human_executive',
-      escalation_path: ['astra', 'human_executive'],
+      supervisor: 'astra' as any,
+      controller: 'astra' as any,
+      reviewer: 'human_executive' as any,
+      escalation_path: ['astra', 'human_executive'] as any,
       autonomy_level: 3,
       failure_policy: {
         max_retries: 2,
         retry_delay_ms: 15000,
-        escalation_path: ['astra', 'human_executive'],
+        escalation_path: ['astra', 'human_executive'] as any,
         notify_human: true
       }
     },
