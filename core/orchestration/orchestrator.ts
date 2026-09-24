@@ -5,7 +5,6 @@
 
 import { osEngine } from '../engine';
 import { learningManager } from '../learning';
-import type { TaskStatus } from '../contracts';
 
 export type PipelineStage = {
   name: string;
@@ -106,7 +105,7 @@ export class LunaraOrchestrator {
         resource_id: null,
         content_id: null,
         payload: { pipeline: pipeline.name, instanceId: instance.instanceId, status: "COMPLETED" },
-        severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე და დამატებულია 'as any'
+        severity: "info" as any
       });
       return;
     }
@@ -166,11 +165,10 @@ export class LunaraOrchestrator {
     const taskId = event.task_id;
     if (!taskId) return;
 
-    // ✅ BULLETPROOF FIX: Exact regex matching the instanceId format
     const match = taskId.match(/^task_pipe_(pipeline_inst_\d+_[a-z0-9]+)_([a-z_]+)$/);
     if (!match) return;
     
-    const instanceId = match[1]; // This is now 100% guaranteed to be correct
+    const instanceId = match[1];
     const instance = this.activePipelines.get(instanceId);
     if (!instance) return;
 
@@ -198,7 +196,6 @@ export class LunaraOrchestrator {
     const taskId = event.task_id;
     if (!taskId) return;
 
-    // ✅ BULLETPROOF FIX: Exact regex matching the instanceId format
     const match = taskId.match(/^task_pipe_(pipeline_inst_\d+_[a-z0-9]+)_([a-z_]+)$/);
     if (!match) return;
     
