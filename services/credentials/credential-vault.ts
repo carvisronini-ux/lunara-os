@@ -1,126 +1,130 @@
 // ============================================================
-// LUNARA OS — Credential Vault (Zero-Budget Implementation)
-// Foundation: §36-45, §70, §95
-// Purpose: In-memory credential metadata management
-// NOTE: In production, this would use Supabase/Vault. 
-// For zero-budget demo, we use in-memory storage.
+// LUNARA OS — Credential Vault
+// Foundation: §22, §40, §51
+// Purpose: Secure storage for API keys. Never exposes plaintext to client.
 // ============================================================
 
-export type CredentialType = "api_key" | "oauth_token" | "bearer_token" | "basic_auth";
-export type CredentialStatus = "active" | "expired" | "revoked" | "suspended";
-export type ProviderHealth = "healthy" | "degraded" | "unavailable";
+import type { Credential, Provider, PermissionScope, CredentialStatus, CredentialAuditLog } from './types';
+import { accessManager } from './access-manager';
 
-export interface CredentialMetadata {
-  credential_id: string;
-  provider: string;           // "openai", "telegram", "tiktok", etc.
-  credential_name: string;    // "openai_gpt4_key", "telegram_bot_token"
-  credential_type: CredentialType;
-  scope: string[];            // ["research.trends", "publishing.telegram"]
-  status: CredentialStatus;
-  created_at: number;
-  last_verified: number | null;
-  expires_at: number | null;
-  quota_limit: number | null;  // requests per day
-  quota_used: number;
-  health: ProviderHealth;
-  // ❌ NO actual API key stored here!
-  // In production, actual secrets would be in Vercel Env Vars / Supabase Vault
-}
+// მარტივი mock დაშიფვრა (რეალურ პროდუქციაში იქნება KMS ან Env Vars)
+const mockEncrypt = (text: string) => Buffer.from(`ENC:${text}`).toString('base64');
+const mockDecrypt = (encrypted: string) => {
+  try {
+    const decoded = Buffer.from(encrypted, 'base64').toString('utf8');
+    return decoded.startsWith('ENC:') ? decoded.slice(4) : encrypted;
+  } catch { return encrypted; }
+};
 
 export class CredentialVault {
-  private credentials: Map<string, CredentialMetadata> = new Map();
+  private credentials: Map<string, Credential> = new Map();
+  private auditLog: CredentialAuditLog[] = [];
 
   constructor() {
-    console.log('[CredentialVault] Initialized (in-memory mode)');
-    this.initializeMockCredentials();
+    console.log('[CredentialVault] 🔐 Initialized. Secrets isolated.');
   }
 
-  private initializeMockCredentials() {
-    // Mock credentials for demo purposes
-    const mockCredentials: CredentialMetadata[] = [
-      {
-        credential_id: "cred_openai_001",
-        provider: "openai",
-        credential_name: "openai_gpt4_key",
-        credential_type: "api_key",
-        scope: ["content.write", "content.rewrite", "quality.brand_check"],
-        status: "active",
-        created_at: Date.now() - 1000 * 60 * 60 * 24 * 30,
-        last_verified: Date.now() - 1000 * 60 * 60,
-        expires_at: Date.now() + 1000 * 60 * 60 * 24 * 365,
-        quota_limit: 1000,
-        quota_used: 247,
-        health: "healthy"
-      },
-      {
-        credential_id: "cred_telegram_001",
-        provider: "telegram",
-        credential_name: "telegram_bot_token",
-        credential_type: "bearer_token",
-        scope: ["publishing.telegram", "analytics.collect"],
-        status: "active",
-        created_at: Date.now() - 1000 * 60 * 60 * 24 * 60,
-        last_verified: Date.now() - 1000 * 60 * 30,
-        expires_at: null,
-        quota_limit: 500,
-        quota_used: 89,
-        health: "healthy"
-      },
-      {
-        credential_id: "cred_tiktok_001",
-        provider: "tiktok",
-        credential_name: "tiktok_research_key",
-        credential_type: "api_key",
-        scope: ["research.trends", "research.competitors"],
-        status: "active",
-        created_at: Date.now() - 1000 * 60 * 60 * 24 * 15,
-        last_verified: Date.now() - 1000 * 60 * 60 * 2,
-        expires_at: Date.now() + 1000 * 60 * 60 * 24 * 180,
-        quota_limit: 200,
-        quota_used: 45,
-        health: "healthy"
-      }
-    ];
+  public addCredential(
+    provider: Provider,
+    name: string,
+    plaintextValue: string,
+    scope: PermissionScope,
+    owner: string = "human_executive"
+  ): string {
+    const id = `cred_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
 
-    mockCredentials.forEach(cred => {
-      this.credentials.set(cred.credential_id, cred);
-    });
+    const cred: Credential = {
+      credential_id: id,
+      provider,
+      name,
+      encrypted_value: mockEncrypt(plaintextValue),
+      scope,
+      status: "ACTIVE",
+      owner,
+      created_at: now,
+      last_rotated_at: null,
+      expires_at: null
+    };
+
+    this.credentials.set(id, cred);
+    this.logAudit("created", owner, id, "success", `Added ${provider} credential: ${name}`);
+    console.log(`[CredentialVault] ✅ Added: ${name} (${provider})`);
+    return id;
   }
 
-  public getCredential(credentialId: string): CredentialMetadata | undefined {
-    return this.credentials.get(credentialId);
+  // §40: აბრუნებს მხოლოდ მეტამონაცემებს (უსაფრთხოა UI-სთვის)
+  public getMetadata(): Omit<Credential, 'encrypted_value'>[] {
+    return Array.from(this.credentials.values()).map(({ encrypted_value, ...rest }) => rest);
   }
 
-  public getCredentialByProvider(provider: string, scope: string): CredentialMetadata | undefined {
+  public getCredentialByProvider(provider: Provider, permission: PermissionScope): Credential | undefined {
     return Array.from(this.credentials.values()).find(
-      cred => cred.provider === provider && cred.scope.includes(scope) && cred.status === "active"
+      c => c.provider === provider && c.scope === permission && c.status === "ACTIVE"
     );
   }
 
-  public getAllCredentials(): CredentialMetadata[] {
-    return Array.from(this.credentials.values());
-  }
-
-  public updateQuota(credentialId: string, increment: number = 1): boolean {
+  // მხოლოდ AccessManager-ს შეუძლია ამის გამოძახება ვალიდური Lease-ით
+  public getDecryptedValue(credentialId: string, requestingAgentId: string): string | null {
     const cred = this.credentials.get(credentialId);
-    if (!cred) return false;
+    if (!cred || cred.status !== "ACTIVE") return null;
 
-    cred.quota_used += increment;
-    cred.last_verified = Date.now();
-
-    if (cred.quota_limit && cred.quota_used >= cred.quota_limit * 0.9) {
-      cred.health = "degraded";
+    // შეამოწმე აქვს თუ არა აგენტს ვალიდური ლიზინგი
+    const hasLease = accessManager.validateLeaseForCredential(credentialId, requestingAgentId);
+    if (!hasLease) {
+      this.logAudit("access_attempt", requestingAgentId, credentialId, "denied", "No valid lease");
+      return null;
     }
 
-    return true;
+    this.logAudit("access_attempt", requestingAgentId, credentialId, "success", "Lease validated, access granted");
+    return mockDecrypt(cred.encrypted_value);
   }
 
-  public revokeCredential(credentialId: string): boolean {
+  public rotateCredential(credentialId: string, newPlaintextValue: string, rotatedBy: string): boolean {
     const cred = this.credentials.get(credentialId);
     if (!cred) return false;
 
-    cred.status = "revoked";
+    cred.encrypted_value = mockEncrypt(newPlaintextValue);
+    cred.last_rotated_at = Date.now();
+    
+    // §21: Secret rotation - ანულირებს ყველა არსებულ ლიზინგს უსაფრთხოებისთვის
+    accessManager.revokeAllLeasesForCredential(credentialId, rotatedBy);
+    
+    this.logAudit("rotated", rotatedBy, credentialId, "success", "Credential rotated, all leases revoked");
     return true;
+  }
+
+  public revokeCredential(credentialId: string, revokedBy: string, reason: string): boolean {
+    const cred = this.credentials.get(credentialId);
+    if (!cred) return false;
+
+    cred.status = "REVOKED";
+    accessManager.revokeAllLeasesForCredential(credentialId, revokedBy);
+    this.logAudit("revoked", revokedBy, credentialId, "success", reason);
+    return true;
+  }
+
+  private logAudit(
+    action: CredentialAuditLog["action"],
+    actorId: string,
+    targetId: string | null,
+    result: CredentialAuditLog["result"],
+    reason: string
+  ) {
+    this.auditLog.unshift({
+      log_id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      action,
+      actor_id: actorId,
+      target_credential_id: targetId,
+      result,
+      reason,
+      timestamp: Date.now()
+    });
+    if (this.auditLog.length > 100) this.auditLog.pop();
+  }
+
+  public getAuditLog(limit = 20): CredentialAuditLog[] {
+    return this.auditLog.slice(0, limit);
   }
 }
 
