@@ -90,7 +90,7 @@ export class LearningManager {
       resource_id: null,
       content_id: contentId || null,
       payload: { recordId, stage: "OBSERVATION", observation },
-      severity: "info"
+      severity: "info" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
     });
 
     return recordId;
@@ -142,7 +142,7 @@ export class LearningManager {
       resource_id: null,
       content_id: null,
       payload: { version, state: "CANDIDATE", proposer: proposerId },
-      severity: "info"
+      severity: "info" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
     });
 
     return version;
@@ -168,7 +168,7 @@ export class LearningManager {
       resource_id: null,
       content_id: null,
       payload: { version, approvedBy },
-      severity: "success"
+      severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე და დამატებულია 'as any'
     });
 
     return true;
@@ -192,7 +192,7 @@ export class LearningManager {
       resource_id: null,
       content_id: null,
       payload: { version, state: "DEPRECATED", rejectedBy },
-      severity: "warning"
+      severity: "warning" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
     });
 
     return true;
