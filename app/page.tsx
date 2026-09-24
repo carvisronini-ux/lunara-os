@@ -330,7 +330,7 @@ export default function HomePage() {
 
     initialResources.forEach(res => {
       resourceManager.registerResource({
-        provider_id: res.id as any,
+        resource_id: res.id as any,
         name: res.name,
         type: res.type as any,
         health: res.status === "healthy" ? "HEALTHY" : res.status === "degraded" ? "DEGRADED" : "UNAVAILABLE",
