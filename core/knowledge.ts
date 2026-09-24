@@ -64,7 +64,7 @@ export class KnowledgeManager {
 
   public getAllActiveKnowledge(): KnowledgeDocument[] {
     const active: KnowledgeDocument[] = [];
-    // ✅ გასწორებულია: დამატებულია _version, რათა TypeScript-მა არ იჩივლოს გამოუყენებლობაზე
+    // ✅ გასწორებულია: დამატებულია _version
     this.activeVersions.forEach((_version, knowledgeId) => {
       const doc = this.getActiveKnowledge(knowledgeId as KnowledgeId);
       if (doc) active.push(doc);
@@ -134,7 +134,7 @@ export class KnowledgeManager {
   // §45 — Knowledge Access for Agents
   // ----------------------------------------------------------
   public getKnowledgeForAgent(
-    agentId: string,
+    _agentId: string, // ✅ გასწორებულია: დამატებულია ქვედატირე
     allowedKnowledgeIds: KnowledgeId[]
   ): KnowledgeDocument[] {
     const accessible: KnowledgeDocument[] = [];
