@@ -90,7 +90,7 @@ export class ResourceManager {
       expires_at: now + (durationSeconds * 1000),
       revoked_at: null,
       approved_by: null,
-      audit_log: []
+      audit_log: [] as any
     };
 
     this.leases.set(leaseId, lease);
