@@ -36,13 +36,6 @@ const sizeMap = {
   large: 'w-36 h-36',
 };
 
-const statusColors: Record<BuildingStatus, string> = {
-  healthy: 'bg-green-400',
-  busy: 'bg-blue-400',
-  warning: 'bg-yellow-400',
-  critical: 'bg-red-500',
-};
-
 export function IsoBuilding({
   name,
   displayName,
