@@ -77,11 +77,12 @@ export default function VirtualOfficePage() {
       }));
       setDepartments(updatedDepartments);
 
+      // ✅ გასწორებულია: გამოყენებულია message და timestamp EventData ინტერფეისის შესაბამისად
       const initialEvents: EventData[] = Array.from({ length: 5 }, (_, i) => ({
         event_id: `sim_event_${i}`,
         event_type: randomItem(eventTypes),
-        source_agent_name: randomItem(agentPool).name,
-        created_at: new Date(Date.now() - i * 60000).toISOString(),
+        message: `${randomItem(agentPool).name} triggered a system event`,
+        timestamp: new Date(Date.now() - i * 60000).toLocaleTimeString(),
       }));
       setEvents(initialEvents);
     }
@@ -107,11 +108,12 @@ export default function VirtualOfficePage() {
         }),
       })));
 
+      // ✅ გასწორებულია: გამოყენებულია message და timestamp
       setEvents(prev => [{
         event_id: `sim_event_${Date.now()}`,
         event_type: randomItem(eventTypes),
-        source_agent_name: randomItem(agentPool).name,
-        created_at: new Date().toISOString(),
+        message: `${randomItem(agentPool).name} triggered a system event`,
+        timestamp: new Date().toLocaleTimeString(),
       }, ...prev].slice(0, 20));
     }, 3000);
 
