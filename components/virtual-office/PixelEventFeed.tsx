@@ -9,6 +9,7 @@ export interface EventData {
 
 interface PixelEventFeedProps {
   events: EventData[];
+  title?: string;
 }
 
 const eventTypeIcons: Record<string, string> = {
@@ -27,22 +28,29 @@ const eventTypeIcons: Record<string, string> = {
   PATTERN_DISCOVERED: '🧬',
 };
 
-export function PixelEventFeed({ events }: PixelEventFeedProps) {
+export function PixelEventFeed({ events, title = 'EVENTS' }: PixelEventFeedProps) {
   return (
-    <div className="space-y-2">
-      {events.length === 0 ? (
-        <div className="text-[8px] text-gray-500 pixel-font text-center py-4">No events yet...</div>
-      ) : (
-        events.slice(0, 12).map((event) => (
-          <div key={event.event_id} className="pixel-event flex items-start gap-2 p-2 rounded bg-[#2C1810]/50 border border-[#F5E6D3]/20">
-            <span className="text-[10px]">{eventTypeIcons[event.event_type] || '⚡'}</span>
-            <div className="flex-1">
-              <div className="text-[9px] text-[#F5E6D3] pixel-font leading-tight">{event.message}</div>
-              <div className="text-[7px] text-gray-500 pixel-font mt-0.5">{event.timestamp}</div>
-            </div>
-          </div>
-        ))
+    <div className="bg-black border-4 border-white p-4">
+      {title && (
+        <div className="border-b-2 border-white pb-2 mb-3">
+          <span className="text-[10px] text-yellow-400 pixel-font">{title}</span>
+        </div>
       )}
+      <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+        {events.length === 0 ? (
+          <div className="text-[8px] text-gray-500 pixel-font text-center py-4">No events yet...</div>
+        ) : (
+          events.slice(0, 12).map((event) => (
+            <div key={event.event_id} className="pixel-event flex items-start gap-2 p-2 rounded bg-[#2C1810]/50 border border-[#F5E6D3]/20">
+              <span className="text-[10px]">{eventTypeIcons[event.event_type] || '⚡'}</span>
+              <div className="flex-1">
+                <div className="text-[9px] text-[#F5E6D3] pixel-font leading-tight">{event.message}</div>
+                <div className="text-[7px] text-gray-500 pixel-font mt-0.5">{event.timestamp}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
