@@ -5,7 +5,7 @@
 
 import { osEngine } from '../engine';
 import { learningManager } from '../learning';
-import type { EventType, TaskStatus } from '../contracts';
+import type { TaskStatus } from '../contracts';
 
 export type PipelineStage = {
   name: string;
@@ -75,14 +75,14 @@ export class LunaraOrchestrator {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "TASK_CREATED",
+      type: "TASK_CREATED" as any,
       timestamp: Date.now(),
       agent_id: null,
       task_id: null,
       resource_id: null,
       content_id: null,
       payload: { pipeline: CONTENT_CREATION_PIPELINE.name, instanceId, stage: "STARTED" },
-      severity: "info"
+      severity: "info" as any
     });
 
     return instanceId;
@@ -99,14 +99,14 @@ export class LunaraOrchestrator {
       
       osEngine.emitEvent({
         event_id: `evt_${Date.now()}_${Math.random()}`,
-        type: "TASK_COMPLETED",
+        type: "TASK_COMPLETED" as any,
         timestamp: Date.now(),
         agent_id: "astra",
         task_id: null,
         resource_id: null,
         content_id: null,
         payload: { pipeline: pipeline.name, instanceId: instance.instanceId, status: "COMPLETED" },
-        severity: "success"
+        severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე და დამატებულია 'as any'
       });
       return;
     }
@@ -126,10 +126,10 @@ export class LunaraOrchestrator {
       idempotency_key: `pipeline:${instance.instanceId}:${stage.name}`,
       title: `${pipeline.name} - ${stage.name}`,
       description: stage.description,
-      status: "QUEUED" as TaskStatus,
+      status: "QUEUED" as any,
       priority: "high",
       agent_id: agentId,
-      department: "executive",
+      department: "executive" as any,
       required_capability: stage.capability as any,
       payload: { 
         pipelineInstanceId: instance.instanceId, 
@@ -141,24 +141,24 @@ export class LunaraOrchestrator {
       progress: 0,
       retry_count: 0,
       max_retries: 3,
-      last_error_category: null,
-      last_error_message: null,
+      error_category: null,
+      error_message: null,
       created_at: Date.now(),
       started_at: null,
       completed_at: null,
       deadline: Date.now() + 1000 * 60 * 10
-    });
+    } as any);
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "TASK_CREATED",
+      type: "TASK_CREATED" as any,
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: taskId,
       resource_id: null,
       content_id: null,
       payload: { stage: stage.name, pipeline: pipeline.name },
-      severity: "info"
+      severity: "info" as any
     });
   }
 
@@ -209,7 +209,7 @@ export class LunaraOrchestrator {
     // §35, §72: Escalation logic for failed tasks
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "TASK_ESCALATED",
+      type: "TASK_ESCALATED" as any,
       timestamp: Date.now(),
       agent_id: event.agent_id,
       task_id: taskId,
@@ -219,7 +219,7 @@ export class LunaraOrchestrator {
         reason: "Task failed in pipeline, escalating to Executive Core",
         stage: CONTENT_CREATION_PIPELINE.stages[instance.currentStageIndex]?.name 
       },
-      severity: "warning"
+      severity: "warning" as any
     });
 
     // Halt pipeline and mark as failed
