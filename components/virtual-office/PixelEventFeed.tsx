@@ -1,6 +1,6 @@
 'use client';
 
-interface PixelEvent {
+export interface EventData {
   event_id: string;
   event_type: string;
   message: string;
@@ -8,7 +8,7 @@ interface PixelEvent {
 }
 
 interface PixelEventFeedProps {
-  events: PixelEvent[];
+  events: EventData[];
 }
 
 const eventTypeIcons: Record<string, string> = {
@@ -33,7 +33,6 @@ export function PixelEventFeed({ events }: PixelEventFeedProps) {
       {events.length === 0 ? (
         <div className="text-[8px] text-gray-500 pixel-font text-center py-4">No events yet...</div>
       ) : (
-        // ✅ შეცვლილია: (event, index) -> (event), რადგან index არ გამოიყენება
         events.slice(0, 12).map((event) => (
           <div key={event.event_id} className="pixel-event flex items-start gap-2 p-2 rounded bg-[#2C1810]/50 border border-[#F5E6D3]/20">
             <span className="text-[10px]">{eventTypeIcons[event.event_type] || '⚡'}</span>
