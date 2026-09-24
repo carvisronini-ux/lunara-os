@@ -46,7 +46,7 @@ export class AccessManager {
       permission,
       purpose,
       task_id: taskId,
-      status: "APPROVED", // §35: Auto-approved for operational flow, but gated by human_executive for high-risk
+      status: "APPROVED",
       created_at: now,
       approved_at: now,
       activated_at: now,
@@ -73,7 +73,21 @@ export class AccessManager {
     return leaseId;
   }
 
-  // ახალი მეთოდი: ამოწმებს კონკრეტული აგენტის წვდომას (გამოიყენება Vault-ის მიერ)
+  // ✅ ეს მეთოდი აუცილებელია mock-proxy.ts-ისთვის
+  public validateLease(leaseId: string): boolean {
+    const lease = this.leases.get(leaseId);
+    if (!lease) return false;
+
+    if (lease.status !== "ACTIVE" && lease.status !== "APPROVED") return false;
+    if (Date.now() > lease.expires_at) {
+      lease.status = "EXPIRED";
+      return false;
+    }
+
+    return true;
+  }
+
+  // ✅ ეს მეთოდი აუცილებელია credential-vault.ts-ისთვის
   public validateLeaseForCredential(credentialId: string, agentId: string): boolean {
     const activeLease = Array.from(this.leases.values()).find(
       l => l.credential_id === credentialId && 
@@ -107,7 +121,6 @@ export class AccessManager {
     return true;
   }
 
-  // §36 Emergency System: Revoke all access for a specific credential (e.g., on rotation)
   public revokeAllLeasesForCredential(credentialId: string, revokedBy: string): number {
     let count = 0;
     this.leases.forEach(lease => {
@@ -119,7 +132,6 @@ export class AccessManager {
     return count;
   }
 
-  // §36 Emergency System: Global kill switch
   public revokeAllLeasesGlobally(revokedBy: string): number {
     let count = 0;
     this.leases.forEach(lease => {
