@@ -75,7 +75,7 @@ export class EchoAgent {
         totalScheduled: plans.length,
         platforms: Array.from(new Set(plans.map(p => p.platform)))
       },
-      severity: "info"
+      severity: "info" as any
     });
 
     console.log(`[Echo] ✅ Scheduled ${plans.length} variants across ${Array.from(new Set(plans.map(p => p.platform))).length} platforms`);
@@ -99,7 +99,6 @@ export class EchoAgent {
   // Calculate optimal posting time based on channel
   private calculateOptimalTime(channelId: string): number {
     const now = Date.now();
-    // ✅ წაშლილია გამოუყენებელი 'const hour = new Date().getHours();'
 
     // Peak engagement times by channel
     const optimalHours: Record<string, number> = {
@@ -166,7 +165,7 @@ export class EchoAgent {
         platform: targetPlan.platform,
         postId: postId
       },
-      severity: "success"
+      severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე, რათა EventSeverity ტიპს შეესაბამებოდეს
     });
 
     return true;
