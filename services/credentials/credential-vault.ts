@@ -4,7 +4,7 @@
 // Purpose: Secure storage for API keys. Never exposes plaintext to client.
 // ============================================================
 
-import type { Credential, Provider, PermissionScope, CredentialStatus, CredentialAuditLog } from './types';
+import type { Credential, Provider, PermissionScope, CredentialAuditLog } from './types';
 import { accessManager } from './access-manager';
 
 // მარტივი mock დაშიფვრა (რეალურ პროდუქციაში იქნება KMS ან Env Vars)
