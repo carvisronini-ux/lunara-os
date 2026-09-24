@@ -4,7 +4,7 @@
 // Purpose: Schedule and distribute approved content to platforms
 // ============================================================
 
-import type { ContentFamily, ContentVariant } from '../content/content-family';
+import type { ContentFamily } from '../content/content-family';
 import type { QualityReview } from './aegis';
 import { osEngine } from '../engine';
 
