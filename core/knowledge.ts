@@ -27,7 +27,7 @@ export class KnowledgeManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "KNOWLEDGE_VERSION_CREATED",
+      type: "KNOWLEDGE_VERSION_CREATED" as any,
       timestamp: Date.now(),
       agent_id: doc.owner,
       task_id: null,
@@ -103,7 +103,7 @@ export class KnowledgeManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "KNOWLEDGE_UPDATED",
+      type: "KNOWLEDGE_UPDATED" as any,
       timestamp: Date.now(),
       agent_id: updatedBy,
       task_id: null,

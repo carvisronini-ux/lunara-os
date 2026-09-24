@@ -173,7 +173,7 @@ export function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
               <div className="bg-gray-900 border-2 border-gray-700 p-3">
                 <div className="text-xs text-gray-500 mb-2">Required Files</div>
                 <div className="space-y-1">
-                  {debugInfo.files.map((file, index) => (
+                  {debugInfo.files.map((file) => (
                     <div key={index} className="flex items-center gap-2 text-xs">
                       <div className={clsx(
                         'w-2 h-2 border border-black',
@@ -259,7 +259,7 @@ export function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
                 <div className="bg-red-900/20 border-2 border-red-400 p-3">
                   <div className="text-xs text-red-400 mb-2">⚠ ERRORS DETECTED</div>
                   <div className="space-y-1">
-                    {debugInfo.errors.map((error, index) => (
+                    {debugInfo.errors.map((error) => (
                       <div key={index} className="text-xs text-red-300">
                         • {error}
                       </div>

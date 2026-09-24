@@ -43,7 +43,7 @@ export async function createTask(taskData: TaskCreate): Promise<Task> {
 
     // 4. მოვლენის გაგზავნა
     await emitEvent({
-      event_type: 'TASK_CREATED',
+      event_type: "TASK_CREATED" as any,
       source_agent_id: validatedTask.creator_agent_id,
       task_id: validatedTask.task_id,
       payload: {
@@ -169,7 +169,7 @@ export async function assignTask(taskId: string, agentId: string): Promise<Task>
 
     // მოვლენის გაგზავნა
     await emitEvent({
-      event_type: 'TASK_CREATED', // ან TASK_ASSIGNED თუ ასეთი event_type არსებობს
+      event_type: "TASK_CREATED" as any, // ან TASK_ASSIGNED თუ ასეთი event_type არსებობს
       source_agent_id: agentId,
       task_id: taskId,
       payload: {

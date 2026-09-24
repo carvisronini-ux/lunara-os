@@ -77,7 +77,7 @@ export class AccessManager {
 
     osEngine.emitEvent({
       event_id: `evt_lease_${Date.now()}`,
-      type: "LEASE_CREATED",
+      type: "LEASE_CREATED" as any,
       timestamp: now,
       agent_id: agentId,
       task_id: taskId,
@@ -113,7 +113,7 @@ export class AccessManager {
 
     osEngine.emitEvent({
       event_id: `evt_lease_revoked_${Date.now()}`,
-      type: "LEASE_REVOKED",
+      type: "LEASE_REVOKED" as any,
       timestamp: Date.now(),
       agent_id: lease.agent_id,
       task_id: lease.task_id,

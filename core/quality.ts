@@ -75,7 +75,7 @@ export class QualityManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "CONTENT_CREATED",
+      type: "CONTENT_CREATED" as any,
       timestamp: Date.now(),
       agent_id: passport.creator_agent,
       task_id: null,
@@ -105,7 +105,7 @@ export class QualityManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "CONTENT_REVIEW_REQUESTED",
+      type: "CONTENT_REVIEW_REQUESTED" as any,
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: null,
@@ -155,8 +155,8 @@ export class QualityManager {
     const passport = this.passports.get(contentId);
     if (!passport) return false;
 
-    passport.status = decision;
-    passport.current_stage = decision;
+    passport.status = decision as any;
+    passport.current_stage = decision as any;
     passport.updated_at = Date.now();
     passport.review_notes.push(`[FINAL DECISION by ${decisionMakerId}${isHumanOverride ? ' (HUMAN OVERRIDE)' : ''}]: ${decision}`);
 

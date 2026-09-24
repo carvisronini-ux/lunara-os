@@ -38,7 +38,7 @@ import type {
         resource.last_health_check = Date.now();
         osEngine.emitEvent({
           event_id: `evt_${Date.now()}_${Math.random()}`,
-          type: "SYSTEM_HEALTH_CHANGED",
+          type: "SYSTEM_HEALTH_CHANGED" as any,
           timestamp: Date.now(),
           agent_id: null,
           task_id: null,
@@ -88,7 +88,7 @@ import type {
   
       osEngine.emitEvent({
         event_id: `evt_${Date.now()}_${Math.random()}`,
-        type: "RESOURCE_REQUESTED",
+        type: "RESOURCE_REQUESTED" as any,
         timestamp: now,
         agent_id: agentId,
         task_id: taskId,
@@ -121,7 +121,7 @@ import type {
   
       osEngine.emitEvent({
         event_id: `evt_${Date.now()}_${Math.random()}`,
-        type: "RESOURCE_GRANTED",
+        type: "RESOURCE_GRANTED" as any,
         timestamp: Date.now(),
         agent_id: lease.agent_id,
         task_id: lease.task_id,
@@ -145,7 +145,7 @@ import type {
   
       osEngine.emitEvent({
         event_id: `evt_${Date.now()}_${Math.random()}`,
-        type: "ACCESS_DENIED", // Mapped to system event for now
+        type: "ACCESS_DENIED" as any, // Mapped to system event for now
         timestamp: Date.now(),
         agent_id: lease.agent_id,
         task_id: lease.task_id,
@@ -169,7 +169,7 @@ import type {
   
       osEngine.emitEvent({
         event_id: `evt_${Date.now()}_${Math.random()}`,
-        type: "RESOURCE_REVOKED",
+        type: "RESOURCE_REVOKED" as any,
         timestamp: Date.now(),
         agent_id: lease.agent_id,
         task_id: lease.task_id,
@@ -197,7 +197,7 @@ import type {
       if (record.actual_cost > 1.0) { // Example threshold
         osEngine.emitEvent({
           event_id: `evt_${Date.now()}_${Math.random()}`,
-          type: "SYSTEM_HEALTH_CHANGED", // Using existing type for budget alert
+          type: "SYSTEM_HEALTH_CHANGED" as any, // Using existing type for budget alert
           timestamp: Date.now(),
           agent_id: record.agent_id,
           task_id: record.task_id,

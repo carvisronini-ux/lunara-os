@@ -56,7 +56,7 @@ export class LunaraOSEngine {
 
     this.emitEvent({
       event_id: `evt_agent_reg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'AGENT_REGISTERED',
+      type: "AGENT_REGISTERED" as any,
       timestamp: Date.now(),
       agent_id: constitution.agent_id,
       task_id: null,
@@ -88,7 +88,7 @@ export class LunaraOSEngine {
     if (oldStatus !== newState.status) {
       this.emitEvent({
         event_id: `evt_agent_status_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: 'AGENT_STATUS_CHANGED',
+        type: "AGENT_STATUS_CHANGED" as any,
         timestamp: Date.now(),
         agent_id: agentId,
         task_id: newState.current_task_id || null,
@@ -119,7 +119,7 @@ export class LunaraOSEngine {
 
     this.emitEvent({
       event_id: `evt_task_created_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'TASK_CREATED',
+      type: "TASK_CREATED" as any,
       timestamp: Date.now(),
       agent_id: task.creator_agent_id,
       task_id: task.task_id,
