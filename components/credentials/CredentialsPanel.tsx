@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
-import type { Provider, PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
   const [credentials, setCredentials] = useState<any[]>([]);
@@ -39,7 +38,7 @@ export function CredentialsPanel() {
           className="rounded-xl bg-red-500/20 border border-red-500/40 px-4 py-2 text-sm font-bold text-red-400 hover:bg-red-500/30"
         >
           🚨 EMERGENCY: REVOKE ALL ACCESS
-       0</button>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -97,6 +96,7 @@ export function CredentialsPanel() {
                   <span className="text-slate-300">{log.action} by {log.actor_id}</span>
                 </div>
               ))}
+              {audit.length === 0 && <div className="text-xs text-slate-500">No audit logs yet.</div>}
             </div>
           </div>
         </div>
