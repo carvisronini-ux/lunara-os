@@ -4,7 +4,16 @@
 // Purpose: Define the permanent identity of the first 3 agents
 // ============================================================
 
-import type { AgentConstitution, AgentState } from '../contracts';
+import type { AgentConstitution, AgentStatus } from '../contracts';
+
+// ლოკალური ტიპის განსაზღვრა, რადგან AgentState შესაძლოა არ იყოს ექსპორტირებული
+type AgentState = {
+  agent_id: string;
+  status: AgentStatus;
+  current_task_id: string | null;
+  last_heartbeat: number;
+  health_score: number;
+};
 
 export const initialAgents: { constitution: AgentConstitution; state: AgentState }[] = [
   {
