@@ -67,7 +67,7 @@ export function EventFeed({ events, title = 'Live Event Feed', maxEvents = 20 }:
           </div>
         ) : (
           <div className="space-y-2">
-            {displayEvents.map((event) => {
+            {displayEvents.map((event, index) => {
               const colorClass = eventTypeColors[event.event_type] || 'text-gray-400 bg-gray-400/10 border-gray-400/30';
 
               return (
