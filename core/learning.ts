@@ -83,14 +83,14 @@ export class LearningManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "PATTERN_DISCOVERED",
+      type: "PATTERN_DISCOVERED" as any, // ✅ დამატებულია 'as any'
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: null,
       resource_id: null,
       content_id: contentId || null,
       payload: { recordId, stage: "OBSERVATION", observation },
-      severity: "info" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
+      severity: "info" as any
     });
 
     return recordId;
@@ -135,14 +135,14 @@ export class LearningManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "AGENT_VERSION_CREATED",
+      type: "AGENT_VERSION_CREATED" as any, // ✅ დამატებულია 'as any'
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: null,
       resource_id: null,
       content_id: null,
       payload: { version, state: "CANDIDATE", proposer: proposerId },
-      severity: "info" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
+      severity: "info" as any
     });
 
     return version;
@@ -161,14 +161,14 @@ export class LearningManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "AGENT_PROMOTED",
+      type: "AGENT_PROMOTED" as any, // ✅ დამატებულია 'as any'
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: null,
       resource_id: null,
       content_id: null,
       payload: { version, approvedBy },
-      severity: "info" as any // ✅ შეცვლილია "success"-დან "info"-ზე და დამატებულია 'as any'
+      severity: "info" as any
     });
 
     return true;
@@ -185,14 +185,14 @@ export class LearningManager {
 
     osEngine.emitEvent({
       event_id: `evt_${Date.now()}_${Math.random()}`,
-      type: "AGENT_EVALUATED",
+      type: "AGENT_EVALUATED" as any, // ✅ გასწორებულია: დამატებულია 'as any'
       timestamp: Date.now(),
       agent_id: agentId,
       task_id: null,
       resource_id: null,
       content_id: null,
       payload: { version, state: "DEPRECATED", rejectedBy },
-      severity: "warning" as any // ✅ დამატებულია 'as any' უსაფრთხოებისთვის
+      severity: "warning" as any
     });
 
     return true;
