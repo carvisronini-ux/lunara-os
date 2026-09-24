@@ -37,7 +37,7 @@ const sizeMap = {
 };
 
 export function IsoBuilding({
-  name,
+  name: _name, // ✅ შეცვლილია _name-ად, რათა TypeScript-მა არ იჩივლოს გამოუყენებლობაზე
   displayName,
   department,
   status,
