@@ -83,7 +83,7 @@ export class ResourceManager {
       permission,
       purpose,
       task_id: taskId,
-      status: "requested",
+      status: "REQUESTED",
       created_at: now,
       approved_at: null,
       activated_at: null,
@@ -113,7 +113,7 @@ export class ResourceManager {
 
   public approveLease(leaseId: string, approvedBy: string): boolean {
     const lease = this.leases.get(leaseId);
-    if (!lease || lease.status !== "requested") return false;
+    if (!lease || lease.status !== "REQUESTED") return false;
 
     // Check resource health before approving
     const resource = this.resources.get(lease.resource_id);
@@ -122,7 +122,7 @@ export class ResourceManager {
       return false;
     }
 
-    lease.status = "approved"; // Will transition to ACTIVE upon first use in real implementation
+    lease.status = "APPROVED"; // Will transition to ACTIVE upon first use in real implementation
     lease.approved_at = Date.now();
     lease.approved_by = approvedBy;
     lease.activated_at = Date.now();
@@ -146,9 +146,9 @@ export class ResourceManager {
 
   public rejectLease(leaseId: string, rejectedBy: string, reason: string): boolean {
     const lease = this.leases.get(leaseId);
-    if (!lease || lease.status !== "requested") return false;
+    if (!lease || lease.status !== "REQUESTED") return false;
 
-    lease.status = "revoked";
+    lease.status = "REVOKED";
     lease.revoked_at = Date.now();
     
     this.addAuditLog(rejectedBy, 'ACCESS_DENIED', 'failure', `Denied lease ${leaseId}: ${reason}`, lease.task_id, lease.resource_id);
@@ -170,9 +170,9 @@ export class ResourceManager {
 
   public revokeLease(leaseId: string, revokedBy: string): boolean {
     const lease = this.leases.get(leaseId);
-    if (!lease || (lease.status !== "approved" && lease.status !== "active")) return false;
+    if (!lease || (lease.status !== "APPROVED" && lease.status !== "ACTIVE")) return false;
 
-    lease.status = "revoked";
+    lease.status = "REVOKED";
     lease.revoked_at = Date.now();
     
     this.addAuditLog(revokedBy, 'ACCESS_REVOKED', 'success', `Revoked active lease ${leaseId}`, lease.task_id, lease.resource_id);
@@ -193,7 +193,7 @@ export class ResourceManager {
   }
 
   public getPendingLeases(): AccessLease[] {
-    return Array.from(this.leases.values()).filter(l => l.status === "requested");
+    return Array.from(this.leases.values()).filter(l => l.status === "REQUESTED");
   }
 
   // ----------------------------------------------------------
