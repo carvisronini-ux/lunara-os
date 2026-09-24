@@ -5,7 +5,7 @@
 
 import type { 
   AccessLease, CostRecord, AuditEntry, 
-  ProviderHealth, AccessLeaseStatus 
+  ProviderHealth 
 } from './contracts';
 import { osEngine } from './engine';
 
