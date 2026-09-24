@@ -1,6 +1,5 @@
 'use client';
 
-import { clsx } from 'clsx';
 import { AgentCard, type AgentData } from './AgentCard';
 
 export interface DepartmentData {
