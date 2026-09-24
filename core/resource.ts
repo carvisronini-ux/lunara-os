@@ -55,7 +55,7 @@ export class ResourceManager {
         resource_id: resourceId,
         content_id: null,
         payload: { health },
-        severity: health === "unavailable" ? "critical" : "info"
+        severity: health === "UNAVAILABLE" ? "critical" : "info"
       });
     }
   }
