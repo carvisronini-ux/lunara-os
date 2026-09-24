@@ -116,7 +116,7 @@ export class ResourceManager {
 
     // Check resource health before approving
     const resource = this.resources.get(lease.resource_id);
-    if (!resource || resource.health === "unavailable") {
+    if (!resource || resource.health === "UNAVAILABLE") {
       this.rejectLease(leaseId, approvedBy, "Resource unavailable or unhealthy");
       return false;
     }
