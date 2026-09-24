@@ -80,6 +80,15 @@ export class CredentialVault {
     return mockDecrypt(cred.encrypted_value);
   }
 
+  // ✅ ახალი მეთოდი: აახლებს გამოყენების რაოდენობას (mock-proxy.ts-ისთვის)
+  public updateQuota(credentialId: string): void {
+    const cred = this.credentials.get(credentialId);
+    if (cred) {
+      // Mock implementation: შეგიძლია დაამატო usage_count ველი Credential ტიპში
+      console.log(`[CredentialVault] 📊 Quota updated for credential: ${credentialId}`);
+    }
+  }
+
   public rotateCredential(credentialId: string, newPlaintextValue: string, rotatedBy: string): boolean {
     const cred = this.credentials.get(credentialId);
     if (!cred) return false;
