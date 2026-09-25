@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
-import type { Provider, PermissionScope } from '@/services/credentials/types';
+import type { Provider } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
   const [credentials, setCredentials] = useState<any[]>([]);
@@ -11,9 +11,7 @@ export function CredentialsPanel() {
   const [audit, setAudit] = useState<any[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCredName, setNewCredName] = useState('');
   const [newCredProvider, setNewCredProvider] = useState<Provider>('openai');
-  const [newCredScope, setNewCredScope] = useState<PermissionScope>('read');
   const [newCredValue, setNewCredValue] = useState('');
 
   const refreshData = () => {
@@ -27,9 +25,9 @@ export function CredentialsPanel() {
   }, []);
 
   const handleAddCredential = () => {
-    if (!newCredName || !newCredValue) return;
-    credentialVault.addCredential(newCredProvider, newCredName, newCredValue, newCredScope, "human_executive");
-    setNewCredName('');
+    if (!newCredValue) return;
+    // ✅ გამარტივებული: მხოლოდ provider და value, დანარჩენი ავტომატურად
+    credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive");
     setNewCredValue('');
     setShowAddModal(false);
     refreshData();
@@ -65,62 +63,38 @@ export function CredentialsPanel() {
         </div>
       </div>
 
-      {/* Add Credential Modal */}
+      {/* ✅ გამარტივებული Add Credential Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Name</label>
-                <input 
-                  type="text" 
-                  value={newCredName}
-                  onChange={(e) => setNewCredName(e.target.value)}
+                <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
+                <select 
+                  value={newCredProvider}
+                  onChange={(e) => setNewCredProvider(e.target.value as Provider)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="e.g., OpenAI Main Key"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase">Provider</label>
-                  <select 
-                    value={newCredProvider}
-                    onChange={(e) => setNewCredProvider(e.target.value as Provider)}
-                    className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="telegram">Telegram</option>
-                    <option value="supabase">Supabase</option>
-                    <option value="cloudflare">Cloudflare</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 uppercase">Scope</label>
-                  <select 
-                    value={newCredScope}
-                    onChange={(e) => setNewCredScope(e.target.value as PermissionScope)}
-                    className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  >
-                    <option value="read">Read</option>
-                    <option value="write">Write</option>
-                    <option value="execute">Execute</option>
-                    <option value="publish">Publish</option>
-                    <option value="spend">Spend</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
+                >
+                  <option value="openai">OpenAI (GPT-4, DALL-E)</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="telegram">Telegram Bot API</option>
+                  <option value="supabase">Supabase OS</option>
+                  <option value="cloudflare">Cloudflare R2</option>
+                </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Secret Value</label>
+                <label className="text-xs font-bold text-slate-400 uppercase">API Key / Secret</label>
                 <input 
                   type="password" 
                   value={newCredValue}
                   onChange={(e) => setNewCredValue(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="sk-..."
+                  placeholder="sk-... / token / secret"
                 />
+              </div>
+              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3 text-xs text-blue-300">
+                💡 <strong>Auto-configured:</strong> Name, Scope, and Owner will be set automatically by the Vault Manager Agent based on the provider.
               </div>
               <div className="flex gap-3 pt-2">
                 <button 
@@ -133,7 +107,7 @@ export function CredentialsPanel() {
                   onClick={handleAddCredential}
                   className="flex-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 py-2 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30"
                 >
-                  Save Encrypted
+                  🔐 Save Encrypted
                 </button>
               </div>
             </div>

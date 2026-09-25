@@ -16,6 +16,19 @@ const mockDecrypt = (encrypted: string) => {
   } catch { return encrypted; }
 };
 
+// ✅ ახალი: ავტომატური scope განსაზღვრა provider-ის მიხედვით (§21 least privilege)
+function determineScopeForProvider(provider: Provider): PermissionScope {
+  const scopeMap: Record<Provider, PermissionScope> = {
+    openai: "spend",           // AI მოდელები = ხარჯვა
+    anthropic: "spend",        // AI მოდელები = ხარჯვა
+    telegram: "publish",       // Telegram = გამოქვეყნება
+    supabase: "write",         // მონაცემთა ბაზა = ჩაწერა
+    cloudflare: "write",       // Storage = ჩაწერა
+    custom: "read"             // ნაგულისხმევი = მხოლოდ წაკითხვა
+  };
+  return scopeMap[provider] || "read";
+}
+
 export class CredentialVault {
   private credentials: Map<string, Credential> = new Map();
   private auditLog: CredentialAuditLog[] = [];
@@ -24,6 +37,41 @@ export class CredentialVault {
     console.log('[CredentialVault] 🔐 Initialized. Secrets isolated.');
   }
 
+  // ✅ გამარტივებული: მხოლოდ provider და plaintextValue, დანარჩენი ავტომატურად
+  public addCredentialSimple(
+    provider: Provider,
+    plaintextValue: string,
+    owner: string = "human_executive"
+  ): string {
+    const id = `cred_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const now = Date.now();
+    
+    // ავტომატური scope განსაზღვრა
+    const scope = determineScopeForProvider(provider);
+    
+    // ავტომატური სახელი
+    const name = `${provider.toUpperCase()} Key`;
+
+    const cred: Credential = {
+      credential_id: id,
+      provider,
+      name,
+      encrypted_value: mockEncrypt(plaintextValue),
+      scope,
+      status: "ACTIVE",
+      owner,
+      created_at: now,
+      last_rotated_at: null,
+      expires_at: null
+    };
+
+    this.credentials.set(id, cred);
+    this.logAudit("created", owner, id, "success", `Added ${provider} credential (auto-scope: ${scope})`);
+    console.log(`[CredentialVault] ✅ Added: ${name} (${provider}, scope: ${scope})`);
+    return id;
+  }
+
+  // ძველი მეთოდი (თუ სადმე გამოიყენება)
   public addCredential(
     provider: Provider,
     name: string,
@@ -84,7 +132,6 @@ export class CredentialVault {
   public updateQuota(credentialId: string): void {
     const cred = this.credentials.get(credentialId);
     if (cred) {
-      // Mock implementation: შეგიძლია დაამატო usage_count ველი Credential ტიპში
       console.log(`[CredentialVault] 📊 Quota updated for credential: ${credentialId}`);
     }
   }
@@ -96,7 +143,7 @@ export class CredentialVault {
     cred.encrypted_value = mockEncrypt(newPlaintextValue);
     cred.last_rotated_at = Date.now();
     
-    // §21: Secret rotation - ანულირებს ყვუელა არსებულ ლიზინგს უსაფრთხოებისთვის
+    // §21: Secret rotation - ანულირებს ყველა არსებულ ლიზინგს უსაფრთხოებისთვის
     accessManager.revokeAllLeasesForCredential(credentialId, rotatedBy);
     
     this.logAudit("rotated", rotatedBy, credentialId, "success", "Credential rotated, all leases revoked");
