@@ -96,7 +96,7 @@ export class CredentialVault {
     cred.encrypted_value = mockEncrypt(newPlaintextValue);
     cred.last_rotated_at = Date.now();
     
-    // §21: Secret rotation - ანულირებს ყველა არსებულ ლიზინგს უსაფრთხოებისთვის
+    // §21: Secret rotation - ანულირებს ყვუელა არსებულ ლიზინგს უსაფრთხოებისთვის
     accessManager.revokeAllLeasesForCredential(credentialId, rotatedBy);
     
     this.logAudit("rotated", rotatedBy, credentialId, "success", "Credential rotated, all leases revoked");
