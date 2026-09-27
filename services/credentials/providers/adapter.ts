@@ -36,18 +36,84 @@ export interface GenerateResult {
 
 const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 
-// ✅ განახლებული: ფილტრი რომელიც გამორიცხავს არა-LLM მოდელებს
+// ფილტრი რომელიც გამორიცხავს არა-LLM მოდელებს
 const GROQ_NON_CHAT_PATTERNS = [
   'whisper',           // Speech-to-Text
   'prompt-guard',      // Safety model
   'orpheus',           // Audio model
   'distil-whisper',    // Speech-to-Text
-  'llava',             // Vision (არ გვჭირდება ახლა)
+  'llava',             // Vision
+  'safeguard',         // Safety-only models
+];
+
+// ფილტრი რომელიც გამორიცხავს არა-ინგლისურ LLM-ებს (Lunara-სთვის)
+const NON_ENGLISH_PATTERNS = [
+  'allam',             // არაბული
+  'jais',              // არაბული
+  'aya',               // მრავალენოვანი (არა ინგლისური-ფოკუსი)
 ];
 
 function isGroqChatModel(modelId: string): boolean {
   const lower = modelId.toLowerCase();
   return !GROQ_NON_CHAT_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
+function isEnglishModel(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  return !NON_ENGLISH_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
+// ჭკვიანი მოდელის შერჩევა: პრიორიტეტი ენიჭება ინგლისურ, დიდ LLM-ებს
+function selectBestGroqModel(models: ProviderModel[]): string {
+  // 1. ფილტრავს მხოლოდ chat/text generation მოდელებს
+  const chatModels = models.filter(m => isGroqChatModel(m.id));
+  
+  // 2. ფილტრავს მხოლოდ ინგლისურ მოდელებს
+  const englishModels = chatModels.filter(m => isEnglishModel(m.id));
+  
+  // 3. თუ ინგლისური მოდელები არ არის, იყენებს ყველა chat მოდელს
+  const candidates = englishModels.length > 0 ? englishModels : chatModels;
+  
+  if (candidates.length === 0) return '';
+
+  // 4. პრიორიტეტული სია (ყველაზე დიდი/ძლიერი პირველი)
+  const priorityOrder = [
+    'openai/gpt-oss-120b',      // ყველაზე დიდი
+    'qwen/qwen3.8-27b',         // დიდი, მრავალენოვანი
+    'openai/gpt-oss-20b',       // საშუალო
+    'llama-3.3-70b-versatile',
+    'llama-3.1-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768',
+    'gemma2-9b-it',
+    'llama3-70b-8192',
+    'llama3-8b-8192',
+    'gemma-7b-it'
+  ];
+
+  // 5. ეძებს პრიორიტეტულ სიაში
+  for (const preferred of priorityOrder) {
+    if (candidates.some(m => m.id === preferred)) {
+      return preferred;
+    }
+  }
+
+  // 6. თუ არცერთი პრიორიტეტული არ არის, ირჩევს ყველაზე დიდ მოდელს (სახელის მიხედვით)
+  // მოდელები რომლებიც შეიცავენ რიცხვებს (ზომას) — ვირჩევთ ყველაზე დიდს
+  const modelsWithSize = candidates
+    .map(m => {
+      const match = m.id.match(/(\d+)[bB]/);
+      return { model: m, size: match ? parseInt(match[1]) : 0 };
+    })
+    .filter(m => m.size > 0)
+    .sort((a, b) => b.size - a.size);
+
+  if (modelsWithSize.length > 0) {
+    return modelsWithSize[0].model.id;
+  }
+
+  // 7. ბოლო შანსი: პირველი ხელმისაწვდომი
+  return candidates[0].id;
 }
 
 export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
@@ -79,24 +145,11 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
     const data = await response.json();
     const allModels: ProviderModel[] = data.data || [];
 
-    // ✅ ფილტრავს მხოლოდ chat/text generation მოდელებს
+    // იყენებს კვიან შერჩევას
+    const recommendedModel = selectBestGroqModel(allModels);
+    
+    // აბრუნებს მხოლოდ chat მოდელებს UI-სთვის
     const chatModels = allModels.filter(m => isGroqChatModel(m.id));
-
-    // Groq-ის უფასო მოდელების პრიორიტეტი (§45 Cost Intelligence)
-    const freeTierPriority = [
-      'llama-3.3-70b-versatile',
-      'llama-3.1-70b-versatile',
-      'llama-3.1-8b-instant',
-      'mixtral-8x7b-32768',
-      'gemma2-9b-it',
-      'llama3-70b-8192',
-      'llama3-8b-8192',
-      'gemma-7b-it'
-    ];
-
-    const recommendedModel = freeTierPriority.find(m => 
-      chatModels.some(model => model.id === m)
-    ) || chatModels[0]?.id || '';
 
     return {
       success: true,
@@ -169,7 +222,7 @@ export async function generateWithGroq(
       model,
       provider: 'groq',
       latency,
-      cost: 0 // Groq free tier
+      cost: 0
     };
   } catch (error) {
     return {
@@ -296,7 +349,7 @@ export async function generateWithDeepSeek(
       model,
       provider: 'deepseek',
       latency,
-      cost: 0 // DeepSeek free tier (for now)
+      cost: 0
     };
   } catch (error) {
     return {
