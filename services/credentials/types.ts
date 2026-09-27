@@ -9,8 +9,12 @@ export type Provider =
   | "telegram" 
   | "supabase" 
   | "cloudflare" 
-  | "deepseek"   // ✅ ახალი: Muse/Nyx ტექსტის გენერაცია
-  | "groq"       // ✅ ახალი: Ultra-fast LLM ინფერენსი
+  | "deepseek"       // ✅ Muse/Nyx ტექსტის გენერაცია (უფასო tier)
+  | "groq"           // ✅ Ultra-fast LLM ინფერენსი (უფასო tier)
+  | "gemini"         // ✅ ახალი: Google AI Studio (ძალიან გულუხვი უფასო tier)
+  | "mistral"        // ✅ ახალი: Mistral AI (1000 req/day უფასო)
+  | "huggingface"    // ✅ ახალი: Hugging Face Inference API (უფასო)
+  | "together"       // ✅ ახალი: Together AI ($25 free credits)
   | "custom";
 
 export type CredentialStatus = "ACTIVE" | "SUSPENDED" | "EXPIRED" | "REVOKED";

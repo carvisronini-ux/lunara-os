@@ -23,6 +23,10 @@ function determineScopeForProvider(provider: Provider): PermissionScope {
     anthropic: "spend",        // AI მოდელები = ფულის ხარჯვა
     deepseek: "spend",         // ✅ LLM ინფერენსი = ფულის ხარჯვა (Muse/Nyx)
     groq: "spend",             // ✅ Ultra-fast LLM = ფულის ხარჯვა
+    gemini: "spend",           // ✅ Google AI Studio = ფულის ხარჯვა (თუმცა ძალიან გულუხვი უფასო tier)
+    mistral: "spend",          // ✅ Mistral AI = ფულის ხარჯვა (1000 req/day უფასო)
+    huggingface: "execute",    // ✅ Hugging Face Inference API = შესრულება
+    together: "spend",         // ✅ Together AI = ფულის ხარჯვა ($25 free credits)
     telegram: "publish",       // Telegram = გამოქვეყნება
     supabase: "write",         // მონაცემთა ბაზა = ჩაწერა
     cloudflare: "write",       // Storage = ჩაწერა
