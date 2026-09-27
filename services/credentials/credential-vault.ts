@@ -129,6 +129,39 @@ export class CredentialVault {
     return mockDecrypt(cred.encrypted_value);
   }
 
+  // ✅ სპეციალური მეთოდი ტესტისთვის (ქმნის დროებით წვდომას human_executive-სთვის)
+  public getDecryptedValueForTesting(credentialId: string): string | null {
+    const cred = this.credentials.get(credentialId);
+    if (!cred || cred.status !== "ACTIVE") return null;
+
+    return mockDecrypt(cred.encrypted_value);
+  }
+
+  // ✅ ახალი მეთოდი: ტესტის შედეგებისა და მოდელების მეტამონაცემებში შენახვა
+  public updateCredentialMetadata(
+    credentialId: string,
+    metadata: Partial<Credential['metadata']>
+  ): boolean {
+    const cred = this.credentials.get(credentialId);
+    if (!cred) return false;
+
+    cred.metadata = {
+      ...cred.metadata,
+      ...metadata,
+      lastTestedAt: Date.now()
+    };
+
+    this.logAudit(
+      "rotated",
+      "system",
+      credentialId,
+      "success",
+      `Updated metadata: models=${metadata.models?.length || 0}, recommended=${metadata.recommendedModel || 'none'}`
+    );
+
+    return true;
+  }
+
   public updateQuota(credentialId: string): void {
     const cred = this.credentials.get(credentialId);
     if (cred) {

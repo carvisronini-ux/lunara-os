@@ -36,6 +36,15 @@ export interface Credential {
   created_at: number;
   last_rotated_at: number | null;
   expires_at: number | null;
+  
+  // ✅ ახალი: ტესტირების შედეგებისა და მოდელების შესანახად
+  metadata?: {
+    models?: string[];
+    recommendedModel?: string;
+    lastTestedAt?: number;
+    testSuccess?: boolean;
+    testLatency?: number;
+  };
 }
 
 export interface AccessLease {

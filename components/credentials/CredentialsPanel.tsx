@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
+import { testCredential } from '@/services/credentials/credential-tester';
 import type { Provider } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
@@ -13,6 +14,9 @@ export function CredentialsPanel() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCredProvider, setNewCredProvider] = useState<Provider>('deepseek');
   const [newCredValue, setNewCredValue] = useState('');
+  
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, any>>({});
 
   const refreshData = () => {
     setCredentials(credentialVault.getMetadata());
@@ -33,9 +37,28 @@ export function CredentialsPanel() {
   };
 
   const handleRevokeAll = () => {
-    if (confirm('⚠️ EMERGENCY: Are you sure you want to revoke ALL active leases?')) {
+    if (confirm('️ EMERGENCY: Are you sure you want to revoke ALL active leases?')) {
       accessManager.revokeAllLeasesGlobally('human_executive');
       refreshData();
+    }
+  };
+
+  const handleTestCredential = async (credentialId: string) => {
+    setTestingId(credentialId);
+    try {
+      const result = await testCredential(credentialId);
+      setTestResults(prev => ({ ...prev, [credentialId]: result }));
+      refreshData();
+    } catch (error) {
+      setTestResults(prev => ({
+        ...prev,
+        [credentialId]: {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }));
+    } finally {
+      setTestingId(null);
     }
   };
 
@@ -62,7 +85,7 @@ export function CredentialsPanel() {
         </div>
       </div>
 
-      {/* გამარტივებული Add Credential Modal */}
+      {/* Add Credential Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
@@ -98,12 +121,6 @@ export function CredentialsPanel() {
                   placeholder="sk-... / gsk_... / token / secret"
                 />
               </div>
-              <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3 text-xs text-blue-300">
-                💡 <strong>Auto-configured:</strong> Name, Scope, and Owner will be set automatically by the Vault Manager Agent based on the provider (§21 Least Privilege).
-              </div>
-              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs text-yellow-300">
-                🔐 <strong>Security (§40):</strong> The key is encrypted immediately and never stored in plaintext. Never share API keys in chat or commit them to Git.
-              </div>
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => setShowAddModal(false)}
@@ -131,21 +148,107 @@ export function CredentialsPanel() {
             {credentials.length === 0 ? (
               <p className="text-slate-500 text-sm">No credentials registered yet. Add one to begin.</p>
             ) : (
-              credentials.map((cred: any) => (
-                <div key={cred.credential_id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-4">
-                  <div>
-                    <div className="font-bold text-white">{cred.name}</div>
-                    <div className="text-xs text-slate-400 uppercase">{cred.provider} • Scope: {cred.scope} • Owner: {cred.owner}</div>
+              credentials.map((cred: any) => {
+                const testResult = testResults[cred.credential_id];
+                const isTesting = testingId === cred.credential_id;
+                
+                return (
+                  <div key={cred.credential_id} className="rounded-xl border border-white/5 bg-white/5 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="font-bold text-white">{cred.name}</div>
+                        <div className="text-xs text-slate-400 uppercase">
+                          {cred.provider} • Scope: {cred.scope} • Owner: {cred.owner}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-lg px-3 py-1 text-xs font-black ${
+                          cred.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {cred.status}
+                        </span>
+                        <button
+                          onClick={() => handleTestCredential(cred.credential_id)}
+                          disabled={isTesting}
+                          className="rounded-lg bg-blue-500/20 border border-blue-500/40 px-3 py-1 text-xs font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isTesting ? ' Testing...' : '🧪 Test'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* Test Results */}
+                    {testResult && (
+                      <div className={`mt-3 rounded-lg border p-3 ${
+                        testResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+                      }`}>
+                        {testResult.success ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-emerald-400 text-sm font-bold">✅ Test Successful</span>
+                              {testResult.latency && (
+                                <span className="text-xs text-slate-400">
+                                  Latency: {testResult.latency}ms
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Auto-detected Model */}
+                            {testResult.recommendedModel && (
+                              <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
+                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Free Model:</div>
+                                <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
+                                <div className="text-xs text-slate-500 mt-1">System will use this model automatically</div>
+                              </div>
+                            )}
+                            
+                            {/* Available Models */}
+                            {testResult.models && testResult.models.length > 0 && (
+                              <div>
+                                <div className="text-xs text-slate-400 mb-1">Available Models ({testResult.models.length}):</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {testResult.models.slice(0, 6).map((model: string, idx: number) => (
+                                    <span 
+                                      key={idx} 
+                                      className={`text-xs rounded px-2 py-0.5 font-mono ${
+                                        model === testResult.recommendedModel 
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                                          : 'bg-white/5 border border-white/10 text-slate-300'
+                                      }`}
+                                    >
+                                      {model}
+                                    </span>
+                                  ))}
+                                  {testResult.models.length > 6 && (
+                                    <span className="text-xs text-slate-500 px-2 py-0.5">+{testResult.models.length - 6} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-red-400 text-sm">
+                             Test Failed: {testResult.error}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Previous Test Info (from metadata) */}
+                    {!testResult && cred.metadata?.recommendedModel && (
+                      <div className="mt-3 p-2 rounded bg-blue-500/5 border border-blue-500/20">
+                        <div className="text-xs text-slate-400">Last tested model:</div>
+                        <div className="text-sm font-mono text-blue-400">{cred.metadata.recommendedModel}</div>
+                        {cred.metadata.lastTestedAt && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            Tested: {new Date(cred.metadata.lastTestedAt).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`rounded-lg px-3 py-1 text-xs font-black ${
-                      cred.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {cred.status}
-                    </span>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
