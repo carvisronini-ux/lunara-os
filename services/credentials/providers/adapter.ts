@@ -36,6 +36,20 @@ export interface GenerateResult {
 
 const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 
+// ✅ განახლებული: ფილტრი რომელიც გამორიცხავს არა-LLM მოდელებს
+const GROQ_NON_CHAT_PATTERNS = [
+  'whisper',           // Speech-to-Text
+  'prompt-guard',      // Safety model
+  'orpheus',           // Audio model
+  'distil-whisper',    // Speech-to-Text
+  'llava',             // Vision (არ გვჭირდება ახლა)
+];
+
+function isGroqChatModel(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  return !GROQ_NON_CHAT_PATTERNS.some(pattern => lower.includes(pattern));
+}
+
 export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
   
@@ -63,7 +77,10 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
-    const models: ProviderModel[] = data.data || [];
+    const allModels: ProviderModel[] = data.data || [];
+
+    // ✅ ფილტრავს მხოლოდ chat/text generation მოდელებს
+    const chatModels = allModels.filter(m => isGroqChatModel(m.id));
 
     // Groq-ის უფასო მოდელების პრიორიტეტი (§45 Cost Intelligence)
     const freeTierPriority = [
@@ -71,17 +88,20 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
       'llama-3.1-70b-versatile',
       'llama-3.1-8b-instant',
       'mixtral-8x7b-32768',
-      'gemma2-9b-it'
+      'gemma2-9b-it',
+      'llama3-70b-8192',
+      'llama3-8b-8192',
+      'gemma-7b-it'
     ];
 
     const recommendedModel = freeTierPriority.find(m => 
-      models.some(model => model.id === m)
-    ) || models[0]?.id || '';
+      chatModels.some(model => model.id === m)
+    ) || chatModels[0]?.id || '';
 
     return {
       success: true,
       provider: 'groq',
-      models,
+      models: chatModels.length > 0 ? chatModels : allModels,
       recommendedModel,
       latency
     };
@@ -202,6 +222,7 @@ export async function testDeepSeekApiKey(apiKey: string): Promise<TestResult> {
     const recommendedModel = 
       models.find(m => m.id === 'deepseek-chat')?.id ||
       models.find(m => m.id === 'deepseek-reasoner')?.id ||
+      models.find(m => m.id.includes('flash'))?.id ||
       models[0]?.id || '';
 
     return {
