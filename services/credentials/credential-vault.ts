@@ -16,11 +16,13 @@ const mockDecrypt = (encrypted: string) => {
   } catch { return encrypted; }
 };
 
-// ✅ ახალი: ავტომატური scope განსაზღვრა provider-ის მიხედვით (§21 least privilege)
+// ✅ განახლებული: ავტომატური scope განსაზღვრა provider-ის მიხედვით (§21 least privilege)
 function determineScopeForProvider(provider: Provider): PermissionScope {
   const scopeMap: Record<Provider, PermissionScope> = {
-    openai: "spend",           // AI მოდელები = ხარჯვა
-    anthropic: "spend",        // AI მოდელები = ხარჯვა
+    openai: "spend",           // AI მოდელები = ფულის ხარჯვა
+    anthropic: "spend",        // AI მოდელები = ფულის ხარჯვა
+    deepseek: "spend",         // ✅ LLM ინფერენსი = ფულის ხარჯვა (Muse/Nyx)
+    groq: "spend",             // ✅ Ultra-fast LLM = ფულის ხარჯვა
     telegram: "publish",       // Telegram = გამოქვეყნება
     supabase: "write",         // მონაცემთა ბაზა = ჩაწერა
     cloudflare: "write",       // Storage = ჩაწერა
@@ -46,7 +48,7 @@ export class CredentialVault {
     const id = `cred_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = Date.now();
     
-    // ავტომატური scope განსაზღვრა
+    // ავტომატური scope განსაზღვრა (§21 least privilege)
     const scope = determineScopeForProvider(provider);
     
     // ავტომატური სახელი
@@ -117,7 +119,6 @@ export class CredentialVault {
     const cred = this.credentials.get(credentialId);
     if (!cred || cred.status !== "ACTIVE") return null;
 
-    // შეამოწმე აქვს თუ არა აგენტს ვალიდური ლიზინგი
     const hasLease = accessManager.validateLeaseForCredential(credentialId, requestingAgentId);
     if (!hasLease) {
       this.logAudit("access_attempt", requestingAgentId, credentialId, "denied", "No valid lease");
@@ -128,7 +129,6 @@ export class CredentialVault {
     return mockDecrypt(cred.encrypted_value);
   }
 
-  // ✅ ახალი მეთოდი: აახლებს გამოყენების რაოდენობას (mock-proxy.ts-ისთვის)
   public updateQuota(credentialId: string): void {
     const cred = this.credentials.get(credentialId);
     if (cred) {
@@ -143,7 +143,6 @@ export class CredentialVault {
     cred.encrypted_value = mockEncrypt(newPlaintextValue);
     cred.last_rotated_at = Date.now();
     
-    // §21: Secret rotation - ანულირებს ყველა არსებულ ლიზინგს უსაფრთხოებისთვის
     accessManager.revokeAllLeasesForCredential(credentialId, rotatedBy);
     
     this.logAudit("rotated", rotatedBy, credentialId, "success", "Credential rotated, all leases revoked");

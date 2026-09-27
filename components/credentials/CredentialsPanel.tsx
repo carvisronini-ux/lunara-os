@@ -11,7 +11,7 @@ export function CredentialsPanel() {
   const [audit, setAudit] = useState<any[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCredProvider, setNewCredProvider] = useState<Provider>('openai');
+  const [newCredProvider, setNewCredProvider] = useState<Provider>('deepseek');
   const [newCredValue, setNewCredValue] = useState('');
 
   const refreshData = () => {
@@ -26,7 +26,6 @@ export function CredentialsPanel() {
 
   const handleAddCredential = () => {
     if (!newCredValue) return;
-    // ✅ გამარტივებული: მხოლოდ provider და value, დანარჩენი ავტომატურად
     credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive");
     setNewCredValue('');
     setShowAddModal(false);
@@ -63,7 +62,7 @@ export function CredentialsPanel() {
         </div>
       </div>
 
-      {/* ✅ გამარტივებული Add Credential Modal */}
+      {/* გამარტივებული Add Credential Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
@@ -76,11 +75,17 @@ export function CredentialsPanel() {
                   onChange={(e) => setNewCredProvider(e.target.value as Provider)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="openai">OpenAI (GPT-4, DALL-E)</option>
-                  <option value="anthropic">Anthropic (Claude)</option>
-                  <option value="telegram">Telegram Bot API</option>
-                  <option value="supabase">Supabase OS</option>
-                  <option value="cloudflare">Cloudflare R2</option>
+                  <optgroup label="🧠 LLM Text Generation">
+                    <option value="deepseek">DeepSeek (Muse/Nyx Text)</option>
+                    <option value="groq">Groq (Ultra-fast LLM)</option>
+                    <option value="openai">OpenAI (GPT-4, DALL-E)</option>
+                    <option value="anthropic">Anthropic (Claude)</option>
+                  </optgroup>
+                  <optgroup label="📡 Distribution & Storage">
+                    <option value="telegram">Telegram Bot API</option>
+                    <option value="supabase">Supabase OS</option>
+                    <option value="cloudflare">Cloudflare R2</option>
+                  </optgroup>
                 </select>
               </div>
               <div>
@@ -90,11 +95,14 @@ export function CredentialsPanel() {
                   value={newCredValue}
                   onChange={(e) => setNewCredValue(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="sk-... / token / secret"
+                  placeholder="sk-... / gsk_... / token / secret"
                 />
               </div>
               <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3 text-xs text-blue-300">
-                💡 <strong>Auto-configured:</strong> Name, Scope, and Owner will be set automatically by the Vault Manager Agent based on the provider.
+                💡 <strong>Auto-configured:</strong> Name, Scope, and Owner will be set automatically by the Vault Manager Agent based on the provider (§21 Least Privilege).
+              </div>
+              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs text-yellow-300">
+                🔐 <strong>Security (§40):</strong> The key is encrypted immediately and never stored in plaintext. Never share API keys in chat or commit them to Git.
               </div>
               <div className="flex gap-3 pt-2">
                 <button 

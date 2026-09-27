@@ -3,16 +3,32 @@
 // Foundation: §21, §22, §40, §51
 // ============================================================
 
-export type Provider = "openai" | "anthropic" | "telegram" | "supabase" | "cloudflare" | "custom";
+export type Provider = 
+  | "openai" 
+  | "anthropic" 
+  | "telegram" 
+  | "supabase" 
+  | "cloudflare" 
+  | "deepseek"   // ✅ ახალი: Muse/Nyx ტექსტის გენერაცია
+  | "groq"       // ✅ ახალი: Ultra-fast LLM ინფერენსი
+  | "custom";
 
 export type CredentialStatus = "ACTIVE" | "SUSPENDED" | "EXPIRED" | "REVOKED";
 
-export type PermissionScope = "read" | "write" | "execute" | "publish" | "spend" | "access_resource" | "manage_credentials" | "admin";
+export type PermissionScope = 
+  | "read" 
+  | "write" 
+  | "execute" 
+  | "publish" 
+  | "spend" 
+  | "access_resource" 
+  | "manage_credentials" 
+  | "admin";
 
 export interface Credential {
   credential_id: string;
   provider: Provider;
-  name: string; // ადამიანისთვის წასაკითხი სახელი
+  name: string;
   encrypted_value: string; // §40: არასდროს ინახება plaintext-ში
   scope: PermissionScope;
   status: CredentialStatus;
