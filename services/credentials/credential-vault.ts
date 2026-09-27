@@ -137,10 +137,16 @@ export class CredentialVault {
     return mockDecrypt(cred.encrypted_value);
   }
 
-  // ✅ ახალი მეთოდი: ტესტის შედეგებისა და მოდელების მეტამონაცემებში შენახვა
+  // ✅ გამოსწორებული მეთოდი: ზუსტი ტიპიზაცია metadata-სთვის, რათა თავიდან ავიცილოთ 'possibly undefined' შეცდომა
   public updateCredentialMetadata(
     credentialId: string,
-    metadata: Partial<Credential['metadata']>
+    metadata: {
+      models?: string[];
+      recommendedModel?: string;
+      lastTestedAt?: number;
+      testSuccess?: boolean;
+      testLatency?: number;
+    }
   ): boolean {
     const cred = this.credentials.get(credentialId);
     if (!cred) return false;
