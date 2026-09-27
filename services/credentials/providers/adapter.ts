@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Unified API Adapters
-// Foundation: §22, §40, §45
-// Purpose: Test API keys, fetch models, generate text
+// LUNARA OS — Unified API Adapters (Professional Grade)
+// Foundation: §22, §40, §45, §60 (Reduce complexity, isolate credentials)
+// Purpose: Flawless API key testing, intelligent model selection, text generation
 // ============================================================
 
 export interface ProviderModel {
@@ -31,49 +31,65 @@ export interface GenerateResult {
 }
 
 // ============================================================
-// GROQ ADAPTER
+// GLOBAL MODEL FILTERING RULES
+// ============================================================
+
+const EXCLUDE_PATTERNS = [
+  'embed', 'embedding', 'vision', 'guard', 'safeguard', 'safety',
+  'whisper', 'audio', 'speech', 'stt', 'tts',
+  'allam', 'jais', 'aya', 'arabic', 'chinese', 'russian', // არა-ინგლისური ფოკუსი
+  'base', 'pretrain' // Base მოდელები ცუდია instruction-following-ისთვის
+];
+
+const PREFER_PATTERNS = [
+  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro' // ინსტრუქციებზე მორგებული მოდელები
+];
+
+function isValidModel(modelId: string): boolean {
+  const lower = modelId.toLowerCase();
+  
+  // 1. უარვყოფთ აშკარად არასასურველს
+  if (EXCLUDE_PATTERNS.some(pattern => lower.includes(pattern))) {
+    return false;
+  }
+  
+  // 2. ვანიჭებთ უპირატესობას instruct/chat ვარიანტებს (თუ არ არის ცნობილი გამონაკლისი)
+  const hasPrefer = PREFER_PATTERNS.some(pattern => lower.includes(pattern));
+  const isKnownGoodBase = lower.includes('llama-3.3-70b') || lower.includes('deepseek-v3');
+  
+  return hasPrefer || isKnownGoodBase || lower.includes('gpt-oss');
+}
+
+// ============================================================
+// GROQ ADAPTER (Ultra-fast, Free Tier Optimized)
 // ============================================================
 
 const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
 
-const GROQ_NON_CHAT_PATTERNS = ['whisper', 'prompt-guard', 'orpheus', 'distil-whisper', 'llava', 'safeguard'];
-const NON_ENGLISH_PATTERNS = ['allam', 'jais', 'aya'];
-
-function isGroqChatModel(modelId: string): boolean {
-  const lower = modelId.toLowerCase();
-  return !GROQ_NON_CHAT_PATTERNS.some(pattern => lower.includes(pattern));
-}
-
-function isEnglishModel(modelId: string): boolean {
-  const lower = modelId.toLowerCase();
-  return !NON_ENGLISH_PATTERNS.some(pattern => lower.includes(pattern));
-}
-
 function selectBestGroqModel(models: ProviderModel[]): string {
-  const chatModels = models.filter(m => isGroqChatModel(m.id));
-  const englishModels = chatModels.filter(m => isEnglishModel(m.id));
-  const candidates = englishModels.length > 0 ? englishModels : chatModels;
-  if (candidates.length === 0) return '';
+  const validModels = models.filter(m => isValidModel(m.id));
+  if (validModels.length === 0) return '';
 
+  // მკაცრი პრიორიტეტული სია (ხარისხი და უფასო ხელმისაწვდომობა)
   const priorityOrder = [
-    'openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b',
-    'llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant',
-    'mixtral-8x7b-32768', 'gemma2-9b-it', 'llama3-70b-8192', 'llama3-8b-8192', 'gemma-7b-it'
+    'llama-3.3-70b-versatile',      // 🥇 საუკეთესო: უახლესი, უფასო, მაღალი ხარისხი
+    'llama-3.1-70b-versatile',      // 🥈 შესანიშნავი ალტერნატივა
+    'llama-3.1-8b-instant',         // 🥉 სწრაფი, მსუბუქი ამოცანებისთვის
+    'mixtral-8x7b-32768',           // დიდი კონტექსტისთვის
+    'gemma2-9b-it',                 // კარგი მცირე მოდელი
+    'llama3-70b-8192',              // Legacy 70B
+    'llama3-8b-8192'                // Legacy 8B
   ];
 
   for (const preferred of priorityOrder) {
-    if (candidates.some(m => m.id === preferred)) return preferred;
+    if (validModels.some(m => m.id === preferred)) {
+      return preferred;
+    }
   }
 
-  const modelsWithSize = candidates
-    .map(m => {
-      const match = m.id.match(/(\d+)[bB]/);
-      return { model: m, size: match ? parseInt(match[1]) : 0 };
-    })
-    .filter(m => m.size > 0)
-    .sort((a, b) => b.size - a.size);
-
-  return modelsWithSize.length > 0 ? modelsWithSize[0].model.id : candidates[0].id;
+  // Fallback: ვირჩევთ პირველს, რომელიც შეიცავს 'llama' ან 'mixtral'-ს
+  const fallback = validModels.find(m => m.id.includes('llama') || m.id.includes('mixtral') || m.id.includes('gemma'));
+  return fallback ? fallback.id : validModels[0].id;
 }
 
 export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
@@ -92,10 +108,10 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
 
     const data = await response.json();
     const allModels: ProviderModel[] = data.data || [];
+    const validModels = allModels.filter(m => isValidModel(m.id));
     const recommendedModel = selectBestGroqModel(allModels);
-    const chatModels = allModels.filter(m => isGroqChatModel(m.id));
 
-    return { success: true, provider: 'groq', models: chatModels.length > 0 ? chatModels : allModels, recommendedModel, latency };
+    return { success: true, provider: 'groq', models: validModels, recommendedModel, latency };
   } catch (error) {
     return { success: false, provider: 'groq', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
@@ -132,10 +148,21 @@ export async function generateWithGroq(apiKey: string, model: string, prompt: st
 }
 
 // ============================================================
-// DEEPSEEK ADAPTER
+// DEEPSEEK ADAPTER (High Quality, Generous Free Tier)
 // ============================================================
 
 const DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1';
+
+function selectBestDeepSeekModel(models: ProviderModel[]): string {
+  const validModels = models.filter(m => isValidModel(m.id));
+  if (validModels.length === 0) return models[0]?.id || '';
+
+  const priorityOrder = ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v3'];
+  for (const preferred of priorityOrder) {
+    if (validModels.some(m => m.id === preferred)) return preferred;
+  }
+  return validModels[0].id;
+}
 
 export async function testDeepSeekApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -153,9 +180,10 @@ export async function testDeepSeekApiKey(apiKey: string): Promise<TestResult> {
 
     const data = await response.json();
     const models: ProviderModel[] = data.data || [];
-    const recommendedModel = models.find(m => m.id === 'deepseek-chat')?.id || models.find(m => m.id === 'deepseek-reasoner')?.id || models.find(m => m.id.includes('flash'))?.id || models[0]?.id || '';
+    const recommendedModel = selectBestDeepSeekModel(models);
+    const validModels = models.filter(m => isValidModel(m.id));
 
-    return { success: true, provider: 'deepseek', models, recommendedModel, latency };
+    return { success: true, provider: 'deepseek', models: validModels, recommendedModel, latency };
   } catch (error) {
     return { success: false, provider: 'deepseek', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
@@ -192,10 +220,24 @@ export async function generateWithDeepSeek(apiKey: string, model: string, prompt
 }
 
 // ============================================================
-// GEMINI ADAPTER (Google AI Studio — უფასო tier)
+// GEMINI ADAPTER (Google AI Studio — Best Free Tier)
 // ============================================================
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+function selectBestGeminiModel(models: ProviderModel[]): string {
+  const validModels = models.filter(m => isValidModel(m.id));
+  if (validModels.length === 0) return '';
+
+  const priorityOrder = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+  for (const preferred of priorityOrder) {
+    if (validModels.some(m => m.id.includes(preferred))) {
+      // ვაბრუნებთ ზუსტ ID-ს, რომელიც API-მ დააბრუნა
+      return validModels.find(m => m.id.includes(preferred))!.id;
+    }
+  }
+  return validModels[0].id;
+}
 
 export async function testGeminiApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -209,14 +251,12 @@ export async function testGeminiApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
+    // Gemini აბრუნებს "models/gemini-...", ჩვენ გვჭირდება მხოლოდ სახელი
     const models: ProviderModel[] = (data.models || []).map((m: any) => ({ id: m.name.replace('models/', '') }));
-    const generativeModels = models.filter(m => m.id.includes('gemini') && !m.id.includes('embedding') && !m.id.includes('vision'));
-    
-    const recommendedModel = generativeModels.find(m => m.id.includes('gemini-2.0-flash'))?.id || 
-                             generativeModels.find(m => m.id.includes('gemini-1.5-flash'))?.id || 
-                             generativeModels[0]?.id || '';
+    const validModels = models.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestGeminiModel(models);
 
-    return { success: true, provider: 'gemini', models: generativeModels, recommendedModel, latency };
+    return { success: true, provider: 'gemini', models: validModels, recommendedModel, latency };
   } catch (error) {
     return { success: false, provider: 'gemini', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
@@ -249,10 +289,21 @@ export async function generateWithGemini(apiKey: string, model: string, prompt: 
 }
 
 // ============================================================
-// MISTRAL ADAPTER (უფასო tier: 1000 req/day)
+// MISTRAL ADAPTER (1000 req/day Free Tier)
 // ============================================================
 
 const MISTRAL_API_BASE = 'https://api.mistral.ai/v1';
+
+function selectBestMistralModel(models: ProviderModel[]): string {
+  const validModels = models.filter(m => isValidModel(m.id));
+  if (validModels.length === 0) return '';
+
+  const priorityOrder = ['mistral-small-latest', 'mistral-medium-latest', 'open-mixtral-8x7b', 'mistral-tiny'];
+  for (const preferred of priorityOrder) {
+    if (validModels.some(m => m.id === preferred)) return preferred;
+  }
+  return validModels[0].id;
+}
 
 export async function testMistralApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -270,10 +321,10 @@ export async function testMistralApiKey(apiKey: string): Promise<TestResult> {
 
     const data = await response.json();
     const models: ProviderModel[] = data.data || [];
-    const chatModels = models.filter(m => !m.id.includes('embed') && !m.id.includes('codestral'));
-    const recommendedModel = chatModels.find(m => m.id === 'mistral-small-latest')?.id || chatModels.find(m => m.id.includes('mistral-small'))?.id || chatModels[0]?.id || '';
+    const validModels = models.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestMistralModel(models);
 
-    return { success: true, provider: 'mistral', models: chatModels, recommendedModel, latency };
+    return { success: true, provider: 'mistral', models: validModels, recommendedModel, latency };
   } catch (error) {
     return { success: false, provider: 'mistral', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
@@ -310,7 +361,7 @@ export async function generateWithMistral(apiKey: string, model: string, prompt:
 }
 
 // ============================================================
-// HUGGING FACE ADAPTER (უფასო Inference API)
+// HUGGING FACE ADAPTER (Free Inference API)
 // ============================================================
 
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
@@ -331,7 +382,11 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
       return { success: false, provider: 'huggingface', models: [], recommendedModel: '', error: errorData.error || `HTTP ${response.status}`, latency };
     }
 
-    const availableModels = ['mistralai/Mistral-7B-Instruct-v0.3', 'meta-llama/Meta-Llama-3-8B-Instruct', 'HuggingFaceH4/zephyr-7b-beta'];
+    const availableModels = [
+      'mistralai/Mistral-7B-Instruct-v0.3',
+      'meta-llama/Meta-Llama-3-8B-Instruct',
+      'HuggingFaceH4/zephyr-7b-beta'
+    ];
     return { success: true, provider: 'huggingface', models: availableModels.map(id => ({ id })), recommendedModel: availableModels[0], latency };
   } catch (error) {
     return { success: false, provider: 'huggingface', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
@@ -365,10 +420,25 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
 }
 
 // ============================================================
-// TOGETHER AI ADAPTER ($25 free credits)
+// TOGETHER AI ADAPTER ($25 Free Credits)
 // ============================================================
 
 const TOGETHER_API_BASE = 'https://api.together.xyz/v1';
+
+function selectBestTogetherModel(models: ProviderModel[]): string {
+  const validModels = models.filter(m => isValidModel(m.id));
+  if (validModels.length === 0) return '';
+
+  const priorityOrder = [
+    'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
+    'meta-llama/Meta-Llama-3-70B-Instruct',
+    'mistralai/Mixtral-8x7B-Instruct-v0.1'
+  ];
+  for (const preferred of priorityOrder) {
+    if (validModels.some(m => m.id === preferred)) return preferred;
+  }
+  return validModels[0].id;
+}
 
 export async function testTogetherApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -386,10 +456,10 @@ export async function testTogetherApiKey(apiKey: string): Promise<TestResult> {
 
     const data = await response.json();
     const models: ProviderModel[] = data.data || [];
-    const chatModels = models.filter(m => m.id.includes('instruct') || m.id.includes('chat') || m.id.includes('llama'));
-    const recommendedModel = chatModels.find(m => m.id.includes('llama-3.1-70b'))?.id || chatModels.find(m => m.id.includes('llama-3-70b'))?.id || chatModels[0]?.id || '';
+    const validModels = models.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestTogetherModel(models);
 
-    return { success: true, provider: 'together', models: chatModels, recommendedModel, latency };
+    return { success: true, provider: 'together', models: validModels, recommendedModel, latency };
   } catch (error) {
     return { success: false, provider: 'together', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
