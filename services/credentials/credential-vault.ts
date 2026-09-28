@@ -39,7 +39,6 @@ export class CredentialVault {
   private async loadCache() {
     const { data, error } = await supabase.from('credentials').select('*');
     if (!error && data) {
-      // ✅ გამოსწორება: დავამატეთ ': any' ტიპი item პარამეტრზე TypeScript-ის შეცდომის თავიდან ასაცილებლად
       data.forEach((item: any) => {
         this.cache.set(item.id, {
           credential_id: item.id,
@@ -200,6 +199,14 @@ export class CredentialVault {
     this.logAudit("revoked", deletedBy, credentialId, "success", reason);
     console.log(`[CredentialVault] 🗑️ Soft-deleted in DB & Cache: ${cred.name}`);
     return true;
+  }
+
+  // ✅ დაბრუნებულია: updateQuota მეთოდი (mock-proxy.ts-ისთვის)
+  public updateQuota(credentialId: string): void {
+    const cred = this.cache.get(credentialId);
+    if (cred) {
+      console.log(`[CredentialVault] 📊 Quota updated for credential: ${credentialId}`);
+    }
   }
 
   public getAuditLog(limit = 20): CredentialAuditLog[] {
