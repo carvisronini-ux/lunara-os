@@ -7,7 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { AgentStatus } from "@/core/contracts"; // ✅ დამატებული იმპორტი
+import type { AgentStatus } from "@/core/contracts";
 
 type Agent = {
   id: string;
@@ -17,7 +17,7 @@ type Agent = {
   level: number;
   xp: number;
   xpToNext: number;
-  status: AgentStatus; // ✅ შეცვლილია string-დან AgentStatus-ზე
+  status: AgentStatus;
   taskId: string | null;
   accent: string;
   icon: string;
@@ -39,18 +39,6 @@ interface DepartmentModalProps {
   agents: Agent[];
   onClose: () => void;
   onAgentClick: (agent: Agent) => void;
-}
-
-function getStatusColor(status: AgentStatus): string {
-  switch (status) {
-    case 'WORKING': return 'text-yellow-400';
-    case 'IDLE': return 'text-slate-400';
-    case 'COMPLETED': return 'text-emerald-400';
-    case 'ERROR': return 'text-red-400';
-    case 'WAITING': return 'text-blue-400';
-    case 'PAUSED': return 'text-amber-400';
-    default: return 'text-slate-400';
-  }
 }
 
 function getStatusLabel(status: AgentStatus): string {
