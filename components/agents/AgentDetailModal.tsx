@@ -1,13 +1,13 @@
 // ============================================================
 // LUNARA OS — Agent Detail Modal
 // Foundation: §34 (Agent Training), §42 (Target UI Structure)
-// Purpose: Detailed view and instruction management for individual agents
+// Purpose: Detailed view and REAL instruction management for individual agents
 // ============================================================
 
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { AgentStatus } from "@/core/contracts"; // ✅ დამატებული იმპორტი
+import type { AgentStatus } from "@/core/contracts";
 
 type Agent = {
   id: string;
@@ -17,7 +17,7 @@ type Agent = {
   level: number;
   xp: number;
   xpToNext: number;
-  status: AgentStatus; // ✅ შეცვლილია string-დან AgentStatus-ზე
+  status: AgentStatus;
   taskId: string | null;
   accent: string;
   icon: string;
@@ -56,39 +56,65 @@ function getStatusLabel(status: AgentStatus): string {
 }
 
 export default function AgentDetailModal({ agent, onClose }: AgentDetailModalProps) {
-  const [instructions, setInstructions] = useState(`You are ${agent.name}, ${agent.role} of Lunara OS.
-
-CORE RESPONSIBILITY:
-- Execute tasks with precision and adhere to Dark Luxury / Cosmic Editorial brand guidelines.
-
-VOICE:
-- Mysterious, intelligent, intimate, emotionally precise.
-- Modern and concise.
-
-AVOID:
-- Generic AI astrology clichés.
-- Fake certainty or "AI woman + galaxy" aesthetics.`);
-  
+  const [instructions, setInstructions] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+  const [currentVersion, setCurrentVersion] = useState(1);
 
+  // ✅ რეალური ინსტრუქციის ჩატვირთვა Supabase-დან მოდალის გახსნისას
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const fetchInstruction = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/agent-instructions?agent_id=${agent.id}`);
+        const data = await res.json();
+        
+        if (data.system_prompt) {
+          setInstructions(data.system_prompt);
+        } else {
+          // Fallback თუ ბაზაში არ არის
+          setInstructions(`You are ${agent.name}, ${agent.role} of Lunara OS.\n\nCORE RESPONSIBILITY:\n- Execute tasks with precision and adhere to Dark Luxury / Cosmic Editorial brand guidelines.`);
+        }
+      } catch (error) {
+        console.error("Failed to fetch instruction", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+    
+    fetchInstruction();
+  }, [agent.id]);
 
   const handleSaveInstructions = async () => {
     setIsSaving(true);
     setSaveMessage('');
-    
-    setTimeout(() => {
+
+    try {
+      const response = await fetch('/api/agent-instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent_id: agent.id,
+          system_prompt: instructions,
+          updated_by: 'human_executive'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setCurrentVersion(data.version);
+        setSaveMessage(`✅ ინსტრუქციები შენახულია! (v${data.version})`);
+        setTimeout(() => setSaveMessage(''), 4000);
+      } else {
+        setSaveMessage(`❌ შეცდომა: ${data.error}`);
+      }
+    } catch (error) {
+      setSaveMessage('❌ ქსელური შეცდომა. სცადეთ თავიდან.');
+    } finally {
       setIsSaving(false);
-      setSaveMessage('✅ ინსტრუქციები წარმატებით შენახვა! (v2.0)');
-      setTimeout(() => setSaveMessage(''), 3000);
-    }, 800);
+    }
   };
 
   return (
@@ -165,16 +191,22 @@ AVOID:
               <h3 className="text-xl font-bold text-[#D8B878] flex items-center gap-2">
                 🧠 სისტემური ინსტრუქციები (System Prompt)
               </h3>
-              <span className="text-xs text-[#A99BC7] bg-white/5 px-2 py-1 rounded border border-white/10">v1.0</span>
+              <span className="text-xs text-[#A99BC7] bg-white/5 px-2 py-1 rounded border border-white/10">v{currentVersion}</span>
             </div>
             
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              className="w-full bg-[#171127] border border-[#6D6BEA]/30 rounded-xl p-4 text-[#F5F1FF] font-mono text-sm focus:outline-none focus:border-[#D8B878] transition-colors resize-y"
-              rows={12}
-              placeholder="შეიყვანე აგენტის სისტემური ინსტრუქციები აქ..."
-            />
+            {isLoading ? (
+              <div className="w-full h-64 bg-[#171127] rounded-xl border border-[#6D6BEA]/30 flex items-center justify-center">
+                <span className="text-[#A99BC7] animate-pulse">იტვირთება ინსტრუქცია...</span>
+              </div>
+            ) : (
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                className="w-full bg-[#171127] border border-[#6D6BEA]/30 rounded-xl p-4 text-[#F5F1FF] font-mono text-sm focus:outline-none focus:border-[#D8B878] transition-colors resize-y"
+                rows={12}
+                placeholder="შეიყვანე აგენტის სისტემური ინსტრუქციები აქ..."
+              />
+            )}
             
             <div className="flex items-center justify-between mt-4">
               <p className="text-xs text-[#A99BC7]/70">
@@ -182,11 +214,13 @@ AVOID:
               </p>
               <div className="flex items-center gap-3">
                 {saveMessage && (
-                  <span className="text-sm text-emerald-400 font-medium animate-pulse">{saveMessage}</span>
+                  <span className={`text-sm font-medium animate-pulse ${saveMessage.includes('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {saveMessage}
+                  </span>
                 )}
                 <button
                   onClick={handleSaveInstructions}
-                  disabled={isSaving}
+                  disabled={isSaving || isLoading}
                   className="px-6 py-2.5 bg-gradient-to-r from-[#D8B878] to-[#6D6BEA] text-[#08070D] font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {isSaving ? '💾 ინახება...' : '💾 ინსტრუქციის შენახვა'}

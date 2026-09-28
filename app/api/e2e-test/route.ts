@@ -1,13 +1,14 @@
 // ============================================================
 // LUNARA OS — E2E Test API Route (Server-Side with Deep Diagnostics)
-// Foundation: §56 (First True E2E Test), §40 (Secrets)
-// Purpose: Execute E2E test pipeline server-side with detailed error diagnostics
+// Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
+// Purpose: Execute E2E test pipeline server-side using dynamic agent instructions
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateWithProvider } from '@/services/credentials/providers/adapter';
 import { sendTelegramMessage } from '@/services/distribution/telegram';
 import { credentialVault } from '@/services/credentials/credential-vault';
+import { getInstruction } from '@/services/agents/agent-instructions'; // ✅ ახალი იმპორტი
 
 export interface E2ELog {
   step: number;
@@ -60,7 +61,6 @@ export async function POST(request: NextRequest) {
     } else if (activeCredentials.length === 0) {
       detailedErrorMessage = `⚠️ Vault-ში ნაპოვნია ${credentials.length} გასაღები, მაგრამ არცერთი არ არის ACTIVE სტატუსში (სავარაუდოდ ყველა REVOKED-ია). გადადით "🔐 API საცავი" პანელზე და დარწმუნდით, რომ მინიმუმ ერთ გასაღებს აქვს ACTIVE სტატუსი.`;
     } else {
-      // თუ არის ACTIVE, მაგრამ ვერ ვპოულობთ (უკიდურესი შემთხვევა)
       detailedErrorMessage = `ნაპოვნია ${activeCredentials.length} ACTIVE გასაღები, მაგრამ სისტემამ ვერ შეარჩია შესაბამისი პროვაიდერი. შეამოწმეთ გასაღების მონაცემები.`;
     }
 
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       credential_id: activeCred.credential_id
     });
 
-    // 2. Muse: კონტენტის გენერაცია
+    // 2. Muse: კონტენტის გენერაცია (დინამიური ინსტრუქციით)
     addLog(2, 'Muse', 'running', 'Generating content based on prompt...');
     const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
     
@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ logs });
     }
 
-    const museSystemPrompt = "You are Muse, Lunara OS Content Lead. Write a short, mysterious, and engaging Telegram post. Use emojis, keep it concise, and follow Dark Luxury / Cosmic Editorial style. No generic AI clichés.";
+    // ✅ ვიღებთ რეალურ ინსტრუქციას Supabase-დან, ან ვიყენებთ fallback-ს
+    const museSystemPrompt = await getInstruction('muse') || "You are Muse, Lunara OS Content Lead. Write a short, mysterious, and engaging Telegram post. Use emojis, keep it concise, and follow Dark Luxury / Cosmic Editorial style. No generic AI clichés.";
     
     const generationStart = Date.now();
     const generation = await generateWithProvider(
@@ -116,17 +117,21 @@ export async function POST(request: NextRequest) {
       provider: generation.provider
     });
 
-    // 3. Aegis: ხარისხის შემოწმება (QA)
+    // 3. Aegis: ხარისხის შემოწმება (QA) (დინამიური ინსტრუქციით)
     addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
     
     const qaStart = Date.now();
     const qaPrompt = `Review this text for brand fit, originality and quality. Reply ONLY with "APPROVED" or "REJECTED":\n\n${generation.content}`;
+    
+    // ✅ ვიღებთ რეალურ ინსტრუქციას Supabase-დან, ან ვიყენებთ fallback-ს
+    const aegisSystemPrompt = await getInstruction('aegis') || "You are Aegis, Lunara OS Quality Director. Be strict but fair.";
+    
     const qaCheck = await generateWithProvider(
       activeCred.provider, 
       apiKey, 
       modelName, 
       qaPrompt, 
-      "You are Aegis, Lunara OS Quality Director. Be strict but fair."
+      aegisSystemPrompt
     );
     const qaLatency = Date.now() - qaStart;
     
