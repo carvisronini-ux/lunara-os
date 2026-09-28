@@ -68,7 +68,6 @@ export default function DepartmentModal({ department, agents, onClose, onAgentCl
 
   const departmentAgents = agents.filter(a => a.department === department.id);
   const workingCount = departmentAgents.filter(a => a.status === 'WORKING').length;
-  const idleCount = departmentAgents.filter(a => a.status === 'IDLE').length;
   const totalXP = departmentAgents.reduce((sum, a) => sum + a.xp, 0);
   const totalMissions = departmentAgents.reduce((sum, a) => sum + a.missionsCompleted, 0);
 
