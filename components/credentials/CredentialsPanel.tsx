@@ -24,44 +24,65 @@ export function CredentialsPanel() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
 
-  const refreshData = () => {
-    setCredentials(credentialVault.getMetadata());
+  // ✅ განახლება: მონაცემების ასინქრონული ჩატვირთვა Supabase-დან
+  useEffect(() => {
+    const loadData = async () => {
+      const creds = await credentialVault.getMetadata();
+      setCredentials(creds);
+      setLeases(accessManager.getActiveLeases());
+      setAudit(credentialVault.getAuditLog(15));
+    };
+    loadData();
+  }, []);
+
+  const refreshData = async () => {
+    const creds = await credentialVault.getMetadata();
+    setCredentials(creds);
     setLeases(accessManager.getActiveLeases());
     setAudit(credentialVault.getAuditLog(15));
   };
 
-  useEffect(() => {
-    refreshData();
-  }, []);
-
-  const handleAddCredential = () => {
+  const handleAddCredential = async () => {
     if (!newCredValue) return;
-    credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive");
-    setNewCredValue('');
-    setShowAddModal(false);
-    refreshData();
-  };
-
-  const handleEditCredential = () => {
-    if (!editCredId || !editCredValue) return;
-    const success = credentialVault.updateCredential(editCredId, editCredValue, "human_executive");
-    if (success) {
-      setEditCredValue('');
-      setEditCredId(null);
-      setShowEditModal(false);
+    try {
+      await credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive");
+      setNewCredValue('');
+      setShowAddModal(false);
       refreshData();
+    } catch (error) {
+      console.error("Failed to add credential:", error);
+      alert("Failed to save credential. Check console for details.");
     }
   };
 
-  const handleDeleteCredential = (credentialId: string) => {
-    const success = credentialVault.deleteCredential(
-      credentialId,
-      "human_executive",
-      "Manual deletion by human executive"
-    );
-    if (success) {
-      setShowDeleteConfirm(null);
-      refreshData();
+  const handleEditCredential = async () => {
+    if (!editCredId || !editCredValue) return;
+    try {
+      const success = await credentialVault.updateCredential(editCredId, editCredValue, "human_executive");
+      if (success) {
+        setEditCredValue('');
+        setEditCredId(null);
+        setShowEditModal(false);
+        refreshData();
+      }
+    } catch (error) {
+      console.error("Failed to update credential:", error);
+    }
+  };
+
+  const handleDeleteCredential = async (credentialId: string) => {
+    try {
+      const success = await credentialVault.deleteCredential(
+        credentialId,
+        "human_executive",
+        "Manual deletion by human executive"
+      );
+      if (success) {
+        setShowDeleteConfirm(null);
+        refreshData();
+      }
+    } catch (error) {
+      console.error("Failed to delete credential:", error);
     }
   };
 
@@ -202,7 +223,7 @@ export function CredentialsPanel() {
                 />
               </div>
               <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs text-yellow-300">
-                ️ <strong>Warning:</strong> This action will rotate the credential and revoke all active access leases.
+                ⚠️ <strong>Warning:</strong> This action will rotate the credential and revoke all active access leases.
               </div>
               <div className="flex gap-3 pt-2">
                 <button 
@@ -301,7 +322,7 @@ export function CredentialsPanel() {
                               className="rounded-lg bg-red-500/20 border border-red-500/40 px-3 py-1 text-xs font-bold text-red-400 hover:bg-red-500/30"
                               title="Delete credential"
                             >
-                              ️ Delete
+                              🗑️ Delete
                             </button>
                           </>
                         )}
@@ -310,7 +331,7 @@ export function CredentialsPanel() {
                           disabled={isTesting}
                           className="rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isTesting ? ' Testing...' : '🧪 Test'}
+                          {isTesting ? '⏳ Testing...' : '🧪 Test'}
                         </button>
                       </div>
                     </div>
@@ -330,7 +351,7 @@ export function CredentialsPanel() {
                             </div>
                             {testResult.recommendedModel && (
                               <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
-                                <div className="text-xs text-slate-400 mb-1"> Auto-detected Free Model:</div>
+                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Free Model:</div>
                                 <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
                                 <div className="text-xs text-slate-500 mt-1">System will use this model automatically</div>
                               </div>

@@ -18,7 +18,10 @@ export interface CredentialTestResult {
 }
 
 export async function testCredential(credentialId: string): Promise<CredentialTestResult> {
-  const cred = credentialVault.getMetadata().find(c => c.credential_id === credentialId);
+  // ✅ განახლება 1: ველოდებით მონაცემების წამოღებას Supabase-დან (ქეშიდან)
+  const credentials = await credentialVault.getMetadata();
+  const cred = credentials.find(c => c.credential_id === credentialId);
+  
   if (!cred) {
     return {
       success: false,
@@ -29,19 +32,19 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ვიღებთ გაშიფრულ გასაღებს ტესტისთვის
-  const apiKey = credentialVault.getDecryptedValueForTesting(credentialId);
+  // ✅ განახლება 2: ველოდებით გაშიფრული გასაღების მიღებას
+  const apiKey = await credentialVault.getDecryptedValueForTesting(credentialId);
   if (!apiKey) {
     return {
       success: false,
       provider: cred.provider,
       models: [],
       recommendedModel: '',
-      error: 'Failed to retrieve API key'
+      error: 'Failed to retrieve API key or credential is not ACTIVE'
     };
   }
 
-  // ვტესტავთ პროვაიდერს
+  // ვტესტავთ პროვაიდერს adapter-ის მეშვეობით
   const result = await testProvider(cred.provider, apiKey);
 
   const testResult: CredentialTestResult = {
@@ -53,9 +56,9 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     latency: result.latency
   };
 
-  // ვინახავთ ტესტის შედეგებს metadata-ში
+  // ✅ განახლება 3: ველოდებით მეტამონაცემების შენახვას Supabase-ში
   if (result.success) {
-    credentialVault.updateCredentialMetadata(credentialId, {
+    await credentialVault.updateCredentialMetadata(credentialId, {
       models: result.models.map(m => m.id),
       recommendedModel: result.recommendedModel,
       testSuccess: true,
