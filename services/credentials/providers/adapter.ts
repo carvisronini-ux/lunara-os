@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Unified API Adapters (Professional Grade)
-// Foundation: §22, §40, §45, §60 (Reduce complexity, isolate credentials)
-// Purpose: Flawless API key testing, intelligent model selection, text generation
+// LUNARA OS — Unified API Adapters (Dynamic & Intelligent)
+// Foundation: §22, §40, §45, §60
+// Purpose: Flawless API key testing, DYNAMIC intelligent model selection (NO hardcoded names), text generation
 // ============================================================
 
 export interface ProviderModel {
@@ -31,7 +31,7 @@ export interface GenerateResult {
 }
 
 // ============================================================
-// GLOBAL MODEL FILTERING RULES
+// GLOBAL MODEL FILTERING & SCORING RULES
 // ============================================================
 
 const EXCLUDE_PATTERNS = [
@@ -42,55 +42,65 @@ const EXCLUDE_PATTERNS = [
 ];
 
 const PREFER_PATTERNS = [
-  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro' // ინსტრუქციებზე მორგებული მოდელები
+  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro', 'turbo' // ინსტრუქციებზე მორგებული, სწრაფი მოდელები
 ];
 
 function isValidModel(modelId: string): boolean {
   const lower = modelId.toLowerCase();
-  
   // 1. უარვყოფთ აშკარად არასასურველს
   if (EXCLUDE_PATTERNS.some(pattern => lower.includes(pattern))) {
     return false;
   }
-  
-  // 2. ვანიჭებთ უპირატესობას instruct/chat ვარიანტებს (თუ არ არის ცნობილი გამონაკლისი)
-  const hasPrefer = PREFER_PATTERNS.some(pattern => lower.includes(pattern));
-  const isKnownGoodBase = lower.includes('llama-3.3-70b') || lower.includes('deepseek-v3');
-  
-  return hasPrefer || isKnownGoodBase || lower.includes('gpt-oss');
+  return true; // თუ არ არის გამორიცხული, განვიხილავთ როგორც ვალიდურს
+}
+
+// 🧠 ჭკვიანი, დინამიური მოდელის შერჩევა (არანაირი hardcoded სახელი!)
+function selectBestModel(models: ProviderModel[]): string {
+  if (models.length === 0) return '';
+
+  const scoredModels = models.map(m => {
+    const lowerId = m.id.toLowerCase();
+    let score = 0;
+
+    // 1. ძლიერი ბონუსი სასურველი შესაძლებლობებისთვის
+    PREFER_PATTERNS.forEach(pattern => {
+      if (lowerId.includes(pattern)) score += 10;
+    });
+
+    // 2. ბონუსი ცნობილი, ძლიერი მოდელის ოჯახებისთვის
+    if (lowerId.includes('llama') || lowerId.includes('gpt') || lowerId.includes('claude') || 
+        lowerId.includes('gemini') || lowerId.includes('deepseek') || lowerId.includes('mixtral') || 
+        lowerId.includes('qwen') || lowerId.includes('mistral')) {
+      score += 5;
+    }
+
+    // 3. ჯარიმა არასტაბილური/სატესტო ვერსიებისთვის
+    if (lowerId.includes('preview') || lowerId.includes('experimental') || lowerId.includes('test')) {
+      score -= 15;
+    }
+
+    // 4. ევრისტიკა ზომის/სიმძლავრისთვის (რიცხვების ამოღება, მაგ. 70b > 8b, 4 > 3)
+    const numbers = lowerId.match(/\d+/g);
+    if (numbers) {
+      const maxNum = Math.max(...numbers.map(n => parseInt(n, 10)));
+      score += maxNum * 0.1; // მაგალითად, 70b მიიღებს +7 ქულას
+    }
+
+    return { model: m, score };
+  });
+
+  // დალაგება ქულის მიხედვით (კლებადობით)
+  scoredModels.sort((a, b) => b.score - a.score);
+
+  // ვაბრუნებთ საუკეთესო ქულის მქონე მოდელის ზუსტ ID-ს, რომელიც API-მ დააბრუნა
+  return scoredModels[0].model.id;
 }
 
 // ============================================================
-// GROQ ADAPTER (Ultra-fast, Free Tier Optimized)
+// GROQ ADAPTER
 // ============================================================
 
 const GROQ_API_BASE = 'https://api.groq.com/openai/v1';
-
-function selectBestGroqModel(models: ProviderModel[]): string {
-  const validModels = models.filter(m => isValidModel(m.id));
-  if (validModels.length === 0) return '';
-
-  // მკაცრი პრიორიტეტული სია (ხარისხი და უფასო ხელმისაწვდომობა)
-  const priorityOrder = [
-    'llama-3.3-70b-versatile',      // 🥇 საუკეთესო: უახლესი, უფასო, მაღალი ხარისხი
-    'llama-3.1-70b-versatile',      // 🥈 შესანიშნავი ალტერნატივა
-    'llama-3.1-8b-instant',         // 🥉 სწრაფი, მსუბუქი ამოცანებისთვის
-    'mixtral-8x7b-32768',           // დიდი კონტექსტისთვის
-    'gemma2-9b-it',                 // კარგი მცირე მოდელი
-    'llama3-70b-8192',              // Legacy 70B
-    'llama3-8b-8192'                // Legacy 8B
-  ];
-
-  for (const preferred of priorityOrder) {
-    if (validModels.some(m => m.id === preferred)) {
-      return preferred;
-    }
-  }
-
-  // Fallback: ვირჩევთ პირველს, რომელიც შეიცავს 'llama' ან 'mixtral'-ს
-  const fallback = validModels.find(m => m.id.includes('llama') || m.id.includes('mixtral') || m.id.includes('gemma'));
-  return fallback ? fallback.id : validModels[0].id;
-}
 
 export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -108,8 +118,10 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
 
     const data = await response.json();
     const allModels: ProviderModel[] = data.data || [];
+    
+    // ვფილტრავთ და ვირჩევთ დინამიურად
     const validModels = allModels.filter(m => isValidModel(m.id));
-    const recommendedModel = selectBestGroqModel(allModels);
+    const recommendedModel = selectBestModel(validModels);
 
     return { success: true, provider: 'groq', models: validModels, recommendedModel, latency };
   } catch (error) {
@@ -148,21 +160,10 @@ export async function generateWithGroq(apiKey: string, model: string, prompt: st
 }
 
 // ============================================================
-// DEEPSEEK ADAPTER (High Quality, Generous Free Tier)
+// DEEPSEEK ADAPTER
 // ============================================================
 
 const DEEPSEEK_API_BASE = 'https://api.deepseek.com/v1';
-
-function selectBestDeepSeekModel(models: ProviderModel[]): string {
-  const validModels = models.filter(m => isValidModel(m.id));
-  if (validModels.length === 0) return models[0]?.id || '';
-
-  const priorityOrder = ['deepseek-chat', 'deepseek-reasoner', 'deepseek-v3'];
-  for (const preferred of priorityOrder) {
-    if (validModels.some(m => m.id === preferred)) return preferred;
-  }
-  return validModels[0].id;
-}
 
 export async function testDeepSeekApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -179,9 +180,10 @@ export async function testDeepSeekApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
-    const models: ProviderModel[] = data.data || [];
-    const recommendedModel = selectBestDeepSeekModel(models);
-    const validModels = models.filter(m => isValidModel(m.id));
+    const allModels: ProviderModel[] = data.data || [];
+    
+    const validModels = allModels.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestModel(validModels);
 
     return { success: true, provider: 'deepseek', models: validModels, recommendedModel, latency };
   } catch (error) {
@@ -220,24 +222,10 @@ export async function generateWithDeepSeek(apiKey: string, model: string, prompt
 }
 
 // ============================================================
-// GEMINI ADAPTER (Google AI Studio — Best Free Tier)
+// GEMINI ADAPTER
 // ============================================================
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-function selectBestGeminiModel(models: ProviderModel[]): string {
-  const validModels = models.filter(m => isValidModel(m.id));
-  if (validModels.length === 0) return '';
-
-  const priorityOrder = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
-  for (const preferred of priorityOrder) {
-    if (validModels.some(m => m.id.includes(preferred))) {
-      // ვაბრუნებთ ზუსტ ID-ს, რომელიც API-მ დააბრუნა
-      return validModels.find(m => m.id.includes(preferred))!.id;
-    }
-  }
-  return validModels[0].id;
-}
 
 export async function testGeminiApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -251,10 +239,10 @@ export async function testGeminiApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
-    // Gemini აბრუნებს "models/gemini-...", ჩვენ გვჭირდება მხოლოდ სახელი
-    const models: ProviderModel[] = (data.models || []).map((m: any) => ({ id: m.name.replace('models/', '') }));
-    const validModels = models.filter(m => isValidModel(m.id));
-    const recommendedModel = selectBestGeminiModel(models);
+    const allModels: ProviderModel[] = (data.models || []).map((m: any) => ({ id: m.name.replace('models/', '') }));
+    
+    const validModels = allModels.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestModel(validModels);
 
     return { success: true, provider: 'gemini', models: validModels, recommendedModel, latency };
   } catch (error) {
@@ -289,21 +277,10 @@ export async function generateWithGemini(apiKey: string, model: string, prompt: 
 }
 
 // ============================================================
-// MISTRAL ADAPTER (1000 req/day Free Tier)
+// MISTRAL ADAPTER
 // ============================================================
 
 const MISTRAL_API_BASE = 'https://api.mistral.ai/v1';
-
-function selectBestMistralModel(models: ProviderModel[]): string {
-  const validModels = models.filter(m => isValidModel(m.id));
-  if (validModels.length === 0) return '';
-
-  const priorityOrder = ['mistral-small-latest', 'mistral-medium-latest', 'open-mixtral-8x7b', 'mistral-tiny'];
-  for (const preferred of priorityOrder) {
-    if (validModels.some(m => m.id === preferred)) return preferred;
-  }
-  return validModels[0].id;
-}
 
 export async function testMistralApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -320,9 +297,10 @@ export async function testMistralApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
-    const models: ProviderModel[] = data.data || [];
-    const validModels = models.filter(m => isValidModel(m.id));
-    const recommendedModel = selectBestMistralModel(models);
+    const allModels: ProviderModel[] = data.data || [];
+    
+    const validModels = allModels.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestModel(validModels);
 
     return { success: true, provider: 'mistral', models: validModels, recommendedModel, latency };
   } catch (error) {
@@ -361,7 +339,7 @@ export async function generateWithMistral(apiKey: string, model: string, prompt:
 }
 
 // ============================================================
-// HUGGING FACE ADAPTER (Free Inference API)
+// HUGGING FACE ADAPTER
 // ============================================================
 
 const HF_API_BASE = 'https://api-inference.huggingface.co/models';
@@ -387,7 +365,9 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
       'meta-llama/Meta-Llama-3-8B-Instruct',
       'HuggingFaceH4/zephyr-7b-beta'
     ];
-    return { success: true, provider: 'huggingface', models: availableModels.map(id => ({ id })), recommendedModel: availableModels[0], latency };
+    
+    const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
+    return { success: true, provider: 'huggingface', models: validModels, recommendedModel: selectBestModel(validModels), latency };
   } catch (error) {
     return { success: false, provider: 'huggingface', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
   }
@@ -420,25 +400,10 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
 }
 
 // ============================================================
-// TOGETHER AI ADAPTER ($25 Free Credits)
+// TOGETHER AI ADAPTER
 // ============================================================
 
 const TOGETHER_API_BASE = 'https://api.together.xyz/v1';
-
-function selectBestTogetherModel(models: ProviderModel[]): string {
-  const validModels = models.filter(m => isValidModel(m.id));
-  if (validModels.length === 0) return '';
-
-  const priorityOrder = [
-    'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
-    'meta-llama/Meta-Llama-3-70B-Instruct',
-    'mistralai/Mixtral-8x7B-Instruct-v0.1'
-  ];
-  for (const preferred of priorityOrder) {
-    if (validModels.some(m => m.id === preferred)) return preferred;
-  }
-  return validModels[0].id;
-}
 
 export async function testTogetherApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
@@ -455,9 +420,10 @@ export async function testTogetherApiKey(apiKey: string): Promise<TestResult> {
     }
 
     const data = await response.json();
-    const models: ProviderModel[] = data.data || [];
-    const validModels = models.filter(m => isValidModel(m.id));
-    const recommendedModel = selectBestTogetherModel(models);
+    const allModels: ProviderModel[] = data.data || [];
+    
+    const validModels = allModels.filter(m => isValidModel(m.id));
+    const recommendedModel = selectBestModel(validModels);
 
     return { success: true, provider: 'together', models: validModels, recommendedModel, latency };
   } catch (error) {
