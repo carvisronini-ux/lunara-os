@@ -6,8 +6,6 @@
 
 import type { Credential, Provider, PermissionScope, CredentialAuditLog } from './types';
 import { accessManager } from './access-manager';
-// ⚠️ მნიშვნელოვანი: დარწმუნდი, რომ ეს იმპორტი მიუთითებს შენს Supabase კლიენტზე!
-// მაგალითად: import { supabase } from '@/core/database/client'; ან '@/lib/supabase';
 import { supabase } from '@/lib/supabase'; 
 
 // მარტივი mock დაშიფვრა (რეალურ პროდუქციაში იქნება KMS ან Env Vars)
@@ -41,7 +39,8 @@ export class CredentialVault {
   private async loadCache() {
     const { data, error } = await supabase.from('credentials').select('*');
     if (!error && data) {
-      data.forEach(item => {
+      // ✅ გამოსწორება: დავამატეთ ': any' ტიპი item პარამეტრზე TypeScript-ის შეცდომის თავიდან ასაცილებლად
+      data.forEach((item: any) => {
         this.cache.set(item.id, {
           credential_id: item.id,
           provider: item.provider,
