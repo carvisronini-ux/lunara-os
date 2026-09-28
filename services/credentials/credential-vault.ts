@@ -172,6 +172,63 @@ export class CredentialVault {
     return true;
   }
 
+  // ✅ ახალი მეთოდი: Credential-ის რედაქტირება (API გასაღების rotation)
+  public updateCredential(
+    credentialId: string,
+    newPlaintextValue: string,
+    updatedBy: string = "human_executive"
+  ): boolean {
+    const cred = this.credentials.get(credentialId);
+    if (!cred) return false;
+
+    // განვაახლოთ encrypted value
+    cred.encrypted_value = mockEncrypt(newPlaintextValue);
+    cred.last_rotated_at = Date.now();
+
+    // გავაუქმოთ ყველა აქტიური lease (§22 — temporary access lease)
+    accessManager.revokeAllLeasesForCredential(credentialId, updatedBy);
+
+    // ჩავწეროთ audit log-ში
+    this.logAudit(
+      "rotated",
+      updatedBy,
+      credentialId,
+      "success",
+      `Credential updated/rotated by ${updatedBy}, all leases revoked`
+    );
+
+    console.log(`[CredentialVault] 🔄 Updated: ${cred.name} (${cred.provider})`);
+    return true;
+  }
+
+  // ✅ ახალი მეთოდი: Credential-ის წაშლა (soft delete — status = REVOKED)
+  public deleteCredential(
+    credentialId: string,
+    deletedBy: string = "human_executive",
+    reason: string = "Manual deletion by human executive"
+  ): boolean {
+    const cred = this.credentials.get(credentialId);
+    if (!cred) return false;
+
+    // შევცვალოთ status REVOKED-ზე (არა ფიზიკური წაშლა — audit trail-ისთვის)
+    cred.status = "REVOKED";
+
+    // გავაუქმოთ ყველა აქტიური lease
+    accessManager.revokeAllLeasesForCredential(credentialId, deletedBy);
+
+    // ჩავწეროთ audit log-ში
+    this.logAudit(
+      "revoked",
+      deletedBy,
+      credentialId,
+      "success",
+      reason
+    );
+
+    console.log(`[CredentialVault] 🗑️ Deleted: ${cred.name} (${cred.provider})`);
+    return true;
+  }
+
   public updateQuota(credentialId: string): void {
     const cred = this.credentials.get(credentialId);
     if (cred) {

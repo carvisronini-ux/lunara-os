@@ -12,8 +12,14 @@ export function CredentialsPanel() {
   const [audit, setAudit] = useState<any[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCredProvider, setNewCredProvider] = useState<Provider>('gemini'); // ✅ ნაგულისხმევად Gemini (ყველაზე გულუხვი უფასო)
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  
+  const [newCredProvider, setNewCredProvider] = useState<Provider>('gemini');
   const [newCredValue, setNewCredValue] = useState('');
+  
+  const [editCredId, setEditCredId] = useState<string | null>(null);
+  const [editCredValue, setEditCredValue] = useState('');
   
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
@@ -34,6 +40,29 @@ export function CredentialsPanel() {
     setNewCredValue('');
     setShowAddModal(false);
     refreshData();
+  };
+
+  const handleEditCredential = () => {
+    if (!editCredId || !editCredValue) return;
+    const success = credentialVault.updateCredential(editCredId, editCredValue, "human_executive");
+    if (success) {
+      setEditCredValue('');
+      setEditCredId(null);
+      setShowEditModal(false);
+      refreshData();
+    }
+  };
+
+  const handleDeleteCredential = (credentialId: string) => {
+    const success = credentialVault.deleteCredential(
+      credentialId,
+      "human_executive",
+      "Manual deletion by human executive"
+    );
+    if (success) {
+      setShowDeleteConfirm(null);
+      refreshData();
+    }
   };
 
   const handleRevokeAll = () => {
@@ -60,6 +89,12 @@ export function CredentialsPanel() {
     } finally {
       setTestingId(null);
     }
+  };
+
+  const openEditModal = (cred: any) => {
+    setEditCredId(cred.credential_id);
+    setEditCredValue(''); // ცარიელი — უსაფრთხოებისთვის არ ვაჩვენებთ ძველ გასაღებს
+    setShowEditModal(true);
   };
 
   return (
@@ -146,6 +181,85 @@ export function CredentialsPanel() {
         </div>
       )}
 
+      {/* Edit Credential Modal */}
+      {showEditModal && editCredId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-white mb-2">Edit Credential</h3>
+            <p className="text-xs text-slate-400 mb-4">
+              🔐 §40: Enter the new API key. The old key will be permanently replaced and all active leases will be revoked.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">New API Key / Secret</label>
+                <input 
+                  type="password" 
+                  value={editCredValue}
+                  onChange={(e) => setEditCredValue(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  placeholder="Enter new API key..."
+                  autoFocus
+                />
+              </div>
+              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs text-yellow-300">
+                ️ <strong>Warning:</strong> This action will rotate the credential and revoke all active access leases.
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditCredId(null);
+                    setEditCredValue('');
+                  }}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleEditCredential}
+                  disabled={!editCredValue}
+                  className="flex-1 rounded-xl bg-blue-500/20 border border-blue-500/40 py-2 text-sm font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  🔄 Update Credential
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-xl font-black text-red-400 mb-2">⚠️ Delete Credential</h3>
+            <p className="text-sm text-slate-300 mb-4">
+              Are you sure you want to delete this credential? This action will:
+            </p>
+            <ul className="text-xs text-slate-400 mb-6 space-y-1">
+              <li>• Set credential status to REVOKED</li>
+              <li>• Revoke all active access leases</li>
+              <li>• Record this action in the audit log</li>
+              <li>• Prevent any future API calls with this key</li>
+            </ul>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(null)}
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => handleDeleteCredential(showDeleteConfirm)}
+                className="flex-1 rounded-xl bg-red-500/20 border border-red-500/40 py-2 text-sm font-bold text-red-400 hover:bg-red-500/30"
+              >
+                🗑️ Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Credentials List */}
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
@@ -173,12 +287,30 @@ export function CredentialsPanel() {
                         }`}>
                           {cred.status}
                         </span>
+                        {cred.status === 'ACTIVE' && (
+                          <>
+                            <button
+                              onClick={() => openEditModal(cred)}
+                              className="rounded-lg bg-blue-500/20 border border-blue-500/40 px-3 py-1 text-xs font-bold text-blue-400 hover:bg-blue-500/30"
+                              title="Edit credential"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => setShowDeleteConfirm(cred.credential_id)}
+                              className="rounded-lg bg-red-500/20 border border-red-500/40 px-3 py-1 text-xs font-bold text-red-400 hover:bg-red-500/30"
+                              title="Delete credential"
+                            >
+                              ️ Delete
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => handleTestCredential(cred.credential_id)}
                           disabled={isTesting}
-                          className="rounded-lg bg-blue-500/20 border border-blue-500/40 px-3 py-1 text-xs font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isTesting ? '⏳ Testing...' : '🧪 Test'}
+                          {isTesting ? ' Testing...' : '🧪 Test'}
                         </button>
                       </div>
                     </div>
@@ -196,31 +328,27 @@ export function CredentialsPanel() {
                                 <span className="text-xs text-slate-400">Latency: {testResult.latency}ms</span>
                               )}
                             </div>
-                            
-                            {/* Auto-detected Model */}
                             {testResult.recommendedModel && (
                               <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
-                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Free Model:</div>
+                                <div className="text-xs text-slate-400 mb-1"> Auto-detected Free Model:</div>
                                 <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
                                 <div className="text-xs text-slate-500 mt-1">System will use this model automatically</div>
                               </div>
                             )}
-                            
-                            {/* Available Models */}
                             {testResult.models && testResult.models.length > 0 && (
                               <div>
                                 <div className="text-xs text-slate-400 mb-1">Available Models ({testResult.models.length}):</div>
                                 <div className="flex flex-wrap gap-1">
-                                  {testResult.models.slice(0, 6).map((model: string, idx: number) => (
+                                  {testResult.models.slice(0, 6).map((model: any, idx: number) => (
                                     <span 
                                       key={idx} 
                                       className={`text-xs rounded px-2 py-0.5 font-mono ${
-                                        model === testResult.recommendedModel 
+                                        model.id === testResult.recommendedModel 
                                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
                                           : 'bg-white/5 border border-white/10 text-slate-300'
                                       }`}
                                     >
-                                      {model}
+                                      {model.id}
                                     </span>
                                   ))}
                                   {testResult.models.length > 6 && (
@@ -238,7 +366,7 @@ export function CredentialsPanel() {
                       </div>
                     )}
 
-                    {/* Previous Test Info (from metadata) */}
+                    {/* Previous Test Info */}
                     {!testResult && cred.metadata?.recommendedModel && (
                       <div className="mt-3 p-2 rounded bg-blue-500/5 border border-blue-500/20">
                         <div className="text-xs text-slate-400">Last tested model:</div>
