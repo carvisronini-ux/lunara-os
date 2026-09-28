@@ -62,29 +62,37 @@ export default function AgentDetailModal({ agent, onClose }: AgentDetailModalPro
   const [saveMessage, setSaveMessage] = useState('');
   const [currentVersion, setCurrentVersion] = useState(1);
 
-  // ✅ რეალური ინსტრუქციის ჩატვირთვა Supabase-დან მოდალის გახსნისას
   useEffect(() => {
     const fetchInstruction = async () => {
       setIsLoading(true);
       try {
+        console.log(`[AgentDetailModal] 🔄 Fetching instruction for agent: ${agent.id}`);
         const res = await fetch(`/api/agent-instructions?agent_id=${agent.id}`);
+        
+        if (!res.ok) {
+          console.error(`[AgentDetailModal] ❌ API returned ${res.status}:`, await res.text());
+        }
+        
         const data = await res.json();
+        console.log("[AgentDetailModal] 📦 API Response:", data);
         
         if (data.system_prompt) {
           setInstructions(data.system_prompt);
         } else {
-          // Fallback თუ ბაზაში არ არის
+          console.warn(`[AgentDetailModal] ⚠️ No system_prompt found for ${agent.id}, using fallback.`);
           setInstructions(`You are ${agent.name}, ${agent.role} of Lunara OS.\n\nCORE RESPONSIBILITY:\n- Execute tasks with precision and adhere to Dark Luxury / Cosmic Editorial brand guidelines.`);
         }
       } catch (error) {
-        console.error("Failed to fetch instruction", error);
+        console.error("[AgentDetailModal] ❌ Failed to fetch instruction:", error);
+        // Fallback შეცდომის შემთხვევაშიც, რომ ცარიელი არ იყოს
+        setInstructions(`You are ${agent.name}, ${agent.role} of Lunara OS.\n\nCORE RESPONSIBILITY:\n- Execute tasks with precision and adhere to Dark Luxury / Cosmic Editorial brand guidelines.`);
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchInstruction();
-  }, [agent.id]);
+  }, [agent.id, agent.name, agent.role]);
 
   const handleSaveInstructions = async () => {
     setIsSaving(true);
