@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateWithProvider } from '@/services/credentials/providers/adapter';
 import { sendTelegramMessage } from '@/services/distribution/telegram';
 import { credentialVault } from '@/services/credentials/credential-vault';
-import { getInstruction } from '@/services/agents/agent-instructions'; // ✅ ახალი იმპორტი
+import { getInstruction } from '@/services/agents/agent-instructions';
 
 export interface E2ELog {
   step: number;
@@ -18,6 +18,22 @@ export interface E2ELog {
   timestamp: number;
   latency?: number;
   metadata?: Record<string, any>;
+}
+
+// ✅ Helper: ამოიღებს <post> block-ს Muse-ის XML output-დან
+function extractPost(content: string): string {
+  const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
+  if (postMatch) {
+    return postMatch[1].trim();
+  }
+  // Fallback: თუ <post> block არ არის, მთლიანი content-ი გამოიყენე
+  return content.trim();
+}
+
+// ✅ Helper: ამოიღებს <thinking> block-ს Muse-ის XML output-დან (debug-ისთვის)
+function extractThinking(content: string): string | null {
+  const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/i);
+  return thinkingMatch ? thinkingMatch[1].trim() : null;
 }
 
 export async function POST(request: NextRequest) {
@@ -110,9 +126,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ logs });
     }
     
-    addLog(2, 'Muse', 'success', `Content generated successfully (${generation.content.length} chars)`, generationLatency, {
-      content_preview: generation.content.substring(0, 100) + '...',
-      full_content: generation.content,
+    // ✅ ახალი: <thinking> და <post> block-ების ამოღება Muse-ის XML output-დან
+    const publishedContent = extractPost(generation.content);
+    const thinkingContent = extractThinking(generation.content);
+    
+    addLog(2, 'Muse', 'success', `Content generated successfully (${publishedContent.length} chars)`, generationLatency, {
+      content_preview: publishedContent.substring(0, 100) + '...',
+      full_content: publishedContent,
+      thinking_block: thinkingContent, // Debug Center-ში ჩანს Muse-ის reasoning
+      raw_response: generation.content, // სრული raw response (debugging-ისთვის)
       model: generation.model,
       provider: generation.provider
     });
@@ -121,7 +143,8 @@ export async function POST(request: NextRequest) {
     addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
     
     const qaStart = Date.now();
-    const qaPrompt = `Review this text for brand fit, originality and quality. Reply ONLY with "APPROVED" or "REJECTED":\n\n${generation.content}`;
+    // ✅ Aegis ახლა publishedContent-ს (მხოლოდ <post> block-ს) შეამოწმებს
+    const qaPrompt = `Review this text for brand fit, originality and quality. Reply ONLY with "APPROVED" or "REJECTED":\n\n${publishedContent}`;
     
     // ✅ ვიღებთ რეალურ ინსტრუქციას Supabase-დან, ან ვიყენებთ fallback-ს
     const aegisSystemPrompt = await getInstruction('aegis') || "You are Aegis, Lunara OS Quality Director. Be strict but fair.";
@@ -152,8 +175,9 @@ export async function POST(request: NextRequest) {
     addLog(4, 'Echo', 'running', 'Sending to Telegram channel...');
     
     const telegramStart = Date.now();
+    // ✅ Telegram-ზე მხოლოდ <post> block-ს ვაგზავნით (არა raw response-ს)
     const tgResult = await sendTelegramMessage({ 
-      text: generation.content, 
+      text: publishedContent, 
       parse_mode: 'Markdown' 
     });
     const telegramLatency = Date.now() - telegramStart;
