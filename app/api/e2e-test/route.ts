@@ -30,10 +30,16 @@ function extractPost(content: string): string {
   return content.trim();
 }
 
-// ✅ Helper: ამოიღებს <thinking> block-ს Muse-ის XML output-დან (debug-ისთვის)
+// ✅ Helper: ამოიღებს <thinking> block-ს XML output-დან (debug-ისთვის)
 function extractThinking(content: string): string | null {
   const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/i);
   return thinkingMatch ? thinkingMatch[1].trim() : null;
+}
+
+// ✅ Helper: ამოიღებს <verdict> block-ს Aegis-ის XML output-დან
+function extractVerdict(content: string): string {
+  const verdictMatch = content.match(/<verdict>([\s\S]*?)<\/verdict>/i);
+  return verdictMatch ? verdictMatch[1].trim() : content.trim();
 }
 
 export async function POST(request: NextRequest) {
@@ -143,8 +149,8 @@ export async function POST(request: NextRequest) {
     addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
     
     const qaStart = Date.now();
-    // ✅ Aegis ახლა publishedContent-ს (მხოლოდ <post> block-ს) შეამოწმებს
-    const qaPrompt = `Review this text for brand fit, originality and quality. Reply ONLY with "APPROVED" or "REJECTED":\n\n${publishedContent}`;
+    // ✅ Aegis ახლა publishedContent-ს შეამოწმებს და ელოდება <thinking> და <verdict> ბლოკებს
+    const qaPrompt = `Evaluate this content:\n\n${publishedContent}`;
     
     // ✅ ვიღებთ რეალურ ინსტრუქციას Supabase-დან, ან ვიყენებთ fallback-ს
     const aegisSystemPrompt = await getInstruction('aegis') || "You are Aegis, Lunara OS Quality Director. Be strict but fair.";
@@ -158,16 +164,24 @@ export async function POST(request: NextRequest) {
     );
     const qaLatency = Date.now() - qaStart;
     
-    const isApproved = qaCheck.content?.toUpperCase().includes('APPROVED');
+    // ✅ ახალი: <verdict> და <thinking> ბლოკების ამოღება Aegis-ის output-დან
+    const verdictContent = extractVerdict(qaCheck.content);
+    const aegisThinking = extractThinking(qaCheck.content);
+    
+    const isApproved = verdictContent.toUpperCase().includes('APPROVED');
     if (isApproved) {
       addLog(3, 'Aegis', 'success', 'Content approved by QA', qaLatency, {
         verdict: 'approved',
-        qa_response: qaCheck.content
+        thinking_block: aegisThinking,
+        full_verdict: verdictContent,
+        raw_response: qaCheck.content
       });
     } else {
       addLog(3, 'Aegis', 'warning', 'QA suggested revisions, but proceeding for E2E test...', qaLatency, {
         verdict: 'revise',
-        qa_response: qaCheck.content
+        thinking_block: aegisThinking,
+        full_verdict: verdictContent,
+        raw_response: qaCheck.content
       });
     }
 
