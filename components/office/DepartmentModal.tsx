@@ -7,6 +7,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { AgentStatus } from "@/core/contracts"; // ✅ დამატებული იმპორტი
 
 type Agent = {
   id: string;
@@ -16,7 +17,7 @@ type Agent = {
   level: number;
   xp: number;
   xpToNext: number;
-  status: string;
+  status: AgentStatus; // ✅ შეცვლილია string-დან AgentStatus-ზე
   taskId: string | null;
   accent: string;
   icon: string;
@@ -37,10 +38,10 @@ interface DepartmentModalProps {
   department: Department;
   agents: Agent[];
   onClose: () => void;
-  onAgentClick: (agent: Agent) => void; // ✅ ახალი პროპი
+  onAgentClick: (agent: Agent) => void;
 }
 
-function getStatusColor(status: string): string {
+function getStatusColor(status: AgentStatus): string {
   switch (status) {
     case 'WORKING': return 'text-yellow-400';
     case 'IDLE': return 'text-slate-400';
@@ -52,7 +53,7 @@ function getStatusColor(status: string): string {
   }
 }
 
-function getStatusLabel(status: string): string {
+function getStatusLabel(status: AgentStatus): string {
   switch (status) {
     case 'WORKING': return '⚡ მუშაობს';
     case 'IDLE': return '⏸️ უმოქმედო';
@@ -146,7 +147,7 @@ export default function DepartmentModal({ department, agents, onClose, onAgentCl
                   key={agent.id}
                   className="rounded-2xl border border-white/10 bg-white/5 p-5 transition-all hover:border-white/30 hover:shadow-xl cursor-pointer"
                   style={{ borderColor: `${agent.accent}30` }}
-                  onClick={() => onAgentClick(agent)} // ✅ აქ ვაგზავნით დაკლიკებულ აგენტს
+                  onClick={() => onAgentClick(agent)}
                 >
                   <div className="flex items-start gap-4">
                     <div
