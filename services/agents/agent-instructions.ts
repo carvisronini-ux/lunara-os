@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Agent Instructions Service
+// LUNARA OS — Agent Instructions Service (Enhanced Logging)
 // Foundation: §34 (Agent Training), §24 (Knowledge OS)
-// Purpose: Fetch and update agent system prompts from Supabase
+// Purpose: Fetch and update agent system prompts from Supabase with detailed logging
 // ============================================================
 
 import { supabase } from '@/lib/supabase';
@@ -20,17 +20,25 @@ export interface AgentInstruction {
 
 // ინსტრუქციის მიღება აგენტის ID-ით
 export async function getInstruction(agentId: string): Promise<string | null> {
+  console.log(`[AgentInstructions] 🔍 Fetching instruction for ${agentId}`);
+  
   const { data, error } = await supabase
     .from('agent_instructions')
     .select('system_prompt')
     .eq('agent_id', agentId)
     .single();
 
-  if (error || !data) {
-    console.warn(`[AgentInstructions] No instruction found for ${agentId}`);
+  if (error) {
+    console.error(`[AgentInstructions] ❌ Supabase error for ${agentId}:`, error);
     return null;
   }
 
+  if (!data) {
+    console.warn(`[AgentInstructions] ⚠️ No data found for ${agentId}`);
+    return null;
+  }
+
+  console.log(`[AgentInstructions] ✅ Retrieved ${agentId} instruction (${data.system_prompt.length} chars)`);
   return data.system_prompt;
 }
 
@@ -41,20 +49,32 @@ export async function updateInstruction(
   updatedBy: string = 'human_executive'
 ): Promise<{ success: boolean; version?: number; error?: string }> {
   
+  console.log(`[AgentInstructions] 🔄 Updating instruction for ${agentId}`);
+  console.log(`[AgentInstructions] 📝 New prompt length: ${newPrompt.length} chars`);
+  
   // 1. ჯერ ვიღებთ მიმდინარე ვერსიას
+  console.log(`[AgentInstructions] 📡 Fetching current version...`);
   const { data: currentData, error: fetchError } = await supabase
     .from('agent_instructions')
     .select('version')
     .eq('agent_id', agentId)
     .single();
 
-  if (fetchError || !currentData) {
+  if (fetchError) {
+    console.error(`[AgentInstructions] ❌ Failed to fetch current version:`, fetchError);
+    return { success: false, error: fetchError.message };
+  }
+
+  if (!currentData) {
+    console.error(`[AgentInstructions] ❌ Agent instruction not found in database`);
     return { success: false, error: 'Agent instruction not found in database' };
   }
 
+  console.log(`[AgentInstructions] 📊 Current version: ${currentData.version}`);
   const newVersion = currentData.version + 1;
 
   // 2. ვაახლებთ მონაცემებს
+  console.log(`[AgentInstructions] 💾 Updating to v${newVersion}...`);
   const { error: updateError } = await supabase
     .from('agent_instructions')
     .update({
@@ -70,6 +90,6 @@ export async function updateInstruction(
     return { success: false, error: updateError.message };
   }
 
-  console.log(`[AgentInstructions] ✅ Updated ${agentId} to v${newVersion}`);
+  console.log(`[AgentInstructions] ✅ Successfully updated ${agentId} to v${newVersion}`);
   return { success: true, version: newVersion };
 }
