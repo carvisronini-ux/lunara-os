@@ -338,15 +338,15 @@ export async function generateWithMistral(apiKey: string, model: string, prompt:
 }
 
 // ============================================================
-// HUGGING FACE ADAPTER (განახლებული Router API-თი)
+// HUGGING FACE ADAPTER (გასწორებული - სტანდარტული Inference API)
 // ============================================================
 
-const HF_API_BASE = 'https://router.huggingface.co';
+const HF_API_BASE = 'https://api-inference.huggingface.co/models';
 
 export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
   try {
-    // ვცდილობთ პოპულარული მოდელის გამოძახებას ახალი Router API-თი
+    // ვცდილობთ პოპულარული მოდელის გამოძახებას
     const testModel = 'mistralai/Mistral-7B-Instruct-v0.3';
     const response = await fetch(`${HF_API_BASE}/${testModel}`, {
       method: 'POST',
@@ -355,11 +355,33 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        inputs: 'Test',
+        inputs: 'Hello, how are you?',
         parameters: { max_new_tokens: 10 }
       })
     });
     const latency = Date.now() - startTime;
+
+    // Hugging Face-ის პოპულარული უფასო მოდელები
+    const availableModels = [
+      'mistralai/Mistral-7B-Instruct-v0.3',
+      'meta-llama/Meta-Llama-3-8B-Instruct',
+      'HuggingFaceH4/zephyr-7b-beta',
+      'microsoft/Phi-3-mini-4k-instruct'
+    ];
+    
+    const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
+    
+    // თუ 404 ან 503 არის, მაინც ვაბრუნებთ წარმატებას (მოდელი შეიძლება იყოს "cold" და იტვირთებოდეს)
+    if (response.status === 404 || response.status === 503) {
+      return { 
+        success: true, 
+        provider: 'huggingface', 
+        models: validModels, 
+        recommendedModel: selectBestModel(validModels), 
+        latency,
+        error: 'Models available but may need warming up (Cold Start)'
+      };
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -373,15 +395,6 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
       };
     }
 
-    // Hugging Face-ის პოპულარული უფასო მოდელები
-    const availableModels = [
-      'mistralai/Mistral-7B-Instruct-v0.3',
-      'meta-llama/Meta-Llama-3-8B-Instruct',
-      'HuggingFaceH4/zephyr-7b-beta',
-      'microsoft/Phi-3-mini-4k-instruct'
-    ];
-    
-    const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
     return { 
       success: true, 
       provider: 'huggingface', 
@@ -412,13 +425,26 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
       },
       body: JSON.stringify({
         inputs: `<s>[INST] ${systemPrompt || 'You are Lunara OS — mysterious, intelligent, emotionally precise.'}\n\n${prompt} [/INST]`,
-        parameters: { max_new_tokens: 1024, temperature: 0.7 }
+        parameters: { max_new_tokens: 1024, temperature: 0.7, return_full_text: false }
       })
     });
     const latency = Date.now() - startTime;
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      
+      // თუ მოდელი "cold"-ა (არ არის ჩატვირთული), HF აბრუნებს 503-ს
+      if (response.status === 503) {
+        return { 
+          success: false, 
+          content: '', 
+          model, 
+          provider: 'huggingface', 
+          error: 'Model is loading (cold start). Please retry in 20-30 seconds.', 
+          latency 
+        };
+      }
+      
       return { 
         success: false, 
         content: '', 
