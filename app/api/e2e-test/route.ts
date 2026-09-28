@@ -20,13 +20,27 @@ export interface E2ELog {
   metadata?: Record<string, any>;
 }
 
-// ✅ Helper: ამოიღებს <post> block-ს Muse-ის XML output-დან
+// ✅ განახლებული Helper: უკეთესად უმკლავდება მოჭრილ ტექსტს (token cutoff)
 function extractPost(content: string): string {
+  // 1. იდეალური მატჩი: <post> ... </post>
   const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
   if (postMatch) {
     return postMatch[1].trim();
   }
-  // Fallback: თუ <post> block არ არის, მთლიანი content-ი გამოიყენე
+  
+  // 2. Fallback: თუ <post> არის, მაგრამ </post> აკლია (token cutoff-ის გამო)
+  const postStartMatch = content.match(/<post>([\s\S]*)/i);
+  if (postStartMatch) {
+    return postStartMatch[1].trim();
+  }
+  
+  // 3. Fallback: ამოიღე ყველაფერი <thinking> ბლოკის დახურვის შემდეგ
+  const afterThinkingMatch = content.match(/<\/thinking>([\s\S]*)/i);
+  if (afterThinkingMatch) {
+    return afterThinkingMatch[1].trim();
+  }
+  
+  // 4. საბოლოო Fallback
   return content.trim();
 }
 

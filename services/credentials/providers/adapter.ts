@@ -37,29 +37,26 @@ export interface GenerateResult {
 const EXCLUDE_PATTERNS = [
   'embed', 'embedding', 'vision', 'guard', 'safeguard', 'safety',
   'whisper', 'audio', 'speech', 'stt', 'tts',
-  'allam', 'jais', 'aya', 'arabic', 'chinese', 'russian', // არა-ინგლისური ფოკუსი
-  'base', 'pretrain', // Base მოდელები ცუდია instruction-following-ისთვის
-  // ⚠️ მკაცრი გამორიცხვა: არასტაბილური/ექსპერიმენტული ვერსიები
+  'allam', 'jais', 'aya', 'arabic', 'chinese', 'russian',
+  'base', 'pretrain',
   'preview', 'experimental', 'test', 'alpha', 'beta',
-  'antigravity', 'lyria', 'nano-banana', 'deep-research' // Google-ის/სხვა ცნობილი ექსპერიმენტული პროექტები
+  'antigravity', 'lyria', 'nano-banana', 'deep-research'
 ];
 
 const PREFER_PATTERNS = [
-  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro', 'turbo', 'latest' // ინსტრუქციებზე მორგებული, სწრაფი, სტაბილური მოდელები
+  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro', 'turbo', 'latest'
 ];
 
 function isValidModel(modelId: string): boolean {
   const lower = modelId.toLowerCase();
   
-  // 1. მკაცრი გამორიცხვა: თუ შეიცავს რომელიმე EXCLUDE პატერნს, უარვყოფთ დაუყოვნებლივ
   if (EXCLUDE_PATTERNS.some(pattern => lower.includes(pattern))) {
     return false;
   }
   
-  return true; // თუ არ არის გამორიცხული, განვიხილავთ როგორც ვალიდურს
+  return true;
 }
 
-// 🧠 ჭკვიანი, დინამიური მოდელის შერჩევა (არანაირი hardcoded სახელი!)
 function selectBestModel(models: ProviderModel[]): string {
   if (models.length === 0) return '';
 
@@ -67,32 +64,27 @@ function selectBestModel(models: ProviderModel[]): string {
     const lowerId = m.id.toLowerCase();
     let score = 0;
 
-    // 1. ძლიერი ბონუსი სასურველი შესაძლებლობებისთვის
     PREFER_PATTERNS.forEach(pattern => {
       if (lowerId.includes(pattern)) score += 10;
     });
 
-    // 2. ბონუსი ცნობილი, ძლიერი მოდელის ოჯახებისთვის
     if (lowerId.includes('llama') || lowerId.includes('gpt') || lowerId.includes('claude') || 
         lowerId.includes('gemini') || lowerId.includes('deepseek') || lowerId.includes('mixtral') || 
         lowerId.includes('qwen') || lowerId.includes('mistral')) {
       score += 5;
     }
 
-    // 3. ევრისტიკა ზომის/სიმძლავრისთვის (რიცხვების ამოღება, მაგ. 70b > 8b, 4 > 3)
     const numbers = lowerId.match(/\d+/g);
     if (numbers) {
       const maxNum = Math.max(...numbers.map(n => parseInt(n, 10)));
-      score += maxNum * 0.1; // მაგალითად, 70b მიიღებს +7 ქულას
+      score += maxNum * 0.1;
     }
 
     return { model: m, score };
   });
 
-  // დალაგება ქულის მიხედვით (კლებადობით)
   scoredModels.sort((a, b) => b.score - a.score);
 
-  // ვაბრუნებთ საუკეთესო ქულის მქონე მოდელის ზუსტ ID-ს, რომელიც API-მ დააბრუნა
   return scoredModels[0].model.id;
 }
 
@@ -141,7 +133,7 @@ export async function generateWithGroq(apiKey: string, model: string, prompt: st
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 1024
+        max_tokens: 2048 // ✅ გაზრდილია 1024-დან 2048-მდე
       })
     });
     const latency = Date.now() - startTime;
@@ -203,7 +195,7 @@ export async function generateWithDeepSeek(apiKey: string, model: string, prompt
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 1024
+        max_tokens: 2048 // ✅ გაზრდილია
       })
     });
     const latency = Date.now() - startTime;
@@ -257,7 +249,7 @@ export async function generateWithGemini(apiKey: string, model: string, prompt: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${systemPrompt || ''}\n\nUser: ${prompt}` }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 } // ✅ გაზრდილია
       })
     });
     const latency = Date.now() - startTime;
@@ -320,7 +312,7 @@ export async function generateWithMistral(apiKey: string, model: string, prompt:
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 1024
+        max_tokens: 2048 // ✅ გაზრდილია
       })
     });
     const latency = Date.now() - startTime;
@@ -352,7 +344,7 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'X-Wait-For-Model': 'true', // ⚠️ აგვარებს Cold Start-ს და ზოგჯერ CORS-ს
+        'X-Wait-For-Model': 'true',
         'Accept': 'application/json'
       },
       body: JSON.stringify({
@@ -371,7 +363,6 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
     
     const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
     
-    // თუ მაინც ვერ მივაღწიეთ (CORS), მაგრამ გასაღები სწორია, მაინც ვაბრუნებთ წარმატებას
     if (!response.ok && response.status !== 404 && response.status !== 503) {
       return { 
         success: true, 
@@ -391,7 +382,6 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
       latency 
     };
   } catch (error) {
-    // "Failed to fetch" არის კლასიკური CORS შეცდომა ბრაუზერში
     const availableModels = [
       'mistralai/Mistral-7B-Instruct-v0.3',
       'meta-llama/Meta-Llama-3-8B-Instruct'
@@ -399,7 +389,7 @@ export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult>
     const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
     
     return { 
-      success: true, // ვაბრუნებთ true-ს, რადგან გასაღები სავარაუდოდ სწორია, უბრალოდ ბრაუზერი ბლოკავს
+      success: true,
       provider: 'huggingface', 
       models: validModels, 
       recommendedModel: selectBestModel(validModels), 
@@ -422,7 +412,7 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
       },
       body: JSON.stringify({
         inputs: `<s>[INST] ${systemPrompt || 'You are Lunara OS'}\n\n${prompt} [/INST]`,
-        parameters: { max_new_tokens: 1024, temperature: 0.7, return_full_text: false }
+        parameters: { max_new_tokens: 2048, temperature: 0.7, return_full_text: false } // ✅ გაზრდილია
       })
     });
     const latency = Date.now() - startTime;
@@ -499,7 +489,7 @@ export async function generateWithTogether(apiKey: string, model: string, prompt
           { role: 'user', content: prompt }
         ],
         temperature: 0.7,
-        max_tokens: 1024
+        max_tokens: 2048 // ✅ გაზრდილია
       })
     });
     const latency = Date.now() - startTime;
