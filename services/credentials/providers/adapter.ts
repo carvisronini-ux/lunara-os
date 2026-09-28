@@ -38,19 +38,24 @@ const EXCLUDE_PATTERNS = [
   'embed', 'embedding', 'vision', 'guard', 'safeguard', 'safety',
   'whisper', 'audio', 'speech', 'stt', 'tts',
   'allam', 'jais', 'aya', 'arabic', 'chinese', 'russian', // არა-ინგლისური ფოკუსი
-  'base', 'pretrain' // Base მოდელები ცუდია instruction-following-ისთვის
+  'base', 'pretrain', // Base მოდელები ცუდია instruction-following-ისთვის
+  // ⚠️ მკაცრი გამორიცხვა: არასტაბილური/ექსპერიმენტული ვერსიები
+  'preview', 'experimental', 'test', 'alpha', 'beta',
+  'antigravity', 'lyria', 'nano-banana', 'deep-research' // Google-ის/სხვა ცნობილი ექსპერიმენტული პროექტები
 ];
 
 const PREFER_PATTERNS = [
-  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro', 'turbo' // ინსტრუქციებზე მორგებული, სწრაფი მოდელები
+  'instruct', 'chat', 'versatile', 'it', 'flash', 'pro', 'turbo', 'latest' // ინსტრუქციებზე მორგებული, სწრაფი, სტაბილური მოდელები
 ];
 
 function isValidModel(modelId: string): boolean {
   const lower = modelId.toLowerCase();
-  // 1. უარვყოფთ აშკარად არასასურველს
+  
+  // 1. მკაცრი გამორიცხვა: თუ შეიცავს რომელიმე EXCLUDE პატერნს, უარვყოფთ დაუყოვნებლივ
   if (EXCLUDE_PATTERNS.some(pattern => lower.includes(pattern))) {
     return false;
   }
+  
   return true; // თუ არ არის გამორიცხული, განვიხილავთ როგორც ვალიდურს
 }
 
@@ -74,12 +79,7 @@ function selectBestModel(models: ProviderModel[]): string {
       score += 5;
     }
 
-    // 3. ჯარიმა არასტაბილური/სატესტო ვერსიებისთვის
-    if (lowerId.includes('preview') || lowerId.includes('experimental') || lowerId.includes('test')) {
-      score -= 15;
-    }
-
-    // 4. ევრისტიკა ზომის/სიმძლავრისთვის (რიცხვების ამოღება, მაგ. 70b > 8b, 4 > 3)
+    // 3. ევრისტიკა ზომის/სიმძლავრისთვის (რიცხვების ამოღება, მაგ. 70b > 8b, 4 > 3)
     const numbers = lowerId.match(/\d+/g);
     if (numbers) {
       const maxNum = Math.max(...numbers.map(n => parseInt(n, 10)));
@@ -119,7 +119,6 @@ export async function testGroqApiKey(apiKey: string): Promise<TestResult> {
     const data = await response.json();
     const allModels: ProviderModel[] = data.data || [];
     
-    // ვფილტრავთ და ვირჩევთ დინამიურად
     const validModels = allModels.filter(m => isValidModel(m.id));
     const recommendedModel = selectBestModel(validModels);
 
