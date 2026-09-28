@@ -37,6 +37,7 @@ interface DepartmentModalProps {
   department: Department;
   agents: Agent[];
   onClose: () => void;
+  onAgentClick: (agent: Agent) => void; // ✅ ახალი პროპი
 }
 
 function getStatusColor(status: string): string {
@@ -54,7 +55,7 @@ function getStatusColor(status: string): string {
 function getStatusLabel(status: string): string {
   switch (status) {
     case 'WORKING': return '⚡ მუშაობს';
-    case 'IDLE': return '️ უმოქმედო';
+    case 'IDLE': return '⏸️ უმოქმედო';
     case 'COMPLETED': return '✅ დასრულებული';
     case 'ERROR': return '❌ შეცდომა';
     case 'WAITING': return '⏳ მოლოდინში';
@@ -63,8 +64,7 @@ function getStatusLabel(status: string): string {
   }
 }
 
-export default function DepartmentModal({ department, agents, onClose }: DepartmentModalProps) {
-  // ESC-ზე დახურვა
+export default function DepartmentModal({ department, agents, onClose, onAgentClick }: DepartmentModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -73,7 +73,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  // Backdrop-ზე დაჭერით დახურვა (თუ მოდალზე არ არის)
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -90,7 +89,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
       onClick={handleBackdropClick}
     >
       <div className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#08070D] shadow-2xl">
-        {/* Close Button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-xl text-white hover:bg-white/10 transition-colors"
@@ -98,7 +96,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
           ×
         </button>
 
-        {/* Header */}
         <div className="border-b border-white/10 p-8" style={{ background: `linear-gradient(135deg, ${department.color}20, transparent)` }}>
           <div className="flex items-center gap-6">
             <div
@@ -113,7 +110,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
             </div>
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mt-6">
             <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
               <div className="text-2xl font-black text-white">{departmentAgents.length}</div>
@@ -134,7 +130,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
           </div>
         </div>
 
-        {/* Agents Grid */}
         <div className="p-8">
           <h3 className="text-xl font-bold text-[#D8B878] mb-4">
             👥 აგენტები ({departmentAgents.length})
@@ -151,6 +146,7 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
                   key={agent.id}
                   className="rounded-2xl border border-white/10 bg-white/5 p-5 transition-all hover:border-white/30 hover:shadow-xl cursor-pointer"
                   style={{ borderColor: `${agent.accent}30` }}
+                  onClick={() => onAgentClick(agent)} // ✅ აქ ვაგზავნით დაკლიკებულ აგენტს
                 >
                   <div className="flex items-start gap-4">
                     <div
@@ -202,7 +198,6 @@ export default function DepartmentModal({ department, agents, onClose }: Departm
           )}
         </div>
 
-        {/* Footer */}
         <div className="border-t border-white/10 p-6 flex justify-end">
           <button
             onClick={onClose}
