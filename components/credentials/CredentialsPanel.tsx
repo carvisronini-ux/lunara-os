@@ -12,7 +12,7 @@ export function CredentialsPanel() {
   const [audit, setAudit] = useState<any[]>([]);
   
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCredProvider, setNewCredProvider] = useState<Provider>('deepseek');
+  const [newCredProvider, setNewCredProvider] = useState<Provider>('gemini'); // ✅ ნაგულისხმევად Gemini (ყველაზე გულუხვი უფასო)
   const [newCredValue, setNewCredValue] = useState('');
   
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function CredentialsPanel() {
   };
 
   const handleRevokeAll = () => {
-    if (confirm('️ EMERGENCY: Are you sure you want to revoke ALL active leases?')) {
+    if (confirm('⚠️ EMERGENCY: Are you sure you want to revoke ALL active leases?')) {
       accessManager.revokeAllLeasesGlobally('human_executive');
       refreshData();
     }
@@ -98,10 +98,16 @@ export function CredentialsPanel() {
                   onChange={(e) => setNewCredProvider(e.target.value as Provider)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 >
-                  <optgroup label="🧠 LLM Text Generation">
-                    <option value="deepseek">DeepSeek (Muse/Nyx Text)</option>
-                    <option value="groq">Groq (Ultra-fast LLM)</option>
-                    <option value="openai">OpenAI (GPT-4, DALL-E)</option>
+                  <optgroup label="🧠 LLM Text Generation (უფასო Tier)">
+                    <option value="gemini">Gemini (Google AI Studio — უფასო, გულუხვი)</option>
+                    <option value="deepseek">DeepSeek (უფასო, მაღალი ხარისხი)</option>
+                    <option value="groq">Groq (Ultra-fast, უფასო Tier)</option>
+                    <option value="mistral">Mistral AI (1000 req/day უფასო)</option>
+                    <option value="huggingface">Hugging Face (უფასო Inference API)</option>
+                    <option value="together">Together AI ($25 free credits)</option>
+                  </optgroup>
+                  <optgroup label="💎 LLM Text Generation (ფასიანი)">
+                    <option value="openai">OpenAI (GPT-4 / DALL-E)</option>
                     <option value="anthropic">Anthropic (Claude)</option>
                   </optgroup>
                   <optgroup label="📡 Distribution & Storage">
@@ -118,7 +124,7 @@ export function CredentialsPanel() {
                   value={newCredValue}
                   onChange={(e) => setNewCredValue(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="sk-... / gsk_... / token / secret"
+                  placeholder="sk-... / gsk_... / AIza... / token / secret"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -172,7 +178,7 @@ export function CredentialsPanel() {
                           disabled={isTesting}
                           className="rounded-lg bg-blue-500/20 border border-blue-500/40 px-3 py-1 text-xs font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isTesting ? ' Testing...' : '🧪 Test'}
+                          {isTesting ? '⏳ Testing...' : '🧪 Test'}
                         </button>
                       </div>
                     </div>
@@ -187,9 +193,7 @@ export function CredentialsPanel() {
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-emerald-400 text-sm font-bold">✅ Test Successful</span>
                               {testResult.latency && (
-                                <span className="text-xs text-slate-400">
-                                  Latency: {testResult.latency}ms
-                                </span>
+                                <span className="text-xs text-slate-400">Latency: {testResult.latency}ms</span>
                               )}
                             </div>
                             
@@ -228,7 +232,7 @@ export function CredentialsPanel() {
                           </>
                         ) : (
                           <div className="text-red-400 text-sm">
-                             Test Failed: {testResult.error}
+                            ❌ Test Failed: {testResult.error}
                           </div>
                         )}
                       </div>
