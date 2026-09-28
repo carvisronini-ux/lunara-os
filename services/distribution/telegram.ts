@@ -1,11 +1,8 @@
 // ============================================================
-// LUNARA OS — Telegram Distribution Adapter
+// LUNARA OS — Telegram Distribution Adapter (Enhanced Logging)
 // Foundation: §28 (Echo Distribution), §40 (Secrets), §53 (Deployment)
-// Purpose: Send messages to Telegram channels securely
+// Purpose: Send messages to Telegram channels securely with detailed logging
 // ============================================================
-
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 
 export interface TelegramMessageOptions {
   text: string;
@@ -17,11 +14,22 @@ export async function sendTelegramMessage(
   options: TelegramMessageOptions
 ): Promise<{ success: boolean; messageId?: number; error?: string }> {
   
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
+
   // 1. უსაფრთხოების შემოწმება (§40)
-  if (!BOT_TOKEN || !CHANNEL_ID) {
-    console.error('[Telegram] ❌ Missing credentials in environment variables');
-    return { success: false, error: 'Telegram credentials are missing' };
+  if (!BOT_TOKEN) {
+    console.error('[Telegram] ❌ TELEGRAM_BOT_TOKEN is missing from environment variables');
+    return { success: false, error: 'TELEGRAM_BOT_TOKEN is not configured' };
   }
+  
+  if (!CHANNEL_ID) {
+    console.error('[Telegram] ❌ TELEGRAM_CHANNEL_ID is missing from environment variables');
+    return { success: false, error: 'TELEGRAM_CHANNEL_ID is not configured' };
+  }
+
+  console.log(`[Telegram] 🚀 Sending message to channel: ${CHANNEL_ID}`);
+  console.log(`[Telegram] 📝 Message length: ${options.text.length} chars`);
 
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
 
@@ -51,6 +59,7 @@ export async function sendTelegramMessage(
       };
     } else {
       console.error(`[Telegram] ❌ API Error:`, data.description);
+      console.error(`[Telegram] 📋 Full response:`, JSON.stringify(data, null, 2));
       return { 
         success: false, 
         error: data.description || 'Unknown Telegram API error' 
