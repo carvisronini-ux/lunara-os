@@ -338,37 +338,66 @@ export async function generateWithMistral(apiKey: string, model: string, prompt:
 }
 
 // ============================================================
-// HUGGING FACE ADAPTER
+// HUGGING FACE ADAPTER (განახლებული Router API-თი)
 // ============================================================
 
-const HF_API_BASE = 'https://api-inference.huggingface.co/models';
+const HF_API_BASE = 'https://router.huggingface.co';
 
 export async function testHuggingFaceApiKey(apiKey: string): Promise<TestResult> {
   const startTime = Date.now();
   try {
+    // ვცდილობთ პოპულარული მოდელის გამოძახებას ახალი Router API-თი
     const testModel = 'mistralai/Mistral-7B-Instruct-v0.3';
     const response = await fetch(`${HF_API_BASE}/${testModel}`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inputs: 'Test', parameters: { max_new_tokens: 10 } })
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inputs: 'Test',
+        parameters: { max_new_tokens: 10 }
+      })
     });
     const latency = Date.now() - startTime;
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return { success: false, provider: 'huggingface', models: [], recommendedModel: '', error: errorData.error || `HTTP ${response.status}`, latency };
+      return { 
+        success: false, 
+        provider: 'huggingface', 
+        models: [], 
+        recommendedModel: '', 
+        error: errorData.error || `HTTP ${response.status}`, 
+        latency 
+      };
     }
 
+    // Hugging Face-ის პოპულარული უფასო მოდელები
     const availableModels = [
       'mistralai/Mistral-7B-Instruct-v0.3',
       'meta-llama/Meta-Llama-3-8B-Instruct',
-      'HuggingFaceH4/zephyr-7b-beta'
+      'HuggingFaceH4/zephyr-7b-beta',
+      'microsoft/Phi-3-mini-4k-instruct'
     ];
     
     const validModels = availableModels.map(id => ({ id })).filter(m => isValidModel(m.id));
-    return { success: true, provider: 'huggingface', models: validModels, recommendedModel: selectBestModel(validModels), latency };
+    return { 
+      success: true, 
+      provider: 'huggingface', 
+      models: validModels, 
+      recommendedModel: selectBestModel(validModels), 
+      latency 
+    };
   } catch (error) {
-    return { success: false, provider: 'huggingface', models: [], recommendedModel: '', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
+    return { 
+      success: false, 
+      provider: 'huggingface', 
+      models: [], 
+      recommendedModel: '', 
+      error: error instanceof Error ? error.message : 'Unknown error', 
+      latency: Date.now() - startTime 
+    };
   }
 }
 
@@ -377,9 +406,12 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
   try {
     const response = await fetch(`${HF_API_BASE}/${model}`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        inputs: `<s>[INST] ${systemPrompt || ''}\n\n${prompt} [/INST]`,
+        inputs: `<s>[INST] ${systemPrompt || 'You are Lunara OS — mysterious, intelligent, emotionally precise.'}\n\n${prompt} [/INST]`,
         parameters: { max_new_tokens: 1024, temperature: 0.7 }
       })
     });
@@ -387,14 +419,28 @@ export async function generateWithHuggingFace(apiKey: string, model: string, pro
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return { success: false, content: '', model, provider: 'huggingface', error: errorData.error || `HTTP ${response.status}`, latency };
+      return { 
+        success: false, 
+        content: '', 
+        model, 
+        provider: 'huggingface', 
+        error: errorData.error || `HTTP ${response.status}`, 
+        latency 
+      };
     }
 
     const data = await response.json();
     const content = Array.isArray(data) && data[0]?.generated_text ? data[0].generated_text : '';
     return { success: true, content, model, provider: 'huggingface', latency, cost: 0 };
   } catch (error) {
-    return { success: false, content: '', model, provider: 'huggingface', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
+    return { 
+      success: false, 
+      content: '', 
+      model, 
+      provider: 'huggingface', 
+      error: error instanceof Error ? error.message : 'Unknown error', 
+      latency: Date.now() - startTime 
+    };
   }
 }
 
