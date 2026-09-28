@@ -29,32 +29,44 @@ function determineScopeForProvider(provider: Provider): PermissionScope {
 export class CredentialVault {
   private auditLog: CredentialAuditLog[] = [];
   private cache: Map<string, Credential> = new Map(); // ლოკალური ქეში სწრაფი წვდომისთვის
+  private _ready: Promise<void>; // ✅ ახალი: მზადყოფნის Promise
 
   constructor() {
     console.log('[CredentialVault] 🔐 Initialized with Supabase persistent storage.');
-    this.loadCache(); // მონაცემების ჩატვირთვა გაშვებისას
+    this._ready = this.loadCache(); // ✅ ახლა ვინახავთ Promise-ს
+  }
+
+  // ✅ ახალი მეთოდი: ელოდება ქეშის ჩატვირთვას
+  public get ready(): Promise<void> {
+    return this._ready;
   }
 
   // მონაცემთა ბაზიდან ქეშში ჩატვირთვა
   private async loadCache() {
-    const { data, error } = await supabase.from('credentials').select('*');
-    if (!error && data) {
-      data.forEach((item: any) => {
-        this.cache.set(item.id, {
-          credential_id: item.id,
-          provider: item.provider,
-          name: item.name,
-          encrypted_value: item.encrypted_value,
-          scope: item.scope,
-          status: item.status,
-          owner: item.owner,
-          created_at: new Date(item.created_at).getTime(),
-          last_rotated_at: item.last_rotated_at ? new Date(item.last_rotated_at).getTime() : null,
-          expires_at: item.expires_at ? new Date(item.expires_at).getTime() : null,
-          metadata: item.metadata || undefined
+    try {
+      const { data, error } = await supabase.from('credentials').select('*');
+      if (!error && data) {
+        data.forEach((item: any) => {
+          this.cache.set(item.id, {
+            credential_id: item.id,
+            provider: item.provider,
+            name: item.name,
+            encrypted_value: item.encrypted_value,
+            scope: item.scope,
+            status: item.status,
+            owner: item.owner,
+            created_at: new Date(item.created_at).getTime(),
+            last_rotated_at: item.last_rotated_at ? new Date(item.last_rotated_at).getTime() : null,
+            expires_at: item.expires_at ? new Date(item.expires_at).getTime() : null,
+            metadata: item.metadata || undefined
+          });
         });
-      });
-      console.log(`[CredentialVault] 📦 Loaded ${this.cache.size} credentials into cache.`);
+        console.log(`[CredentialVault] 📦 Loaded ${this.cache.size} credentials into cache.`);
+      } else if (error) {
+        console.error('[CredentialVault] ❌ Failed to load cache:', error);
+      }
+    } catch (err) {
+      console.error('[CredentialVault] ❌ Exception during loadCache:', err);
     }
   }
 
