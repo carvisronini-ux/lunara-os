@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (Server-Side)
+// LUNARA OS — E2E Test API Route (Server-Side with Deep Diagnostics)
 // Foundation: §56 (First True E2E Test), §40 (Secrets)
-// Purpose: Execute E2E test pipeline server-side with access to env vars
+// Purpose: Execute E2E test pipeline server-side with detailed error diagnostics
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -33,19 +33,46 @@ export async function POST(request: NextRequest) {
       logs.push({ step, agent, status, message, timestamp: Date.now(), latency, metadata });
     };
 
-    // 1. საუკეთესო API გასაღების პოვნა
+    // 1. საუკეთესო API გასაღების პოვნა (ღრმა დიაგნოსტიკით)
     addLog(1, 'System', 'running', 'Finding best available API key...');
-    const credentials = credentialVault.getMetadata();
-    const activeCred = credentials.find(c => c.status === 'ACTIVE' && c.provider === 'groq') || 
-                       credentials.find(c => c.status === 'ACTIVE');
     
-    if (!activeCred) {
-      addLog(1, 'System', 'error', 'No active credentials found in Vault!');
+    // ველოდებით ქეშის ჩატვირთვას
+    await credentialVault.ready;
+    
+    const credentials = credentialVault.getMetadata();
+    const activeCredentials = credentials.filter(c => c.status === 'ACTIVE');
+    
+    // დიაგნოსტიკური მონაცემები
+    const diagnosticMetadata = {
+      total_in_cache: credentials.length,
+      active_count: activeCredentials.length,
+      all_credentials_status: credentials.map(c => ({ 
+        id: c.credential_id.substring(0, 8) + '...', 
+        provider: c.provider, 
+        status: c.status 
+      }))
+    };
+
+    let detailedErrorMessage = '';
+
+    if (credentials.length === 0) {
+      detailedErrorMessage = '🚨 Credential Vault სრულიად ცარიელია! შესაძლო მიზეზები: 1) Supabase-თან კავშირი ვერ ხერხდება, 2) RLS პოლიტიკა ბლოკავს წაკითხვას, ან 3) მონაცემთა ბაზაში ჯერ არცერთი გასაღები არ არის დამატებული. გადადით "🔐 API საცავი" პანელზე და დაამატეთ მინიმუმ ერთი გასაღები.';
+    } else if (activeCredentials.length === 0) {
+      detailedErrorMessage = `⚠️ Vault-ში ნაპოვნია ${credentials.length} გასაღები, მაგრამ არცერთი არ არის ACTIVE სტატუსში (სავარაუდოდ ყველა REVOKED-ია). გადადით "🔐 API საცავი" პანელზე და დარწმუნდით, რომ მინიმუმ ერთ გასაღებს აქვს ACTIVE სტატუსი.`;
+    } else {
+      // თუ არის ACTIVE, მაგრამ ვერ ვპოულობთ (უკიდურესი შემთხვევა)
+      detailedErrorMessage = `ნაპოვნია ${activeCredentials.length} ACTIVE გასაღები, მაგრამ სისტემამ ვერ შეარჩია შესაბამისი პროვაიდერი. შეამოწმეთ გასაღების მონაცემები.`;
+    }
+
+    if (credentials.length === 0 || activeCredentials.length === 0) {
+      addLog(1, 'System', 'error', detailedErrorMessage, undefined, diagnosticMetadata);
       return NextResponse.json({ logs });
     }
     
-    const modelName = activeCred.metadata?.recommendedModel || '';
-    addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName || 'default model'})`, undefined, {
+    const activeCred = activeCredentials.find(c => c.provider === 'groq') || activeCredentials[0];
+    const modelName = activeCred.metadata?.recommendedModel || 'default-model';
+    
+    addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
       provider: activeCred.provider,
       model: modelName,
       credential_id: activeCred.credential_id
@@ -56,7 +83,9 @@ export async function POST(request: NextRequest) {
     const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
     
     if (!apiKey) {
-      addLog(2, 'Muse', 'error', 'Failed to retrieve API key from Vault');
+      addLog(2, 'Muse', 'error', 'Failed to retrieve decrypted API key from Vault. Check encryption logic.', undefined, {
+        credential_id: activeCred.credential_id
+      });
       return NextResponse.json({ logs });
     }
 
@@ -73,7 +102,10 @@ export async function POST(request: NextRequest) {
     const generationLatency = Date.now() - generationStart;
 
     if (!generation.success) {
-      addLog(2, 'Muse', 'error', `Generation failed: ${generation.error}`, generationLatency);
+      addLog(2, 'Muse', 'error', `Generation failed: ${generation.error}`, generationLatency, {
+        provider: activeCred.provider,
+        model: modelName
+      });
       return NextResponse.json({ logs });
     }
     
@@ -128,9 +160,10 @@ export async function POST(request: NextRequest) {
       });
     } else {
       addLog(4, 'Echo', 'error', `Telegram failed: ${tgResult.error}`, telegramLatency, {
-        error: tgResult.error,
+        error_details: tgResult.error,
         bot_token_configured: !!process.env.TELEGRAM_BOT_TOKEN,
-        channel_id_configured: !!process.env.TELEGRAM_CHANNEL_ID
+        channel_id_configured: !!process.env.TELEGRAM_CHANNEL_ID,
+        hint: "თუ bot_token_configured: false-ია, გადაამოწმე .env ფაილი ან Vercel Environment Variables და გადატვირთე სერვერი (npm run dev)."
       });
     }
 
@@ -152,7 +185,8 @@ export async function POST(request: NextRequest) {
         agent: 'System',
         status: 'error',
         message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        metadata: { stack: error instanceof Error ? error.stack : 'No stack trace' }
       }]
     }, { status: 500 });
   }
