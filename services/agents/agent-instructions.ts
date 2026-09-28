@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Agent Instructions Service (Enhanced Logging)
+// LUNARA OS — Agent Instructions Service
 // Foundation: §34 (Agent Training), §24 (Knowledge OS)
-// Purpose: Fetch and update agent system prompts from Supabase with detailed logging
+// Purpose: Fetch and update agent system prompts from Supabase (with auto-create fallback)
 // ============================================================
 
 import { supabase } from '@/lib/supabase';
@@ -20,62 +20,74 @@ export interface AgentInstruction {
 
 // ინსტრუქციის მიღება აგენტის ID-ით
 export async function getInstruction(agentId: string): Promise<string | null> {
-  console.log(`[AgentInstructions] 🔍 Fetching instruction for ${agentId}`);
-  
   const { data, error } = await supabase
     .from('agent_instructions')
     .select('system_prompt')
     .eq('agent_id', agentId)
-    .single();
+    .maybeSingle(); // ✅ maybeSingle() იცავს შეცდომისგან, თუ ჩანაწერი არ არსებობს
 
-  if (error) {
-    console.error(`[AgentInstructions] ❌ Supabase error for ${agentId}:`, error);
+  if (error || !data) {
+    console.warn(`[AgentInstructions] No instruction found for ${agentId}`);
     return null;
   }
 
-  if (!data) {
-    console.warn(`[AgentInstructions] ⚠️ No data found for ${agentId}`);
-    return null;
-  }
-
-  console.log(`[AgentInstructions] ✅ Retrieved ${agentId} instruction (${data.system_prompt.length} chars)`);
   return data.system_prompt;
 }
 
-// ინსტრუქციის განახლება (ვერსიონირებით)
+// ინსტრუქციის განახლება ან შექმნა (Upsert ლოგიკა)
 export async function updateInstruction(
   agentId: string,
   newPrompt: string,
   updatedBy: string = 'human_executive'
 ): Promise<{ success: boolean; version?: number; error?: string }> {
   
-  console.log(`[AgentInstructions] 🔄 Updating instruction for ${agentId}`);
-  console.log(`[AgentInstructions] 📝 New prompt length: ${newPrompt.length} chars`);
+  console.log(`[AgentInstructions] 🔄 Saving instruction for ${agentId}`);
   
-  // 1. ჯერ ვიღებთ მიმდინარე ვერსიას
-  console.log(`[AgentInstructions] 📡 Fetching current version...`);
+  // 1. ვცდილობთ ვიპოვოთ არსებული ჩანაწერი
   const { data: currentData, error: fetchError } = await supabase
     .from('agent_instructions')
-    .select('version')
+    .select('version, agent_name, department')
     .eq('agent_id', agentId)
-    .single();
+    .maybeSingle(); // ✅ არ აბრუნებს შეცდომას, თუ 0 სტრიქონია
 
   if (fetchError) {
-    console.error(`[AgentInstructions] ❌ Failed to fetch current version:`, fetchError);
+    console.error(`[AgentInstructions] ❌ Failed to fetch:`, fetchError);
     return { success: false, error: fetchError.message };
   }
 
   if (!currentData) {
-    console.error(`[AgentInstructions] ❌ Agent instruction not found in database`);
-    return { success: false, error: 'Agent instruction not found in database' };
+    // 2. თუ არ არსებობს, ვქმნით ახალს (INSERT)
+    console.log(`[AgentInstructions] 📝 Agent ${agentId} not found in DB. Creating new record...`);
+    
+    const fallbackName = agentId.charAt(0).toUpperCase() + agentId.slice(1);
+    
+    const { data: newData, error: insertError } = await supabase
+      .from('agent_instructions')
+      .insert({
+        agent_id: agentId,
+        agent_name: fallbackName,
+        department: 'creative',
+        system_prompt: newPrompt,
+        version: 1,
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString()
+      })
+      .select('version')
+      .single();
+
+    if (insertError) {
+      console.error('[AgentInstructions] ❌ Insert failed:', insertError);
+      return { success: false, error: insertError.message };
+    }
+
+    console.log(`[AgentInstructions] ✅ Successfully created ${agentId} v1`);
+    return { success: true, version: newData.version };
   }
 
-  console.log(`[AgentInstructions] 📊 Current version: ${currentData.version}`);
-  const newVersion = currentData.version + 1;
-
-  // 2. ვაახლებთ მონაცემებს
-  console.log(`[AgentInstructions] 💾 Updating to v${newVersion}...`);
-  const { error: updateError } = await supabase
+  // 3. თუ არსებობს, ვაახლებთ მას (UPDATE)
+  const newVersion = (currentData.version || 0) + 1;
+  
+  const { data: updatedData, error: updateError } = await supabase
     .from('agent_instructions')
     .update({
       system_prompt: newPrompt,
@@ -83,13 +95,15 @@ export async function updateInstruction(
       updated_by: updatedBy,
       updated_at: new Date().toISOString()
     })
-    .eq('agent_id', agentId);
+    .eq('agent_id', agentId)
+    .select('version')
+    .single();
 
   if (updateError) {
-    console.error('[AgentInstructions] ❌ Failed to update:', updateError);
+    console.error('[AgentInstructions] ❌ Update failed:', updateError);
     return { success: false, error: updateError.message };
   }
 
   console.log(`[AgentInstructions] ✅ Successfully updated ${agentId} to v${newVersion}`);
-  return { success: true, version: newVersion };
+  return { success: true, version: updatedData.version };
 }
