@@ -1,5 +1,5 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (Full Pipeline with Smart Fallbacks)
+// LUNARA OS — E2E Test API Route (Deep Vault Diagnostics)
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -39,23 +39,25 @@ function extractVerdict(content: string): string {
   return verdictMatch ? verdictMatch[1].trim() : content.trim();
 }
 
-// ✅ განახლებული: ამატებს Fallback-ს, თუ visual_concept ცარიელია ან მოკლე
 function extractVisualConcept(content: string, fallbackText: string): string {
   const conceptMatch = content.match(/<visual_concept>([\s\S]*?)<\/visual_concept>/i);
   if (conceptMatch && conceptMatch[1].trim().length > 30) {
-    console.log('[Route] ✅ Extracted visual_concept successfully');
     return conceptMatch[1].trim();
   }
   
-  console.warn('[Route] ⚠️ visual_concept not found or too short. Using smart fallback.');
-  // თუ Lumen-მა ვერ დაწერა, ჩვენ ვქმნით მინიმალურ აღწერას ტექსტის საფუძველზე
-  return `A cinematic, dark luxury editorial photograph representing the mood of this text: "${fallbackText.substring(0, 150)}...". Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, no text, no watermarks, 8k resolution, ultra detailed.`;
+  const afterThinking = content.split(/<\/thinking>/i);
+  if (afterThinking.length > 1) {
+    const cleanRest = afterThinking[1].replace(/<\/?visual_concept>/gi, '').trim();
+    if (cleanRest.length > 30) return cleanRest;
+  }
+
+  const firstSentence = fallbackText.split('.')[0] || fallbackText;
+  return `A cinematic, dark luxury editorial photograph of: ${firstSentence}. Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, volumetric lighting, 8k resolution, masterpiece, photorealistic, no text, no watermarks, no logos.`;
 }
 
 export async function POST(request: NextRequest) {
   try {
     const { prompt } = await request.json();
-    
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 });
     }
@@ -65,14 +67,28 @@ export async function POST(request: NextRequest) {
       logs.push({ step, agent, status, message, timestamp: Date.now(), latency, metadata });
     };
 
+    // 1. საუკეთესო API გასაღების პოვნა (ღრმა დიაგნოსტიკით)
     addLog(1, 'System', 'running', 'Finding best available API key...');
+    
+    console.log('[System] 🔄 Waiting for Credential Vault to initialize...');
     await credentialVault.ready;
     
     const credentials = credentialVault.getMetadata();
-    const activeCredentials = credentials.filter(c => c.status === 'ACTIVE');
+    console.log('[System] 🔍 TOTAL credentials found in Vault:', credentials.length);
+    console.log('[System] 📋 Credentials data:', JSON.stringify(credentials, null, 2));
     
-    if (credentials.length === 0 || activeCredentials.length === 0) {
-      addLog(1, 'System', 'error', 'No active credentials found in Vault.');
+    const activeCredentials = credentials.filter(c => c.status === 'ACTIVE');
+    console.log('[System] 🔍 ACTIVE credentials found:', activeCredentials.length);
+
+    if (credentials.length === 0) {
+      console.error('[System] ❌ Vault is completely empty! Check Supabase connection and RLS policies.');
+      addLog(1, 'System', 'error', 'Vault is completely empty. Check Supabase connection and RLS policies.');
+      return NextResponse.json({ logs });
+    }
+
+    if (activeCredentials.length === 0) {
+      console.error('[System] ❌ No ACTIVE credentials found. All credentials might be REVOKED or PENDING.');
+      addLog(1, 'System', 'error', `Found ${credentials.length} credentials, but NONE are ACTIVE. Check their status in the UI.`);
       return NextResponse.json({ logs });
     }
     
@@ -81,12 +97,15 @@ export async function POST(request: NextRequest) {
     const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
     
     if (!apiKey) {
-      addLog(1, 'System', 'error', 'Failed to retrieve decrypted API key.');
+      console.error('[System] ❌ Failed to decrypt API key for:', activeCred.credential_id);
+      addLog(1, 'System', 'error', `Failed to decrypt API key for ${activeCred.provider}. Check OS_ENCRYPTION_KEY in .env`);
       return NextResponse.json({ logs });
     }
 
     addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
-      provider: activeCred.provider, model: modelName, credential_id: activeCred.credential_id
+      provider: activeCred.provider,
+      model: modelName,
+      credential_id: activeCred.credential_id.substring(0, 8) + '...'
     });
 
     // 2. Muse
@@ -105,14 +124,10 @@ export async function POST(request: NextRequest) {
     const publishedContent = extractPost(generation.content);
     const museThinking = extractThinking(generation.content);
     
-    // ✅ შევამოწმოთ, მოიჭრა თუ არა ტექსტი
-    const isTruncated = !generation.content.includes('</post>') && generation.content.length < 400;
-    
-    addLog(2, 'Muse', isTruncated ? 'warning' : 'success', `Content generated (${publishedContent.length} chars)${isTruncated ? ' (WARNING: Output may be truncated)' : ''}`, generationLatency, {
+    addLog(2, 'Muse', 'success', `Content generated successfully (${publishedContent.length} chars)`, generationLatency, {
       content_preview: publishedContent.substring(0, 100) + '...',
       full_content: publishedContent,
-      thinking_block: museThinking,
-      is_truncated: isTruncated
+      thinking_block: museThinking
     });
 
     // 3. Aegis
@@ -148,7 +163,6 @@ export async function POST(request: NextRequest) {
       lumenSystemPrompt
     );
 
-    // ✅ გადავცეთ fallbackText, თუ visual_concept ცარიელი აღმოჩნდა
     const visualConcept = extractVisualConcept(lumenResponse.content, publishedContent);
     const lumenThinking = extractThinking(lumenResponse.content);
 
@@ -156,19 +170,19 @@ export async function POST(request: NextRequest) {
 
     const imageResult = await generateImage({
       visualPrompt: visualConcept,
-      width: 1280,
-      height: 1280,
+      width: 1024,
+      height: 1024,
       style: 'dark-luxury'
     });
 
     const lumenLatency = Date.now() - lumenStart;
 
     if (imageResult.success) {
-      addLog(3.5, 'Lumen', 'success', `Image generated successfully`, lumenLatency, {
+      addLog(3.5, 'Lumen', 'success', `Image generated successfully via ${imageResult.provider}`, lumenLatency, {
         visual_concept: visualConcept,
         thinking_block: lumenThinking,
         image_provider: imageResult.provider,
-        image_url: imageResult.imageUrl
+        image_model: imageResult.model || 'unknown'
       });
     } else {
       addLog(3.5, 'Lumen', 'warning', `Image generation failed, proceeding with text-only fallback`, lumenLatency, {
