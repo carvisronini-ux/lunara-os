@@ -1,5 +1,5 @@
 // ============================================================
-// LUNARA OS — Image Generation Service (Dynamic Model Discovery + Fallbacks)
+// LUNARA OS — Image Generation Service (All Keys from Vault)
 // Foundation: §4 (Brand Visuals), §28 (Echo Distribution), §40 (Credentials)
 // Purpose: Ask Gemini for the best model, then use it. Fallback to HF/Pollinations.
 // ============================================================
@@ -55,7 +55,19 @@ async function discoverImageModel(): Promise<{ model: string; provider: string; 
   try {
     await credentialVault.ready;
     const credentials = credentialVault.getMetadata();
-    const geminiCred = credentials.find(c => c.provider === 'gemini' && c.status === 'ACTIVE');
+    
+    // ✅ ჯერ ვეძებთ სპეციალურად ფოტოსთვის შექმნილ გასაღებს
+    let geminiCred = credentials.find(c => 
+      c.provider === 'gemini' && 
+      c.status === 'ACTIVE' && 
+      c.name.toUpperCase().includes('IMAGE')
+    );
+
+    // თუ "IMAGE" სახელის გასაღები არ ვიპოვეთ, ვიღებთ ნებისმიერ აქტიურ Gemini-ს
+    if (!geminiCred) {
+      console.log('[ImageGenerator] ⚠️ Dedicated IMAGE key not found. Falling back to any active Gemini key.');
+      geminiCred = credentials.find(c => c.provider === 'gemini' && c.status === 'ACTIVE');
+    }
     
     if (!geminiCred) return null;
 
@@ -123,7 +135,6 @@ async function generateWithGemini(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy, oversaturated';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    // ✅ აქ ვიყენებთ modelInfo.model-ს და არა hardcoded მნიშვნელობას!
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
@@ -172,7 +183,7 @@ async function generateWithGemini(
 }
 
 // ============================================================
-// 3. HUGGING FACE SDXL (Secondary Fallback)
+// 3. HUGGING FACE SDXL (ახლა Vault-დან იღებს გასაღებს!)
 // ============================================================
 
 async function generateWithHuggingFace(
@@ -180,13 +191,23 @@ async function generateWithHuggingFace(
   attempt: number = 1
 ): Promise<ImageGenerationResult> {
   const startTime = Date.now();
-  const token = process.env.HUGGINGFACE_API_TOKEN;
-
-  if (!token) {
-    return { success: false, provider: 'huggingface', error: 'HUGGINGFACE_API_TOKEN missing in .env', latency: 0 };
-  }
 
   try {
+    await credentialVault.ready;
+    const credentials = credentialVault.getMetadata();
+    
+    // ✅ ახლა Vault-დან ვეძებთ Hugging Face-ის გასაღებს
+    const hfCred = credentials.find(c => c.provider === 'huggingface' && c.status === 'ACTIVE');
+    
+    if (!hfCred) {
+      return { success: false, provider: 'huggingface', error: 'No active Hugging Face credential found in Vault', latency: 0 };
+    }
+
+    const token = credentialVault.getDecryptedValueForTesting(hfCred.credential_id);
+    if (!token) {
+      return { success: false, provider: 'huggingface', error: 'Failed to decrypt Hugging Face token', latency: 0 };
+    }
+
     const { visualPrompt, style = 'dark-luxury' } = options;
     console.log(`[HuggingFace] 🎨 Attempt ${attempt}: Starting SDXL generation...`);
 
@@ -338,7 +359,7 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   console.log('[ImageGenerator] 🚀 Starting image generation pipeline with priority chain...');
   const pipelineStart = Date.now();
 
-  console.log('[ImageGenerator] 1️⃣ Trying Gemini (Dynamic Model Discovery)...');
+  console.log('[ImageGenerator] 1️⃣ Trying Gemini (Dedicated IMAGE Key Priority)...');
   const geminiResult = await generateWithGemini(options);
   if (geminiResult.success) {
     console.log(`[ImageGenerator] ✅ Gemini succeeded with model ${geminiResult.model} in ${geminiResult.latency}ms (NO WATERMARK)`);
@@ -346,7 +367,7 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   }
   console.warn(`[ImageGenerator] ⚠️ Gemini failed: ${geminiResult.error}. Moving to next provider...`);
 
-  console.log('[ImageGenerator] 2️⃣ Trying Hugging Face SDXL...');
+  console.log('[ImageGenerator] 2️⃣ Trying Hugging Face SDXL (from Vault)...');
   const hfResult = await generateWithHuggingFace(options);
   if (hfResult.success) {
     console.log(`[ImageGenerator] ✅ Hugging Face succeeded in ${hfResult.latency}ms (NO WATERMARK)`);
