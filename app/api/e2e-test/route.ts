@@ -73,6 +73,10 @@ export async function POST(request: NextRequest) {
     console.log('[System] 🔄 Waiting for Credential Vault to initialize...');
     await credentialVault.ready;
     
+    // ✅ ახალი დიაგნოსტიკა: შეამოწმებს, ჩატვირთა თუ არა Next.js-მა .env ცვლადი
+    const serviceKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY;
+    console.log('[System] 🔑 SERVICE_ROLE_KEY loaded:', serviceKey ? `YES (starts with ${serviceKey.substring(0, 15)}...)` : 'NO (undefined!)');
+
     const credentials = credentialVault.getMetadata();
     console.log('[System] 🔍 TOTAL credentials found in Vault:', credentials.length);
     console.log('[System] 📋 Credentials data:', JSON.stringify(credentials, null, 2));
