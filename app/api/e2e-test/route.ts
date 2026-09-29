@@ -125,7 +125,9 @@ export async function POST(request: NextRequest) {
     const apiKey: string = rawApiKey;
 
     addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
-      provider: activeCred.provider, model: modelName, credential_id: activeCred.credential_id.substring(0, 8) + '...'
+      provider: activeCred.provider, 
+      model: modelName, 
+      credential_id: activeCred.credential_id.substring(0, 8) + '...'
     });
 
     // 2. Muse
@@ -254,6 +256,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ logs });
   } catch (error) {
+    console.error('E2E Route Critical Error:', error);
     return NextResponse.json({ 
       error: error instanceof Error ? error.message : 'Unknown error',
       logs: [{ step: 0, agent: 'System', status: 'error', message: error instanceof Error ? error.message : 'Unknown error', timestamp: Date.now() }]
