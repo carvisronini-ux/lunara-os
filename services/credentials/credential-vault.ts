@@ -78,12 +78,19 @@ export class CredentialVault {
     if (this.auditLog.length > 100) this.auditLog.pop();
   }
 
-  // ✅ მუდმივი შენახვა: დამატება Supabase-ში + ქეშის განახლება
-  public async addCredentialSimple(provider: Provider, plaintextValue: string, owner: string = "human_executive"): Promise<string> {
+  // ✅ განახლებული: ახლა იღებს optional customName პარამეტრს
+  public async addCredentialSimple(
+    provider: Provider, 
+    plaintextValue: string, 
+    owner: string = "human_executive",
+    customName?: string // <-- ახალი პარამეტრი
+  ): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
     const scope = determineScopeForProvider(provider);
-    const name = `${provider.toUpperCase()} Key`;
+    
+    // ✅ თუ სახელი არ არის მითითებული, ვქმნით ავტომატურს (მაგ. "GEMINI Key")
+    const name = customName || `${provider.toUpperCase()} Key`;
 
     const { error } = await supabase.from('credentials').insert({
       id, provider, name, encrypted_value: mockEncrypt(plaintextValue),
@@ -138,7 +145,7 @@ export class CredentialVault {
     return mockDecrypt(cred.encrypted_value);
   }
 
-  // ✅ მუდმივი განახლება: მეტამონაცემების შენახვა
+  // ✅ მუდმივი შენახვა: მეტამონაცემების შენახვა
   public async updateCredentialMetadata(credentialId: string, metadata: any): Promise<boolean> {
     const cred = this.cache.get(credentialId);
     if (!cred) return false;

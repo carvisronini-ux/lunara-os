@@ -15,6 +15,7 @@ export function CredentialsPanel() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
+  const [newCredName, setNewCredName] = useState(''); // ✅ ახალი: სახელის ველი
   const [newCredProvider, setNewCredProvider] = useState<Provider>('gemini');
   const [newCredValue, setNewCredValue] = useState('');
   
@@ -24,7 +25,6 @@ export function CredentialsPanel() {
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
 
-  // ✅ განახლება: მონაცემების ასინქრონული ჩატვირთვა Supabase-დან
   useEffect(() => {
     const loadData = async () => {
       const creds = await credentialVault.getMetadata();
@@ -45,8 +45,10 @@ export function CredentialsPanel() {
   const handleAddCredential = async () => {
     if (!newCredValue) return;
     try {
-      await credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive");
+      // ✅ გადავცემთ სახელს. თუ ცარიელია, სისტემა ავტომატურად შექმნის დეფოლტ სახელს
+      await credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive", newCredName || undefined);
       setNewCredValue('');
+      setNewCredName('');
       setShowAddModal(false);
       refreshData();
     } catch (error) {
@@ -114,7 +116,7 @@ export function CredentialsPanel() {
 
   const openEditModal = (cred: any) => {
     setEditCredId(cred.credential_id);
-    setEditCredValue(''); // ცარიელი — უსაფრთხოებისთვის არ ვაჩვენებთ ძველ გასაღებს
+    setEditCredValue('');
     setShowEditModal(true);
   };
 
@@ -147,6 +149,20 @@ export function CredentialsPanel() {
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
+              
+              {/* ✅ ახალი ველი: Custom Name */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Custom Name (Recommended)</label>
+                <input 
+                  type="text" 
+                  value={newCredName}
+                  onChange={(e) => setNewCredName(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  placeholder="e.g., GEMINI IMAGE Key"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Leave blank for auto-generated name (e.g., "GEMINI Key")</p>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
                 <select 
@@ -154,15 +170,15 @@ export function CredentialsPanel() {
                   onChange={(e) => setNewCredProvider(e.target.value as Provider)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 >
-                  <optgroup label="🧠 LLM Text Generation (უფასო Tier)">
-                    <option value="gemini">Gemini (Google AI Studio — უფასო, გულუხვი)</option>
-                    <option value="deepseek">DeepSeek (უფასო, მაღალი ხარისხი)</option>
-                    <option value="groq">Groq (Ultra-fast, უფასო Tier)</option>
-                    <option value="mistral">Mistral AI (1000 req/day უფასო)</option>
-                    <option value="huggingface">Hugging Face (უფასო Inference API)</option>
-                    <option value="together">Together AI ($25 free credits)</option>
+                  <optgroup label="🧠 LLM Text Generation">
+                    <option value="gemini">Gemini (Google AI Studio)</option>
+                    <option value="deepseek">DeepSeek</option>
+                    <option value="groq">Groq</option>
+                    <option value="mistral">Mistral AI</option>
+                    <option value="huggingface">Hugging Face</option>
+                    <option value="together">Together AI</option>
                   </optgroup>
-                  <optgroup label="💎 LLM Text Generation (ფასიანი)">
+                  <optgroup label="💎 LLM Text Generation (Paid)">
                     <option value="openai">OpenAI (GPT-4 / DALL-E)</option>
                     <option value="anthropic">Anthropic (Claude)</option>
                   </optgroup>
@@ -185,14 +201,19 @@ export function CredentialsPanel() {
               </div>
               <div className="flex gap-3 pt-2">
                 <button 
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setNewCredName('');
+                    setNewCredValue('');
+                  }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleAddCredential}
-                  className="flex-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 py-2 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30"
+                  disabled={!newCredValue}
+                  className="flex-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 py-2 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
                 >
                   🔐 Save Encrypted
                 </button>
@@ -202,7 +223,7 @@ export function CredentialsPanel() {
         </div>
       )}
 
-      {/* Edit Credential Modal */}
+      {/* Edit Credential Modal (უცვლელი) */}
       {showEditModal && editCredId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
@@ -249,7 +270,7 @@ export function CredentialsPanel() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog (უცვლელი) */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
@@ -282,7 +303,7 @@ export function CredentialsPanel() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Credentials List */}
+        {/* Credentials List (უცვლელი) */}
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
           <h3 className="text-lg font-bold text-white mb-4">Registered Credentials (Metadata Only)</h3>
           <div className="space-y-3">
@@ -336,7 +357,6 @@ export function CredentialsPanel() {
                       </div>
                     </div>
                     
-                    {/* Test Results */}
                     {testResult && (
                       <div className={`mt-3 rounded-lg border p-3 ${
                         testResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
@@ -387,7 +407,6 @@ export function CredentialsPanel() {
                       </div>
                     )}
 
-                    {/* Previous Test Info */}
                     {!testResult && cred.metadata?.recommendedModel && (
                       <div className="mt-3 p-2 rounded bg-blue-500/5 border border-blue-500/20">
                         <div className="text-xs text-slate-400">Last tested model:</div>
@@ -406,7 +425,7 @@ export function CredentialsPanel() {
           </div>
         </div>
 
-        {/* Active Leases & Audit */}
+        {/* Active Leases & Audit (უცვლელი) */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
             <h3 className="text-lg font-bold text-white mb-4">Active Leases</h3>
