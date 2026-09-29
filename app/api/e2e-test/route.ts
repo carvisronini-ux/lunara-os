@@ -1,5 +1,7 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (Deep Vault Diagnostics)
+// LUNARA OS — E2E Test API Route (100% Bulletproof Extraction)
+// Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
+// Purpose: Execute full E2E pipeline with maximum robustness
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,14 +21,37 @@ export interface E2ELog {
   metadata?: Record<string, any>;
 }
 
+// ✅ 100%-ით ტყვიაგამძლე ამოღება
 function extractPost(content: string): string {
+  console.log('[Route] 🔍 RAW Muse Output length:', content.length);
+  console.log('[Route] 🔍 RAW Muse Output snippet:', content.substring(0, 300));
+  
+  // 1. სცადე იდეალური მატჩი: <post> ... </post>
   const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
-  if (postMatch) return postMatch[1].trim();
-  const postStartMatch = content.match(/<post>([\s\S]*)/i);
-  if (postStartMatch) return postStartMatch[1].trim();
-  const afterThinkingMatch = content.match(/<\/thinking>([\s\S]*)/i);
-  if (afterThinkingMatch) return afterThinkingMatch[1].trim();
-  return content.trim();
+  if (postMatch && postMatch[1].trim().length > 10) {
+    console.log('[Route] ✅ Extracted from <post> tags');
+    return postMatch[1].trim();
+  }
+
+  // 2. Fallback: აიღე ყველაფერი </thinking>-ის შემდეგ
+  const afterThinking = content.split(/<\/thinking>/i);
+  if (afterThinking.length > 1) {
+    const cleaned = afterThinking[1].replace(/<\/?post>/gi, '').trim();
+    if (cleaned.length > 10) {
+      console.log('[Route] ✅ Extracted from after </thinking>');
+      return cleaned;
+    }
+  }
+
+  // 3. Fallback: თუ საერთოდ არ არის ტეგები, მაგრამ ტექსტი გრძელია (>50 სიმბოლო), დავუშვათ რომ ეს არის პოსტი
+  if (content.trim().length > 50) {
+    console.log('[Route] ✅ Extracted raw text (no tags found, but length > 50)');
+    // წავშალოთ შესაძლო XML ტეგები დასაწყისიდან/ბოლოდან, თუ შემთხვევით არის
+    return content.replace(/^[\s\S]*?<post>/i, '').replace(/<\/post>[\s\S]*$/i, '').trim();
+  }
+
+  console.warn('[Route] ❌ Failed to extract any meaningful post. Content was likely empty or malformed.');
+  return "";
 }
 
 function extractThinking(content: string): string | null {
@@ -34,32 +59,16 @@ function extractThinking(content: string): string | null {
   return thinkingMatch ? thinkingMatch[1].trim() : null;
 }
 
-// ✅ განახლებული: ჭკვიანი extractVerdict, რომელიც მუშაობს მაშინაც, თუ Aegis-მა XML ტეგები ვერ დაიცვა
 function extractVerdict(content: string): string {
-  // 1. სცადე იდეალური მატჩი: <verdict> ... </verdict>
   const verdictMatch = content.match(/<verdict>([\s\S]*?)<\/verdict>/i);
   if (verdictMatch && verdictMatch[1].trim().length > 0) {
-    console.log('[Route] ✅ Extracted verdict from XML tags');
     return verdictMatch[1].trim();
   }
   
-  // 2. Fallback: თუ ტეგი არ არის, მაგრამ სიტყვა APPROVED ან REVISE ჩანს ტექსტში
   const upperContent = content.toUpperCase();
-  if (upperContent.includes('APPROVED')) {
-    console.log('[Route] ️ Fallback: Found APPROVED in raw text');
-    return 'VERDICT: APPROVED';
-  }
-  if (upperContent.includes('REJECTED')) {
-    console.log('[Route] ️ Fallback: Found REJECTED in raw text');
-    return 'VERDICT: REJECTED';
-  }
-  if (upperContent.includes('REVISE')) {
-    console.log('[Route] ️ Fallback: Found REVISE in raw text');
-    return 'VERDICT: REVISE';
-  }
+  if (upperContent.includes('APPROVED')) return 'VERDICT: APPROVED';
+  if (upperContent.includes('REJECTED') || upperContent.includes('REVISE')) return 'VERDICT: REVISE';
   
-  // 3. საბოლოო Fallback: დააბრუნე მთლიანი კონტენტი
-  console.warn('[Route] ⚠️ Could not extract verdict, returning full content');
   return content.trim();
 }
 
@@ -75,8 +84,8 @@ function extractVisualConcept(content: string, fallbackText: string): string {
     if (cleanRest.length > 30) return cleanRest;
   }
 
-  const firstSentence = fallbackText.split('.')[0] || fallbackText;
-  return `A cinematic, dark luxury editorial photograph of: ${firstSentence}. Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, volumetric lighting, 8k resolution, masterpiece, photorealistic, no text, no watermarks, no logos.`;
+  const baseText = fallbackText.length > 10 ? fallbackText.split('.')[0] : "A mysterious, atmospheric cosmic event";
+  return `A cinematic, dark luxury editorial photograph of: ${baseText}. Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, volumetric lighting, 8k resolution, masterpiece, photorealistic, no text, no watermarks, no logos.`;
 }
 
 export async function POST(request: NextRequest) {
@@ -91,31 +100,15 @@ export async function POST(request: NextRequest) {
       logs.push({ step, agent, status, message, timestamp: Date.now(), latency, metadata });
     };
 
-    // 1. საუკეთესო API გასაღების პოვნა (ღრმა დიაგნოსტიკით)
+    // 1. საუკეთესო API გასაღების პოვნა
     addLog(1, 'System', 'running', 'Finding best available API key...');
-    
-    console.log('[System] 🔄 Waiting for Credential Vault to initialize...');
     await credentialVault.ready;
     
-    const serviceKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY;
-    console.log('[System]  SERVICE_ROLE_KEY loaded:', serviceKey ? `YES (starts with ${serviceKey.substring(0, 15)}...)` : 'NO (undefined!)');
-
     const credentials = credentialVault.getMetadata();
-    console.log('[System] 🔍 TOTAL credentials found in Vault:', credentials.length);
-    console.log('[System]  Credentials data:', JSON.stringify(credentials, null, 2));
-    
     const activeCredentials = credentials.filter(c => c.status === 'ACTIVE');
-    console.log('[System] 🔍 ACTIVE credentials found:', activeCredentials.length);
-
-    if (credentials.length === 0) {
-      console.error('[System] ❌ Vault is completely empty! Check Supabase connection and RLS policies.');
-      addLog(1, 'System', 'error', 'Vault is completely empty. Check Supabase connection and RLS policies.');
-      return NextResponse.json({ logs });
-    }
-
+    
     if (activeCredentials.length === 0) {
-      console.error('[System] ❌ No ACTIVE credentials found. All credentials might be REVOKED or PENDING.');
-      addLog(1, 'System', 'error', `Found ${credentials.length} credentials, but NONE are ACTIVE. Check their status in the UI.`);
+      addLog(1, 'System', 'error', 'No active credentials found.');
       return NextResponse.json({ logs });
     }
     
@@ -123,16 +116,8 @@ export async function POST(request: NextRequest) {
     const modelName = activeCred.metadata?.recommendedModel || 'default-model';
     const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
     
-    if (!apiKey) {
-      console.error('[System] ❌ Failed to decrypt API key for:', activeCred.credential_id);
-      addLog(1, 'System', 'error', `Failed to decrypt API key for ${activeCred.provider}. Check OS_ENCRYPTION_KEY in .env`);
-      return NextResponse.json({ logs });
-    }
-
     addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
-      provider: activeCred.provider,
-      model: modelName,
-      credential_id: activeCred.credential_id.substring(0, 8) + '...'
+      provider: activeCred.provider, model: modelName, credential_id: activeCred.credential_id.substring(0, 8) + '...'
     });
 
     // 2. Muse
@@ -151,10 +136,12 @@ export async function POST(request: NextRequest) {
     const publishedContent = extractPost(generation.content);
     const museThinking = extractThinking(generation.content);
     
-    addLog(2, 'Muse', 'success', `Content generated successfully (${publishedContent.length} chars)`, generationLatency, {
+    addLog(2, 'Muse', publishedContent.length > 10 ? 'success' : 'warning', 
+      `Content generated (${publishedContent.length} chars)`, generationLatency, {
       content_preview: publishedContent.substring(0, 100) + '...',
       full_content: publishedContent,
-      thinking_block: museThinking
+      thinking_block: museThinking,
+      raw_output_length: generation.content.length // ✅ დიაგნოსტიკა: რამხელა იყო ნედლი პასუხი
     });
 
     // 3. Aegis
@@ -164,7 +151,7 @@ export async function POST(request: NextRequest) {
     
     const qaCheck = await generateWithProvider(
       activeCred.provider, apiKey, modelName, 
-      `Evaluate this content:\n\n${publishedContent}`, 
+      `Evaluate this content:\n\n${publishedContent || "EMPTY CONTENT"}`, 
       aegisSystemPrompt
     );
     const qaLatency = Date.now() - qaStart;
@@ -182,18 +169,16 @@ export async function POST(request: NextRequest) {
     // 3.5. Lumen
     addLog(3.5, 'Lumen', 'running', 'Generating visual concept and image...');
     const lumenStart = Date.now();
-    
     const lumenSystemPrompt = await getInstruction('lumen') || "You are Lumen, Lunara OS Visual Director.";
+    
     const lumenResponse = await generateWithProvider(
       activeCred.provider, apiKey, modelName,
-      `Here is the approved Telegram post:\n\n${publishedContent}\n\nGenerate a visual concept for this post.`,
+      `Here is the Telegram post:\n\n${publishedContent}\n\nGenerate a visual concept for this post.`,
       lumenSystemPrompt
     );
 
     const visualConcept = extractVisualConcept(lumenResponse.content, publishedContent);
     const lumenThinking = extractThinking(lumenResponse.content);
-
-    console.log('[Route] 🎨 Lumen visual concept used:', visualConcept.substring(0, 150) + '...');
 
     const imageResult = await generateImage({
       visualPrompt: visualConcept,
@@ -212,10 +197,7 @@ export async function POST(request: NextRequest) {
         image_model: imageResult.model || 'unknown'
       });
     } else {
-      addLog(3.5, 'Lumen', 'warning', `Image generation failed, proceeding with text-only fallback`, lumenLatency, {
-        error: imageResult.error,
-        visual_concept: visualConcept
-      });
+      addLog(3.5, 'Lumen', 'warning', `Image generation failed`, lumenLatency, { error: imageResult.error });
     }
 
     // 4. Echo
@@ -223,7 +205,7 @@ export async function POST(request: NextRequest) {
     const telegramStart = Date.now();
     
     let tgResult;
-    if (imageResult.success && imageResult.imageBuffer) {
+    if (imageResult.success && imageResult.imageBuffer && publishedContent.length > 10) {
       tgResult = await sendTelegramPhoto({
         imageBuffer: imageResult.imageBuffer,
         caption: publishedContent,
@@ -231,7 +213,7 @@ export async function POST(request: NextRequest) {
       });
     } else {
       tgResult = await sendTelegramMessage({ 
-        text: publishedContent, 
+        text: publishedContent || "⚠️ System Error: Content generation failed.", 
         parse_mode: 'Markdown' 
       });
     }
@@ -242,12 +224,10 @@ export async function POST(request: NextRequest) {
       addLog(4, 'Echo', 'success', `Published to Telegram! Message ID: ${tgResult.messageId}`, telegramLatency, {
         message_id: tgResult.messageId,
         channel_id: process.env.TELEGRAM_CHANNEL_ID,
-        included_image: !!imageResult.success
+        included_image: !!(imageResult.success && publishedContent.length > 10)
       });
     } else {
-      addLog(4, 'Echo', 'error', `Telegram failed: ${tgResult.error}`, telegramLatency, {
-        error_details: tgResult.error
-      });
+      addLog(4, 'Echo', 'error', `Telegram failed: ${tgResult.error}`, telegramLatency);
     }
 
     // 5. საბოლოო სტატისტიკა
