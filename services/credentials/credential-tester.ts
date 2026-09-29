@@ -44,11 +44,13 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ✅ ახალი: სპეციალური ტესტი KIE.ai-სთვის (რადგან ის OpenAI-ს თავსებადია)
+  // ✅ განახლებული: სწორი ტესტი KIE.ai-სთვის - კრედიტების ბალანსის შემოწმება
+  // KIE.ai არ არის OpenAI-ს თავსებადი /v1/models endpoint-ით.
+  // საუკეთესო გზა გასაღების ვალიდურობის დასადასტურებლად არის კრედიტების ბალანსის შემოწმება.
   if (cred.provider.toLowerCase() === 'kie') {
     const startTime = Date.now();
     try {
-      const response = await fetch('https://api.kie.ai/v1/models', {
+      const response = await fetch('https://api.kie.ai/api/v1/chat/credit', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -58,9 +60,10 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
 
       if (response.ok) {
         const data = await response.json();
-        // თუ მოდელების სია მოდის, ვიღებთ მას, თუ არა - ვუთითებთ საუკეთესოებს ხელით
-        const models = data.data ? data.data.map((m: any) => m.id) : ['flux', 'stable-diffusion-xl'];
-        const recommended = 'flux'; // KIE.ai-ს საუკეთესო უწყალსანიშნო მოდელი ფოტოსთვის
+        // თუ კოდი 200-ია, გასაღები ვალიდურია და კრედიტები აქვს
+        // KIE.ai-ს საუკეთესო უწყალსანიშნო მოდელები ფოტოს გენერაციისთვის
+        const models = ['flux1-kontext', 'flux-2/flex-text-to-image', 'flux-2/pro-text-to-image'];
+        const recommended = 'flux1-kontext';
 
         await credentialVault.updateCredentialMetadata(credentialId, {
           models,
@@ -83,7 +86,7 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
           provider: cred.provider,
           models: [],
           recommendedModel: '',
-          error: `HTTP ${response.status}: ${errorText}`,
+          error: `Invalid API key (HTTP ${response.status}): ${errorText}`,
           latency: Date.now() - startTime
         };
       }
