@@ -59,8 +59,9 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
       });
 
       if (response.ok) {
-        const data = await response.json();
+        // ✅ წაშლილია გამოუყენებელი 'data' ცვლადი TypeScript-ის შეცდომის თავიდან ასაცილებლად
         // თუ კოდი 200-ია, გასაღები ვალიდურია და კრედიტები აქვს
+        
         // KIE.ai-ს საუკეთესო უწყალსანიშნო მოდელები ფოტოს გენერაციისთვის
         const models = ['flux1-kontext', 'flux-2/flex-text-to-image', 'flux-2/pro-text-to-image'];
         const recommended = 'flux1-kontext';
