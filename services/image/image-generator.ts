@@ -33,7 +33,7 @@ export interface ImageGenerationOptions {
 function getBestModel(cred: any, keywords: string[] = []): string | null {
   if (!cred.metadata) return null;
 
-  // 1. პირველ რიგში, ვეძებთ კონკრეტულ საკვანძო სიტყვებს (მაგ: 'image', 'flux') მოდელების სიაში
+  // 1. პირველ რიგში, ვეძებთ კონკრეტულ საკვანძო სიტყვებს (მაგ: 'imagen', 'flux') მოდელების სიაში
   if (cred.metadata.models && cred.metadata.models.length > 0 && keywords.length > 0) {
     const found = cred.metadata.models.find((m: string) => 
       keywords.some(kw => m.toLowerCase().includes(kw.toLowerCase()))
@@ -98,10 +98,10 @@ async function generateWithGemini(
       return { success: false, provider: 'gemini', error: 'Failed to decrypt Gemini API key', latency: Date.now() - startTime };
     }
 
-    // ✅ ვეძებთ კონკრეტულად ფოტოს მოდელებს, არა ტექსტურს!
-    const rawModelName = getBestModel(geminiCred, ['imagen', 'image', 'generate']);
+    // ✅ განახლება: 'imagen' პირველ ადგილზეა, რათა ერ ის იპოვოს, ვიდრე 'flash-image'
+    const rawModelName = getBestModel(geminiCred, ['imagen', 'generate', 'image']);
     if (!rawModelName) {
-      console.error('[Gemini] ❌ No image generation model found in metadata. This credential appears to be text-only.');
+      console.error('[Gemini]  No image generation model found in metadata. This credential appears to be text-only.');
       return { success: false, provider: 'gemini', error: 'No image model discovered. Credential is text-only.', latency: Date.now() - startTime };
     }
     
@@ -278,7 +278,8 @@ async function generateWithPollinations(
       'mystic-minimal': 'mystic minimalism, clean composition, negative space, subtle glow, elegant simplicity, no text, no watermarks, no logos'
     };
 
-    const safePrompt = visualPrompt.length > 400 ? visualPrompt.substring(0, 400) : visualPrompt;
+    // ✅ განახლება: პრომპტის ლიმიტი შემცირდა 250-მდე სტაბილურობისთვის
+    const safePrompt = visualPrompt.length > 250 ? visualPrompt.substring(0, 250) : visualPrompt;
     const finalPrompt = `${safePrompt}, ${styleEnhancements[style]}, professional photography, 8k resolution, ultra detailed`;
     const encodedPrompt = encodeURIComponent(finalPrompt);
     const seed = Math.floor(Math.random() * 999999);
@@ -374,7 +375,7 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   const pollinationsResult = await generateWithPollinations(options);
   
   if (pollinationsResult.success) {
-    console.log(`[ImageGenerator] ⚠️ Pollinations succeeded with model ${pollinationsResult.model} in ${pollinationsResult.latency}ms. Attempting to cover watermark...`);
+    console.log(`[ImageGenerator] ️ Pollinations succeeded with model ${pollinationsResult.model} in ${pollinationsResult.latency}ms. Attempting to cover watermark...`);
     const coveredImageBuffer = await applyLunaraWatermark(pollinationsResult.imageBuffer!);
     
     return {
