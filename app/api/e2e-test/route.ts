@@ -1,7 +1,7 @@
 // ============================================================
 // LUNARA OS — E2E Test API Route (100% Bulletproof & Type-Safe)
 // Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
-// Purpose: Execute full E2E pipeline with maximum robustness and strict typing
+// Purpose: Execute full E2E pipeline with maximum robustness, strict typing, and TRUE fallback chains.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,14 +25,12 @@ export interface E2ELog {
 function extractPost(content: string): string {
   console.log('[Route] 🔍 RAW Muse Output length:', content.length);
   
-  // 1. სცადე იდეალური მატჩი: <post> ... </post>
   const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
   if (postMatch && postMatch[1].trim().length > 10) {
     console.log('[Route] ✅ Extracted from <post> tags');
     return postMatch[1].trim();
   }
 
-  // 2. Fallback: აიღე ყველაფერი </thinking>-ის შემდეგ
   const afterThinking = content.split(/<\/thinking>/i);
   if (afterThinking.length > 1) {
     const cleaned = afterThinking[1].replace(/<\/?post>/gi, '').trim();
@@ -42,7 +40,6 @@ function extractPost(content: string): string {
     }
   }
 
-  // 3. Fallback: თუ საერთოდ არ არის ტეგები, მაგრამ ტექსტი გრძელია (>50 სიმბოლო)
   if (content.trim().length > 50) {
     console.log('[Route] ✅ Extracted raw text (no tags found, but length > 50)');
     return content.replace(/^[\s\S]*?<post>/i, '').replace(/<\/post>[\s\S]*$/i, '').trim();
@@ -100,8 +97,7 @@ export async function POST(request: NextRequest) {
       logs.push({ step, agent, status, message, timestamp: Date.now(), latency, metadata });
     };
 
-    // 1. საუკეთესო API გასაღების პოვნა
-    addLog(1, 'System', 'running', 'Finding best available API key...');
+    addLog(1, 'System', 'running', 'Finding best available API keys...');
     await credentialVault.ready;
     
     const credentials = credentialVault.getMetadata();
@@ -111,90 +107,127 @@ export async function POST(request: NextRequest) {
       addLog(1, 'System', 'error', 'No active credentials found.');
       return NextResponse.json({ logs });
     }
-    
-    const activeCred = activeCredentials.find(c => c.provider === 'groq') || activeCredentials[0];
-    const modelName: string = activeCred.metadata?.recommendedModel || 'default-model';
-    
-    // ✅ TypeScript Fix: ცალსახა შემოწმება და დატიპვა
-    const rawApiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
-    if (!rawApiKey) {
-      console.error('[System] ❌ Failed to decrypt API key for:', activeCred.credential_id);
-      addLog(1, 'System', 'error', `Failed to decrypt API key for ${activeCred.provider}. Check OS_ENCRYPTION_KEY in .env`);
+
+    // ============================================================
+    // TRUE FALLBACK CHAIN FOR TEXT GENERATION (Muse -> Aegis -> Lumen)
+    // ============================================================
+    const textProviders = ['groq', 'gemini', 'deepseek', 'mistral'];
+    let textGenerationSuccess = false;
+    let publishedContent = "";
+    let museThinking: string | null = null;
+    let visualConcept = "";
+    let lumenThinking: string | null = null;
+    let textLatency = 0;
+
+    for (const targetProvider of textProviders) {
+      const cred = activeCredentials.find(c => c.provider.toLowerCase() === targetProvider);
+      if (!cred) {
+        console.log(`[Route] ⚠️ Skipping ${targetProvider}: No active credential found.`);
+        continue;
+      }
+
+      const apiKey = credentialVault.getDecryptedValueForTesting(cred.credential_id);
+      if (!apiKey) {
+        console.warn(`[Route] ⚠️ Skipping ${cred.provider}: Failed to decrypt API key.`);
+        continue;
+      }
+
+      const modelName = cred.metadata?.recommendedModel || 'default-model';
+      console.log(`[Route] 🔄 Trying text provider: ${cred.provider} (${modelName})`);
+
+      try {
+        // 2. Muse
+        const rawMusePrompt = await getInstruction('muse');
+        const museSystemPrompt: string = rawMusePrompt || "You are Muse, Lunara OS Content Lead.";
+        
+        const generationStart = Date.now();
+        const generation = await generateWithProvider(cred.provider, apiKey, modelName, prompt, museSystemPrompt);
+        const genLatency = Date.now() - generationStart;
+
+        if (!generation.success) {
+          console.warn(`[Route] ⚠️ ${cred.provider} Muse generation failed: ${generation.error}`);
+          continue; // გადადის შემდეგ პროვაიდერზე
+        }
+        
+        const extractedContent = extractPost(generation.content);
+        if (extractedContent.length < 10) {
+          console.warn(`[Route] ⚠️ ${cred.provider} returned empty or malformed content.`);
+          continue;
+        }
+
+        // 3. Aegis
+        const qaStart = Date.now();
+        const rawAegisPrompt = await getInstruction('aegis');
+        const aegisSystemPrompt: string = rawAegisPrompt || "You are Aegis, Lunara OS Quality Director.";
+        
+        const qaCheck = await generateWithProvider(
+          cred.provider, apiKey, modelName, 
+          `Evaluate this content:\n\n${extractedContent}`, 
+          aegisSystemPrompt
+        );
+        const qaLatency = Date.now() - qaStart;
+        
+        const verdictContent = extractVerdict(qaCheck.content);
+        const isApproved = verdictContent.toUpperCase().includes('APPROVED');
+
+        if (!isApproved) {
+           console.warn(`[Route] ⚠️ ${cred.provider} Aegis rejected the content.`);
+           continue;
+        }
+
+        // 3.5. Lumen
+        const lumenStart = Date.now();
+        const rawLumenPrompt = await getInstruction('lumen');
+        const lumenSystemPrompt: string = rawLumenPrompt || "You are Lumen, Lunara OS Visual Director.";
+        
+        const lumenResponse = await generateWithProvider(
+          cred.provider, apiKey, modelName,
+          `Here is the Telegram post:\n\n${extractedContent}\n\nGenerate a visual concept for this post.`,
+          lumenSystemPrompt
+        );
+
+        visualConcept = extractVisualConcept(lumenResponse.content, extractedContent);
+        
+        // წარმატება! ვწყვეტთ ციკლს
+        textGenerationSuccess = true;
+        publishedContent = extractedContent;
+        museThinking = extractThinking(generation.content);
+        lumenThinking = extractThinking(lumenResponse.content);
+        textLatency = genLatency + qaLatency + (Date.now() - lumenStart);
+        
+        addLog(1, 'System', 'success', `Using ${cred.provider} (${modelName}) for text`, undefined, {
+          provider: cred.provider, model: modelName
+        });
+        addLog(2, 'Muse', 'success', `Content generated (${publishedContent.length} chars) via ${cred.provider}`, genLatency, {
+          content_preview: publishedContent.substring(0, 100) + '...',
+          full_content: publishedContent,
+          thinking_block: museThinking
+        });
+        addLog(3, 'Aegis', 'success', 'Content approved by QA', qaLatency, {
+          verdict: 'approved',
+          full_verdict: verdictContent
+        });
+        addLog(3.5, 'Lumen', 'success', 'Visual concept generated', Date.now() - lumenStart, {
+          visual_concept: visualConcept,
+          thinking_block: lumenThinking
+        });
+
+        break; 
+
+      } catch (error) {
+        console.error(`[Route] ❌ ${cred.provider} text generation threw an error:`, error);
+        continue;
+      }
+    }
+
+    if (!textGenerationSuccess) {
+      addLog(2, 'Muse', 'error', 'All text generation providers failed.');
       return NextResponse.json({ logs });
     }
-    const apiKey: string = rawApiKey;
 
-    addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
-      provider: activeCred.provider, 
-      model: modelName, 
-      credential_id: activeCred.credential_id.substring(0, 8) + '...'
-    });
-
-    // 2. Muse
-    addLog(2, 'Muse', 'running', 'Generating content based on prompt...');
-    
-    // ✅ TypeScript Fix: ცალსახა დატიპვა სისტემური პრომპტისთვის
-    const rawMusePrompt = await getInstruction('muse');
-    const museSystemPrompt: string = rawMusePrompt || "You are Muse, Lunara OS Content Lead.";
-    
-    const generationStart = Date.now();
-    const generation = await generateWithProvider(activeCred.provider, apiKey, modelName, prompt, museSystemPrompt);
-    const generationLatency = Date.now() - generationStart;
-
-    if (!generation.success) {
-      addLog(2, 'Muse', 'error', `Generation failed: ${generation.error}`, generationLatency);
-      return NextResponse.json({ logs });
-    }
-    
-    const publishedContent = extractPost(generation.content);
-    const museThinking = extractThinking(generation.content);
-    
-    addLog(2, 'Muse', publishedContent.length > 10 ? 'success' : 'warning', 
-      `Content generated (${publishedContent.length} chars)`, generationLatency, {
-      content_preview: publishedContent.substring(0, 100) + '...',
-      full_content: publishedContent,
-      thinking_block: museThinking,
-      raw_output_length: generation.content.length
-    });
-
-    // 3. Aegis
-    addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
-    const qaStart = Date.now();
-    const rawAegisPrompt = await getInstruction('aegis');
-    const aegisSystemPrompt: string = rawAegisPrompt || "You are Aegis, Lunara OS Quality Director.";
-    
-    const qaCheck = await generateWithProvider(
-      activeCred.provider, apiKey, modelName, 
-      `Evaluate this content:\n\n${publishedContent || "EMPTY CONTENT"}`, 
-      aegisSystemPrompt
-    );
-    const qaLatency = Date.now() - qaStart;
-    
-    const verdictContent = extractVerdict(qaCheck.content);
-    const aegisThinking = extractThinking(qaCheck.content);
-    const isApproved = verdictContent.toUpperCase().includes('APPROVED');
-
-    addLog(3, 'Aegis', isApproved ? 'success' : 'warning', isApproved ? 'Content approved by QA' : 'QA suggested revisions, proceeding...', qaLatency, {
-      verdict: isApproved ? 'approved' : 'revise',
-      thinking_block: aegisThinking,
-      full_verdict: verdictContent
-    });
-
-    // 3.5. Lumen
-    addLog(3.5, 'Lumen', 'running', 'Generating visual concept and image...');
-    const lumenStart = Date.now();
-    const rawLumenPrompt = await getInstruction('lumen');
-    const lumenSystemPrompt: string = rawLumenPrompt || "You are Lumen, Lunara OS Visual Director.";
-    
-    const lumenResponse = await generateWithProvider(
-      activeCred.provider, apiKey, modelName,
-      `Here is the Telegram post:\n\n${publishedContent}\n\nGenerate a visual concept for this post.`,
-      lumenSystemPrompt
-    );
-
-    const visualConcept = extractVisualConcept(lumenResponse.content, publishedContent);
-    const lumenThinking = extractThinking(lumenResponse.content);
-
+    // ============================================================
+    // IMAGE GENERATION (უკვე აქვს საკუთარი Fallback Chain)
+    // ============================================================
     const imageResult = await generateImage({
       visualPrompt: visualConcept,
       width: 1024,
@@ -202,20 +235,20 @@ export async function POST(request: NextRequest) {
       style: 'dark-luxury'
     });
 
-    const lumenLatency = Date.now() - lumenStart;
-
     if (imageResult.success) {
-      addLog(3.5, 'Lumen', 'success', `Image generated successfully via ${imageResult.provider}`, lumenLatency, {
+      addLog(3.5, 'Lumen', 'success', `Image generated successfully via ${imageResult.provider}`, imageResult.latency, {
         visual_concept: visualConcept,
         thinking_block: lumenThinking,
         image_provider: imageResult.provider,
         image_model: imageResult.model || 'unknown'
       });
     } else {
-      addLog(3.5, 'Lumen', 'warning', `Image generation failed`, lumenLatency, { error: imageResult.error });
+      addLog(3.5, 'Lumen', 'warning', `Image generation failed`, imageResult.latency, { error: imageResult.error });
     }
 
-    // 4. Echo
+    // ============================================================
+    // 4. Echo (Telegram)
+    // ============================================================
     addLog(4, 'Echo', 'running', 'Sending to Telegram channel...');
     const telegramStart = Date.now();
     
@@ -246,7 +279,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. საბოლოო სტატისტიკა
-    const totalLatency = generationLatency + qaLatency + lumenLatency + telegramLatency;
+    const totalLatency = textLatency + (imageResult.latency || 0) + telegramLatency;
     addLog(5, 'System', 'info', `E2E test completed in ${totalLatency}ms`, totalLatency, {
       total_steps: 5,
       successful_steps: logs.filter(l => l.status === 'success').length,
