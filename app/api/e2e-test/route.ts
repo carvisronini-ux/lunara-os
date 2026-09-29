@@ -1,7 +1,5 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (Full Pipeline with Image Generation)
-// Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
-// Purpose: Execute full E2E pipeline: Text -> QA -> Image Gen -> Telegram Photo
+// LUNARA OS — E2E Test API Route (Full Pipeline with Smart Fallbacks)
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,7 +19,6 @@ export interface E2ELog {
   metadata?: Record<string, any>;
 }
 
-// ✅ Helper: ამოიღებს <post> block-ს Muse-ის XML output-დან
 function extractPost(content: string): string {
   const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
   if (postMatch) return postMatch[1].trim();
@@ -32,44 +29,27 @@ function extractPost(content: string): string {
   return content.trim();
 }
 
-// ✅ Helper: ამოიღებს <thinking> block-ს
 function extractThinking(content: string): string | null {
   const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/i);
   return thinkingMatch ? thinkingMatch[1].trim() : null;
 }
 
-// ✅ Helper: ამოიღებს <verdict> block-ს Aegis-ისთვის
 function extractVerdict(content: string): string {
   const verdictMatch = content.match(/<verdict>([\s\S]*?)<\/verdict>/i);
   return verdictMatch ? verdictMatch[1].trim() : content.trim();
 }
 
-// ✅ განახლებული Helper: უკეთესად ამოიღებს <visual_concept> block-ს Lumen-ისთვის
-function extractVisualConcept(content: string): string {
-  // 1. სცადე იდეალური მატჩი: <visual_concept> ... </visual_concept>
+// ✅ განახლებული: ამატებს Fallback-ს, თუ visual_concept ცარიელია ან მოკლე
+function extractVisualConcept(content: string, fallbackText: string): string {
   const conceptMatch = content.match(/<visual_concept>([\s\S]*?)<\/visual_concept>/i);
-  if (conceptMatch && conceptMatch[1].trim().length > 0) {
+  if (conceptMatch && conceptMatch[1].trim().length > 30) {
     console.log('[Route] ✅ Extracted visual_concept successfully');
     return conceptMatch[1].trim();
   }
   
-  // 2. Fallback: თუ <visual_concept> არის, მაგრამ ცარიელი ან არ აქვს დამხურავი ტეგი
-  const conceptStartMatch = content.match(/<visual_concept>([\s\S]*)/i);
-  if (conceptStartMatch && conceptStartMatch[1].trim().length > 0) {
-    console.log('[Route] ️ Extracted visual_concept without closing tag');
-    return conceptStartMatch[1].trim();
-  }
-  
-  // 3. Fallback: ამოიღე ყველაფერი <thinking> ბლოკის დახურვის შემდეგ
-  const afterThinkingMatch = content.match(/<\/thinking>([\s\S]*)/i);
-  if (afterThinkingMatch && afterThinkingMatch[1].trim().length > 0) {
-    console.log('[Route] ⚠️ Fallback: extracted after </thinking>');
-    return afterThinkingMatch[1].trim();
-  }
-  
-  // 4. საბოლოო Fallback: დააბრუნე მთლიანი კონტენტი
-  console.warn('[Route] ⚠️ Could not extract visual_concept, returning full content');
-  return content.trim();
+  console.warn('[Route] ⚠️ visual_concept not found or too short. Using smart fallback.');
+  // თუ Lumen-მა ვერ დაწერა, ჩვენ ვქმნით მინიმალურ აღწერას ტექსტის საფუძველზე
+  return `A cinematic, dark luxury editorial photograph representing the mood of this text: "${fallbackText.substring(0, 150)}...". Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, no text, no watermarks, 8k resolution, ultra detailed.`;
 }
 
 export async function POST(request: NextRequest) {
@@ -85,7 +65,6 @@ export async function POST(request: NextRequest) {
       logs.push({ step, agent, status, message, timestamp: Date.now(), latency, metadata });
     };
 
-    // 1. საუკეთესო API გასაღების პოვნა
     addLog(1, 'System', 'running', 'Finding best available API key...');
     await credentialVault.ready;
     
@@ -110,7 +89,7 @@ export async function POST(request: NextRequest) {
       provider: activeCred.provider, model: modelName, credential_id: activeCred.credential_id
     });
 
-    // 2. Muse: კონტენტის გენერაცია
+    // 2. Muse
     addLog(2, 'Muse', 'running', 'Generating content based on prompt...');
     const museSystemPrompt = await getInstruction('muse') || "You are Muse, Lunara OS Content Lead.";
     
@@ -126,13 +105,17 @@ export async function POST(request: NextRequest) {
     const publishedContent = extractPost(generation.content);
     const museThinking = extractThinking(generation.content);
     
-    addLog(2, 'Muse', 'success', `Content generated successfully (${publishedContent.length} chars)`, generationLatency, {
+    // ✅ შევამოწმოთ, მოიჭრა თუ არა ტექსტი
+    const isTruncated = !generation.content.includes('</post>') && generation.content.length < 400;
+    
+    addLog(2, 'Muse', isTruncated ? 'warning' : 'success', `Content generated (${publishedContent.length} chars)${isTruncated ? ' (WARNING: Output may be truncated)' : ''}`, generationLatency, {
       content_preview: publishedContent.substring(0, 100) + '...',
       full_content: publishedContent,
-      thinking_block: museThinking
+      thinking_block: museThinking,
+      is_truncated: isTruncated
     });
 
-    // 3. Aegis: ხარისხის შემოწმება (QA)
+    // 3. Aegis
     addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
     const qaStart = Date.now();
     const aegisSystemPrompt = await getInstruction('aegis') || "You are Aegis, Lunara OS Quality Director.";
@@ -154,7 +137,7 @@ export async function POST(request: NextRequest) {
       full_verdict: verdictContent
     });
 
-    // ✅ 3.5. Lumen: ვიზუალური კონცეფცია და სურათის გენერაცია
+    // 3.5. Lumen
     addLog(3.5, 'Lumen', 'running', 'Generating visual concept and image...');
     const lumenStart = Date.now();
     
@@ -165,12 +148,12 @@ export async function POST(request: NextRequest) {
       lumenSystemPrompt
     );
 
-    const visualConcept = extractVisualConcept(lumenResponse.content);
+    // ✅ გადავცეთ fallbackText, თუ visual_concept ცარიელი აღმოჩნდა
+    const visualConcept = extractVisualConcept(lumenResponse.content, publishedContent);
     const lumenThinking = extractThinking(lumenResponse.content);
 
-    console.log('[Route] 🎨 Lumen visual concept:', visualConcept.substring(0, 150) + '...');
+    console.log('[Route] 🎨 Lumen visual concept used:', visualConcept.substring(0, 150) + '...');
 
-    // სურათის რეალური გენერაცია
     const imageResult = await generateImage({
       visualPrompt: visualConcept,
       width: 1280,
@@ -194,20 +177,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 4. Echo: Telegram-ზე გამოქვეყნება (სურათი + ტექსტი)
+    // 4. Echo
     addLog(4, 'Echo', 'running', 'Sending to Telegram channel...');
     const telegramStart = Date.now();
     
     let tgResult;
     if (imageResult.success && imageResult.imageBuffer) {
-      // ✅ ვაგზავნით სურათს + Caption-ს
       tgResult = await sendTelegramPhoto({
         imageBuffer: imageResult.imageBuffer,
         caption: publishedContent,
         parse_mode: 'Markdown'
       });
     } else {
-      // ⚠️ Fallback: თუ სურათის გენერაცია ვერ მოხერხდა, ვაგზავნით მხოლოდ ტექსტს
       tgResult = await sendTelegramMessage({ 
         text: publishedContent, 
         parse_mode: 'Markdown' 
