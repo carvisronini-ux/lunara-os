@@ -77,7 +77,6 @@ type EmergencyState = {
   accessRevoked: boolean;
 };
 
-// ✅ Telegram არხის მონაცემების სტრუქტურა
 type TelegramChannelData = {
   name: string;
   username: string;
@@ -148,9 +147,9 @@ const initialTelegramData: TelegramChannelData = {
 
 const departments: Department[] = [
   { id: "executive", name: "აღმასრულებელი ცენტრი", icon: "👑", color: "#8b5cf6", description: "სტრატეგია და კოორდინაცია" },
-  { id: "intelligence", name: "დაზვერვა", icon: "", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
+  { id: "intelligence", name: "დაზვერვა", icon: "🔍", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
   { id: "strategy", name: "სტრატეგია", icon: "🎯", color: "#a855f7", description: "დაგეგმვა და გადაწყვეტილებები" },
-  { id: "content", name: "კონტენტი", icon: "️", color: "#f59e0b", description: "სცენარები და ტექსტები" },
+  { id: "content", name: "კონტენტი", icon: "✍️", color: "#f59e0b", description: "სცენარები და ტექსტები" },
   { id: "creative", name: "კრეატივი", icon: "🎨", color: "#ec4899", description: "ვიზუალური მიმართულება" },
   { id: "production", name: "წარმოება", icon: "🎬", color: "#ef4444", description: "აქტივების გენერაცია" },
   { id: "resources", name: "რესურსები", icon: "🔐", color: "#10b981", description: "მონაცემები და წვდომა" },
@@ -164,15 +163,15 @@ const initialAgents: Agent[] = [
   { id: "astra", name: "Astra", role: "აღმასრულებელი კოორდინატორი", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "სისტემის პრიორიტეტების მონიტორინგი" },
   { id: "nyx", name: "Nyx", role: "ტრენდების დაზვერვა", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "WORKING", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "TikTok-ის ტრენდების ანალიზი" },
   { id: "orion", name: "Orion", role: "კონკურენტების დაზვერვა", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "დანაწილების მოლოდინში" },
-  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "WAITING_FOR_REVIEW", taskId: "task-002", accent: "#a855f7", icon: "", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
+  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "WAITING_FOR_REVIEW", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
   { id: "muse", name: "Muse", role: "კონტენტის ხელმძღვანელი", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "WORKING", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "3 სცენარის ვარიანტის წერა" },
   { id: "vega", name: "Vega", role: "კრეატიული დირექტორი", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "WAITING", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "სცენარის დამტკიცების მოლოდინში" },
   { id: "atlas", name: "Atlas", role: "რესურსების დირექტორი", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "WORKING", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "API მონაცემების გადამოწმება" },
-  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#059669", icon: "", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
-  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "WORKING", taskId: "task-006", accent: "#06b6d4", icon: "️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
+  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
+  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "WORKING", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
   { id: "echo", name: "Echo", role: "გავრცელების მენეჯერი", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "COMPLETED", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "გამოქვეყნებულია Telegram-ზე" },
-  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f97316", icon: "", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
-  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "WORKING", taskId: "task-008", accent: "#14b8a6", icon: "", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
+  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
+  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "WORKING", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
   { id: "lumen", name: "Lumen", role: "ვიზუალური დირექტორი", department: "creative", level: 5, xp: 450, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f472b6", icon: "🌟", missionsCompleted: 0, autonomyLevel: 3, currentTask: "მზად არის ვიზუალური კონცეფციების შესაქმნელად" },
 ];
 
@@ -229,7 +228,7 @@ const initialKnowledge: KnowledgeDocument[] = [
     status: "active",
     source: "დაზვერვის დეპარტამენტი",
     title: "პლატფორმის სპეციფიკური წესები",
-    content: "TikTok: სწრაფი უკები, ტრენდებზე მორგებული ენა, უფრო ნედლი პრეზენტაცია. YouTube Shorts: ნათელი პრემისა, შენარჩუნების ანალიზი. Instagram Reels: ვიზუალური იდენტობა, გაზიარებადობა. Telegram: ინტერაქცია, გამოკითხვები, საზოგადოება.",
+    content: "TikTok: სწრაფი ჰუკები, ტრენდებზე მორგებული ენა, უფრო ნედლი პრეზენტაცია. YouTube Shorts: ნათელი პრემისა, შენარჩუნების ანალიზი. Instagram Reels: ვიზუალური იდენტობა, გაზიარებადობა. Telegram: ინტერაქცია, გამოკითხვები, საზოგადოება.",
     confidence: 0.85,
     owner: "nyx",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 15,
@@ -276,15 +275,15 @@ function getStatusLabel(status: AgentStatus): string {
   switch (status) {
     case "IDLE": return "⏸️ უმოქმედო";
     case "WORKING": return "⚡ მუშაობს";
-    case "WAITING": return " მოლოდინში";
+    case "WAITING": return "⏳ მოლოდინში";
     case "WAITING_FOR_RESOURCE": return "🔐 რესურსის მოლოდინში";
     case "WAITING_FOR_REVIEW": return "🔍 გადახედვის მოლოდინში";
     case "COMPLETED": return "✅ დასრულებული";
-    case "ERROR": return " შეცდომა";
+    case "ERROR": return "❌ შეცდომა";
     case "PAUSED": return "⏸️ შეჩერებული";
     case "SUSPENDED": return "🚫 შეწყვეტილი";
     case "STARTING": return "🚀 იწყება";
-    case "OFFLINE": return " ოფლაინ";
+    case "OFFLINE": return "⚫ ოფლაინ";
     default: return status;
   }
 }
@@ -309,85 +308,6 @@ function generateMessageFromEvent(event: any): string {
     default: return `სისტემური მოვლენა: ${event.type}`;
   }
 }
-
-// ✅ მთლიანი დოკუმენტაციის ტექსტი
-const FULL_DOCUMENTATION_TEXT = `# LUNARA TELEGRAM CHANNEL — COMPLETE DOCUMENTATION
-
-## 1. CHANNEL IDENTITY & BRANDING
-- **Channel Name:** LUNARA
-- **Username:** @lunaraOS
-- **Network ID:** LUNARA-MEDIA-001
-- **Status:** Active — Early Stage
-- **Brand Positioning:** LUNARA — Tarot & Astrology
-- **Taglines:**
-  - "Your daily cosmic signal."
-  - "Don't just read your horoscope. Discover your signal."
-- **Voice & Tone:** Mysterious, Intelligent, Intimate, Premium, Concise
-
-## 2. MISSION & VISION
-**Primary Mission:**
-Build a recognizable, psychologically relevant and shareable media destination around cosmic wisdom, tarot and astrology; earn attention through useful, emotionally precise and curiosity-driven content; create recurring audience habits; and build a measurable bridge into the wider Lunara ecosystem.
-
-**Internal Mission:**
-WIN ATTENTION WITHOUT SACRIFICING TRUST → BUILD HABIT WITHOUT MANUFACTURING DEPENDENCE → TURN VALIDATED INSIGHT INTO SUSTAINABLE GROWTH.
-
-## 3. CONTENT STRATEGY & PILLARS
-- Love / Relationships: 30%
-- Tarot: 20%
-- Astrology: 15%
-- Daily Cosmic: 15%
-- Mystery: 10%
-- Education: 10%
-
-**Signature Series:**
-THE LUNARA SIGNAL, LUNARA LOVE SIGNAL, ZODIAC UNLOCKED, LUNARA AFTER DARK, LUNARA 24, LUNARA WEEKLY READING
-
-## 4. GROWTH STRATEGY & PLAYBOOK
-1. **Similar Channels Optimization:** Identify 10-20 successful channels, create similar original content, cross-promote to appear in their 'Similar Channels'.
-2. **Cross-Promotion Network:** Direct channel-to-channel promotion with 5-10 channels of similar size. Track joins per promotion.
-3. **Forward Incentive:** Reward users for forwarding content (e.g., 'Forward to 3 friends and DM for exclusive reading').
-4. **Comment Engagement Loop:** End every post with a question, respond to all comments in first 2 hours, pin best comments.
-5. **First 50 Founders:** Offer exclusive benefits (founding status, free premium reading) to the first 50 subscribers to build a loyal core.
-6. **Analytics-Driven Iteration:** Track every post's performance. Identify top 20% performers and double down on what works.
-
-## 5. 90-DAY GROWTH PLAN
-**PHASE 1: FOUNDATION (Days 1-30)** — 0 → 500 subscribers
-Launch with 7 strong posts, engage comments, first cross-promotion (5 channels), analyze top performers.
-
-**PHASE 2: MOMENTUM (Days 31-60)** — 500 → 2,000 subscribers
-Scale cross-promotion (10 channels), launch 'First 50 Founders', create first viral experiment.
-
-**PHASE 3: ACCELERATION (Days 61-90)** — 2,000 → 10,000 subscribers
-Double down on winning content, launch daily signature series, first paid promotion test.
-
-## 6. KEY PERFORMANCE INDICATORS (KPIs)
-- Reach / Subscriber: > 50%
-- Forwards / Post: > 30
-- Join Rate: > 5% of views
-- D7 Retention: > 60%
-
-⚠️ KPI Principle: No single metric defines success. Optimize the whole chain (Views → Joins → Retention → Conversion).
-
-## 7. IMPLEMENTATION CHECKLIST
-**Week 1 Setup:**
-☑ Channel created with optimized name/username
-☑ Avatar uploaded (mascot logo style)
-☑ Description written (255 chars, keyword-rich)
-☑ Pinned post created (welcome + value prop)
-☑ First 7 posts created and scheduled
-
-**Daily & Weekly Tasks:**
-▸ Post 1-2 times (consistent times)
-▸ Respond to all comments (first 2 hours)
-▸ Track metrics (views, forwards, joins)
-▸ Weekly review (top 3 posts, patterns)
- Cross-promote with 2-3 new channels
-
----
-Document Version: 1.0
-Last Updated: 30 September 2026
-Owner: Lunara OS / Executive Core
-`;
 
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
@@ -423,10 +343,12 @@ export default function HomePage() {
     accessRevoked: false,
   });
 
-  // ✅ ახალი სტეიტები Telegram მოდალებისთვის
+  // ✅ ახალი სტეიტები დინამიური დოკუმენტაციისთვის
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [telegramChannelData, setTelegramChannelData] = useState<TelegramChannelData>(initialTelegramData);
+  const [documentationContent, setDocumentationContent] = useState('');
+  const [isDocLoading, setIsDocLoading] = useState(false);
   
   const [activePanel, setActivePanel] = useState<"overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge" | "intelligence" | "content-family" | "distribution" | "credentials" | "e2e-test" | "telegram">("overview");
   const timersRef = useRef<number[]>([]);
@@ -594,6 +516,27 @@ export default function HomePage() {
     };
   }, [emergencyState.allAgentsPaused]);
 
+  // ✅ დინამიურად წაკითხვა დოკუმენტაციის ფაილიდან, როცა მოდალი იხსნება
+  useEffect(() => {
+    if (isDocModalOpen && !documentationContent) {
+      setIsDocLoading(true);
+      fetch('/api/docs')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setDocumentationContent(data.content);
+          } else {
+            console.error('Failed to load documentation:', data.error);
+          }
+          setIsDocLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to load documentation:', err);
+          setIsDocLoading(false);
+        });
+    }
+  }, [isDocModalOpen, documentationContent]);
+
   const selectedAgent = agents.find(a => a.id === selectedAgentId) ?? null;
   const selectedDept = departments.find(d => d.id === selectedDepartment);
   
@@ -607,7 +550,7 @@ export default function HomePage() {
 
   const runNyxAnalysis = () => {
     setNyxLogs([]);
-    pushEvent("system", " Nyx-მა დაიწყო ტრენდების ანალიზი");
+    pushEvent("system", "🔍 Nyx-მა დაიწყო ტრენდების ანალიზი");
     
     const steps = [
       "[Nyx] 🔍 იწყებს ტრენდების ანალიზს...",
@@ -632,7 +575,7 @@ export default function HomePage() {
     setIsCopying(true);
     
     const reportText = `🔍 LUNARA OS - Nyx Trend Analysis Report
- თარიღი: ${new Date().toLocaleString('ka-GE')}
+ 📅 თარიღი: ${new Date().toLocaleString('ka-GE')}
 
 📊 შესრულების ლოგები:
 ${nyxLogs.length > 0 ? nyxLogs.join('\n') : '[ლოგები არ არის ჩაწერილი]'}
@@ -677,7 +620,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
   const pausePublishing = () => {
     setEmergencyState(prev => ({ ...prev, publishingPaused: true }));
-    pushEvent("emergency", "️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
+    pushEvent("emergency", "⚠️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
   };
 
   const resumePublishing = () => {
@@ -696,22 +639,25 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
     pushEvent("emergency", "🔐 დროებითი წვდომა გააუქმა ადამიანმა აღმასრულებელმა");
   };
 
-  // ✅ დოკუმენტაციის კოპირების ფუნქცია
-  const copyDocumentation = () => {
-    navigator.clipboard.writeText(FULL_DOCUMENTATION_TEXT);
-    pushEvent("system", "📋 დოკუმენტაცია დაკოპირდა ბუფერში");
-  };
-
-  // ✅ დოკუმენტაციის ჩამოტვირთვის ფუნქცია
-  const downloadDocumentation = () => {
-    const blob = new Blob([FULL_DOCUMENTATION_TEXT], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'LUNARA_Telegram_Channel_Documentation.md';
-    a.click();
-    URL.revokeObjectURL(url);
-    pushEvent("system", "📥 დოკუმენტაცია ჩამოიტვირთა");
+  // ✅ დოკუმენტაციის შენახვის ფუნქცია
+  const saveDocumentation = async () => {
+    try {
+      const res = await fetch('/api/docs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: documentationContent })
+      });
+      const data = await res.json();
+      if (data.success) {
+        pushEvent("system", "💾 Documentation saved successfully to file");
+        setIsDocModalOpen(false);
+      } else {
+        pushEvent("error", "❌ Failed to save documentation");
+      }
+    } catch (error) {
+      console.error('Failed to save documentation:', error);
+      pushEvent("error", "❌ Failed to save documentation");
+    }
   };
 
   return (
@@ -763,7 +709,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
         <div className="px-6 py-3 border-t border-white/5 bg-slate-900/50">
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}> მიმოხილვა</button>
+            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 მიმოხილვა</button>
             <button onClick={() => setActivePanel("intelligence")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "intelligence" ? "bg-blue-500/20 text-blue-400 border border-blue-400/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
               🔍 შესაძლებლობები
               {opportunities.filter(o => o.status === "discovered").length > 0 && (
@@ -843,7 +789,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <h3 className="text-lg font-black mb-4">💚 სისტემის ანმრთელობა</h3>
+              <h3 className="text-lg font-black mb-4">💚 სისტემის ჯანმრთელობა</h3>
               <div className="space-y-3">
                 {[{ name: "აგენტების ბუსი", value: 100, color: "bg-emerald-500" }, { name: "ამოცანების ძრავა", value: 100, color: "bg-emerald-500" }, { name: "მოვლენების ბუსი", value: 98, color: "bg-blue-500" }, { name: "ხარისხის კარიბჭე", value: 100, color: "bg-emerald-500" }, { name: "სწავლის ციკლი", value: 95, color: "bg-purple-500" }].map(item => (
                   <div key={item.name}>
@@ -1052,7 +998,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                       )}
                       {opp.status === "validated" && (
                         <div className="flex gap-3">
-                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30"> Sage-სთვის გადაცემა</button>
+                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30">🎯 Sage-სთვის გადაცემა</button>
                           <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ უარყოფა</button>
                         </div>
                       )}
@@ -1101,7 +1047,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                               <div key={variant.channel_id} className={`rounded-xl border p-4 ${review?.verdict === "approved" ? "border-emerald-500/30 bg-emerald-500/5" : review?.verdict === "revise" ? "border-yellow-500/30 bg-yellow-500/5" : "border-white/10 bg-white/5"}`}>
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-2">
-                                    <div className="text-2xl">{variant.channel_id === "human_mind" ? "" : variant.channel_id === "love" ? "💕" : variant.channel_id === "astrology" ? "♈" : variant.channel_id === "tarot" ? "🎴" : variant.channel_id === "mystery" ? "🌙" : "✨"}</div>
+                                    <div className="text-2xl">{variant.channel_id === "human_mind" ? "🧠" : variant.channel_id === "love" ? "💕" : variant.channel_id === "astrology" ? "♈" : variant.channel_id === "tarot" ? "🎴" : variant.channel_id === "mystery" ? "🌙" : "✨"}</div>
                                     <div className="text-sm font-bold text-white uppercase">{variant.channel_id.replace('_', ' ')}</div>
                                   </div>
                                   {review && (
@@ -1149,7 +1095,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               <div className="space-y-6">
                 {qualityReviews.length === 0 ? (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
-                    <div className="text-4xl mb-4">️</div>
+                    <div className="text-4xl mb-4">🛡️</div>
                     <h3 className="text-xl font-black text-white mb-2">QA შეფასებები ჯერ არ არის</h3>
                     <p className="text-slate-400 mb-6">დაამტკიცე Opportunity, რომ Aegis-მ შეაფასოს Content Family.</p>
                   </div>
@@ -1159,7 +1105,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-black text-white mb-1">
-                            {review.channel_id === "human_mind" ? "🧠 Human Mind" : review.channel_id === "love" ? "💕 Love" : review.channel_id === "astrology" ? "♈ Astrology" : review.channel_id === "tarot" ? " Tarot" : review.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
+                            {review.channel_id === "human_mind" ? "🧠 Human Mind" : review.channel_id === "love" ? "💕 Love" : review.channel_id === "astrology" ? "♈ Astrology" : review.channel_id === "tarot" ? "🎴 Tarot" : review.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
                           </h3>
                           <p className="text-xs text-slate-500">Family: {review.family_id}</p>
                         </div>
@@ -1358,7 +1304,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-black mb-4 tracking-wide"> რესურსები</h2>
+              <h2 className="text-2xl font-black mb-4 tracking-wide">🔐 რესურსები</h2>
               <div className="space-y-3">
                 {resources.map(resource => (
                   <div key={resource.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -1402,7 +1348,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                   onClick={() => { setIsTelegramModalOpen(false); setIsDocModalOpen(true); }}
                   className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-sm"
                 >
-                   View Full Documentation
+                   📄 View Full Documentation
                 </button>
                 <button onClick={() => setIsTelegramModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1412,7 +1358,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
               <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2"> 1. CHANNEL IDENTITY & BRANDING</h3>
+                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📌 1. CHANNEL IDENTITY & BRANDING</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <InputField label="Channel Name" value={telegramChannelData.name} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, name: v }))} />
                   <InputField label="Username" value={telegramChannelData.username} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, username: v }))} />
@@ -1464,7 +1410,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               </section>
 
               <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2"> 3. CONTENT STRATEGY & PILLARS</h3>
+                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📝 3. CONTENT STRATEGY & PILLARS</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                   {telegramChannelData.pillars.map((pillar, idx) => (
                     <PillarInput 
@@ -1617,7 +1563,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
         </div>
       )}
 
-      {/* ✅ Full Documentation Modal */}
+      {/* ✅ Full Documentation Modal (Dynamic from file) */}
       {isDocModalOpen && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => setIsDocModalOpen(false)}>
           <div className="relative w-full max-w-6xl max-h-[95vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1626,20 +1572,37 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                 <h2 className="text-2xl font-black text-white flex items-center gap-2">
                   📄 LUNARA Telegram Channel — Full Documentation
                 </h2>
-                <p className="text-sm text-slate-400">Complete strategic document for the channel</p>
+                <p className="text-sm text-slate-400">Edit and manage the channel's strategic document</p>
               </div>
               <div className="flex gap-2">
                 <button 
-                  onClick={copyDocumentation}
+                  onClick={() => {
+                    navigator.clipboard.writeText(documentationContent);
+                    pushEvent("system", "📋 Documentation copied to clipboard");
+                  }}
                   className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white font-bold hover:bg-white/20 transition-colors text-sm flex items-center gap-2"
                 >
-                   Copy
+                  📋 Copy
                 </button>
                 <button 
-                  onClick={downloadDocumentation}
+                  onClick={() => {
+                    const blob = new Blob([documentationContent], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'LUNARA_Telegram_Channel.md';
+                    a.click();
+                    pushEvent("system", "📥 Documentation downloaded");
+                  }}
                   className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-sm flex items-center gap-2"
                 >
                   📥 Download .md
+                </button>
+                <button 
+                  onClick={saveDocumentation}
+                  className="px-4 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-colors text-sm flex items-center gap-2"
+                >
+                  💾 Save to File
                 </button>
                 <button onClick={() => setIsDocModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1647,56 +1610,19 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <div className="prose prose-invert max-w-none">
-                {FULL_DOCUMENTATION_TEXT.split('\n').map((line, idx) => {
-                  if (line.startsWith('# ')) {
-                    return <h1 key={idx} className="text-3xl font-black text-white mb-6 mt-8 first:mt-0">{line.replace('# ', '')}</h1>;
-                  }
-                  if (line.startsWith('## ')) {
-                    return <h2 key={idx} className="text-2xl font-black text-sky-400 mb-4 mt-8 border-b border-white/10 pb-2">{line.replace('## ', '')}</h2>;
-                  }
-                  if (line.startsWith('### ')) {
-                    return <h3 key={idx} className="text-xl font-bold text-white mb-3 mt-6">{line.replace('### ', '')}</h3>;
-                  }
-                  if (line.startsWith('- **')) {
-                    const match = line.match(/- \*\*(.+?)\*\*:?\s*(.*)/);
-                    if (match) {
-                      return (
-                        <div key={idx} className="flex gap-2 mb-2 text-sm">
-                          <span className="text-sky-400">•</span>
-                          <span className="font-bold text-white">{match[1]}:</span>
-                          <span className="text-slate-300">{match[2]}</span>
-                        </div>
-                      );
-                    }
-                  }
-                  if (line.startsWith('- ')) {
-                    return (
-                      <div key={idx} className="flex gap-2 mb-1 text-sm text-slate-300">
-                        <span className="text-sky-400">•</span>
-                        <span>{line.replace('- ', '')}</span>
-                      </div>
-                    );
-                  }
-                  if (line.startsWith('**') && line.endsWith('**')) {
-                    return <p key={idx} className="text-base font-bold text-emerald-400 my-3">{line.replace(/\*\*/g, '')}</p>;
-                  }
-                  if (line.startsWith('⚠️')) {
-                    return <div key={idx} className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 my-4 text-red-300 text-sm font-bold">{line}</div>;
-                  }
-                  if (line.startsWith('☑') || line.startsWith('▸')) {
-                    return <div key={idx} className="flex gap-2 mb-2 text-sm text-slate-300">{line}</div>;
-                  }
-                  if (line.trim() === '') {
-                    return <div key={idx} className="h-2" />;
-                  }
-                  if (line.startsWith('---')) {
-                    return <hr key={idx} className="border-white/10 my-6" />;
-                  }
-                  return <p key={idx} className="text-sm text-slate-300 mb-2 leading-relaxed">{line}</p>;
-                })}
-              </div>
+            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+              {isDocLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-sky-400 font-bold animate-pulse">Loading documentation from file...</div>
+                </div>
+              ) : (
+                <textarea
+                  className="w-full h-full min-h-[600px] bg-slate-950 border border-white/10 rounded-xl p-6 text-sm text-slate-300 font-mono focus:outline-none focus:border-sky-500/50 resize-none leading-relaxed"
+                  value={documentationContent}
+                  onChange={(e) => setDocumentationContent(e.target.value)}
+                  placeholder="Documentation content will appear here..."
+                />
+              )}
             </div>
           </div>
         </div>
