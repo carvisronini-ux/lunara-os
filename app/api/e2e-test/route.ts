@@ -34,9 +34,33 @@ function extractThinking(content: string): string | null {
   return thinkingMatch ? thinkingMatch[1].trim() : null;
 }
 
+// ✅ განახლებული: ჭკვიანი extractVerdict, რომელიც მუშაობს მაშინაც, თუ Aegis-მა XML ტეგები ვერ დაიცვა
 function extractVerdict(content: string): string {
+  // 1. სცადე იდეალური მატჩი: <verdict> ... </verdict>
   const verdictMatch = content.match(/<verdict>([\s\S]*?)<\/verdict>/i);
-  return verdictMatch ? verdictMatch[1].trim() : content.trim();
+  if (verdictMatch && verdictMatch[1].trim().length > 0) {
+    console.log('[Route] ✅ Extracted verdict from XML tags');
+    return verdictMatch[1].trim();
+  }
+  
+  // 2. Fallback: თუ ტეგი არ არის, მაგრამ სიტყვა APPROVED ან REVISE ჩანს ტექსტში
+  const upperContent = content.toUpperCase();
+  if (upperContent.includes('APPROVED')) {
+    console.log('[Route] ️ Fallback: Found APPROVED in raw text');
+    return 'VERDICT: APPROVED';
+  }
+  if (upperContent.includes('REJECTED')) {
+    console.log('[Route] ️ Fallback: Found REJECTED in raw text');
+    return 'VERDICT: REJECTED';
+  }
+  if (upperContent.includes('REVISE')) {
+    console.log('[Route] ️ Fallback: Found REVISE in raw text');
+    return 'VERDICT: REVISE';
+  }
+  
+  // 3. საბოლოო Fallback: დააბრუნე მთლიანი კონტენტი
+  console.warn('[Route] ⚠️ Could not extract verdict, returning full content');
+  return content.trim();
 }
 
 function extractVisualConcept(content: string, fallbackText: string): string {
@@ -73,13 +97,12 @@ export async function POST(request: NextRequest) {
     console.log('[System] 🔄 Waiting for Credential Vault to initialize...');
     await credentialVault.ready;
     
-    // ✅ ახალი დიაგნოსტიკა: შეამოწმებს, ჩატვირთა თუ არა Next.js-მა .env ცვლადი
     const serviceKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY;
-    console.log('[System] 🔑 SERVICE_ROLE_KEY loaded:', serviceKey ? `YES (starts with ${serviceKey.substring(0, 15)}...)` : 'NO (undefined!)');
+    console.log('[System]  SERVICE_ROLE_KEY loaded:', serviceKey ? `YES (starts with ${serviceKey.substring(0, 15)}...)` : 'NO (undefined!)');
 
     const credentials = credentialVault.getMetadata();
     console.log('[System] 🔍 TOTAL credentials found in Vault:', credentials.length);
-    console.log('[System] 📋 Credentials data:', JSON.stringify(credentials, null, 2));
+    console.log('[System]  Credentials data:', JSON.stringify(credentials, null, 2));
     
     const activeCredentials = credentials.filter(c => c.status === 'ACTIVE');
     console.log('[System] 🔍 ACTIVE credentials found:', activeCredentials.length);
