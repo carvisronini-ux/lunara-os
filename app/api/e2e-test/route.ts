@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (100% Bulletproof Extraction)
+// LUNARA OS — E2E Test API Route (100% Bulletproof & Type-Safe)
 // Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
-// Purpose: Execute full E2E pipeline with maximum robustness
+// Purpose: Execute full E2E pipeline with maximum robustness and strict typing
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,7 +24,6 @@ export interface E2ELog {
 // ✅ 100%-ით ტყვიაგამძლე ამოღება
 function extractPost(content: string): string {
   console.log('[Route] 🔍 RAW Muse Output length:', content.length);
-  console.log('[Route] 🔍 RAW Muse Output snippet:', content.substring(0, 300));
   
   // 1. სცადე იდეალური მატჩი: <post> ... </post>
   const postMatch = content.match(/<post>([\s\S]*?)<\/post>/i);
@@ -43,10 +42,9 @@ function extractPost(content: string): string {
     }
   }
 
-  // 3. Fallback: თუ საერთოდ არ არის ტეგები, მაგრამ ტექსტი გრძელია (>50 სიმბოლო), დავუშვათ რომ ეს არის პოსტი
+  // 3. Fallback: თუ საერთოდ არ არის ტეგები, მაგრამ ტექსტი გრძელია (>50 სიმბოლო)
   if (content.trim().length > 50) {
     console.log('[Route] ✅ Extracted raw text (no tags found, but length > 50)');
-    // წავშალოთ შესაძლო XML ტეგები დასაწყისიდან/ბოლოდან, თუ შემთხვევით არის
     return content.replace(/^[\s\S]*?<post>/i, '').replace(/<\/post>[\s\S]*$/i, '').trim();
   }
 
@@ -90,7 +88,9 @@ function extractVisualConcept(content: string, fallbackText: string): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt } = await request.json();
+    const body = await request.json();
+    const prompt: string = body.prompt;
+    
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ error: 'Invalid prompt' }, { status: 400 });
     }
@@ -113,16 +113,27 @@ export async function POST(request: NextRequest) {
     }
     
     const activeCred = activeCredentials.find(c => c.provider === 'groq') || activeCredentials[0];
-    const modelName = activeCred.metadata?.recommendedModel || 'default-model';
-    const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
+    const modelName: string = activeCred.metadata?.recommendedModel || 'default-model';
     
+    // ✅ TypeScript Fix: ცალსახა შემოწმება და დატიპვა
+    const rawApiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
+    if (!rawApiKey) {
+      console.error('[System] ❌ Failed to decrypt API key for:', activeCred.credential_id);
+      addLog(1, 'System', 'error', `Failed to decrypt API key for ${activeCred.provider}. Check OS_ENCRYPTION_KEY in .env`);
+      return NextResponse.json({ logs });
+    }
+    const apiKey: string = rawApiKey;
+
     addLog(1, 'System', 'success', `Using ${activeCred.provider} (${modelName})`, undefined, {
       provider: activeCred.provider, model: modelName, credential_id: activeCred.credential_id.substring(0, 8) + '...'
     });
 
     // 2. Muse
     addLog(2, 'Muse', 'running', 'Generating content based on prompt...');
-    const museSystemPrompt = await getInstruction('muse') || "You are Muse, Lunara OS Content Lead.";
+    
+    // ✅ TypeScript Fix: ცალსახა დატიპვა სისტემური პრომპტისთვის
+    const rawMusePrompt = await getInstruction('muse');
+    const museSystemPrompt: string = rawMusePrompt || "You are Muse, Lunara OS Content Lead.";
     
     const generationStart = Date.now();
     const generation = await generateWithProvider(activeCred.provider, apiKey, modelName, prompt, museSystemPrompt);
@@ -141,13 +152,14 @@ export async function POST(request: NextRequest) {
       content_preview: publishedContent.substring(0, 100) + '...',
       full_content: publishedContent,
       thinking_block: museThinking,
-      raw_output_length: generation.content.length // ✅ დიაგნოსტიკა: რამხელა იყო ნედლი პასუხი
+      raw_output_length: generation.content.length
     });
 
     // 3. Aegis
     addLog(3, 'Aegis', 'running', 'Checking content quality and brand fit...');
     const qaStart = Date.now();
-    const aegisSystemPrompt = await getInstruction('aegis') || "You are Aegis, Lunara OS Quality Director.";
+    const rawAegisPrompt = await getInstruction('aegis');
+    const aegisSystemPrompt: string = rawAegisPrompt || "You are Aegis, Lunara OS Quality Director.";
     
     const qaCheck = await generateWithProvider(
       activeCred.provider, apiKey, modelName, 
@@ -169,7 +181,8 @@ export async function POST(request: NextRequest) {
     // 3.5. Lumen
     addLog(3.5, 'Lumen', 'running', 'Generating visual concept and image...');
     const lumenStart = Date.now();
-    const lumenSystemPrompt = await getInstruction('lumen') || "You are Lumen, Lunara OS Visual Director.";
+    const rawLumenPrompt = await getInstruction('lumen');
+    const lumenSystemPrompt: string = rawLumenPrompt || "You are Lumen, Lunara OS Visual Director.";
     
     const lumenResponse = await generateWithProvider(
       activeCred.provider, apiKey, modelName,
