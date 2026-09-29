@@ -44,9 +44,62 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ✅ განახლებული: სწორი ტესტი KIE.ai-სთვის - კრედიტების ბალანსის შემოწმება
-  // KIE.ai არ არის OpenAI-ს თავსებადი /v1/models endpoint-ით.
-  // საუკეთესო გზა გასაღების ვალიდურობის დასადასტურებლად არის კრედიტების ბალანსის შემოწმება.
+  // ✅ ახალი: სპეციალური ტესტი Cloudflare-ისთვის
+  if (cred.provider.toLowerCase() === 'cloudflare') {
+    const startTime = Date.now();
+    const accountId = 'b41cb921e1b841685c0f5d364f661fbe';
+    
+    try {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const models = ['@cf/stabilityai/stable-diffusion-xl-base-1.0', '@cf/black-forest-labs/flux-1-schnell'];
+        const recommended = '@cf/stabilityai/stable-diffusion-xl-base-1.0';
+
+        await credentialVault.updateCredentialMetadata(credentialId, {
+          models,
+          recommendedModel: recommended,
+          testSuccess: true,
+          testLatency: Date.now() - startTime
+        });
+
+        return {
+          success: true,
+          provider: cred.provider,
+          models,
+          recommendedModel: recommended,
+          latency: Date.now() - startTime
+        };
+      } else {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        return {
+          success: false,
+          provider: cred.provider,
+          models: [],
+          recommendedModel: '',
+          error: `Invalid API key or Account ID (HTTP ${response.status}): ${errorText}`,
+          latency: Date.now() - startTime
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        provider: cred.provider,
+        models: [],
+        recommendedModel: '',
+        error: error instanceof Error ? error.message : 'Unknown network error',
+        latency: Date.now() - startTime
+      };
+    }
+  }
+
+  // ✅ სპეციალური ტესტი KIE.ai-სთვის - კრედიტების ბალანსის შემოწმება
   if (cred.provider.toLowerCase() === 'kie') {
     const startTime = Date.now();
     try {
@@ -59,10 +112,6 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
       });
 
       if (response.ok) {
-        // ✅ წაშლილია გამოუყენებელი 'data' ცვლადი TypeScript-ის შეცდომის თავიდან ასაცილებლად
-        // თუ კოდი 200-ია, გასაღები ვალიდურია და კრედიტები აქვს
-        
-        // KIE.ai-ს საუკეთესო უწყალსანიშნო მოდელები ფოტოს გენერაციისთვის
         const models = ['flux1-kontext', 'flux-2/flex-text-to-image', 'flux-2/pro-text-to-image'];
         const recommended = 'flux1-kontext';
 
@@ -103,7 +152,7 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     }
   }
 
-  // ✅ სტანდარტული ტესტირება სხვა პროვაიდერებისთვის (gemini, groq, და ა.შ.)
+  // ✅ სტანდარტული ტესტირება სხვა პროვაიდერებისთვის (gemini, groq, huggingface და ა.შ.)
   const result = await testProvider(cred.provider, apiKey);
 
   const testResult: CredentialTestResult = {
