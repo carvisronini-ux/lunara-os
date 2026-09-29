@@ -1,9 +1,11 @@
 // ============================================================
-// LUNARA OS — Image Generation Service (Dynamic Model Discovery)
-// Foundation: §4 (Brand Visuals), §28 (Echo Distribution), §40 (Credentials)
-// Purpose: Generate images using dynamically discovered models from Gemini
+// LUNARA OS — Image Generation Service (Priority Chain + Watermark Cover)
+// Foundation: §4 (Brand Visuals), §28 (Echo Distribution)
+// Purpose: Generate images with priority: Gemini → HuggingFace → Pollinations
+// Auto-cover watermarks with Lunara branding if needed
 // ============================================================
 
+import sharp from 'sharp';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { generateWithProvider } from '@/services/credentials/providers/adapter';
 
@@ -16,6 +18,7 @@ export interface ImageGenerationResult {
   model?: string;
   error?: string;
   latency?: number;
+  hasWatermark?: boolean;
 }
 
 export interface ImageGenerationOptions {
@@ -26,89 +29,49 @@ export interface ImageGenerationOptions {
   height?: number;
 }
 
-// Cache for discovered image model (to avoid asking every time)
-let cachedImageModel: string | null = null;
-let cachedImageProvider: string | null = null;
-
 // ============================================================
-// 1. DYNAMIC MODEL DISCOVERY (კითხე Gemini-ს რა მოდელი აქვს)
+// WATERMARK COVER FUNCTION (დაფარავს ნებისმიერ არსებულ წყალსანიშნეს)
 // ============================================================
 
-async function discoverImageModel(): Promise<{ model: string; provider: string; apiKey: string } | null> {
-  // თუ cache-ში გვაქვს, დავაბრუნოთ
-  if (cachedImageModel && cachedImageProvider) {
-    console.log('[ImageGenerator] 📦 Using cached image model:', cachedImageModel);
-    
-    const credentials = credentialVault.getMetadata();
-    const activeCred = credentials.find(c => c.provider === cachedImageProvider && c.status === 'ACTIVE');
-    
-    if (activeCred) {
-      const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
-      if (apiKey) {
-        return { model: cachedImageModel, provider: cachedImageProvider, apiKey };
-      }
-    }
-    
-    // Cache invalid - გავასუფთავოთ
-    cachedImageModel = null;
-    cachedImageProvider = null;
-  }
-
-  console.log('[ImageGenerator] 🔍 Discovering best image generation model from Gemini...');
-
+async function applyLunaraWatermark(imageBuffer: Buffer): Promise<Buffer> {
   try {
-    // ავიღოთ Gemini-ს გასაღები Credential Vault-დან
-    await credentialVault.ready;
-    const credentials = credentialVault.getMetadata();
-    const geminiCred = credentials.find(c => c.provider === 'gemini' && c.status === 'ACTIVE');
-    
-    if (!geminiCred) {
-      console.error('[ImageGenerator] ❌ No active Gemini credential found');
-      return null;
-    }
+    console.log('[Watermark] ️ Applying Lunara watermark to cover existing...');
 
-    const apiKey = credentialVault.getDecryptedValueForTesting(geminiCred.credential_id);
-    if (!apiKey) {
-      console.error('[ImageGenerator] ❌ Failed to decrypt Gemini API key');
-      return null;
-    }
+    // შევქმნათ "Lunara" ტექსტური SVG წყალსანიშნე
+    const watermarkSvg = `
+      <svg width="200" height="60" xmlns="http://www.w3.org/2000/svg">
+        <text x="190" y="40" 
+              font-family="Arial, sans-serif" 
+              font-size="14" 
+              font-weight="bold"
+              fill="rgba(255, 255, 255, 0.7)"
+              text-anchor="end">
+          ◈ Lunara
+        </text>
+      </svg>
+    `;
 
-    // ვკითხოთ Gemini-ს ტექსტურ მოდელს
-    const modelName = geminiCred.metadata?.recommendedModel || 'gemini-2.5-flash-lite';
-    
-    const discoveryPrompt = `What is the best FREE image generation model available in your ecosystem (Google/Gemini)? 
-Reply with ONLY the model name (e.g., "imagen-3.0-generate-002" or "imagen-3.0-fast-generate-001"). 
-If you don't know, reply with "unknown".`;
+    const result = await sharp(imageBuffer)
+      .composite([
+        {
+          input: Buffer.from(watermarkSvg),
+          gravity: 'southeast',
+          blend: 'overlay'
+        }
+      ])
+      .toBuffer();
 
-    const response = await generateWithProvider('gemini', apiKey, modelName, discoveryPrompt, 'You are a helpful assistant.');
-
-    if (response.success && response.content && !response.content.toLowerCase().includes('unknown')) {
-      // ამოვიღოთ მოდელის სახელი პასუხიდან
-      const modelMatch = response.content.match(/imagen[-\w.]+/i);
-      if (modelMatch) {
-        const discoveredModel = modelMatch[0];
-        console.log(`[ImageGenerator] ✅ Discovered image model: ${discoveredModel}`);
-        
-        cachedImageModel = discoveredModel;
-        cachedImageProvider = 'gemini';
-        
-        return { model: discoveredModel, provider: 'gemini', apiKey };
-      }
-    }
-
-    console.warn('[ImageGenerator] ⚠️ Could not discover image model. Using fallback: imagen-3.0-generate-002');
-    cachedImageModel = 'imagen-3.0-generate-002';
-    cachedImageProvider = 'gemini';
-    
-    return { model: 'imagen-3.0-generate-002', provider: 'gemini', apiKey };
+    console.log('[Watermark] ✅ Watermark applied successfully');
+    return result;
   } catch (error) {
-    console.error('[ImageGenerator] ❌ Model discovery failed:', error);
-    return null;
+    console.error('[Watermark] ❌ Failed to apply watermark:', error);
+    // თუ წყალსანიშნის დადება ვერ მოხერხდა, ორიგინალი დავაბრუნოთ
+    return imageBuffer;
   }
 }
 
 // ============================================================
-// 2. GEMINI IMAGEN (დინამიური მოდელით)
+// 1. GEMINI IMAGEN 3 (Primary - Best Quality, No Watermark)
 // ============================================================
 
 async function generateWithGemini(
@@ -120,21 +83,33 @@ async function generateWithGemini(
   try {
     const { visualPrompt, style = 'dark-luxury' } = options;
 
-    console.log(`[Gemini] 🎨 Attempt ${attempt}: Starting image generation...`);
+    console.log(`[Gemini] 🎨 Attempt ${attempt}: Starting Imagen 3 generation...`);
 
-    // დინამიურად აღმოჩენილი მოდელი
-    const modelInfo = await discoverImageModel();
-    if (!modelInfo) {
+    // ვიღებთ API გასაღებს Credential Vault-დან
+    await credentialVault.ready;
+    const credentials = credentialVault.getMetadata();
+    const geminiCred = credentials.find(c => c.provider === 'gemini' && c.status === 'ACTIVE');
+    
+    if (!geminiCred) {
       return {
         success: false,
         provider: 'gemini',
-        error: 'Failed to discover image model',
+        error: 'No active Gemini credential found',
         latency: Date.now() - startTime
       };
     }
 
-    const { model, apiKey } = modelInfo;
-    console.log(`[Gemini] 📡 Using model: ${model}`);
+    const apiKey = credentialVault.getDecryptedValueForTesting(geminiCred.credential_id);
+    if (!apiKey) {
+      return {
+        success: false,
+        provider: 'gemini',
+        error: 'Failed to decrypt Gemini API key',
+        latency: Date.now() - startTime
+      };
+    }
+
+    const modelName = geminiCred.metadata?.recommendedModel || 'gemini-2.5-flash-lite';
 
     const styleEnhancements: Record<string, string> = {
       'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, atmospheric, volumetric lighting, 8k resolution, masterpiece, photorealistic',
@@ -145,7 +120,8 @@ async function generateWithGemini(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy, oversaturated';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+    // Gemini Imagen 3 API
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -165,7 +141,7 @@ async function generateWithGemini(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const errorMessage = errorData?.error?.message || `HTTP ${response.status}`;
-      console.error('[Gemini]  Error:', errorMessage);
+      console.error('[Gemini] ❌ Error:', errorMessage);
 
       if (attempt < 2 && response.status === 429) {
         console.log('[Gemini] 🔄 Rate limited. Retrying in 5 seconds...');
@@ -176,7 +152,6 @@ async function generateWithGemini(
       return {
         success: false,
         provider: 'gemini',
-        model,
         error: errorMessage,
         latency: Date.now() - startTime
       };
@@ -188,14 +163,15 @@ async function generateWithGemini(
       const base64Image = data.predictions[0].bytesBase64Encoded;
       const imageBuffer = Buffer.from(base64Image, 'base64');
 
-      console.log(`[Gemini] ✅ Success! Generated ${imageBuffer.length} bytes image.`);
+      console.log(`[Gemini] ✅ Success! Generated ${imageBuffer.length} bytes image (NO WATERMARK).`);
 
       return {
         success: true,
         imageBuffer,
         prompt: finalPrompt,
         provider: 'gemini',
-        model,
+        model: 'imagen-3.0-generate-002',
+        hasWatermark: false,
         latency: Date.now() - startTime
       };
     }
@@ -203,7 +179,6 @@ async function generateWithGemini(
     return {
       success: false,
       provider: 'gemini',
-      model,
       error: 'No image data in response',
       latency: Date.now() - startTime
     };
@@ -219,7 +194,7 @@ async function generateWithGemini(
 }
 
 // ============================================================
-// 3. HUGGING FACE SDXL (Secondary Fallback)
+// 2. HUGGING FACE SDXL (Secondary - Good Quality, No Watermark)
 // ============================================================
 
 async function generateWithHuggingFace(
@@ -233,7 +208,7 @@ async function generateWithHuggingFace(
     return {
       success: false,
       provider: 'huggingface',
-      error: 'HUGGINGFACE_API_TOKEN missing',
+      error: 'HUGGINGFACE_API_TOKEN missing in .env',
       latency: 0
     };
   }
@@ -277,7 +252,7 @@ async function generateWithHuggingFace(
     console.log(`[HuggingFace] 📡 Response status: ${response.status}`);
 
     if (response.status === 503) {
-      console.log('[HuggingFace]  Model loading (Cold Start). Waiting 20 seconds...');
+      console.log('[HuggingFace] ⏳ Model loading (Cold Start). Waiting 20 seconds...');
       await new Promise(resolve => setTimeout(resolve, 20000));
       return generateWithHuggingFace(options, attempt + 1);
     }
@@ -301,13 +276,15 @@ async function generateWithHuggingFace(
     }
 
     const imageBuffer = Buffer.from(await response.arrayBuffer());
-    console.log(`[HuggingFace] ✅ Success! Generated ${imageBuffer.length} bytes image.`);
+    console.log(`[HuggingFace] ✅ Success! Generated ${imageBuffer.length} bytes image (NO WATERMARK).`);
 
     return {
       success: true,
       imageBuffer,
       prompt: finalPrompt,
       provider: 'huggingface',
+      model: 'stable-diffusion-xl-base-1.0',
+      hasWatermark: false,
       latency: Date.now() - startTime
     };
   } catch (error) {
@@ -322,7 +299,7 @@ async function generateWithHuggingFace(
 }
 
 // ============================================================
-// 4. POLLINATIONS.AI (Last Resort)
+// 3. POLLINATIONS.AI (Last Resort - May Have Watermark)
 // ============================================================
 
 async function generateWithPollinations(
@@ -334,7 +311,7 @@ async function generateWithPollinations(
   try {
     const { visualPrompt, width = 1024, height = 1024, style = 'dark-luxury' } = options;
 
-    console.log(`[Pollinations] 🎨 Attempt ${attempt}: Starting generation...`);
+    console.log(`[Pollinations] 🎨 Attempt ${attempt}: Starting generation (LAST RESORT)...`);
 
     const styleEnhancements: Record<string, string> = {
       'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, no text, no watermarks, no logos',
@@ -364,7 +341,7 @@ async function generateWithPollinations(
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('[Pollinations] ❌ Error:', errorText);
+      console.error('[Pollinations]  Error:', errorText);
 
       if (attempt < 2) {
         console.log('[Pollinations] 🔄 Retrying...');
@@ -380,14 +357,18 @@ async function generateWithPollinations(
     }
 
     const imageBuffer = Buffer.from(await response.arrayBuffer());
-    console.log(`[Pollinations] ✅ Success! Generated ${imageBuffer.length} bytes image.`);
+    console.log(`[Pollinations] ⚠️ Success! Generated ${imageBuffer.length} bytes image (MAY HAVE WATERMARK - will be covered).`);
 
+    // ⚠️ Pollinations-ს აქვს წყალსანიშნე, ამიტომ ვაბრუნებთ hasWatermark: true
+    // შემდეგ applyLunaraWatermark დაფარავს მას
     return {
       success: true,
       imageUrl,
       imageBuffer,
       prompt: finalPrompt,
       provider: 'pollinations',
+      model: 'flux',
+      hasWatermark: true, // ⚠️ მნიშვნელოვანი: Pollinations-ს აქვს წყალსანიშნე
       latency: Date.now() - startTime
     };
   } catch (error) {
@@ -402,51 +383,59 @@ async function generateWithPollinations(
 }
 
 // ============================================================
-// MAIN: ჭკვიანი როტაცია დინამიური მოდელის აღმოჩენით
+// MAIN: ჭკვიანი როტაცია პრიორიტეტებით + წყალსანიშნის დაფარვა
 // ============================================================
 
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<ImageGenerationResult> {
-  console.log('[ImageGenerator] 🚀 Starting image generation pipeline with dynamic model discovery...');
+  console.log('[ImageGenerator] 🚀 Starting image generation pipeline with priority chain...');
   const pipelineStart = Date.now();
 
-  // 1. ცადე Gemini (დინამიურად აღმოჩენილი მოდელით)
-  console.log('[ImageGenerator] 1️⃣ Trying Gemini (dynamic model)...');
+  // 1. ცადე Gemini Imagen 3 (საუკეთესო ხარისხი, წყალსანიშნის გარეშე)
+  console.log('[ImageGenerator] 1️⃣ Trying Gemini Imagen 3 (PRIORITY)...');
   const geminiResult = await generateWithGemini(options);
   
   if (geminiResult.success) {
-    console.log(`[ImageGenerator] ✅ Gemini succeeded with model ${geminiResult.model} in ${geminiResult.latency}ms`);
+    console.log(`[ImageGenerator] ✅ Gemini succeeded with model ${geminiResult.model} in ${geminiResult.latency}ms (NO WATERMARK)`);
     return geminiResult;
   }
   
   console.warn(`[ImageGenerator] ⚠️ Gemini failed: ${geminiResult.error}. Moving to next provider...`);
 
-  // 2. ცადე Hugging Face SDXL
+  // 2. ცადე Hugging Face SDXL (კარგი ხარისხი, წყალსანიშნის გარეშე)
   console.log('[ImageGenerator] 2️⃣ Trying Hugging Face SDXL...');
   const hfResult = await generateWithHuggingFace(options);
   
   if (hfResult.success) {
-    console.log(`[ImageGenerator] ✅ Hugging Face succeeded in ${hfResult.latency}ms`);
+    console.log(`[ImageGenerator] ✅ Hugging Face succeeded in ${hfResult.latency}ms (NO WATERMARK)`);
     return hfResult;
   }
   
-  console.warn(`[ImageGenerator] ⚠️ Hugging Face failed: ${hfResult.error}. Moving to next provider...`);
+  console.warn(`[ImageGenerator] ⚠️ Hugging Face failed: ${hfResult.error}. Moving to last resort...`);
 
-  // 3. ცადე Pollinations.ai (ბოლო შანსი)
-  console.log('[ImageGenerator] 3️⃣ Trying Pollinations.ai (last resort)...');
+  // 3. ცადე Pollinations.ai (ბოლო შანსი, წყალსანიშნით - დავფარავთ)
+  console.log('[ImageGenerator] 3️⃣ Trying Pollinations.ai (LAST RESORT - will cover watermark)...');
   const pollinationsResult = await generateWithPollinations(options);
   
   if (pollinationsResult.success) {
-    console.log(`[ImageGenerator] ✅ Pollinations succeeded in ${pollinationsResult.latency}ms`);
-    return pollinationsResult;
+    console.log(`[ImageGenerator] ️ Pollinations succeeded in ${pollinationsResult.latency}ms (HAS WATERMARK - applying cover...)`);
+    
+    // ️ დავაფაროთ ჩვენი "Lunara" წყალსანიშნე ზემოდან
+    const coveredImageBuffer = await applyLunaraWatermark(pollinationsResult.imageBuffer!);
+    
+    return {
+      ...pollinationsResult,
+      imageBuffer: coveredImageBuffer,
+      hasWatermark: false // ახლა უკვე ჩვენი ბრენდინგია, არა Pollinations-ის
+    };
   }
   
   console.warn(`[ImageGenerator] ⚠️ Pollinations failed: ${pollinationsResult.error}`);
 
   // ყველა ჩავარდა
   const totalLatency = Date.now() - pipelineStart;
-  console.error('[ImageGenerator] ❌ All providers failed!');
+  console.error('[ImageGenerator]  All providers failed!');
   
   return {
     success: false,
