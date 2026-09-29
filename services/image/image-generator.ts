@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Image Generation Service (All Keys from Vault)
+// LUNARA OS — Image Generation Service (100% Dynamic, No Hardcoding)
 // Foundation: §4 (Brand Visuals), §28 (Echo Distribution), §40 (Credentials)
-// Purpose: Ask Gemini for the best model, then use it. Fallback to HF/Pollinations.
+// Purpose: Dynamically discover and use models strictly from Vault metadata.
 // ============================================================
 
 import sharp from 'sharp';
@@ -28,104 +28,73 @@ export interface ImageGenerationOptions {
   height?: number;
 }
 
-// Cache for discovered image model
-let cachedImageModel: string | null = null;
-let cachedImageProvider: string | null = null;
-
 // ============================================================
-// 1. DYNAMIC MODEL DISCOVERY (ვკითხავთ Gemini-ს სწორ მოდელს)
+// HELPER: დინამიურად იღებს საუკეთესო მოდელს მეტამონაცემებიდან
 // ============================================================
-
-async function discoverImageModel(): Promise<{ model: string; provider: string; apiKey: string } | null> {
-  if (cachedImageModel && cachedImageProvider) {
-    console.log('[ImageGenerator] 📦 Using cached image model:', cachedImageModel);
-    const credentials = credentialVault.getMetadata();
-    const activeCred = credentials.find(c => c.provider === cachedImageProvider && c.status === 'ACTIVE');
-    if (activeCred) {
-      const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
-      if (apiKey) return { model: cachedImageModel, provider: cachedImageProvider, apiKey };
-    }
-    cachedImageModel = null;
-    cachedImageProvider = null;
-    console.log('[ImageGenerator] ⚠️ Cache invalid, re-discovering...');
+function getBestModel(cred: any, keywords: string[] = []): string | null {
+  // 1. პრიორიტეტი: რეკომენდებული მოდელი ტესტიდან
+  if (cred.metadata?.recommendedModel) {
+    return cred.metadata.recommendedModel;
   }
+  // 2. მეორე პრიორიტეტი: პირველი მოდელი, რომელიც შეიცავს საკვანძო სიტყვას
+  if (cred.metadata?.models && cred.metadata.models.length > 0) {
+    if (keywords.length > 0) {
+      const found = cred.metadata.models.find((m: string) => 
+        keywords.some(kw => m.toLowerCase().includes(kw.toLowerCase()))
+      );
+      if (found) return found;
+    }
+    // 3. უკანასკნელი შანსი: უბრალოდ პირველი ხელმისაწვდომი მოდელი სიაში
+    return cred.metadata.models[0];
+  }
+  return null;
+}
 
-  console.log('[ImageGenerator] 🔍 Discovering best image generation model from Gemini...');
+// ============================================================
+// 1. GEMINI IMAGEN (მთლიანად დინამიური)
+// ============================================================
+async function generateWithGemini(
+  options: ImageGenerationOptions,
+  attempt: number = 1
+): Promise<ImageGenerationResult> {
+  const startTime = Date.now();
+  console.log('[Gemini] 🎨 Attempt: Starting Imagen generation...');
 
   try {
     await credentialVault.ready;
     const credentials = credentialVault.getMetadata();
     
-    // ✅ ჯერ ვეძებთ სპეციალურად ფოტოსთვის შექმნილ გასაღებს
     let geminiCred = credentials.find(c => 
       c.provider === 'gemini' && 
       c.status === 'ACTIVE' && 
       c.name.toUpperCase().includes('IMAGE')
     );
 
-    // თუ "IMAGE" სახელის გასაღები არ ვიპოვეთ, ვიღებთ ნებისმიერ აქტიურ Gemini-ს
     if (!geminiCred) {
-      console.log('[ImageGenerator] ⚠️ Dedicated IMAGE key not found. Falling back to any active Gemini key.');
+      console.log('[Gemini] ⚠️ Dedicated IMAGE key not found. Falling back to any active Gemini key.');
       geminiCred = credentials.find(c => c.provider === 'gemini' && c.status === 'ACTIVE');
     }
     
-    if (!geminiCred) return null;
+    if (!geminiCred) {
+      return { success: false, provider: 'gemini', error: 'No active Gemini credential found', latency: Date.now() - startTime };
+    }
 
     const apiKey = credentialVault.getDecryptedValueForTesting(geminiCred.credential_id);
-    if (!apiKey) return null;
+    if (!apiKey) {
+      return { success: false, provider: 'gemini', error: 'Failed to decrypt Gemini API key', latency: Date.now() - startTime };
+    }
 
-    const modelName = geminiCred.metadata?.recommendedModel || 'gemini-2.5-flash-lite';
+    // ✅ დინამიური მოდელის არჩევა მეტამონაცემებიდან (არანაირი hardcoded მნიშვნელობა)
+    const modelName = getBestModel(geminiCred, ['imagen', 'image', 'generate']);
     
-    // ✅ გაუმჯობესებული Prompt: ვაიძულებთ LLM-ს, არ მოიგონოს არარსებული ვერსია
-    const discoveryPrompt = `What is the EXACT, currently available model name for Google's Imagen 3 image generation in the v1beta API? 
-    Reply with ONLY the model name (e.g., "imagen-3.0-generate-001" or "imagen-3.0-fast-generate-001"). 
-    Do NOT hallucinate version numbers like "002" if they are not officially released. If unsure, reply with "imagen-3.0-generate-001".`;
-
-    const response = await generateWithProvider('gemini', apiKey, modelName, discoveryPrompt, 'You are a helpful API assistant.');
-
-    if (response.success && response.content) {
-      const modelMatch = response.content.match(/imagen[-\w.]+/i);
-      if (modelMatch) {
-        const discoveredModel = modelMatch[0];
-        console.log(`[ImageGenerator] ✅ Discovered image model: ${discoveredModel}`);
-        cachedImageModel = discoveredModel;
-        cachedImageProvider = 'gemini';
-        return { model: discoveredModel, provider: 'gemini', apiKey };
-      }
+    if (!modelName) {
+      console.error('[Gemini] ❌ No model found in metadata. Please test the credential first to populate models.');
+      return { success: false, provider: 'gemini', error: 'No model discovered in metadata. Run test first.', latency: Date.now() - startTime };
     }
 
-    console.warn('[ImageGenerator] ⚠️ Could not discover model. Falling back to default: imagen-3.0-generate-001');
-    cachedImageModel = 'imagen-3.0-generate-001';
-    cachedImageProvider = 'gemini';
-    return { model: 'imagen-3.0-generate-001', provider: 'gemini', apiKey };
-  } catch (error) {
-    console.error('[ImageGenerator] ❌ Model discovery failed:', error);
-    return null;
-  }
-}
+    console.log(`[Gemini] 📡 Using dynamically discovered model: ${modelName}`);
 
-// ============================================================
-// 2. GEMINI IMAGEN (იყენებს დინამიურად აღმოჩენილ მოდელს)
-// ============================================================
-
-async function generateWithGemini(
-  options: ImageGenerationOptions,
-  attempt: number = 1
-): Promise<ImageGenerationResult> {
-  const startTime = Date.now();
-
-  try {
     const { visualPrompt, style = 'dark-luxury' } = options;
-    console.log(`[Gemini] 🎨 Attempt ${attempt}: Starting Imagen generation...`);
-
-    const modelInfo = await discoverImageModel();
-    if (!modelInfo) {
-      return { success: false, provider: 'gemini', error: 'Failed to discover image model or get API key', latency: Date.now() - startTime };
-    }
-
-    const { model, apiKey } = modelInfo;
-    console.log(`[Gemini] 📡 Using dynamically discovered model: ${model}`);
-
     const styleEnhancements: Record<string, string> = {
       'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, atmospheric, volumetric lighting, 8k resolution, masterpiece, photorealistic',
       'cosmic-editorial': 'cosmic editorial style, mystical atmosphere, deep navy and black tones, subtle celestial elements, magazine-quality composition, ethereal, 8k resolution, masterpiece, photorealistic',
@@ -135,7 +104,8 @@ async function generateWithGemini(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy, oversaturated';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -159,7 +129,7 @@ async function generateWithGemini(
         return generateWithGemini(options, attempt + 1);
       }
 
-      return { success: false, provider: 'gemini', model, error: errorMessage, latency: Date.now() - startTime };
+      return { success: false, provider: 'gemini', model: modelName, error: errorMessage, latency: Date.now() - startTime };
     }
 
     const data = await response.json();
@@ -171,11 +141,11 @@ async function generateWithGemini(
 
       return {
         success: true, imageBuffer, prompt: finalPrompt, provider: 'gemini',
-        model: model, hasWatermark: false, latency: Date.now() - startTime
+        model: modelName, hasWatermark: false, latency: Date.now() - startTime
       };
     }
 
-    return { success: false, provider: 'gemini', model, error: 'No image data in response', latency: Date.now() - startTime };
+    return { success: false, provider: 'gemini', model: modelName, error: 'No image data in response', latency: Date.now() - startTime };
   } catch (error) {
     console.error('[Gemini] ❌ Exception:', error);
     return { success: false, provider: 'gemini', error: error instanceof Error ? error.message : 'Unknown error', latency: Date.now() - startTime };
@@ -183,9 +153,8 @@ async function generateWithGemini(
 }
 
 // ============================================================
-// 3. HUGGING FACE SDXL (ახლა Vault-დან იღებს გასაღებს!)
+// 2. HUGGING FACE (მთლიანად დინამიური)
 // ============================================================
-
 async function generateWithHuggingFace(
   options: ImageGenerationOptions,
   attempt: number = 1
@@ -196,7 +165,6 @@ async function generateWithHuggingFace(
     await credentialVault.ready;
     const credentials = credentialVault.getMetadata();
     
-    // ✅ ახლა Vault-დან ვეძებთ Hugging Face-ის გასაღებს
     const hfCred = credentials.find(c => c.provider === 'huggingface' && c.status === 'ACTIVE');
     
     if (!hfCred) {
@@ -208,8 +176,16 @@ async function generateWithHuggingFace(
       return { success: false, provider: 'huggingface', error: 'Failed to decrypt Hugging Face token', latency: 0 };
     }
 
+    // ✅ დინამიური მოდელის არჩევა მეტამონაცემებიდან
+    const modelName = getBestModel(hfCred, ['stable-diffusion', 'sdxl', 'flux']);
+    
+    if (!modelName) {
+      console.error('[HuggingFace] ❌ No model found in metadata. Please test the credential first.');
+      return { success: false, provider: 'huggingface', error: 'No model discovered in metadata. Run test first.', latency: Date.now() - startTime };
+    }
+
     const { visualPrompt, style = 'dark-luxury' } = options;
-    console.log(`[HuggingFace] 🎨 Attempt ${attempt}: Starting SDXL generation...`);
+    console.log(`[HuggingFace] 🎨 Attempt ${attempt}: Starting generation with dynamic model: ${modelName}`);
 
     const styleEnhancements: Record<string, string> = {
       'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, atmospheric, volumetric lighting, 8k resolution, masterpiece, photorealistic',
@@ -220,7 +196,8 @@ async function generateWithHuggingFace(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    const apiUrl = `https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0`;
+    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
+    const apiUrl = `https://api-inference.huggingface.co/models/${modelName}`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -234,7 +211,7 @@ async function generateWithHuggingFace(
     console.log(`[HuggingFace] 📡 Response status: ${response.status}`);
 
     if (response.status === 503) {
-      console.log('[HuggingFace] ⏳ Model loading (Cold Start). Waiting 20 seconds...');
+      console.log(`[HuggingFace] ⏳ Model ${modelName} loading (Cold Start). Waiting 20 seconds...`);
       await new Promise(resolve => setTimeout(resolve, 20000));
       return generateWithHuggingFace(options, attempt + 1);
     }
@@ -246,7 +223,7 @@ async function generateWithHuggingFace(
         await new Promise(resolve => setTimeout(resolve, 3000));
         return generateWithHuggingFace(options, attempt + 1);
       }
-      return { success: false, provider: 'huggingface', error: `HTTP ${response.status}: ${errorText}`, latency: Date.now() - startTime };
+      return { success: false, provider: 'huggingface', model: modelName, error: `HTTP ${response.status}: ${errorText}`, latency: Date.now() - startTime };
     }
 
     const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -254,7 +231,7 @@ async function generateWithHuggingFace(
 
     return {
       success: true, imageBuffer, prompt: finalPrompt, provider: 'huggingface',
-      model: 'stable-diffusion-xl-base-1.0', hasWatermark: false, latency: Date.now() - startTime
+      model: modelName, hasWatermark: false, latency: Date.now() - startTime
     };
   } catch (error) {
     console.error('[HuggingFace] ❌ Exception:', error);
@@ -263,9 +240,8 @@ async function generateWithHuggingFace(
 }
 
 // ============================================================
-// 4. POLLINATIONS.AI (Last Resort)
+// 3. POLLINATIONS.AI (დინამიური, უკანასკნელი შანსი)
 // ============================================================
-
 async function generateWithPollinations(
   options: ImageGenerationOptions,
   attempt: number = 1
@@ -273,8 +249,17 @@ async function generateWithPollinations(
   const startTime = Date.now();
 
   try {
+    await credentialVault.ready;
+    const credentials = credentialVault.getMetadata();
+    
+    // ვცდილობთ ვიპოვოთ pollinations-ის კრედალი მეტამონაცემების წასაკითხად
+    const pollinationsCred = credentials.find(c => c.provider === 'pollinations' && c.status === 'ACTIVE');
+    
+    // ✅ დინამიური მოდელის არჩევა: თუ არის მეტამონაცემებში, ვიღებთ მას
+    const modelName = pollinationsCred ? getBestModel(pollinationsCred, ['flux', 'midjourney', 'stable-diffusion']) : 'flux';
+    
     const { visualPrompt, width = 1024, height = 1024, style = 'dark-luxury' } = options;
-    console.log(`[Pollinations] 🎨 Attempt ${attempt}: Starting generation (LAST RESORT)...`);
+    console.log(`[Pollinations] 🎨 Attempt ${attempt}: Starting generation with dynamic model: ${modelName} (LAST RESORT)...`);
 
     const styleEnhancements: Record<string, string> = {
       'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, no text, no watermarks, no logos',
@@ -287,7 +272,8 @@ async function generateWithPollinations(
     const encodedPrompt = encodeURIComponent(finalPrompt);
     const seed = Math.floor(Math.random() * 999999);
     
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&watermark=false&seed=${seed}&enhance=true&model=flux`;
+    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&watermark=false&seed=${seed}&enhance=true&model=${modelName}`;
 
     const response = await fetch(imageUrl, {
       method: 'GET',
@@ -301,7 +287,7 @@ async function generateWithPollinations(
       const errorText = await response.text().catch(() => 'Unknown error');
       console.error('[Pollinations] ❌ Error:', errorText);
       if (attempt < 2) return generateWithPollinations(options, attempt + 1);
-      return { success: false, provider: 'pollinations', error: `HTTP ${response.status}: ${errorText}`, latency: Date.now() - startTime };
+      return { success: false, provider: 'pollinations', model: modelName, error: `HTTP ${response.status}: ${errorText}`, latency: Date.now() - startTime };
     }
 
     const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -309,7 +295,7 @@ async function generateWithPollinations(
 
     return {
       success: true, imageUrl, imageBuffer, prompt: finalPrompt, provider: 'pollinations',
-      model: 'flux', hasWatermark: true, latency: Date.now() - startTime
+      model: modelName, hasWatermark: true, latency: Date.now() - startTime
     };
   } catch (error) {
     console.error('[Pollinations] ❌ Exception:', error);
@@ -320,12 +306,8 @@ async function generateWithPollinations(
 // ============================================================
 // WATERMARK COVER FUNCTION (Safe Fallback)
 // ============================================================
-
 async function applyLunaraWatermark(imageBuffer: Buffer): Promise<Buffer> {
   try {
-    console.log('[Watermark] ️ Applying Lunara watermark to cover existing...');
-    
-    // ✅ დაცვა: თუ სურათი ძალიან პატარაა (შეცდომის გვერდი), ვტოვებთ ორიგინალს
     if (imageBuffer.length < 50000) {
       console.warn('[Watermark] ⚠️ Image buffer too small (<50KB), skipping watermark to avoid corruption.');
       return imageBuffer;
@@ -347,19 +329,19 @@ async function applyLunaraWatermark(imageBuffer: Buffer): Promise<Buffer> {
     return result;
   } catch (error) {
     console.error('[Watermark] ❌ Failed to apply watermark (falling back to original):', error instanceof Error ? error.message : 'Unknown error');
-    return imageBuffer; // ✅ მნიშვნელოვანი: არ ვაჩერებთ მთლიან პაიპლაინს
+    return imageBuffer;
   }
 }
 
 // ============================================================
-// MAIN: Priority Chain
+// MAIN: Priority Chain (Dynamic)
 // ============================================================
-
 export async function generateImage(options: ImageGenerationOptions): Promise<ImageGenerationResult> {
-  console.log('[ImageGenerator] 🚀 Starting image generation pipeline with priority chain...');
+  console.log('[ImageGenerator] 🚀 Starting image generation pipeline with dynamic priority chain...');
   const pipelineStart = Date.now();
 
-  console.log('[ImageGenerator] 1️⃣ Trying Gemini (Dedicated IMAGE Key Priority)...');
+  // 1. Gemini (Dynamic Discovery)
+  console.log('[ImageGenerator] 1️⃣ Trying Gemini (Dynamic Model Discovery)...');
   const geminiResult = await generateWithGemini(options);
   if (geminiResult.success) {
     console.log(`[ImageGenerator] ✅ Gemini succeeded with model ${geminiResult.model} in ${geminiResult.latency}ms (NO WATERMARK)`);
@@ -367,19 +349,21 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   }
   console.warn(`[ImageGenerator] ⚠️ Gemini failed: ${geminiResult.error}. Moving to next provider...`);
 
-  console.log('[ImageGenerator] 2️⃣ Trying Hugging Face SDXL (from Vault)...');
+  // 2. Hugging Face (Dynamic from Vault)
+  console.log('[ImageGenerator] 2️⃣ Trying Hugging Face (Dynamic from Vault)...');
   const hfResult = await generateWithHuggingFace(options);
   if (hfResult.success) {
-    console.log(`[ImageGenerator] ✅ Hugging Face succeeded in ${hfResult.latency}ms (NO WATERMARK)`);
+    console.log(`[ImageGenerator] ✅ Hugging Face succeeded with model ${hfResult.model} in ${hfResult.latency}ms (NO WATERMARK)`);
     return hfResult;
   }
   console.warn(`[ImageGenerator] ⚠️ Hugging Face failed: ${hfResult.error}. Moving to last resort...`);
 
+  // 3. Pollinations (Dynamic from Vault or safe fallback)
   console.log('[ImageGenerator] 3️⃣ Trying Pollinations.ai (LAST RESORT - will attempt to cover watermark)...');
   const pollinationsResult = await generateWithPollinations(options);
   
   if (pollinationsResult.success) {
-    console.log(`[ImageGenerator] ⚠️ Pollinations succeeded in ${pollinationsResult.latency}ms. Attempting to cover watermark...`);
+    console.log(`[ImageGenerator] ⚠️ Pollinations succeeded with model ${pollinationsResult.model} in ${pollinationsResult.latency}ms. Attempting to cover watermark...`);
     const coveredImageBuffer = await applyLunaraWatermark(pollinationsResult.imageBuffer!);
     
     return {
