@@ -6,7 +6,7 @@
 
 import sharp from 'sharp';
 import { credentialVault } from '@/services/credentials/credential-vault';
-import { generateWithProvider } from '@/services/credentials/providers/adapter';
+// ✅ წაშლილია გამოუყენებელი generateWithProvider იმპორტი
 
 export interface ImageGenerationResult {
   success: boolean;
