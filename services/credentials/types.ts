@@ -3,19 +3,8 @@
 // Foundation: §21, §22, §40, §51
 // ============================================================
 
-export type Provider = 
-  | "openai" 
-  | "anthropic" 
-  | "telegram" 
-  | "supabase" 
-  | "cloudflare" 
-  | "deepseek"       // ✅ Muse/Nyx ტექსტის გენერაცია (უფასო tier)
-  | "groq"           // ✅ Ultra-fast LLM ინფერენსი (უფასო tier)
-  | "gemini"         // ✅ ახალი: Google AI Studio (ძალიან გულუხვი უფასო tier)
-  | "mistral"        // ✅ ახალი: Mistral AI (1000 req/day უფასო)
-  | "huggingface"    // ✅ ახალი: Hugging Face Inference API (უფასო)
-  | "together"       // ✅ ახალი: Together AI ($25 free credits)
-  | "custom";
+// ✅ განახლებული: ნებისმიერი სტრიქონი (string), რათა მომავალში კოდის შეცვლის გარეშე დაემატოს ახალი პროვაიდერები (მაგ: "kie", "stability", "midjourney")
+export type Provider = string;
 
 export type CredentialStatus = "ACTIVE" | "SUSPENDED" | "EXPIRED" | "REVOKED";
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
 import { testCredential } from '@/services/credentials/credential-tester';
-import type { Provider } from '@/services/credentials/types';
+import type { PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
   const [credentials, setCredentials] = useState<any[]>([]);
@@ -15,8 +15,9 @@ export function CredentialsPanel() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
-  const [newCredName, setNewCredName] = useState(''); // ✅ ახალი: სახელის ველი
-  const [newCredProvider, setNewCredProvider] = useState<Provider>('gemini');
+  const [newCredName, setNewCredName] = useState('');
+  const [newCredProvider, setNewCredProvider] = useState<string>(''); // ✅ ახლა არის string (თავისუფალი ტექსტი)
+  const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); // ✅ ახალი: Scope-ის არჩევანი
   const [newCredValue, setNewCredValue] = useState('');
   
   const [editCredId, setEditCredId] = useState<string | null>(null);
@@ -43,12 +44,23 @@ export function CredentialsPanel() {
   };
 
   const handleAddCredential = async () => {
-    if (!newCredValue) return;
+    if (!newCredValue || !newCredProvider) {
+      alert("გთხოვთ, მიუთითოთ როგორც პროვაიდერის სახელი, ასევე API გასაღები.");
+      return;
+    }
     try {
-      // ✅ გადავცემთ სახელს. თუ ცარიელია, სისტემა ავტომატურად შექმნის დეფოლტ სახელს
-      await credentialVault.addCredentialSimple(newCredProvider, newCredValue, "human_executive", newCredName || undefined);
+      // ✅ გადავცემთ სახელს და ხელით არჩეულ Scope-ს
+      await credentialVault.addCredentialSimple(
+        newCredProvider, 
+        newCredValue, 
+        "human_executive", 
+        newCredName || undefined,
+        newCredScope
+      );
       setNewCredValue('');
       setNewCredName('');
+      setNewCredProvider('');
+      setNewCredScope('spend');
       setShowAddModal(false);
       refreshData();
     } catch (error) {
@@ -150,45 +162,58 @@ export function CredentialsPanel() {
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
               
-              {/* ✅ ახალი ველი: Custom Name */}
+              {/* 1. Custom Name */}
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase">Custom Name (Recommended)</label>
+                <label className="text-xs font-bold text-slate-400 uppercase">Custom Name (Optional)</label>
                 <input 
                   type="text" 
                   value={newCredName}
                   onChange={(e) => setNewCredName(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="e.g., GEMINI IMAGE Key"
+                  placeholder="e.g., KIE AI Image Key"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">Leave blank for auto-generated name (e.g., "GEMINI Key")</p>
               </div>
 
+              {/* 2. Provider (თავისუფალი ტექსტი რეკომენდაციებით) */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
-                <select 
+                <input 
+                  list="provider-suggestions"
                   value={newCredProvider}
-                  onChange={(e) => setNewCredProvider(e.target.value as Provider)}
+                  onChange={(e) => setNewCredProvider(e.target.value.toLowerCase())}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  placeholder="Type or select (e.g., kie, gemini, openai)"
+                />
+                <datalist id="provider-suggestions">
+                  <option value="kie" />
+                  <option value="gemini" />
+                  <option value="huggingface" />
+                  <option value="groq" />
+                  <option value="deepseek" />
+                  <option value="openai" />
+                  <option value="mistral" />
+                  <option value="telegram" />
+                </datalist>
+                <p className="text-[10px] text-slate-500 mt-1">You can type any custom provider name.</p>
+              </div>
+
+              {/* 3. Permission Scope (ახალი!) */}
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
+                <select 
+                  value={newCredScope}
+                  onChange={(e) => setNewCredScope(e.target.value as PermissionScope)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
                 >
-                  <optgroup label="🧠 LLM Text Generation">
-                    <option value="gemini">Gemini (Google AI Studio)</option>
-                    <option value="deepseek">DeepSeek</option>
-                    <option value="groq">Groq</option>
-                    <option value="mistral">Mistral AI</option>
-                    <option value="huggingface">Hugging Face</option>
-                    <option value="together">Together AI</option>
-                  </optgroup>
-                  <optgroup label="💎 LLM Text Generation (Paid)">
-                    <option value="openai">OpenAI (GPT-4 / DALL-E)</option>
-                    <option value="anthropic">Anthropic (Claude)</option>
-                  </optgroup>
-                  <optgroup label="📡 Distribution & Storage">
-                    <option value="telegram">Telegram Bot API</option>
-                    <option value="supabase">Supabase OS</option>
-                    <option value="cloudflare">Cloudflare R2</option>
-                  </optgroup>
+                  <option value="spend">spend (LLMs, Image Generation APIs)</option>
+                  <option value="execute">execute (Inference / Processing APIs)</option>
+                  <option value="publish">publish (Telegram, Social Media)</option>
+                  <option value="write">write (Databases, Storage)</option>
+                  <option value="read">read (Read-only access)</option>
                 </select>
               </div>
+
+              {/* 4. API Key */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">API Key / Secret</label>
                 <input 
@@ -196,14 +221,17 @@ export function CredentialsPanel() {
                   value={newCredValue}
                   onChange={(e) => setNewCredValue(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="sk-... / gsk_... / AIza... / token / secret"
+                  placeholder="Paste your API key here..."
                 />
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => {
                     setShowAddModal(false);
                     setNewCredName('');
+                    setNewCredProvider('');
+                    setNewCredScope('spend');
                     setNewCredValue('');
                   }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
@@ -212,7 +240,7 @@ export function CredentialsPanel() {
                 </button>
                 <button 
                   onClick={handleAddCredential}
-                  disabled={!newCredValue}
+                  disabled={!newCredValue || !newCredProvider}
                   className="flex-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 py-2 text-sm font-bold text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50"
                 >
                   🔐 Save Encrypted
@@ -223,7 +251,7 @@ export function CredentialsPanel() {
         </div>
       )}
 
-      {/* Edit Credential Modal (უცვლელი) */}
+      {/* Edit Credential Modal */}
       {showEditModal && editCredId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
@@ -270,7 +298,7 @@ export function CredentialsPanel() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog (უცვლელი) */}
+      {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
@@ -303,7 +331,7 @@ export function CredentialsPanel() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Credentials List (უცვლელი) */}
+        {/* Credentials List */}
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
           <h3 className="text-lg font-bold text-white mb-4">Registered Credentials (Metadata Only)</h3>
           <div className="space-y-3">
@@ -425,7 +453,7 @@ export function CredentialsPanel() {
           </div>
         </div>
 
-        {/* Active Leases & Audit (უცვლელი) */}
+        {/* Active Leases & Audit */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
             <h3 className="text-lg font-bold text-white mb-4">Active Leases</h3>

@@ -17,13 +17,14 @@ const mockDecrypt = (encrypted: string) => {
   } catch { return encrypted; }
 };
 
-function determineScopeForProvider(provider: Provider): PermissionScope {
-  const scopeMap: Record<Provider, PermissionScope> = {
+// ✅ განახლებული: იღებს string-ს და აბრუნებს ნაგულისხმევ "spend"-ს უცნობი პროვაიდერებისთვის (მაგ: "kie")
+function determineScopeForProvider(provider: string): PermissionScope {
+  const scopeMap: Record<string, PermissionScope> = {
     openai: "spend", anthropic: "spend", deepseek: "spend", groq: "spend",
     gemini: "spend", mistral: "spend", huggingface: "execute", together: "spend",
-    telegram: "publish", supabase: "write", cloudflare: "write", custom: "read"
+    kie: "spend", telegram: "publish", supabase: "write", cloudflare: "write", custom: "read"
   };
-  return scopeMap[provider] || "read";
+  return scopeMap[provider.toLowerCase()] || "spend";
 }
 
 export class CredentialVault {
@@ -78,18 +79,19 @@ export class CredentialVault {
     if (this.auditLog.length > 100) this.auditLog.pop();
   }
 
-  // ✅ განახლებული: ახლა იღებს optional customName პარამეტრს
+  // ✅ განახლებული: იღებს optional customName და customScope პარამეტრებს UI-დან
   public async addCredentialSimple(
-    provider: Provider, 
+    provider: string, 
     plaintextValue: string, 
     owner: string = "human_executive",
-    customName?: string // <-- ახალი პარამეტრი
+    customName?: string,
+    customScope?: PermissionScope // <-- ახალი პარამეტრი
   ): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const scope = determineScopeForProvider(provider);
     
-    // ✅ თუ სახელი არ არის მითითებული, ვქმნით ავტომატურს (მაგ. "GEMINI Key")
+    // თუ Scope მოწოდებულია, გამოიყენე ის, თუ არა - სცადე ავტომატური განსაზღვრა
+    const scope = customScope || determineScopeForProvider(provider);
     const name = customName || `${provider.toUpperCase()} Key`;
 
     const { error } = await supabase.from('credentials').insert({
@@ -103,12 +105,20 @@ export class CredentialVault {
     }
 
     const newCred: Credential = {
-      credential_id: id, provider, name, encrypted_value: mockEncrypt(plaintextValue),
-      scope, status: "ACTIVE", owner, created_at: Date.now(), last_rotated_at: null, expires_at: null
+      credential_id: id, 
+      provider: provider as Provider, 
+      name, 
+      encrypted_value: mockEncrypt(plaintextValue),
+      scope, 
+      status: "ACTIVE", 
+      owner, 
+      created_at: Date.now(), 
+      last_rotated_at: null, 
+      expires_at: null
     };
     this.cache.set(id, newCred);
 
-    this.logAudit("created", owner, id, "success", `Added ${provider} credential (auto-scope: ${scope})`);
+    this.logAudit("created", owner, id, "success", `Added ${provider} credential (scope: ${scope})`);
     console.log(`[CredentialVault] ✅ Saved to DB & Cache: ${name} (${provider})`);
     return id;
   }
