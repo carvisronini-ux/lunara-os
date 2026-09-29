@@ -18,7 +18,7 @@ export interface CredentialTestResult {
 }
 
 export async function testCredential(credentialId: string): Promise<CredentialTestResult> {
-  // ✅ განახლება 1: ველოდებით მონაცემების წამოღებას Supabase-დან (ქეშიდან)
+  // ✅ ველოდებით მონაცემების წამოღებას Supabase-დან (ქეშიდან)
   const credentials = await credentialVault.getMetadata();
   const cred = credentials.find(c => c.credential_id === credentialId);
   
@@ -32,7 +32,7 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ✅ განახლება 2: ველოდებით გაშიფრული გასაღების მიღებას
+  // ✅ ველოდებით გაშიფრული გასაღების მიღებას
   const apiKey = await credentialVault.getDecryptedValueForTesting(credentialId);
   if (!apiKey) {
     return {
@@ -44,7 +44,62 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ვტესტავთ პროვაიდერს adapter-ის მეშვეობით
+  // ✅ ახალი: სპეციალური ტესტი KIE.ai-სთვის (რადგან ის OpenAI-ს თავსებადია)
+  if (cred.provider.toLowerCase() === 'kie') {
+    const startTime = Date.now();
+    try {
+      const response = await fetch('https://api.kie.ai/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // თუ მოდელების სია მოდის, ვიღებთ მას, თუ არა - ვუთითებთ საუკეთესოებს ხელით
+        const models = data.data ? data.data.map((m: any) => m.id) : ['flux', 'stable-diffusion-xl'];
+        const recommended = 'flux'; // KIE.ai-ს საუკეთესო უწყალსანიშნო მოდელი ფოტოსთვის
+
+        await credentialVault.updateCredentialMetadata(credentialId, {
+          models,
+          recommendedModel: recommended,
+          testSuccess: true,
+          testLatency: Date.now() - startTime
+        });
+
+        return {
+          success: true,
+          provider: cred.provider,
+          models,
+          recommendedModel: recommended,
+          latency: Date.now() - startTime
+        };
+      } else {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        return {
+          success: false,
+          provider: cred.provider,
+          models: [],
+          recommendedModel: '',
+          error: `HTTP ${response.status}: ${errorText}`,
+          latency: Date.now() - startTime
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        provider: cred.provider,
+        models: [],
+        recommendedModel: '',
+        error: error instanceof Error ? error.message : 'Unknown network error',
+        latency: Date.now() - startTime
+      };
+    }
+  }
+
+  // ✅ სტანდარტული ტესტირება სხვა პროვაიდერებისთვის (gemini, groq, და ა.შ.)
   const result = await testProvider(cred.provider, apiKey);
 
   const testResult: CredentialTestResult = {
@@ -56,7 +111,7 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     latency: result.latency
   };
 
-  // ✅ განახლება 3: ველოდებით მეტამონაცემების შენახვას Supabase-ში
+  // ✅ მეტამონაცემების შენახვა Supabase-ში (თუ ტესტი წარმატებულია)
   if (result.success) {
     await credentialVault.updateCredentialMetadata(credentialId, {
       models: result.models.map(m => m.id),
