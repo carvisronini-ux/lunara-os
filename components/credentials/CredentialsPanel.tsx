@@ -16,8 +16,8 @@ export function CredentialsPanel() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
   const [newCredName, setNewCredName] = useState('');
-  const [newCredProvider, setNewCredProvider] = useState<string>(''); // ✅ ახლა არის string (თავისუფალი ტექსტი)
-  const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); // ✅ ახალი: Scope-ის არჩევანი
+  const [newCredProvider, setNewCredProvider] = useState<string>(''); 
+  const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); 
   const [newCredValue, setNewCredValue] = useState('');
   
   const [editCredId, setEditCredId] = useState<string | null>(null);
@@ -29,7 +29,8 @@ export function CredentialsPanel() {
   useEffect(() => {
     const loadData = async () => {
       const creds = await credentialVault.getMetadata();
-      setCredentials(creds);
+      // ✅ მხოლოდ ACTIVE სტატუსის ჩანაწერების ჩვენება (წაშლილები დაიმალება)
+      setCredentials(creds.filter((c: any) => c.status === 'ACTIVE'));
       setLeases(accessManager.getActiveLeases());
       setAudit(credentialVault.getAuditLog(15));
     };
@@ -38,7 +39,8 @@ export function CredentialsPanel() {
 
   const refreshData = async () => {
     const creds = await credentialVault.getMetadata();
-    setCredentials(creds);
+    // ✅ მხოლოდ ACTIVE სტატუსის ჩანაწერების ჩვენება
+    setCredentials(creds.filter((c: any) => c.status === 'ACTIVE'));
     setLeases(accessManager.getActiveLeases());
     setAudit(credentialVault.getAuditLog(15));
   };
@@ -49,7 +51,6 @@ export function CredentialsPanel() {
       return;
     }
     try {
-      // ✅ გადავცემთ სახელს და ხელით არჩეულ Scope-ს
       await credentialVault.addCredentialSimple(
         newCredProvider, 
         newCredValue, 
@@ -93,7 +94,7 @@ export function CredentialsPanel() {
       );
       if (success) {
         setShowDeleteConfirm(null);
-        refreshData();
+        refreshData(); // ✅ ეს განაახლებს სიას და REVOKED ჩანაწერი გაქრება
       }
     } catch (error) {
       console.error("Failed to delete credential:", error);
@@ -197,7 +198,7 @@ export function CredentialsPanel() {
                 <p className="text-[10px] text-slate-500 mt-1">You can type any custom provider name.</p>
               </div>
 
-              {/* 3. Permission Scope (ახალი!) */}
+              {/* 3. Permission Scope */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
                 <select 
@@ -304,14 +305,8 @@ export function CredentialsPanel() {
           <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-xl font-black text-red-400 mb-2">⚠️ Delete Credential</h3>
             <p className="text-sm text-slate-300 mb-4">
-              Are you sure you want to delete this credential? This action will:
+              Are you sure you want to delete this credential? This action will permanently remove it from your active list.
             </p>
-            <ul className="text-xs text-slate-400 mb-6 space-y-1">
-              <li>• Set credential status to REVOKED</li>
-              <li>• Revoke all active access leases</li>
-              <li>• Record this action in the audit log</li>
-              <li>• Prevent any future API calls with this key</li>
-            </ul>
             <div className="flex gap-3">
               <button 
                 onClick={() => setShowDeleteConfirm(null)}
@@ -336,7 +331,7 @@ export function CredentialsPanel() {
           <h3 className="text-lg font-bold text-white mb-4">Registered Credentials (Metadata Only)</h3>
           <div className="space-y-3">
             {credentials.length === 0 ? (
-              <p className="text-slate-500 text-sm">No credentials registered yet. Add one to begin.</p>
+              <p className="text-slate-500 text-sm">No active credentials registered yet. Add one to begin.</p>
             ) : (
               credentials.map((cred: any) => {
                 const testResult = testResults[cred.credential_id];
@@ -399,7 +394,7 @@ export function CredentialsPanel() {
                             </div>
                             {testResult.recommendedModel && (
                               <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
-                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Free Model:</div>
+                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Model:</div>
                                 <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
                                 <div className="text-xs text-slate-500 mt-1">System will use this model automatically</div>
                               </div>
