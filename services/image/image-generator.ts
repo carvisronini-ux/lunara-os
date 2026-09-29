@@ -37,9 +37,9 @@ async function generateWithPollinations(
     const safePrompt = visualPrompt.length > 400 ? visualPrompt.substring(0, 400) + '...' : visualPrompt;
 
     const styleEnhancements: Record<string, string> = {
-      'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, no text, no watermarks',
-      'cosmic-editorial': 'cosmic editorial style, mystical atmosphere, deep navy and black tones, subtle celestial elements, magazine-quality composition, no text, no watermarks',
-      'mystic-minimal': 'mystic minimalism, clean composition, negative space, subtle glow, elegant simplicity, no text, no watermarks'
+      'dark-luxury': 'dark luxury aesthetic, moody cinematic lighting, deep blacks, subtle gold accents, editorial photography, high contrast, premium feel, no text, no watermarks, no logos',
+      'cosmic-editorial': 'cosmic editorial style, mystical atmosphere, deep navy and black tones, subtle celestial elements, magazine-quality composition, no text, no watermarks, no logos',
+      'mystic-minimal': 'mystic minimalism, clean composition, negative space, subtle glow, elegant simplicity, no text, no watermarks, no logos'
     };
 
     const finalPrompt = `${safePrompt}, ${styleEnhancements[style]}, professional photography, 8k resolution, ultra detailed`;
@@ -47,7 +47,13 @@ async function generateWithPollinations(
     
     // დავამატოთ random seed, რომ თავიდან ავიცილოთ ქეშირებული/შეცდომიანი პასუხები
     const seed = Math.floor(Math.random() * 999999);
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&seed=${seed}&enhance=true`;
+    
+    // ✅ წყალსანიშნის მოსაშლელი პარამეტრები:
+    // - nologo=true: ძველი პარამეტრი ლოგოს მოსაშლელად
+    // - watermark=false: ახალი პარამეტრი წყალსანიშნის მოსაშლელად
+    // - model=flux: უახლესი, უმაღლესი ხარისხის მოდელი (ნაკლებად ამატებს წყალსანიშნეს)
+    // - enhance=true: ავტომატური prompt გაუმჯობესება
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&watermark=false&seed=${seed}&enhance=true&model=flux`;
 
     console.log(`[ImageGenerator] 🌐 Fetching: ${imageUrl.substring(0, 120)}...`);
 
@@ -114,7 +120,7 @@ async function generateWithPollinations(
 export async function generateImage(
   options: ImageGenerationOptions
 ): Promise<ImageGenerationResult> {
-  console.log('[ImageGenerator] 🚀 Starting image generation pipeline...');
+  console.log('[ImageGenerator]  Starting image generation pipeline...');
   
   // 1. მთავარი პროვაიდერი: Pollinations.ai (ულიმიტო, უფასო)
   const pollinationsResult = await generateWithPollinations(options);

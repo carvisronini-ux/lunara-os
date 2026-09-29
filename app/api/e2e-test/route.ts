@@ -9,7 +9,7 @@ import { generateWithProvider } from '@/services/credentials/providers/adapter';
 import { sendTelegramMessage, sendTelegramPhoto } from '@/services/distribution/telegram';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { getInstruction } from '@/services/agents/agent-instructions';
-import { generateImage } from '@/services/image/image-generator'; // ✅ ახალი იმპორტი
+import { generateImage } from '@/services/image/image-generator';
 
 export interface E2ELog {
   step: number;
@@ -44,10 +44,32 @@ function extractVerdict(content: string): string {
   return verdictMatch ? verdictMatch[1].trim() : content.trim();
 }
 
-// ✅ Helper: ამოიღებს <visual_concept> block-ს Lumen-ისთვის
+// ✅ განახლებული Helper: უკეთესად ამოიღებს <visual_concept> block-ს Lumen-ისთვის
 function extractVisualConcept(content: string): string {
+  // 1. სცადე იდეალური მატჩი: <visual_concept> ... </visual_concept>
   const conceptMatch = content.match(/<visual_concept>([\s\S]*?)<\/visual_concept>/i);
-  return conceptMatch ? conceptMatch[1].trim() : content.trim();
+  if (conceptMatch && conceptMatch[1].trim().length > 0) {
+    console.log('[Route] ✅ Extracted visual_concept successfully');
+    return conceptMatch[1].trim();
+  }
+  
+  // 2. Fallback: თუ <visual_concept> არის, მაგრამ ცარიელი ან არ აქვს დამხურავი ტეგი
+  const conceptStartMatch = content.match(/<visual_concept>([\s\S]*)/i);
+  if (conceptStartMatch && conceptStartMatch[1].trim().length > 0) {
+    console.log('[Route] ️ Extracted visual_concept without closing tag');
+    return conceptStartMatch[1].trim();
+  }
+  
+  // 3. Fallback: ამოიღე ყველაფერი <thinking> ბლოკის დახურვის შემდეგ
+  const afterThinkingMatch = content.match(/<\/thinking>([\s\S]*)/i);
+  if (afterThinkingMatch && afterThinkingMatch[1].trim().length > 0) {
+    console.log('[Route] ⚠️ Fallback: extracted after </thinking>');
+    return afterThinkingMatch[1].trim();
+  }
+  
+  // 4. საბოლოო Fallback: დააბრუნე მთლიანი კონტენტი
+  console.warn('[Route] ⚠️ Could not extract visual_concept, returning full content');
+  return content.trim();
 }
 
 export async function POST(request: NextRequest) {
@@ -145,6 +167,8 @@ export async function POST(request: NextRequest) {
 
     const visualConcept = extractVisualConcept(lumenResponse.content);
     const lumenThinking = extractThinking(lumenResponse.content);
+
+    console.log('[Route] 🎨 Lumen visual concept:', visualConcept.substring(0, 150) + '...');
 
     // სურათის რეალური გენერაცია
     const imageResult = await generateImage({
