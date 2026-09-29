@@ -44,13 +44,16 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
     };
   }
 
-  // ✅ ახალი: სპეციალური ტესტი Cloudflare-ისთვის
+  // ✅ განახლებული: უფრო სანდო ტესტი Cloudflare-ისთვის (ანგარიშის შემოწმება)
   if (cred.provider.toLowerCase() === 'cloudflare') {
     const startTime = Date.now();
-    const accountId = 'b41cb921e1b841685c0f5d364f661fbe';
+    const accountId = 'b41cb921e1b841685c0f5d364f661fbe'; // შენი Account ID
     
     try {
-      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`, {
+      console.log(`[Cloudflare Test] Testing Account ID: ${accountId}`);
+      
+      // ვამოწმებთ ანგარიშის დეტალებს. ეს ყველაზე სანდო გზაა Token-ის ვალიდურობის შესამოწმებლად.
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -59,6 +62,10 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
       });
 
       if (response.ok) {
+        const data = await response.json();
+        console.log(`[Cloudflare Test] ✅ Success! Account verified: ${data.result?.name || 'Unknown'}`);
+        
+        // Cloudflare Workers AI-ს აქვს ეს მოდელები ნაგულისხმევად (უფასო დონეზე)
         const models = ['@cf/stabilityai/stable-diffusion-xl-base-1.0', '@cf/black-forest-labs/flux-1-schnell'];
         const recommended = '@cf/stabilityai/stable-diffusion-xl-base-1.0';
 
@@ -77,23 +84,25 @@ export async function testCredential(credentialId: string): Promise<CredentialTe
           latency: Date.now() - startTime
         };
       } else {
-        const errorText = await response.text().catch(() => 'Unknown error');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.errors?.[0]?.message || response.statusText;
         return {
           success: false,
           provider: cred.provider,
           models: [],
           recommendedModel: '',
-          error: `Invalid API key or Account ID (HTTP ${response.status}): ${errorText}`,
+          error: `Invalid API key or Account ID (HTTP ${response.status}): ${errorMessage}`,
           latency: Date.now() - startTime
         };
       }
     } catch (error) {
+      console.error('[Cloudflare Test] Network Error:', error);
       return {
         success: false,
         provider: cred.provider,
         models: [],
         recommendedModel: '',
-        error: error instanceof Error ? error.message : 'Unknown network error',
+        error: `Network error: ${error instanceof Error ? error.message : 'Unknown'}. Check your internet connection.`,
         latency: Date.now() - startTime
       };
     }
