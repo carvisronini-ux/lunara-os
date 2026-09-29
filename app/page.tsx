@@ -77,74 +77,6 @@ type EmergencyState = {
   accessRevoked: boolean;
 };
 
-type TelegramChannelData = {
-  name: string;
-  username: string;
-  networkId: string;
-  status: string;
-  positioning: string;
-  taglines: string;
-  mission: string;
-  internalMission: string;
-  pillars: { title: string; percent: string }[];
-  signatureSeries: string;
-  growthStrategies: { title: string; desc: string }[];
-  phases: { phase: string; goal: string; tasks: string }[];
-  kpis: { label: string; target: string }[];
-  checklist: { label: string; checked: boolean }[];
-};
-
-const initialTelegramData: TelegramChannelData = {
-  name: "LUNARA",
-  username: "@lunaraOS",
-  networkId: "LUNARA-MEDIA-001",
-  status: "Active — Early Stage",
-  positioning: "LUNARA — Tarot & Astrology",
-  taglines: `"Your daily cosmic signal."\n"Don't just read your horoscope. Discover your signal."`,
-  mission: "Build a recognizable, psychologically relevant and shareable media destination around cosmic wisdom, tarot and astrology; earn attention through useful, emotionally precise and curiosity-driven content; create recurring audience habits; and build a measurable bridge into the wider Lunara ecosystem.",
-  internalMission: "WIN ATTENTION WITHOUT SACRIFICING TRUST → BUILD HABIT WITHOUT MANUFACTURING DEPENDENCE → TURN VALIDATED INSIGHT INTO SUSTAINABLE GROWTH.",
-  pillars: [
-    { title: "Love / Relationships", percent: "30%" },
-    { title: "Tarot", percent: "20%" },
-    { title: "Astrology", percent: "15%" },
-    { title: "Daily Cosmic", percent: "15%" },
-    { title: "Mystery", percent: "10%" },
-    { title: "Education", percent: "10%" },
-  ],
-  signatureSeries: "THE LUNARA SIGNAL, LUNARA LOVE SIGNAL, ZODIAC UNLOCKED, LUNARA AFTER DARK, LUNARA 24, LUNARA WEEKLY READING",
-  growthStrategies: [
-    { title: "1. Similar Channels Optimization", desc: "Identify 10-20 successful channels, create similar original content, cross-promote to appear in their 'Similar Channels'." },
-    { title: "2. Cross-Promotion Network", desc: "Direct channel-to-channel promotion with 5-10 channels of similar size. Track joins per promotion." },
-    { title: "3. Forward Incentive", desc: "Reward users for forwarding content (e.g., 'Forward to 3 friends and DM for exclusive reading')." },
-    { title: "4. Comment Engagement Loop", desc: "End every post with a question, respond to all comments in first 2 hours, pin best comments." },
-    { title: "5. First 50 Founders", desc: "Offer exclusive benefits (founding status, free premium reading) to the first 50 subscribers to build a loyal core." },
-    { title: "6. Analytics-Driven Iteration", desc: "Track every post's performance. Identify top 20% performers and double down on what works." },
-  ],
-  phases: [
-    { phase: "PHASE 1: FOUNDATION (Days 1-30)", goal: "0 → 500 subscribers", tasks: "Launch with 7 strong posts, engage comments, first cross-promotion (5 channels), analyze top performers." },
-    { phase: "PHASE 2: MOMENTUM (Days 31-60)", goal: "500 → 2,000 subscribers", tasks: "Scale cross-promotion (10 channels), launch 'First 50 Founders', create first viral experiment." },
-    { phase: "PHASE 3: ACCELERATION (Days 61-90)", goal: "2,000 → 10,000 subscribers", tasks: "Double down on winning content, launch daily signature series, first paid promotion test." },
-  ],
-  kpis: [
-    { label: "Reach / Subscriber", target: "> 50%" },
-    { label: "Forwards / Post", target: "> 30" },
-    { label: "Join Rate", target: "> 5% of views" },
-    { label: "D7 Retention", target: "> 60%" },
-  ],
-  checklist: [
-    { label: "Channel created with optimized name/username", checked: true },
-    { label: "Avatar uploaded (mascot logo style)", checked: true },
-    { label: "Description written (255 chars, keyword-rich)", checked: true },
-    { label: "Pinned post created (welcome + value prop)", checked: true },
-    { label: "First 7 posts created and scheduled", checked: true },
-    { label: "Post 1-2 times (consistent times)", checked: true },
-    { label: "Respond to all comments (first 2 hours)", checked: true },
-    { label: "Track metrics (views, forwards, joins)", checked: true },
-    { label: "Weekly review (top 3 posts, patterns)", checked: true },
-    { label: "Cross-promote with 2-3 new channels", checked: true },
-  ],
-};
-
 const departments: Department[] = [
   { id: "executive", name: "აღმასრულებელი ცენტრი", icon: "👑", color: "#8b5cf6", description: "სტრატეგია და კოორდინაცია" },
   { id: "intelligence", name: "დაზვერვა", icon: "🔍", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
@@ -343,10 +275,8 @@ export default function HomePage() {
     accessRevoked: false,
   });
 
-  // ✅ ახალი სტეიტები დინამიური დოკუმენტაციისთვის
-  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  // ✅ მხოლოდ დოკუმენტაციის მოდალის სტეიტები
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
-  const [telegramChannelData, setTelegramChannelData] = useState<TelegramChannelData>(initialTelegramData);
   const [documentationContent, setDocumentationContent] = useState('');
   const [isDocLoading, setIsDocLoading] = useState(false);
   
@@ -516,7 +446,6 @@ export default function HomePage() {
     };
   }, [emergencyState.allAgentsPaused]);
 
-  // ✅ დინამიურად წაკითხვა დოკუმენტაციის ფაილიდან, როცა მოდალი იხსნება
   useEffect(() => {
     if (isDocModalOpen && !documentationContent) {
       setIsDocLoading(true);
@@ -639,7 +568,6 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
     pushEvent("emergency", "🔐 დროებითი წვდომა გააუქმა ადამიანმა აღმასრულებელმა");
   };
 
-  // ✅ დოკუმენტაციის შენახვის ფუნქცია
   const saveDocumentation = async () => {
     try {
       const res = await fetch('/api/docs', {
@@ -1202,12 +1130,33 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
           )}
 
+          {/* ✅ განახლებული Telegram პანელი: მხოლოდ ბანერი და 2 ბეიჯი */}
           {activePanel === "telegram" && (
             <div className="max-w-4xl mx-auto pb-12 flex flex-col items-center justify-center min-h-[60vh]">
               <div 
-                onClick={() => setIsTelegramModalOpen(true)}
+                onClick={() => setIsDocModalOpen(true)}
                 className="group relative w-full max-w-3xl h-72 md:h-96 rounded-3xl border border-sky-500/30 bg-gradient-to-br from-[#08070D] via-[#171127] to-[#0f0a1a] overflow-hidden cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:border-sky-400/60 hover:shadow-[0_0_80px_rgba(56,189,248,0.2)]"
               >
+                {/* Top Right Badges */}
+                <div className="absolute top-4 right-4 flex gap-2 z-20">
+                  <a 
+                    href="https://t.me/lunaraOS" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-2 rounded-full bg-sky-500/20 border border-sky-500/40 px-4 py-2 text-sky-300 text-sm font-bold backdrop-blur-md hover:bg-sky-500/30 transition-all"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.623 4.823-4.351c.192-.192-.054-.3-.297-.108l-5.965 3.759-2.568-.802c-.56-.176-.57-.56.117-.828l10.037-3.869c.466-.174.875.108.713.828z"/></svg>
+                    Open Channel
+                  </a>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setIsDocModalOpen(true); }}
+                    className="flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-4 py-2 text-white text-sm font-bold backdrop-blur-md hover:bg-white/20 transition-all"
+                  >
+                    📄 Documentation
+                  </button>
+                </div>
+
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-900/20 via-transparent to-transparent" />
                 <div className="absolute top-0 right-0 w-96 h-96 bg-purple-600/10 rounded-full blur-3xl group-hover:bg-purple-600/20 transition-all duration-700" />
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-600/10 rounded-full blur-3xl group-hover:bg-sky-600/20 transition-all duration-700" />
@@ -1216,7 +1165,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                 <div className="relative z-10 flex flex-col items-center justify-center h-full text-center p-8">
                   <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-sky-500/10 border border-sky-500/30 px-4 py-1.5 text-sky-300 text-sm font-bold backdrop-blur-sm group-hover:bg-sky-500/20 transition-colors">
                     <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                    CLICK TO EDIT CHANNEL DATA
+                    CLICK TO VIEW DOCUMENTATION
                   </div>
                   <h2 className="text-5xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-400 mb-3 drop-shadow-2xl">
                     LUNARA
@@ -1225,7 +1174,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                     Your daily cosmic signal. Discover the hidden geometry of the cosmos.
                   </p>
                   <div className="flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 px-6 py-3 text-white font-bold backdrop-blur-md group-hover:bg-sky-500/20 group-hover:border-sky-500/40 group-hover:text-sky-300 transition-all duration-300">
-                    <span>Open Channel Settings</span>
+                    <span>📄 View Full Documentation</span>
                     <svg className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </div>
                 </div>
@@ -1331,237 +1280,6 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
           </div>
         </aside>
       </div>
-
-      {/* ✅ Telegram Channel Configuration Modal */}
-      {isTelegramModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setIsTelegramModalOpen(false)}>
-          <div className="relative w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-slate-900/50">
-              <div>
-                <h2 className="text-2xl font-black text-white flex items-center gap-2">
-                  📱 Telegram Channel Configuration
-                </h2>
-                <p className="text-sm text-slate-400">Edit and manage your channel's strategic data</p>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => { setIsTelegramModalOpen(false); setIsDocModalOpen(true); }}
-                  className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-sm"
-                >
-                   📄 View Full Documentation
-                </button>
-                <button onClick={() => setIsTelegramModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📌 1. CHANNEL IDENTITY & BRANDING</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField label="Channel Name" value={telegramChannelData.name} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, name: v }))} />
-                  <InputField label="Username" value={telegramChannelData.username} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, username: v }))} />
-                  <InputField label="Network ID" value={telegramChannelData.networkId} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, networkId: v }))} />
-                  <InputField label="Status" value={telegramChannelData.status} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, status: v }))} />
-                </div>
-                <div className="mt-4">
-                  <label className="text-xs font-bold text-slate-400 mb-1 block">Brand Positioning</label>
-                  <textarea 
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
-                    rows={2} 
-                    value={telegramChannelData.positioning}
-                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, positioning: e.target.value }))}
-                  />
-                </div>
-                <div className="mt-4">
-                  <label className="text-xs font-bold text-slate-400 mb-1 block">Taglines (one per line)</label>
-                  <textarea 
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
-                    rows={2}
-                    value={telegramChannelData.taglines}
-                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, taglines: e.target.value }))}
-                  />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">🎯 2. MISSION & VISION</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-400 mb-1 block">Primary Mission</label>
-                    <textarea 
-                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
-                      rows={3}
-                      value={telegramChannelData.mission}
-                      onChange={(e) => setTelegramChannelData(prev => ({ ...prev, mission: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-400 mb-1 block">Internal Mission</label>
-                    <textarea 
-                      className="w-full bg-sky-500/10 border border-sky-500/20 rounded-xl p-3 text-sm text-sky-300 font-bold focus:border-sky-500/50 focus:outline-none transition-colors" 
-                      rows={2}
-                      value={telegramChannelData.internalMission}
-                      onChange={(e) => setTelegramChannelData(prev => ({ ...prev, internalMission: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📝 3. CONTENT STRATEGY & PILLARS</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                  {telegramChannelData.pillars.map((pillar, idx) => (
-                    <PillarInput 
-                      key={idx}
-                      title={pillar.title} 
-                      percent={pillar.percent}
-                      onChangePercent={(v) => {
-                        const newPillars = [...telegramChannelData.pillars];
-                        newPillars[idx] = { ...newPillars[idx], percent: v };
-                        setTelegramChannelData(prev => ({ ...prev, pillars: newPillars }));
-                      }}
-                    />
-                  ))}
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-400 mb-1 block">Signature Series (comma separated)</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
-                    value={telegramChannelData.signatureSeries}
-                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, signatureSeries: e.target.value }))}
-                  />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📈 4. GROWTH STRATEGY & PLAYBOOK</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {telegramChannelData.growthStrategies.map((strategy, idx) => (
-                    <GrowthInput 
-                      key={idx}
-                      title={strategy.title} 
-                      desc={strategy.desc}
-                      onChangeDesc={(v) => {
-                        const newStrategies = [...telegramChannelData.growthStrategies];
-                        newStrategies[idx] = { ...newStrategies[idx], desc: v };
-                        setTelegramChannelData(prev => ({ ...prev, growthStrategies: newStrategies }));
-                      }}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">🗓️ 5. 90-DAY GROWTH PLAN</h3>
-                <div className="space-y-4">
-                  {telegramChannelData.phases.map((phase, idx) => (
-                    <PhaseInput 
-                      key={idx}
-                      phase={phase.phase} 
-                      goal={phase.goal} 
-                      tasks={phase.tasks}
-                      onChangeGoal={(v) => {
-                        const newPhases = [...telegramChannelData.phases];
-                        newPhases[idx] = { ...newPhases[idx], goal: v };
-                        setTelegramChannelData(prev => ({ ...prev, phases: newPhases }));
-                      }}
-                      onChangeTasks={(v) => {
-                        const newPhases = [...telegramChannelData.phases];
-                        newPhases[idx] = { ...newPhases[idx], tasks: v };
-                        setTelegramChannelData(prev => ({ ...prev, phases: newPhases }));
-                      }}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📊 6. KEY PERFORMANCE INDICATORS (KPIs)</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  {telegramChannelData.kpis.map((kpi, idx) => (
-                    <KpiInput 
-                      key={idx}
-                      label={kpi.label} 
-                      target={kpi.target}
-                      onChangeTarget={(v) => {
-                        const newKpis = [...telegramChannelData.kpis];
-                        newKpis[idx] = { ...newKpis[idx], target: v };
-                        setTelegramChannelData(prev => ({ ...prev, kpis: newKpis }));
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4">
-                  <p className="text-red-300 text-sm font-bold text-center">⚠️ KPI Principle: No single metric defines success. Optimize the whole chain (Views → Joins → Retention → Conversion).</p>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">✅ 7. IMPLEMENTATION CHECKLIST</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-bold text-white mb-3 text-sm">Week 1 Setup</h4>
-                    <ul className="space-y-3">
-                      {telegramChannelData.checklist.slice(0, 5).map((item, idx) => (
-                        <CheckItem 
-                          key={idx}
-                          label={item.label} 
-                          checked={item.checked}
-                          onChange={() => {
-                            const newChecklist = [...telegramChannelData.checklist];
-                            newChecklist[idx] = { ...newChecklist[idx], checked: !newChecklist[idx].checked };
-                            setTelegramChannelData(prev => ({ ...prev, checklist: newChecklist }));
-                          }}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white mb-3 text-sm">Daily & Weekly Tasks</h4>
-                    <ul className="space-y-3">
-                      {telegramChannelData.checklist.slice(5, 10).map((item, idx) => (
-                        <CheckItem 
-                          key={idx + 5}
-                          label={item.label} 
-                          checked={item.checked}
-                          onChange={() => {
-                            const newChecklist = [...telegramChannelData.checklist];
-                            newChecklist[idx + 5] = { ...newChecklist[idx + 5], checked: !newChecklist[idx + 5].checked };
-                            setTelegramChannelData(prev => ({ ...prev, checklist: newChecklist }));
-                          }}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <div className="p-6 border-t border-white/10 bg-slate-900/50 flex items-center justify-between">
-              <button 
-                onClick={() => window.open('https://t.me/lunaraOS', '_blank')}
-                className="flex items-center gap-2 rounded-xl bg-sky-500/20 border border-sky-500/40 px-5 py-3 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors"
-              >
-                <span>Visit @lunaraOS</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              </button>
-              <button 
-                onClick={() => {
-                  console.log('💾 Saved Telegram Channel Data:', telegramChannelData);
-                  pushEvent("system", "💾 Telegram channel configuration saved successfully");
-                  setIsTelegramModalOpen(false);
-                }}
-                className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 px-6 py-3 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-colors"
-              >
-                💾 Save Configuration
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ✅ Full Documentation Modal (Dynamic from file) */}
       {isDocModalOpen && (
@@ -1708,96 +1426,6 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1) !important; border-radius: 3px !important; }
       `}</style>
     </main>
-  );
-}
-
-// ✅ განახლებული ჰელფერ კომპონენტები რეალური onChange-ით
-function InputField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <div>
-      <label className="text-xs font-bold text-slate-400 mb-1 block">{label}</label>
-      <input 
-        type="text" 
-        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-      />
-    </div>
-  );
-}
-
-function PillarInput({ title, percent, onChangePercent }: { title: string; percent: string; onChangePercent: (v: string) => void }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
-      <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{title}</div>
-      <input 
-        type="text" 
-        className="w-full bg-transparent text-center text-xl font-black text-sky-400 focus:outline-none" 
-        value={percent}
-        onChange={(e) => onChangePercent(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function GrowthInput({ title, desc, onChangeDesc }: { title: string; desc: string; onChangeDesc: (v: string) => void }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <h4 className="text-sm font-black text-sky-300 mb-2">{title}</h4>
-      <textarea 
-        className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" 
-        rows={3} 
-        value={desc}
-        onChange={(e) => onChangeDesc(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function PhaseInput({ phase, goal, tasks, onChangeGoal, onChangeTasks }: { phase: string; goal: string; tasks: string; onChangeGoal: (v: string) => void; onChangeTasks: (v: string) => void }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <div className="flex items-center justify-between mb-2">
-        <h4 className="text-sm font-black text-white">{phase}</h4>
-        <input 
-          type="text" 
-          className="bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1 text-xs font-bold text-emerald-400 focus:outline-none w-32 text-right" 
-          value={goal}
-          onChange={(e) => onChangeGoal(e.target.value)}
-        />
-      </div>
-      <textarea 
-        className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" 
-        rows={2} 
-        value={tasks}
-        onChange={(e) => onChangeTasks(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function KpiInput({ label, target, onChangeTarget }: { label: string; target: string; onChangeTarget: (v: string) => void }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
-      <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{label}</div>
-      <input 
-        type="text" 
-        className="w-full bg-transparent text-center text-lg font-black text-sky-400 focus:outline-none" 
-        value={target}
-        onChange={(e) => onChangeTarget(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function CheckItem({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return (
-    <li className="flex items-start gap-3 cursor-pointer group" onClick={onChange}>
-      <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${checked ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-white/5 border-white/20 text-transparent group-hover:border-white/40'}`}>
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-      </div>
-      <span className={`text-sm transition-colors ${checked ? 'text-slate-300 line-through opacity-60' : 'text-slate-400 group-hover:text-slate-300'}`}>{label}</span>
-    </li>
   );
 }
 
