@@ -77,11 +77,80 @@ type EmergencyState = {
   accessRevoked: boolean;
 };
 
+// ✅ Telegram არხის მონაცემების სტრუქტურა
+type TelegramChannelData = {
+  name: string;
+  username: string;
+  networkId: string;
+  status: string;
+  positioning: string;
+  taglines: string;
+  mission: string;
+  internalMission: string;
+  pillars: { title: string; percent: string }[];
+  signatureSeries: string;
+  growthStrategies: { title: string; desc: string }[];
+  phases: { phase: string; goal: string; tasks: string }[];
+  kpis: { label: string; target: string }[];
+  checklist: { label: string; checked: boolean }[];
+};
+
+const initialTelegramData: TelegramChannelData = {
+  name: "LUNARA",
+  username: "@lunaraOS",
+  networkId: "LUNARA-MEDIA-001",
+  status: "Active — Early Stage",
+  positioning: "LUNARA — Tarot & Astrology",
+  taglines: `"Your daily cosmic signal."\n"Don't just read your horoscope. Discover your signal."`,
+  mission: "Build a recognizable, psychologically relevant and shareable media destination around cosmic wisdom, tarot and astrology; earn attention through useful, emotionally precise and curiosity-driven content; create recurring audience habits; and build a measurable bridge into the wider Lunara ecosystem.",
+  internalMission: "WIN ATTENTION WITHOUT SACRIFICING TRUST → BUILD HABIT WITHOUT MANUFACTURING DEPENDENCE → TURN VALIDATED INSIGHT INTO SUSTAINABLE GROWTH.",
+  pillars: [
+    { title: "Love / Relationships", percent: "30%" },
+    { title: "Tarot", percent: "20%" },
+    { title: "Astrology", percent: "15%" },
+    { title: "Daily Cosmic", percent: "15%" },
+    { title: "Mystery", percent: "10%" },
+    { title: "Education", percent: "10%" },
+  ],
+  signatureSeries: "THE LUNARA SIGNAL, LUNARA LOVE SIGNAL, ZODIAC UNLOCKED, LUNARA AFTER DARK, LUNARA 24, LUNARA WEEKLY READING",
+  growthStrategies: [
+    { title: "1. Similar Channels Optimization", desc: "Identify 10-20 successful channels, create similar original content, cross-promote to appear in their 'Similar Channels'." },
+    { title: "2. Cross-Promotion Network", desc: "Direct channel-to-channel promotion with 5-10 channels of similar size. Track joins per promotion." },
+    { title: "3. Forward Incentive", desc: "Reward users for forwarding content (e.g., 'Forward to 3 friends and DM for exclusive reading')." },
+    { title: "4. Comment Engagement Loop", desc: "End every post with a question, respond to all comments in first 2 hours, pin best comments." },
+    { title: "5. First 50 Founders", desc: "Offer exclusive benefits (founding status, free premium reading) to the first 50 subscribers to build a loyal core." },
+    { title: "6. Analytics-Driven Iteration", desc: "Track every post's performance. Identify top 20% performers and double down on what works." },
+  ],
+  phases: [
+    { phase: "PHASE 1: FOUNDATION (Days 1-30)", goal: "0 → 500 subscribers", tasks: "Launch with 7 strong posts, engage comments, first cross-promotion (5 channels), analyze top performers." },
+    { phase: "PHASE 2: MOMENTUM (Days 31-60)", goal: "500 → 2,000 subscribers", tasks: "Scale cross-promotion (10 channels), launch 'First 50 Founders', create first viral experiment." },
+    { phase: "PHASE 3: ACCELERATION (Days 61-90)", goal: "2,000 → 10,000 subscribers", tasks: "Double down on winning content, launch daily signature series, first paid promotion test." },
+  ],
+  kpis: [
+    { label: "Reach / Subscriber", target: "> 50%" },
+    { label: "Forwards / Post", target: "> 30" },
+    { label: "Join Rate", target: "> 5% of views" },
+    { label: "D7 Retention", target: "> 60%" },
+  ],
+  checklist: [
+    { label: "Channel created with optimized name/username", checked: true },
+    { label: "Avatar uploaded (mascot logo style)", checked: true },
+    { label: "Description written (255 chars, keyword-rich)", checked: true },
+    { label: "Pinned post created (welcome + value prop)", checked: true },
+    { label: "First 7 posts created and scheduled", checked: true },
+    { label: "Post 1-2 times (consistent times)", checked: true },
+    { label: "Respond to all comments (first 2 hours)", checked: true },
+    { label: "Track metrics (views, forwards, joins)", checked: true },
+    { label: "Weekly review (top 3 posts, patterns)", checked: true },
+    { label: "Cross-promote with 2-3 new channels", checked: true },
+  ],
+};
+
 const departments: Department[] = [
   { id: "executive", name: "აღმასრულებელი ცენტრი", icon: "👑", color: "#8b5cf6", description: "სტრატეგია და კოორდინაცია" },
-  { id: "intelligence", name: "დაზვერვა", icon: "🔍", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
+  { id: "intelligence", name: "დაზვერვა", icon: "", color: "#3b82f6", description: "ტრენდების და ბაზრის კვლევა" },
   { id: "strategy", name: "სტრატეგია", icon: "🎯", color: "#a855f7", description: "დაგეგმვა და გადაწყვეტილებები" },
-  { id: "content", name: "კონტენტი", icon: "✍️", color: "#f59e0b", description: "სცენარები და ტექსტები" },
+  { id: "content", name: "კონტენტი", icon: "️", color: "#f59e0b", description: "სცენარები და ტექსტები" },
   { id: "creative", name: "კრეატივი", icon: "🎨", color: "#ec4899", description: "ვიზუალური მიმართულება" },
   { id: "production", name: "წარმოება", icon: "🎬", color: "#ef4444", description: "აქტივების გენერაცია" },
   { id: "resources", name: "რესურსები", icon: "🔐", color: "#10b981", description: "მონაცემები და წვდომა" },
@@ -95,15 +164,15 @@ const initialAgents: Agent[] = [
   { id: "astra", name: "Astra", role: "აღმასრულებელი კოორდინატორი", department: "executive", level: 7, xp: 742, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#8b5cf6", icon: "👑", missionsCompleted: 24, autonomyLevel: 4, currentTask: "სისტემის პრიორიტეტების მონიტორინგი" },
   { id: "nyx", name: "Nyx", role: "ტრენდების დაზვერვა", department: "intelligence", level: 5, xp: 516, xpToNext: 1000, status: "WORKING", taskId: "task-001", accent: "#3b82f6", icon: "🔍", missionsCompleted: 18, autonomyLevel: 3, currentTask: "TikTok-ის ტრენდების ანალიზი" },
   { id: "orion", name: "Orion", role: "კონკურენტების დაზვერვა", department: "intelligence", level: 4, xp: 384, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#6366f1", icon: "👁️", missionsCompleted: 12, autonomyLevel: 3, currentTask: "დანაწილების მოლოდინში" },
-  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "WAITING_FOR_REVIEW", taskId: "task-002", accent: "#a855f7", icon: "🎯", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
+  { id: "sage", name: "Sage", role: "მთავარი სტრატეგი", department: "strategy", level: 6, xp: 628, xpToNext: 1000, status: "WAITING_FOR_REVIEW", taskId: "task-002", accent: "#a855f7", icon: "", missionsCompleted: 20, autonomyLevel: 3, currentTask: "სტრატეგიის წინადადება დამტკიცების მოლოდინში" },
   { id: "muse", name: "Muse", role: "კონტენტის ხელმძღვანელი", department: "content", level: 5, xp: 492, xpToNext: 1000, status: "WORKING", taskId: "task-003", accent: "#f59e0b", icon: "✍️", missionsCompleted: 15, autonomyLevel: 3, currentTask: "3 სცენარის ვარიანტის წერა" },
   { id: "vega", name: "Vega", role: "კრეატიული დირექტორი", department: "creative", level: 6, xp: 584, xpToNext: 1000, status: "WAITING", taskId: "task-004", accent: "#ec4899", icon: "🎨", missionsCompleted: 18, autonomyLevel: 3, currentTask: "სცენარის დამტკიცების მოლოდინში" },
   { id: "atlas", name: "Atlas", role: "რესურსების დირექტორი", department: "resources", level: 7, xp: 712, xpToNext: 1000, status: "WORKING", taskId: "task-005", accent: "#10b981", icon: "🔐", missionsCompleted: 22, autonomyLevel: 2, currentTask: "API მონაცემების გადამოწმება" },
-  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#059669", icon: "🔑", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
-  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "WORKING", taskId: "task-006", accent: "#06b6d4", icon: "🛡️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
+  { id: "cipher", name: "Cipher", role: "მონაცემების მენეჯერი", department: "resources", level: 5, xp: 468, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#059669", icon: "", missionsCompleted: 14, autonomyLevel: 2, currentTask: "წვდომის ლიზინგების მონიტორინგი" },
+  { id: "aegis", name: "Aegis", role: "ხარისხის დირექტორი", department: "quality", level: 6, xp: 596, xpToNext: 1000, status: "WORKING", taskId: "task-006", accent: "#06b6d4", icon: "️", missionsCompleted: 19, autonomyLevel: 3, currentTask: "2 კონტენტის ელემენტის გადახედვა" },
   { id: "echo", name: "Echo", role: "გავრცელების მენეჯერი", department: "distribution", level: 5, xp: 524, xpToNext: 1000, status: "COMPLETED", taskId: "task-007", accent: "#84cc16", icon: "📡", missionsCompleted: 16, autonomyLevel: 2, currentTask: "გამოქვეყნებულია Telegram-ზე" },
-  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f97316", icon: "📊", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
-  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "WORKING", taskId: "task-008", accent: "#14b8a6", icon: "🧬", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
+  { id: "nova", name: "Nova", role: "ეფექტურობის ანალიტიკოსი", department: "analytics", level: 4, xp: 412, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f97316", icon: "", missionsCompleted: 11, autonomyLevel: 3, currentTask: "ახალი მონაცემების მოლოდინში" },
+  { id: "iris", name: "Iris", role: "სწავლების დირექტორი", department: "learning", level: 5, xp: 548, xpToNext: 1000, status: "WORKING", taskId: "task-008", accent: "#14b8a6", icon: "", missionsCompleted: 17, autonomyLevel: 3, currentTask: "ეფექტურობის კანონზომიერებების ანალიზი" },
   { id: "lumen", name: "Lumen", role: "ვიზუალური დირექტორი", department: "creative", level: 5, xp: 450, xpToNext: 1000, status: "IDLE", taskId: null, accent: "#f472b6", icon: "🌟", missionsCompleted: 0, autonomyLevel: 3, currentTask: "მზად არის ვიზუალური კონცეფციების შესაქმნელად" },
 ];
 
@@ -160,7 +229,7 @@ const initialKnowledge: KnowledgeDocument[] = [
     status: "active",
     source: "დაზვერვის დეპარტამენტი",
     title: "პლატფორმის სპეციფიკური წესები",
-    content: "TikTok: სწრაფი ჰუკები, ტრენდებზე მორგებული ენა, უფრო ნედლი პრეზენტაცია. YouTube Shorts: ნათელი პრემისა, შენარჩუნების ანალიზი. Instagram Reels: ვიზუალური იდენტობა, გაზიარებადობა. Telegram: ინტერაქცია, გამოკითხვები, საზოგადოება.",
+    content: "TikTok: სწრაფი უკები, ტრენდებზე მორგებული ენა, უფრო ნედლი პრეზენტაცია. YouTube Shorts: ნათელი პრემისა, შენარჩუნების ანალიზი. Instagram Reels: ვიზუალური იდენტობა, გაზიარებადობა. Telegram: ინტერაქცია, გამოკითხვები, საზოგადოება.",
     confidence: 0.85,
     owner: "nyx",
     created_at: Date.now() - 1000 * 60 * 60 * 24 * 15,
@@ -207,15 +276,15 @@ function getStatusLabel(status: AgentStatus): string {
   switch (status) {
     case "IDLE": return "⏸️ უმოქმედო";
     case "WORKING": return "⚡ მუშაობს";
-    case "WAITING": return "⏳ მოლოდინში";
+    case "WAITING": return " მოლოდინში";
     case "WAITING_FOR_RESOURCE": return "🔐 რესურსის მოლოდინში";
     case "WAITING_FOR_REVIEW": return "🔍 გადახედვის მოლოდინში";
     case "COMPLETED": return "✅ დასრულებული";
-    case "ERROR": return "❌ შეცდომა";
+    case "ERROR": return " შეცდომა";
     case "PAUSED": return "⏸️ შეჩერებული";
     case "SUSPENDED": return "🚫 შეწყვეტილი";
     case "STARTING": return "🚀 იწყება";
-    case "OFFLINE": return "⚫ ოფლაინ";
+    case "OFFLINE": return " ოფლაინ";
     default: return status;
   }
 }
@@ -240,6 +309,85 @@ function generateMessageFromEvent(event: any): string {
     default: return `სისტემური მოვლენა: ${event.type}`;
   }
 }
+
+// ✅ მთლიანი დოკუმენტაციის ტექსტი
+const FULL_DOCUMENTATION_TEXT = `# LUNARA TELEGRAM CHANNEL — COMPLETE DOCUMENTATION
+
+## 1. CHANNEL IDENTITY & BRANDING
+- **Channel Name:** LUNARA
+- **Username:** @lunaraOS
+- **Network ID:** LUNARA-MEDIA-001
+- **Status:** Active — Early Stage
+- **Brand Positioning:** LUNARA — Tarot & Astrology
+- **Taglines:**
+  - "Your daily cosmic signal."
+  - "Don't just read your horoscope. Discover your signal."
+- **Voice & Tone:** Mysterious, Intelligent, Intimate, Premium, Concise
+
+## 2. MISSION & VISION
+**Primary Mission:**
+Build a recognizable, psychologically relevant and shareable media destination around cosmic wisdom, tarot and astrology; earn attention through useful, emotionally precise and curiosity-driven content; create recurring audience habits; and build a measurable bridge into the wider Lunara ecosystem.
+
+**Internal Mission:**
+WIN ATTENTION WITHOUT SACRIFICING TRUST → BUILD HABIT WITHOUT MANUFACTURING DEPENDENCE → TURN VALIDATED INSIGHT INTO SUSTAINABLE GROWTH.
+
+## 3. CONTENT STRATEGY & PILLARS
+- Love / Relationships: 30%
+- Tarot: 20%
+- Astrology: 15%
+- Daily Cosmic: 15%
+- Mystery: 10%
+- Education: 10%
+
+**Signature Series:**
+THE LUNARA SIGNAL, LUNARA LOVE SIGNAL, ZODIAC UNLOCKED, LUNARA AFTER DARK, LUNARA 24, LUNARA WEEKLY READING
+
+## 4. GROWTH STRATEGY & PLAYBOOK
+1. **Similar Channels Optimization:** Identify 10-20 successful channels, create similar original content, cross-promote to appear in their 'Similar Channels'.
+2. **Cross-Promotion Network:** Direct channel-to-channel promotion with 5-10 channels of similar size. Track joins per promotion.
+3. **Forward Incentive:** Reward users for forwarding content (e.g., 'Forward to 3 friends and DM for exclusive reading').
+4. **Comment Engagement Loop:** End every post with a question, respond to all comments in first 2 hours, pin best comments.
+5. **First 50 Founders:** Offer exclusive benefits (founding status, free premium reading) to the first 50 subscribers to build a loyal core.
+6. **Analytics-Driven Iteration:** Track every post's performance. Identify top 20% performers and double down on what works.
+
+## 5. 90-DAY GROWTH PLAN
+**PHASE 1: FOUNDATION (Days 1-30)** — 0 → 500 subscribers
+Launch with 7 strong posts, engage comments, first cross-promotion (5 channels), analyze top performers.
+
+**PHASE 2: MOMENTUM (Days 31-60)** — 500 → 2,000 subscribers
+Scale cross-promotion (10 channels), launch 'First 50 Founders', create first viral experiment.
+
+**PHASE 3: ACCELERATION (Days 61-90)** — 2,000 → 10,000 subscribers
+Double down on winning content, launch daily signature series, first paid promotion test.
+
+## 6. KEY PERFORMANCE INDICATORS (KPIs)
+- Reach / Subscriber: > 50%
+- Forwards / Post: > 30
+- Join Rate: > 5% of views
+- D7 Retention: > 60%
+
+⚠️ KPI Principle: No single metric defines success. Optimize the whole chain (Views → Joins → Retention → Conversion).
+
+## 7. IMPLEMENTATION CHECKLIST
+**Week 1 Setup:**
+☑ Channel created with optimized name/username
+☑ Avatar uploaded (mascot logo style)
+☑ Description written (255 chars, keyword-rich)
+☑ Pinned post created (welcome + value prop)
+☑ First 7 posts created and scheduled
+
+**Daily & Weekly Tasks:**
+▸ Post 1-2 times (consistent times)
+▸ Respond to all comments (first 2 hours)
+▸ Track metrics (views, forwards, joins)
+▸ Weekly review (top 3 posts, patterns)
+ Cross-promote with 2-3 new channels
+
+---
+Document Version: 1.0
+Last Updated: 30 September 2026
+Owner: Lunara OS / Executive Core
+`;
 
 export default function HomePage() {
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
@@ -275,8 +423,10 @@ export default function HomePage() {
     accessRevoked: false,
   });
 
-  // ✅ ახალი სტეიტი Telegram მოდალისთვის
+  // ✅ ახალი სტეიტები Telegram მოდალებისთვის
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
+  const [telegramChannelData, setTelegramChannelData] = useState<TelegramChannelData>(initialTelegramData);
   
   const [activePanel, setActivePanel] = useState<"overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge" | "intelligence" | "content-family" | "distribution" | "credentials" | "e2e-test" | "telegram">("overview");
   const timersRef = useRef<number[]>([]);
@@ -457,7 +607,7 @@ export default function HomePage() {
 
   const runNyxAnalysis = () => {
     setNyxLogs([]);
-    pushEvent("system", "🔍 Nyx-მა დაიწყო ტრენდების ანალიზი");
+    pushEvent("system", " Nyx-მა დაიწყო ტრენდების ანალიზი");
     
     const steps = [
       "[Nyx] 🔍 იწყებს ტრენდების ანალიზს...",
@@ -482,7 +632,7 @@ export default function HomePage() {
     setIsCopying(true);
     
     const reportText = `🔍 LUNARA OS - Nyx Trend Analysis Report
-📅 თარიღი: ${new Date().toLocaleString('ka-GE')}
+ თარიღი: ${new Date().toLocaleString('ka-GE')}
 
 📊 შესრულების ლოგები:
 ${nyxLogs.length > 0 ? nyxLogs.join('\n') : '[ლოგები არ არის ჩაწერილი]'}
@@ -527,7 +677,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
   const pausePublishing = () => {
     setEmergencyState(prev => ({ ...prev, publishingPaused: true }));
-    pushEvent("emergency", "⚠️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
+    pushEvent("emergency", "️ გამოქვეყნება შეაჩერა ადამიანმა აღმასრულებელმა");
   };
 
   const resumePublishing = () => {
@@ -544,6 +694,24 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
   const revokeAccess = () => {
     setEmergencyState(prev => ({ ...prev, accessRevoked: true }));
     pushEvent("emergency", "🔐 დროებითი წვდომა გააუქმა ადამიანმა აღმასრულებელმა");
+  };
+
+  // ✅ დოკუმენტაციის კოპირების ფუნქცია
+  const copyDocumentation = () => {
+    navigator.clipboard.writeText(FULL_DOCUMENTATION_TEXT);
+    pushEvent("system", "📋 დოკუმენტაცია დაკოპირდა ბუფერში");
+  };
+
+  // ✅ დოკუმენტაციის ჩამოტვირთვის ფუნქცია
+  const downloadDocumentation = () => {
+    const blob = new Blob([FULL_DOCUMENTATION_TEXT], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'LUNARA_Telegram_Channel_Documentation.md';
+    a.click();
+    URL.revokeObjectURL(url);
+    pushEvent("system", "📥 დოკუმენტაცია ჩამოიტვირთა");
   };
 
   return (
@@ -595,7 +763,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
         <div className="px-6 py-3 border-t border-white/5 bg-slate-900/50">
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 მიმოხილვა</button>
+            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}> მიმოხილვა</button>
             <button onClick={() => setActivePanel("intelligence")} className={`rounded-xl px-5 py-2.5 text-base font-bold transition-all whitespace-nowrap ${activePanel === "intelligence" ? "bg-blue-500/20 text-blue-400 border border-blue-400/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
               🔍 შესაძლებლობები
               {opportunities.filter(o => o.status === "discovered").length > 0 && (
@@ -675,7 +843,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
 
             <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-              <h3 className="text-lg font-black mb-4">💚 სისტემის ჯანმრთელობა</h3>
+              <h3 className="text-lg font-black mb-4">💚 სისტემის ანმრთელობა</h3>
               <div className="space-y-3">
                 {[{ name: "აგენტების ბუსი", value: 100, color: "bg-emerald-500" }, { name: "ამოცანების ძრავა", value: 100, color: "bg-emerald-500" }, { name: "მოვლენების ბუსი", value: 98, color: "bg-blue-500" }, { name: "ხარისხის კარიბჭე", value: 100, color: "bg-emerald-500" }, { name: "სწავლის ციკლი", value: 95, color: "bg-purple-500" }].map(item => (
                   <div key={item.name}>
@@ -884,7 +1052,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                       )}
                       {opp.status === "validated" && (
                         <div className="flex gap-3">
-                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30">🎯 Sage-სთვის გადაცემა</button>
+                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-3 text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30"> Sage-სთვის გადაცემა</button>
                           <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-3 text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ უარყოფა</button>
                         </div>
                       )}
@@ -933,7 +1101,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                               <div key={variant.channel_id} className={`rounded-xl border p-4 ${review?.verdict === "approved" ? "border-emerald-500/30 bg-emerald-500/5" : review?.verdict === "revise" ? "border-yellow-500/30 bg-yellow-500/5" : "border-white/10 bg-white/5"}`}>
                                 <div className="flex items-center justify-between mb-3">
                                   <div className="flex items-center gap-2">
-                                    <div className="text-2xl">{variant.channel_id === "human_mind" ? "🧠" : variant.channel_id === "love" ? "💕" : variant.channel_id === "astrology" ? "♈" : variant.channel_id === "tarot" ? "🎴" : variant.channel_id === "mystery" ? "🌙" : "✨"}</div>
+                                    <div className="text-2xl">{variant.channel_id === "human_mind" ? "" : variant.channel_id === "love" ? "💕" : variant.channel_id === "astrology" ? "♈" : variant.channel_id === "tarot" ? "🎴" : variant.channel_id === "mystery" ? "🌙" : "✨"}</div>
                                     <div className="text-sm font-bold text-white uppercase">{variant.channel_id.replace('_', ' ')}</div>
                                   </div>
                                   {review && (
@@ -981,7 +1149,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               <div className="space-y-6">
                 {qualityReviews.length === 0 ? (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-12 text-center">
-                    <div className="text-4xl mb-4">🛡️</div>
+                    <div className="text-4xl mb-4">️</div>
                     <h3 className="text-xl font-black text-white mb-2">QA შეფასებები ჯერ არ არის</h3>
                     <p className="text-slate-400 mb-6">დაამტკიცე Opportunity, რომ Aegis-მ შეაფასოს Content Family.</p>
                   </div>
@@ -991,7 +1159,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                       <div className="flex items-start justify-between mb-4">
                         <div>
                           <h3 className="text-lg font-black text-white mb-1">
-                            {review.channel_id === "human_mind" ? "🧠 Human Mind" : review.channel_id === "love" ? "💕 Love" : review.channel_id === "astrology" ? "♈ Astrology" : review.channel_id === "tarot" ? "🎴 Tarot" : review.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
+                            {review.channel_id === "human_mind" ? "🧠 Human Mind" : review.channel_id === "love" ? "💕 Love" : review.channel_id === "astrology" ? "♈ Astrology" : review.channel_id === "tarot" ? " Tarot" : review.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
                           </h3>
                           <p className="text-xs text-slate-500">Family: {review.family_id}</p>
                         </div>
@@ -1088,7 +1256,6 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
           )}
 
-          {/* ✅ განახლებული პანელი: მხოლოდ ბანერი, რომელიც ხსნის მოდალს */}
           {activePanel === "telegram" && (
             <div className="max-w-4xl mx-auto pb-12 flex flex-col items-center justify-center min-h-[60vh]">
               <div 
@@ -1191,7 +1358,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
               </div>
             </div>
             <div>
-              <h2 className="text-2xl font-black mb-4 tracking-wide">🔐 რესურსები</h2>
+              <h2 className="text-2xl font-black mb-4 tracking-wide"> რესურსები</h2>
               <div className="space-y-3">
                 {resources.map(resource => (
                   <div key={resource.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -1219,7 +1386,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
         </aside>
       </div>
 
-      {/* ✅ ახალი მოდალი: Telegram არხის კონფიგურაცია */}
+      {/* ✅ Telegram Channel Configuration Modal */}
       {isTelegramModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setIsTelegramModalOpen(false)}>
           <div className="relative w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
@@ -1230,27 +1397,45 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                 </h2>
                 <p className="text-sm text-slate-400">Edit and manage your channel's strategic data</p>
               </div>
-              <button onClick={() => setIsTelegramModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => { setIsTelegramModalOpen(false); setIsDocModalOpen(true); }}
+                  className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-sm"
+                >
+                   View Full Documentation
+                </button>
+                <button onClick={() => setIsTelegramModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
               <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📌 1. CHANNEL IDENTITY & BRANDING</h3>
+                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2"> 1. CHANNEL IDENTITY & BRANDING</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField label="Channel Name" value="LUNARA" onChange={() => {}} />
-                  <InputField label="Username" value="@LunaraOfficial" onChange={() => {}} />
-                  <InputField label="Network ID" value="LUNARA-MEDIA-001" onChange={() => {}} />
-                  <InputField label="Status" value="Active — Early Stage" onChange={() => {}} />
+                  <InputField label="Channel Name" value={telegramChannelData.name} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, name: v }))} />
+                  <InputField label="Username" value={telegramChannelData.username} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, username: v }))} />
+                  <InputField label="Network ID" value={telegramChannelData.networkId} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, networkId: v }))} />
+                  <InputField label="Status" value={telegramChannelData.status} onChange={(v) => setTelegramChannelData(prev => ({ ...prev, status: v }))} />
                 </div>
                 <div className="mt-4">
                   <label className="text-xs font-bold text-slate-400 mb-1 block">Brand Positioning</label>
-                  <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" rows={2} defaultValue="LUNARA — Tarot & Astrology" />
+                  <textarea 
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
+                    rows={2} 
+                    value={telegramChannelData.positioning}
+                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, positioning: e.target.value }))}
+                  />
                 </div>
                 <div className="mt-4">
                   <label className="text-xs font-bold text-slate-400 mb-1 block">Taglines (one per line)</label>
-                  <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" rows={2} defaultValue={`"Your daily cosmic signal."\n"Don't just read your horoscope. Discover your signal."`} />
+                  <textarea 
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
+                    rows={2}
+                    value={telegramChannelData.taglines}
+                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, taglines: e.target.value }))}
+                  />
                 </div>
               </section>
 
@@ -1259,59 +1444,109 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-bold text-slate-400 mb-1 block">Primary Mission</label>
-                    <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" rows={3} defaultValue="Build a recognizable, psychologically relevant and shareable media destination around cosmic wisdom, tarot and astrology; earn attention through useful, emotionally precise and curiosity-driven content; create recurring audience habits; and build a measurable bridge into the wider Lunara ecosystem." />
+                    <textarea 
+                      className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
+                      rows={3}
+                      value={telegramChannelData.mission}
+                      onChange={(e) => setTelegramChannelData(prev => ({ ...prev, mission: e.target.value }))}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 mb-1 block">Internal Mission</label>
-                    <textarea className="w-full bg-sky-500/10 border border-sky-500/20 rounded-xl p-3 text-sm text-sky-300 font-bold focus:border-sky-500/50 focus:outline-none transition-colors" rows={2} defaultValue="WIN ATTENTION WITHOUT SACRIFICING TRUST → BUILD HABIT WITHOUT MANUFACTURING DEPENDENCE → TURN VALIDATED INSIGHT INTO SUSTAINABLE GROWTH." />
+                    <textarea 
+                      className="w-full bg-sky-500/10 border border-sky-500/20 rounded-xl p-3 text-sm text-sky-300 font-bold focus:border-sky-500/50 focus:outline-none transition-colors" 
+                      rows={2}
+                      value={telegramChannelData.internalMission}
+                      onChange={(e) => setTelegramChannelData(prev => ({ ...prev, internalMission: e.target.value }))}
+                    />
                   </div>
                 </div>
               </section>
 
               <section>
-                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📝 3. CONTENT STRATEGY & PILLARS</h3>
+                <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2"> 3. CONTENT STRATEGY & PILLARS</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-                  <PillarInput title="Love / Relationships" percent="30%" />
-                  <PillarInput title="Tarot" percent="20%" />
-                  <PillarInput title="Astrology" percent="15%" />
-                  <PillarInput title="Daily Cosmic" percent="15%" />
-                  <PillarInput title="Mystery" percent="10%" />
-                  <PillarInput title="Education" percent="10%" />
+                  {telegramChannelData.pillars.map((pillar, idx) => (
+                    <PillarInput 
+                      key={idx}
+                      title={pillar.title} 
+                      percent={pillar.percent}
+                      onChangePercent={(v) => {
+                        const newPillars = [...telegramChannelData.pillars];
+                        newPillars[idx] = { ...newPillars[idx], percent: v };
+                        setTelegramChannelData(prev => ({ ...prev, pillars: newPillars }));
+                      }}
+                    />
+                  ))}
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-400 mb-1 block">Signature Series (comma separated)</label>
-                  <input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" defaultValue="THE LUNARA SIGNAL, LUNARA LOVE SIGNAL, ZODIAC UNLOCKED, LUNARA AFTER DARK, LUNARA 24, LUNARA WEEKLY READING" />
+                  <input 
+                    type="text" 
+                    className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-sky-500/50 focus:outline-none transition-colors" 
+                    value={telegramChannelData.signatureSeries}
+                    onChange={(e) => setTelegramChannelData(prev => ({ ...prev, signatureSeries: e.target.value }))}
+                  />
                 </div>
               </section>
 
               <section>
                 <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📈 4. GROWTH STRATEGY & PLAYBOOK</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <GrowthInput title="1. Similar Channels Optimization" desc="Identify 10-20 successful channels, create similar original content, cross-promote to appear in their 'Similar Channels'." />
-                  <GrowthInput title="2. Cross-Promotion Network" desc="Direct channel-to-channel promotion with 5-10 channels of similar size. Track joins per promotion." />
-                  <GrowthInput title="3. Forward Incentive" desc="Reward users for forwarding content (e.g., 'Forward to 3 friends and DM for exclusive reading')." />
-                  <GrowthInput title="4. Comment Engagement Loop" desc="End every post with a question, respond to all comments in first 2 hours, pin best comments." />
-                  <GrowthInput title="5. First 50 Founders" desc="Offer exclusive benefits (founding status, free premium reading) to the first 50 subscribers to build a loyal core." />
-                  <GrowthInput title="6. Analytics-Driven Iteration" desc="Track every post's performance. Identify top 20% performers and double down on what works." />
+                  {telegramChannelData.growthStrategies.map((strategy, idx) => (
+                    <GrowthInput 
+                      key={idx}
+                      title={strategy.title} 
+                      desc={strategy.desc}
+                      onChangeDesc={(v) => {
+                        const newStrategies = [...telegramChannelData.growthStrategies];
+                        newStrategies[idx] = { ...newStrategies[idx], desc: v };
+                        setTelegramChannelData(prev => ({ ...prev, growthStrategies: newStrategies }));
+                      }}
+                    />
+                  ))}
                 </div>
               </section>
 
               <section>
                 <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">🗓️ 5. 90-DAY GROWTH PLAN</h3>
                 <div className="space-y-4">
-                  <PhaseInput phase="PHASE 1: FOUNDATION (Days 1-30)" goal="0 → 500 subscribers" tasks="Launch with 7 strong posts, engage comments, first cross-promotion (5 channels), analyze top performers." />
-                  <PhaseInput phase="PHASE 2: MOMENTUM (Days 31-60)" goal="500 → 2,000 subscribers" tasks="Scale cross-promotion (10 channels), launch 'First 50 Founders', create first viral experiment." />
-                  <PhaseInput phase="PHASE 3: ACCELERATION (Days 61-90)" goal="2,000 → 10,000 subscribers" tasks="Double down on winning content, launch daily signature series, first paid promotion test." />
+                  {telegramChannelData.phases.map((phase, idx) => (
+                    <PhaseInput 
+                      key={idx}
+                      phase={phase.phase} 
+                      goal={phase.goal} 
+                      tasks={phase.tasks}
+                      onChangeGoal={(v) => {
+                        const newPhases = [...telegramChannelData.phases];
+                        newPhases[idx] = { ...newPhases[idx], goal: v };
+                        setTelegramChannelData(prev => ({ ...prev, phases: newPhases }));
+                      }}
+                      onChangeTasks={(v) => {
+                        const newPhases = [...telegramChannelData.phases];
+                        newPhases[idx] = { ...newPhases[idx], tasks: v };
+                        setTelegramChannelData(prev => ({ ...prev, phases: newPhases }));
+                      }}
+                    />
+                  ))}
                 </div>
               </section>
 
               <section>
                 <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📊 6. KEY PERFORMANCE INDICATORS (KPIs)</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  <KpiInput label="Reach / Subscriber" target="> 50%" />
-                  <KpiInput label="Forwards / Post" target="> 30" />
-                  <KpiInput label="Join Rate" target="> 5% of views" />
-                  <KpiInput label="D7 Retention" target="> 60%" />
+                  {telegramChannelData.kpis.map((kpi, idx) => (
+                    <KpiInput 
+                      key={idx}
+                      label={kpi.label} 
+                      target={kpi.target}
+                      onChangeTarget={(v) => {
+                        const newKpis = [...telegramChannelData.kpis];
+                        newKpis[idx] = { ...newKpis[idx], target: v };
+                        setTelegramChannelData(prev => ({ ...prev, kpis: newKpis }));
+                      }}
+                    />
+                  ))}
                 </div>
                 <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4">
                   <p className="text-red-300 text-sm font-bold text-center">⚠️ KPI Principle: No single metric defines success. Optimize the whole chain (Views → Joins → Retention → Conversion).</p>
@@ -1324,21 +1559,35 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                   <div>
                     <h4 className="font-bold text-white mb-3 text-sm">Week 1 Setup</h4>
                     <ul className="space-y-3">
-                      <CheckItem label="Channel created with optimized name/username" checked={true} />
-                      <CheckItem label="Avatar uploaded (mascot logo style)" checked={true} />
-                      <CheckItem label="Description written (255 chars, keyword-rich)" checked={true} />
-                      <CheckItem label="Pinned post created (welcome + value prop)" checked={true} />
-                      <CheckItem label="First 7 posts created and scheduled" checked={true} />
+                      {telegramChannelData.checklist.slice(0, 5).map((item, idx) => (
+                        <CheckItem 
+                          key={idx}
+                          label={item.label} 
+                          checked={item.checked}
+                          onChange={() => {
+                            const newChecklist = [...telegramChannelData.checklist];
+                            newChecklist[idx] = { ...newChecklist[idx], checked: !newChecklist[idx].checked };
+                            setTelegramChannelData(prev => ({ ...prev, checklist: newChecklist }));
+                          }}
+                        />
+                      ))}
                     </ul>
                   </div>
                   <div>
                     <h4 className="font-bold text-white mb-3 text-sm">Daily & Weekly Tasks</h4>
                     <ul className="space-y-3">
-                      <CheckItem label="Post 1-2 times (consistent times)" checked={true} />
-                      <CheckItem label="Respond to all comments (first 2 hours)" checked={true} />
-                      <CheckItem label="Track metrics (views, forwards, joins)" checked={true} />
-                      <CheckItem label="Weekly review (top 3 posts, patterns)" checked={true} />
-                      <CheckItem label="Cross-promote with 2-3 new channels" checked={true} />
+                      {telegramChannelData.checklist.slice(5, 10).map((item, idx) => (
+                        <CheckItem 
+                          key={idx + 5}
+                          label={item.label} 
+                          checked={item.checked}
+                          onChange={() => {
+                            const newChecklist = [...telegramChannelData.checklist];
+                            newChecklist[idx + 5] = { ...newChecklist[idx + 5], checked: !newChecklist[idx + 5].checked };
+                            setTelegramChannelData(prev => ({ ...prev, checklist: newChecklist }));
+                          }}
+                        />
+                      ))}
                     </ul>
                   </div>
                 </div>
@@ -1347,18 +1596,107 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
 
             <div className="p-6 border-t border-white/10 bg-slate-900/50 flex items-center justify-between">
               <button 
-                onClick={() => window.open('https://t.me/LunaraOfficial', '_blank')}
+                onClick={() => window.open('https://t.me/lunaraOS', '_blank')}
                 className="flex items-center gap-2 rounded-xl bg-sky-500/20 border border-sky-500/40 px-5 py-3 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors"
               >
-                <span>Visit @LunaraOfficial</span>
+                <span>Visit @lunaraOS</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
               </button>
               <button 
-                onClick={() => setIsTelegramModalOpen(false)}
+                onClick={() => {
+                  console.log('💾 Saved Telegram Channel Data:', telegramChannelData);
+                  pushEvent("system", "💾 Telegram channel configuration saved successfully");
+                  setIsTelegramModalOpen(false);
+                }}
                 className="rounded-xl bg-emerald-500/20 border border-emerald-500/40 px-6 py-3 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-colors"
               >
                 💾 Save Configuration
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Full Documentation Modal */}
+      {isDocModalOpen && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => setIsDocModalOpen(false)}>
+          <div className="relative w-full max-w-6xl max-h-[95vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-white/10 bg-slate-900/50">
+              <div>
+                <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                  📄 LUNARA Telegram Channel — Full Documentation
+                </h2>
+                <p className="text-sm text-slate-400">Complete strategic document for the channel</p>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={copyDocumentation}
+                  className="px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-white font-bold hover:bg-white/20 transition-colors text-sm flex items-center gap-2"
+                >
+                   Copy
+                </button>
+                <button 
+                  onClick={downloadDocumentation}
+                  className="px-4 py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-sm flex items-center gap-2"
+                >
+                  📥 Download .md
+                </button>
+                <button onClick={() => setIsDocModalOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="prose prose-invert max-w-none">
+                {FULL_DOCUMENTATION_TEXT.split('\n').map((line, idx) => {
+                  if (line.startsWith('# ')) {
+                    return <h1 key={idx} className="text-3xl font-black text-white mb-6 mt-8 first:mt-0">{line.replace('# ', '')}</h1>;
+                  }
+                  if (line.startsWith('## ')) {
+                    return <h2 key={idx} className="text-2xl font-black text-sky-400 mb-4 mt-8 border-b border-white/10 pb-2">{line.replace('## ', '')}</h2>;
+                  }
+                  if (line.startsWith('### ')) {
+                    return <h3 key={idx} className="text-xl font-bold text-white mb-3 mt-6">{line.replace('### ', '')}</h3>;
+                  }
+                  if (line.startsWith('- **')) {
+                    const match = line.match(/- \*\*(.+?)\*\*:?\s*(.*)/);
+                    if (match) {
+                      return (
+                        <div key={idx} className="flex gap-2 mb-2 text-sm">
+                          <span className="text-sky-400">•</span>
+                          <span className="font-bold text-white">{match[1]}:</span>
+                          <span className="text-slate-300">{match[2]}</span>
+                        </div>
+                      );
+                    }
+                  }
+                  if (line.startsWith('- ')) {
+                    return (
+                      <div key={idx} className="flex gap-2 mb-1 text-sm text-slate-300">
+                        <span className="text-sky-400">•</span>
+                        <span>{line.replace('- ', '')}</span>
+                      </div>
+                    );
+                  }
+                  if (line.startsWith('**') && line.endsWith('**')) {
+                    return <p key={idx} className="text-base font-bold text-emerald-400 my-3">{line.replace(/\*\*/g, '')}</p>;
+                  }
+                  if (line.startsWith('⚠️')) {
+                    return <div key={idx} className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 my-4 text-red-300 text-sm font-bold">{line}</div>;
+                  }
+                  if (line.startsWith('☑') || line.startsWith('▸')) {
+                    return <div key={idx} className="flex gap-2 mb-2 text-sm text-slate-300">{line}</div>;
+                  }
+                  if (line.trim() === '') {
+                    return <div key={idx} className="h-2" />;
+                  }
+                  if (line.startsWith('---')) {
+                    return <hr key={idx} className="border-white/10 my-6" />;
+                  }
+                  return <p key={idx} className="text-sm text-slate-300 mb-2 leading-relaxed">{line}</p>;
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -1447,7 +1785,7 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
   );
 }
 
-// ✅ ჰელფერ კომპონენტები მოდალისთვის
+// ✅ განახლებული ჰელფერ კომპონენტები რეალური onChange-ით
 function InputField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
@@ -1462,53 +1800,77 @@ function InputField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-function PillarInput({ title, percent }: { title: string; percent: string }) {
+function PillarInput({ title, percent, onChangePercent }: { title: string; percent: string; onChangePercent: (v: string) => void }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
       <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{title}</div>
-      <input type="text" className="w-full bg-transparent text-center text-xl font-black text-sky-400 focus:outline-none" defaultValue={percent} />
+      <input 
+        type="text" 
+        className="w-full bg-transparent text-center text-xl font-black text-sky-400 focus:outline-none" 
+        value={percent}
+        onChange={(e) => onChangePercent(e.target.value)}
+      />
     </div>
   );
 }
 
-function GrowthInput({ title, desc }: { title: string; desc: string }) {
+function GrowthInput({ title, desc, onChangeDesc }: { title: string; desc: string; onChangeDesc: (v: string) => void }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <h4 className="text-sm font-black text-sky-300 mb-2">{title}</h4>
-      <textarea className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" rows={3} defaultValue={desc} />
+      <textarea 
+        className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" 
+        rows={3} 
+        value={desc}
+        onChange={(e) => onChangeDesc(e.target.value)}
+      />
     </div>
   );
 }
 
-function PhaseInput({ phase, goal, tasks }: { phase: string; goal: string; tasks: string }) {
+function PhaseInput({ phase, goal, tasks, onChangeGoal, onChangeTasks }: { phase: string; goal: string; tasks: string; onChangeGoal: (v: string) => void; onChangeTasks: (v: string) => void }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
       <div className="flex items-center justify-between mb-2">
         <h4 className="text-sm font-black text-white">{phase}</h4>
-        <input type="text" className="bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1 text-xs font-bold text-emerald-400 focus:outline-none w-32 text-right" defaultValue={goal} />
+        <input 
+          type="text" 
+          className="bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1 text-xs font-bold text-emerald-400 focus:outline-none w-32 text-right" 
+          value={goal}
+          onChange={(e) => onChangeGoal(e.target.value)}
+        />
       </div>
-      <textarea className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" rows={2} defaultValue={tasks} />
+      <textarea 
+        className="w-full bg-transparent text-xs text-slate-400 leading-relaxed focus:outline-none resize-none" 
+        rows={2} 
+        value={tasks}
+        onChange={(e) => onChangeTasks(e.target.value)}
+      />
     </div>
   );
 }
 
-function KpiInput({ label, target }: { label: string; target: string }) {
+function KpiInput({ label, target, onChangeTarget }: { label: string; target: string; onChangeTarget: (v: string) => void }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
       <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">{label}</div>
-      <input type="text" className="w-full bg-transparent text-center text-lg font-black text-sky-400 focus:outline-none" defaultValue={target} />
+      <input 
+        type="text" 
+        className="w-full bg-transparent text-center text-lg font-black text-sky-400 focus:outline-none" 
+        value={target}
+        onChange={(e) => onChangeTarget(e.target.value)}
+      />
     </div>
   );
 }
 
-function CheckItem({ label, checked }: { label: string; checked: boolean }) {
-  const [isChecked, setIsChecked] = useState(checked);
+function CheckItem({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
-    <li className="flex items-start gap-3 cursor-pointer group" onClick={() => setIsChecked(!isChecked)}>
-      <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isChecked ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-white/5 border-white/20 text-transparent group-hover:border-white/40'}`}>
+    <li className="flex items-start gap-3 cursor-pointer group" onClick={onChange}>
+      <div className={`mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors ${checked ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-white/5 border-white/20 text-transparent group-hover:border-white/40'}`}>
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
       </div>
-      <span className={`text-sm transition-colors ${isChecked ? 'text-slate-300 line-through opacity-60' : 'text-slate-400 group-hover:text-slate-300'}`}>{label}</span>
+      <span className={`text-sm transition-colors ${checked ? 'text-slate-300 line-through opacity-60' : 'text-slate-400 group-hover:text-slate-300'}`}>{label}</span>
     </li>
   );
 }
