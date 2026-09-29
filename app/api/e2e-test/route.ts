@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — E2E Test API Route (100% Bulletproof & Type-Safe)
+// LUNARA OS — E2E Test API Route (Thematic Image Alignment)
 // Foundation: §56 (First True E2E Test), §40 (Secrets), §34 (Agent Training)
-// Purpose: Execute full E2E pipeline with maximum robustness, strict typing, and TRUE fallback chains.
+// Purpose: Execute full E2E pipeline, ensuring the generated image perfectly matches the post's core themes.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -67,20 +67,31 @@ function extractVerdict(content: string): string {
   return content.trim();
 }
 
+// ✅ განახლებული: ჭკვიანი ვიზუალური კონცეფციის ამოღება
 function extractVisualConcept(content: string, fallbackText: string): string {
+  // 1. ვეძებთ explicit visual concept ტეგს
   const conceptMatch = content.match(/<visual_concept>([\s\S]*?)<\/visual_concept>/i);
   if (conceptMatch && conceptMatch[1].trim().length > 30) {
     return conceptMatch[1].trim();
   }
   
+  // 2. ვეძებთ thinking-ის შემდეგ
   const afterThinking = content.split(/<\/thinking>/i);
   if (afterThinking.length > 1) {
     const cleanRest = afterThinking[1].replace(/<\/?visual_concept>/gi, '').trim();
     if (cleanRest.length > 30) return cleanRest;
   }
 
-  const baseText = fallbackText.length > 10 ? fallbackText.split('.')[0] : "A mysterious, atmospheric cosmic event";
-  return `A cinematic, dark luxury editorial photograph of: ${baseText}. Deep blacks, moody cinematic lighting, subtle gold accents, high contrast, premium feel, volumetric lighting, 8k resolution, masterpiece, photorealistic, no text, no watermarks, no logos.`;
+  // 3. ჭკვიანი Fallback: თუ Lumen-მა ვერ დააბრუნა კონცეფცია, ჩვენ თვითონ ვაანალიზებთ პოსტს
+  // ვიღებთ მნიშვნელოვან სიტყვებს (მინიმუმ 4 სიმბოლო) და ვფილტრავთ უმნიშვნელო სიტყვებს
+  const stopWords = ['this', 'that', 'with', 'from', 'have', 'will', 'what', 'does', 'into', 'feels', 'like', 'page', 'turned', 'when', 'the', 'and', 'are', 'our', 'you'];
+  const words = fallbackText.match(/\b\w{4,}\b/g) || [];
+  const keyElements = words
+    .filter(w => !stopWords.includes(w.toLowerCase()))
+    .slice(0, 10) // ვიღებთ პირველ 10 მნიშვნელოვან სიტყვას
+    .join(', ');
+
+  return `A highly detailed, thematic visual representation of: ${keyElements}. Cinematic lighting, atmospheric, perfectly matching the mood and core elements of the text, masterpiece, 8k resolution, photorealistic, no text, no watermarks, no logos.`;
 }
 
 export async function POST(request: NextRequest) {
@@ -146,7 +157,7 @@ export async function POST(request: NextRequest) {
 
         if (!generation.success) {
           console.warn(`[Route] ⚠️ ${cred.provider} Muse generation failed: ${generation.error}`);
-          continue; // გადადის შემდეგ პროვაიდერზე
+          continue;
         }
         
         const extractedContent = extractPost(generation.content);
@@ -175,14 +186,18 @@ export async function POST(request: NextRequest) {
            continue;
         }
 
-        // 3.5. Lumen
+        // 3.5. Lumen (განახლებული ინსტრუქციით თემატური შესაბამისობისთვის)
         const lumenStart = Date.now();
         const rawLumenPrompt = await getInstruction('lumen');
-        const lumenSystemPrompt: string = rawLumenPrompt || "You are Lumen, Lunara OS Visual Director.";
+        const lumenSystemPrompt: string = rawLumenPrompt || `You are Lumen, Lunara OS Visual Director. 
+Your task is to analyze the provided Telegram post and extract its core visual themes, main subjects, mood, and key elements. 
+Then, compose a highly detailed, cohesive image generation prompt that perfectly matches the post's meaning. 
+Focus on: Main subject, lighting, atmosphere, color palette, and composition. 
+Output ONLY the image generation prompt. Do not include conversational text or explanations.`;
         
         const lumenResponse = await generateWithProvider(
           cred.provider, apiKey, modelName,
-          `Here is the Telegram post:\n\n${extractedContent}\n\nGenerate a visual concept for this post.`,
+          `Here is the Telegram post:\n\n${extractedContent}\n\nGenerate the image generation prompt based on the core elements of this post.`,
           lumenSystemPrompt
         );
 
@@ -228,11 +243,12 @@ export async function POST(request: NextRequest) {
     // ============================================================
     // IMAGE GENERATION (უკვე აქვს საკუთარი Fallback Chain)
     // ============================================================
+    // შენიშვნა: style-ს ვტოვებთ 'cosmic-editorial'-ს ან 'dark-luxury'-ს, მაგრამ visualConcept ახლა იმდენად დეტალურია, რომ ის განსაზღვრავს მთავარ თემას.
     const imageResult = await generateImage({
       visualPrompt: visualConcept,
       width: 1024,
       height: 1024,
-      style: 'dark-luxury'
+      style: 'cosmic-editorial' // უფრო შეესაბამება დაბნელების/კოსმოსურ თემას
     });
 
     if (imageResult.success) {
