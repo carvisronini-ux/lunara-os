@@ -1,7 +1,7 @@
 // ============================================================
-// LUNARA OS — Image Generation Service (100% Dynamic, Zero Hardcoding)
+// LUNARA OS — Image Generation Service (Cloudflare + Smart HF Fallback)
 // Foundation: §4 (Brand Visuals), §28 (Echo Distribution), §40 (Credentials)
-// Purpose: Rely ENTIRELY on Vault metadata (recommendedModel). No hardcoded keywords.
+// Purpose: 100% Free, No-Card required, intelligent model fallback.
 // ============================================================
 
 import sharp from 'sharp';
@@ -27,47 +27,81 @@ export interface ImageGenerationOptions {
   height?: number;
 }
 
+// ⚠️ მნიშვნელოვანი: შენი Cloudflare Account ID (URL-დან აღებული)
+const CLOUDFLARE_ACCOUNT_ID = 'b41cb921e1b841685c0f5d364f661fbe';
+
 // ============================================================
-// MAIN GENERATOR: Dynamic routing based purely on Vault metadata
+// HELPER: ჭკვიანად პოულობს ფოტოს მოდელს ან იყენებს უსაფრთხო Fallback-ს
+// ============================================================
+function getImageModel(cred: any, fallbackModel: string): string {
+  if (!cred.metadata) return fallbackModel;
+
+  const imageKeywords = ['flux', 'stable-diffusion', 'sdxl', 'imagen', 'midjourney', 'dall-e', 'kontext', 'generate'];
+  
+  // 1. ვეძებთ სიაში
+  if (cred.metadata.models && cred.metadata.models.length > 0) {
+    const found = cred.metadata.models.find((m: string) => 
+      imageKeywords.some(kw => m.toLowerCase().includes(kw))
+    );
+    if (found) {
+      console.log(`[Model Discovery] ✅ Found image model in metadata: ${found}`);
+      return found;
+    }
+  }
+
+  // 2. ვამოწმებთ recommendedModel-ს
+  if (cred.metadata.recommendedModel) {
+    const isImageModel = imageKeywords.some(kw => 
+      cred.metadata.recommendedModel.toLowerCase().includes(kw)
+    );
+    if (isImageModel) {
+      console.log(`[Model Discovery] ✅ Recommended model is valid for images: ${cred.metadata.recommendedModel}`);
+      return cred.metadata.recommendedModel;
+    }
+  }
+
+  // 3. უსაფრთხო Fallback: თუ მეტამონაცემები ტექსტურია, ვიყენებთ გარანტირებულ ფოტოს მოდელს
+  console.warn(`[Model Discovery] ⚠️ Metadata indicates text-only models. Using safe fallback: ${fallbackModel}`);
+  return fallbackModel;
+}
+
+// ============================================================
+// MAIN GENERATOR
 // ============================================================
 export async function generateImage(options: ImageGenerationOptions): Promise<ImageGenerationResult> {
-  console.log('[ImageGenerator] 🚀 Starting 100% dynamic image generation pipeline...');
+  console.log('[ImageGenerator] 🚀 Starting No-Card dynamic image generation pipeline...');
   const pipelineStart = Date.now();
 
   await credentialVault.ready;
   const credentials = credentialVault.getMetadata();
 
-  // 1. ვეძებთ პირველ აქტიურ კრედალს, რომელსაც აქვს დატესტილი `recommendedModel`
-  // პრიორიტეტი: huggingface -> gemini -> pollinations
-  const priorityOrder = ['huggingface', 'gemini', 'pollinations'];
+  // პრიორიტეტი: Cloudflare (უფასო/ულიმიტო) -> Hugging Face -> Pollinations
+  const priorityOrder = ['cloudflare', 'huggingface', 'pollinations'];
   
   let selectedCred: any = null;
-  let modelName: string | null = null;
+  let modelName: string = '';
 
   for (const targetProvider of priorityOrder) {
     const cred = credentials.find(c => 
-      c.provider.toLowerCase() === targetProvider && 
-      c.status === 'ACTIVE' &&
-      c.metadata?.recommendedModel // ✅ ვიყენებთ მხოლოდ იმ მოდელს, რაც "Test" ღილაკმა დაადასტურა
+      c.provider.toLowerCase() === targetProvider && c.status === 'ACTIVE'
     );
 
     if (cred) {
       selectedCred = cred;
-      modelName = cred.metadata.recommendedModel;
-      console.log(`[ImageGenerator] ✅ Selected provider: ${cred.provider}, Model: ${modelName} (from metadata)`);
+      // Fallback ოგიკა: Cloudflare-სთვის SDXL, HF-სთვისაც SDXL
+      const fallback = targetProvider === 'cloudflare' 
+        ? '@cf/stabilityai/stable-diffusion-xl-base-1.0' 
+        : 'stabilityai/stable-diffusion-xl-base-1.0';
+      
+      modelName = getImageModel(cred, fallback);
+      console.log(`[ImageGenerator] ✅ Selected: ${cred.provider}, Model: ${modelName}`);
       break;
     }
   }
 
-  if (!selectedCred || !modelName) {
-    console.error('[ImageGenerator] ❌ CRITICAL: No active credential with a tested recommendedModel found.');
-    console.error('[ImageGenerator] 💡 Action Required: Go to API Vault and click "Test" on your image generation keys.');
-    return { 
-      success: false, 
-      provider: 'unknown', 
-      error: 'No tested image model found in Vault. Please test credentials first.', 
-      latency: Date.now() - pipelineStart 
-    };
+  if (!selectedCred) {
+    console.error('[ImageGenerator]  CRITICAL: No active image generation credentials found.');
+    return { success: false, provider: 'unknown', error: 'No active credentials', latency: Date.now() - pipelineStart };
   }
 
   const apiKey = credentialVault.getDecryptedValueForTesting(selectedCred.credential_id);
@@ -82,18 +116,46 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
     'mystic-minimal': 'mystic minimalism, clean composition, negative space, subtle glow, elegant simplicity, serene, 8k resolution, masterpiece, photorealistic'
   };
 
-  // პრომპტის ოპტიმიზაცია სტაბილურობისთვის
   const safePrompt = visualPrompt.length > 300 ? visualPrompt.substring(0, 300) : visualPrompt;
   const finalPrompt = `${safePrompt}, ${styleEnhancements[style]}`;
   const provider = selectedCred.provider.toLowerCase();
 
   try {
     // ============================================================
-    // A. HUGGING FACE (Unified Router - ავტომატურად არჩევს საუკეთესო ინფრასტრუქტურას)
+    // A. CLOUDFLARE WORKERS AI (უფასო, ულიმიტო, ბარათის გარეშე)
+    // ============================================================
+    if (provider === 'cloudflare') {
+      console.log(`[Cloudflare] 🎨 Generating with model: ${modelName}`);
+      const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/${modelName}`;
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${apiKey}`, 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          prompt: finalPrompt
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.errors?.[0]?.message || err.message || `HTTP ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const imageBuffer = Buffer.from(arrayBuffer);
+      
+      console.log(`[Cloudflare] ✅ Success: Generated ${imageBuffer.length} bytes (NO WATERMARK)`);
+      return { success: true, imageBuffer, prompt: finalPrompt, provider: 'cloudflare', model: modelName, hasWatermark: false, latency: Date.now() - pipelineStart };
+    }
+
+    // ============================================================
+    // B. HUGGING FACE (უსაფრთხო Fallback SDXL-ზე)
     // ============================================================
     if (provider === 'huggingface') {
-      console.log(`[HuggingFace] 🎨 Generating with dynamic model: ${modelName}`);
-      // ✅ Unified Router: არ გვჭირდება endpoint-ის გამოცნობა, HF თვითონ ხვდება
+      console.log(`[HuggingFace] 🎨 Generating with model: ${modelName}`);
       const apiUrl = `https://router.huggingface.co/hf-inference/models/${modelName}`;
       
       const response = await fetch(apiUrl, {
@@ -120,44 +182,13 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
     }
 
     // ============================================================
-    // B. GEMINI (Predict API)
-    // ============================================================
-    if (provider === 'gemini') {
-      console.log(`[Gemini] 🎨 Generating with dynamic model: ${modelName}`);
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instances: [{ prompt: finalPrompt }],
-          parameters: { sampleCount: 1, aspectRatio: '1:1' }
-        })
-      });
-
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error?.message || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (!data.predictions?.[0]?.bytesBase64Encoded) {
-        throw new Error('No image data in Gemini response');
-      }
-
-      const imageBuffer = Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64');
-      console.log(`[Gemini] ✅ Success: Generated ${imageBuffer.length} bytes (NO WATERMARK)`);
-      return { success: true, imageBuffer, prompt: finalPrompt, provider: 'gemini', model: modelName, hasWatermark: false, latency: Date.now() - pipelineStart };
-    }
-
-    // ============================================================
-    // C. POLLINATIONS.AI (Fallback)
+    // C. POLLINATIONS.AI (უკანასკნელი შანსი)
     // ============================================================
     if (provider === 'pollinations') {
-      console.log(`[Pollinations] 🎨 Generating with dynamic model: ${modelName} (LAST RESORT)`);
+      console.log(`[Pollinations] 🎨 Generating (LAST RESORT)`);
       const encodedPrompt = encodeURIComponent(finalPrompt);
       const seed = Math.floor(Math.random() * 999999);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&watermark=false&seed=${seed}&enhance=true&model=${modelName}`;
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1024&height=1024&nologo=true&watermark=false&seed=${seed}&enhance=true&model=flux`;
 
       const response = await fetch(imageUrl, {
         method: 'GET',
@@ -173,21 +204,17 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
       const imageBuffer = Buffer.from(await response.arrayBuffer());
       console.log(`[Pollinations] ⚠️ Success: Generated ${imageBuffer.length} bytes.`);
       
-      // ვცდილობთ წყალსანიშნის დადება, თუ სურათი რეალურია
       let finalBuffer = imageBuffer;
       if (imageBuffer.length >= 50000) {
         try {
           const watermarkSvg = `<svg width="200" height="60" xmlns="http://www.w3.org/2000/svg"><text x="190" y="40" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="rgba(255, 255, 255, 0.7)" text-anchor="end">◈ Lunara</text></svg>`;
           finalBuffer = await sharp(imageBuffer).composite([{ input: Buffer.from(watermarkSvg), gravity: 'southeast', blend: 'overlay' }]).toBuffer();
           console.log('[Watermark] ✅ Applied successfully');
-        } catch (wmError) {
-          console.warn('[Watermark] ⚠️ Failed to apply, using original buffer:', wmError instanceof Error ? wmError.message : 'Unknown');
+        } catch (e) {
+          console.warn('[Watermark] ️ Failed, using original.');
         }
-      } else {
-        console.warn('[Watermark] ⚠️ Image buffer too small (<50KB), skipping to avoid corruption.');
       }
-
-      return { success: true, imageBuffer: finalBuffer, prompt: finalPrompt, provider: 'pollinations', model: modelName, hasWatermark: false, latency: Date.now() - pipelineStart };
+      return { success: true, imageBuffer: finalBuffer, prompt: finalPrompt, provider: 'pollinations', model: 'flux', hasWatermark: false, latency: Date.now() - pipelineStart };
     }
 
     throw new Error(`Provider ${provider} logic not implemented`);
