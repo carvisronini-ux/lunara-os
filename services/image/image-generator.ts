@@ -6,7 +6,6 @@
 
 import sharp from 'sharp';
 import { credentialVault } from '@/services/credentials/credential-vault';
-// ✅ წაშლილია გამოუყენებელი generateWithProvider იმპორტი
 
 export interface ImageGenerationResult {
   success: boolean;
@@ -32,11 +31,9 @@ export interface ImageGenerationOptions {
 // HELPER: დინამიურად იღებს საუკეთესო მოდელს მეტამონაცემებიდან
 // ============================================================
 function getBestModel(cred: any, keywords: string[] = []): string | null {
-  // 1. პრიორიტეტი: რეკომენდებული მოდელი ტესტიდან
   if (cred.metadata?.recommendedModel) {
     return cred.metadata.recommendedModel;
   }
-  // 2. მეორე პრიორიტეტი: პირველი მოდელი, რომელიც შეიცავს საკვანძო სიტყვას
   if (cred.metadata?.models && cred.metadata.models.length > 0) {
     if (keywords.length > 0) {
       const found = cred.metadata.models.find((m: string) => 
@@ -44,7 +41,6 @@ function getBestModel(cred: any, keywords: string[] = []): string | null {
       );
       if (found) return found;
     }
-    // 3. უკანასკნელი შანსი: უბრალოდ პირველი ხელმისაწვდომი მოდელი სიაში
     return cred.metadata.models[0];
   }
   return null;
@@ -84,14 +80,14 @@ async function generateWithGemini(
       return { success: false, provider: 'gemini', error: 'Failed to decrypt Gemini API key', latency: Date.now() - startTime };
     }
 
-    // ✅ დინამიური მოდელის არჩევა მეტამონაცემებიდან (არანაირი hardcoded მნიშვნელობა)
-    const modelName = getBestModel(geminiCred, ['imagen', 'image', 'generate']);
-    
-    if (!modelName) {
+    const rawModelName = getBestModel(geminiCred, ['imagen', 'image', 'generate']);
+    if (!rawModelName) {
       console.error('[Gemini] ❌ No model found in metadata. Please test the credential first to populate models.');
       return { success: false, provider: 'gemini', error: 'No model discovered in metadata. Run test first.', latency: Date.now() - startTime };
     }
-
+    
+    // ✅ გარანტირებული string ტიპი
+    const modelName: string = rawModelName;
     console.log(`[Gemini] 📡 Using dynamically discovered model: ${modelName}`);
 
     const { visualPrompt, style = 'dark-luxury' } = options;
@@ -104,7 +100,6 @@ async function generateWithGemini(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy, oversaturated';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
 
     const response = await fetch(apiUrl, {
@@ -176,14 +171,14 @@ async function generateWithHuggingFace(
       return { success: false, provider: 'huggingface', error: 'Failed to decrypt Hugging Face token', latency: 0 };
     }
 
-    // ✅ დინამიური მოდელის არჩევა მეტამონაცემებიდან
-    const modelName = getBestModel(hfCred, ['stable-diffusion', 'sdxl', 'flux']);
-    
-    if (!modelName) {
+    const rawModelName = getBestModel(hfCred, ['stable-diffusion', 'sdxl', 'flux']);
+    if (!rawModelName) {
       console.error('[HuggingFace] ❌ No model found in metadata. Please test the credential first.');
       return { success: false, provider: 'huggingface', error: 'No model discovered in metadata. Run test first.', latency: Date.now() - startTime };
     }
 
+    // ✅ გარანტირებული string ტიპი
+    const modelName: string = rawModelName;
     const { visualPrompt, style = 'dark-luxury' } = options;
     console.log(`[HuggingFace] 🎨 Attempt ${attempt}: Starting generation with dynamic model: ${modelName}`);
 
@@ -196,7 +191,6 @@ async function generateWithHuggingFace(
     const negativePrompt = 'watermark, text, words, letters, signature, logo, username, artist name, blurry, low quality, distorted, deformed, cartoon, illustration, 3d render, bright colors, pastel, neon, ugly, messy, bad anatomy';
     const finalPrompt = `${visualPrompt}, ${styleEnhancements[style]}`;
 
-    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
     const apiUrl = `https://api-inference.huggingface.co/models/${modelName}`;
 
     const response = await fetch(apiUrl, {
@@ -252,11 +246,11 @@ async function generateWithPollinations(
     await credentialVault.ready;
     const credentials = credentialVault.getMetadata();
     
-    // ვცდილობთ ვიპოვოთ pollinations-ის კრედალი მეტამონაცემების წასაკითხად
     const pollinationsCred = credentials.find(c => c.provider === 'pollinations' && c.status === 'ACTIVE');
     
-    // ✅ დინამიური მოდელის არჩევა: თუ არის მეტამონაცემებში, ვიღებთ მას
-    const modelName = pollinationsCred ? getBestModel(pollinationsCred, ['flux', 'midjourney', 'stable-diffusion']) : 'flux';
+    // ✅ გარანტირებული string ტიპი fallback-ით
+    const rawModelName = pollinationsCred ? getBestModel(pollinationsCred, ['flux', 'midjourney', 'stable-diffusion']) : null;
+    const modelName: string = rawModelName || 'flux';
     
     const { visualPrompt, width = 1024, height = 1024, style = 'dark-luxury' } = options;
     console.log(`[Pollinations] 🎨 Attempt ${attempt}: Starting generation with dynamic model: ${modelName} (LAST RESORT)...`);
@@ -272,7 +266,6 @@ async function generateWithPollinations(
     const encodedPrompt = encodeURIComponent(finalPrompt);
     const seed = Math.floor(Math.random() * 999999);
     
-    // ✅ დინამიური URL მეტამონაცემებიდან მიღებული მოდელით
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true&watermark=false&seed=${seed}&enhance=true&model=${modelName}`;
 
     const response = await fetch(imageUrl, {
@@ -340,7 +333,6 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   console.log('[ImageGenerator] 🚀 Starting image generation pipeline with dynamic priority chain...');
   const pipelineStart = Date.now();
 
-  // 1. Gemini (Dynamic Discovery)
   console.log('[ImageGenerator] 1️⃣ Trying Gemini (Dynamic Model Discovery)...');
   const geminiResult = await generateWithGemini(options);
   if (geminiResult.success) {
@@ -349,7 +341,6 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   }
   console.warn(`[ImageGenerator] ⚠️ Gemini failed: ${geminiResult.error}. Moving to next provider...`);
 
-  // 2. Hugging Face (Dynamic from Vault)
   console.log('[ImageGenerator] 2️⃣ Trying Hugging Face (Dynamic from Vault)...');
   const hfResult = await generateWithHuggingFace(options);
   if (hfResult.success) {
@@ -358,7 +349,6 @@ export async function generateImage(options: ImageGenerationOptions): Promise<Im
   }
   console.warn(`[ImageGenerator] ⚠️ Hugging Face failed: ${hfResult.error}. Moving to last resort...`);
 
-  // 3. Pollinations (Dynamic from Vault or safe fallback)
   console.log('[ImageGenerator] 3️⃣ Trying Pollinations.ai (LAST RESORT - will attempt to cover watermark)...');
   const pollinationsResult = await generateWithPollinations(options);
   
