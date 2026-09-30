@@ -49,9 +49,8 @@ export async function GET() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        offset: -10, // ბოლო 10 განახლება
-        limit: 10,
-        timeout: 0
+        limit: 20,
+        allowed_updates: ["channel_post", "edited_channel_post"]
       })
     });
 
