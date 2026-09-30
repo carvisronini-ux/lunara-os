@@ -1473,7 +1473,7 @@ function AnalyticsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
 
   return (
     <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={onClose}>
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="relative w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-6 border-b border-white/10 bg-slate-900/50">
           <div>
             <h2 className="text-2xl font-black text-white flex items-center gap-2">
@@ -1486,7 +1486,7 @@ function AnalyticsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64">
               <div className="w-12 h-12 border-4 border-sky-500/30 border-t-sky-500 rounded-full animate-spin mb-4"></div>
@@ -1503,7 +1503,7 @@ function AnalyticsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               </p>
             </div>
           ) : data ? (
-            <div className="space-y-6">
+            <>
               {/* 1. Real Channel Information */}
               <section className="rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-900/20 to-purple-900/20 p-6">
                 <h3 className="text-lg font-black text-sky-400 mb-4 flex items-center gap-2">📱 Channel Information (Live)</h3>
@@ -1534,22 +1534,80 @@ function AnalyticsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => v
               {/* 2. Real Analytics Dashboard */}
               <section>
                 <h3 className="text-lg font-black text-emerald-400 mb-4 flex items-center gap-2">📈 Live Analytics</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="rounded-2xl border border-emerald-500/30 bg-emerald-900/20 p-8 text-center">
                     <div className="text-xs font-bold text-emerald-400 mb-2">TOTAL SUBSCRIBERS</div>
                     <div className="text-5xl font-black text-white">{data.stats.subscribers.toLocaleString()}</div>
                     <div className="mt-2 text-sm text-emerald-400">Live from Telegram API</div>
                   </div>
-                  <div className="rounded-2xl border border-amber-500/30 bg-amber-900/20 p-8 text-center flex flex-col justify-center">
-                    <div className="text-xs font-bold text-amber-400 mb-2">POST STATISTICS</div>
-                    <div className="text-lg font-black text-white mb-2">Requires Admin Rights</div>
-                    <p className="text-sm text-slate-400">
-                      To see real views, forwards, and reactions per post, the bot must be added to the channel as an Administrator with "Post Messages" permissions.
-                    </p>
+                  <div className="rounded-2xl border border-blue-500/30 bg-blue-900/20 p-8 text-center">
+                    <div className="text-xs font-bold text-blue-400 mb-2">TOTAL POSTS TRACKED</div>
+                    <div className="text-5xl font-black text-white">{data.stats.posts ? data.stats.posts.length : 0}</div>
+                    <div className="mt-2 text-sm text-blue-400">Recent messages</div>
+                  </div>
+                  <div className="rounded-2xl border border-purple-500/30 bg-purple-900/20 p-8 text-center">
+                    <div className="text-xs font-bold text-purple-400 mb-2">TOTAL VIEWS</div>
+                    <div className="text-5xl font-black text-white">
+                      {data.stats.posts ? data.stats.posts.reduce((sum: number, p: any) => sum + (p.views || 0), 0).toLocaleString() : '0'}
+                    </div>
+                    <div className="mt-2 text-sm text-purple-400">Across all tracked posts</div>
                   </div>
                 </div>
               </section>
-            </div>
+
+              {/* 3. Real Post Statistics */}
+              {data.stats.posts && data.stats.posts.length > 0 ? (
+                <section className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
+                  <h3 className="text-lg font-black text-amber-400 mb-4 flex items-center gap-2">🔥 Recent Posts Performance</h3>
+                  <div className="space-y-3">
+                    {data.stats.posts.map((post: any, idx: number) => (
+                      <div key={post.message_id} className="rounded-xl border border-white/10 bg-white/5 p-4 hover:bg-white/10 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 font-black">
+                              #{idx + 1}
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-400">Message ID</div>
+                              <div className="text-sm text-white font-bold font-mono">{post.message_id}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-4 text-sm">
+                            <div className="text-center">
+                              <div className="text-xs text-slate-400">Views</div>
+                              <div className="font-black text-blue-400">{(post.views || 0).toLocaleString()}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-slate-400">Forwards</div>
+                              <div className="font-black text-amber-400">{post.forwards || 0}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-slate-400">Reactions</div>
+                              <div className="font-black text-purple-400">{post.reactions ? post.reactions.length : 0}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <section className="rounded-2xl border border-amber-500/30 bg-amber-900/20 p-6">
+                  <h3 className="text-lg font-black text-amber-400 mb-2">⚠️ No Recent Posts Found</h3>
+                  <p className="text-sm text-slate-300">
+                    ბოტმა ვერ იპოვა ბოლო მესიჯები ამ არხიდან. ეს შეიძლება ნიშნავდეს:
+                  </p>
+                  <ul className="text-sm text-slate-400 mt-2 space-y-1 list-disc list-inside">
+                    <li>არხზე ბოლო 24 საათში არ გამოქვეყნებულა ახალი პოსტი</li>
+                    <li>ბოტს არ აქვს "Post Messages" უფლება არხში (დარწმუნდი რომ ადმინია)</li>
+                    <li>ბოტი ჯერ არ გამოუქვეყნებია პოსტები ამ არხში (getUpdates მხოლოდ ახალ მესიჯებს იღებს)</li>
+                  </ul>
+                  <p className="text-sm text-slate-300 mt-3">
+                    <strong>შენიშვნა:</strong> Telegram Bot API-ს შეუძლია მიიღოს მხოლოდ იმ მესიჯების სტატისტიკა, რომლებიც ბოტმა თავად გამოაქვეყნა ან ბოლო 24 საათში იყო განახლებული.
+                  </p>
+                </section>
+              )}
+            </>
           ) : null}
         </div>
 
