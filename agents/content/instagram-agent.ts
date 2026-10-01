@@ -1,7 +1,5 @@
 // agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
-import * as path from 'path';
-import * as fs from 'fs';
 import sharp from 'sharp';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
@@ -16,15 +14,15 @@ const ZODIAC_SIGNS = [
   { name: 'ARIES', symbol: '♈', dates: '21 მარტი - 19 აპრილი', georgian: 'ვერძი' },
   { name: 'TAURUS', symbol: '♉', dates: '20 აპრილი - 20 მაისი', georgian: 'კურო' },
   { name: 'GEMINI', symbol: '♊', dates: '21 მაისი - 20 ივნისი', georgian: 'ტყუპი' },
-  { name: 'CANCER', symbol: '', dates: '21 ივნისი - 22 ივლისი', georgian: 'კირჩხიბი' },
+  { name: 'CANCER', symbol: '♋', dates: '21 ივნისი - 22 ივლისი', georgian: 'კირჩხიბი' },
   { name: 'LEO', symbol: '♌', dates: '23 ივლისი - 22 აგვისტო', georgian: 'ლომი' },
-  { name: 'VIRGO', symbol: '', dates: '23 აგვისტო - 22 სექტემბერი', georgian: 'ქალწული' },
+  { name: 'VIRGO', symbol: '♍', dates: '23 აგვისტო - 22 სექტემბერი', georgian: 'ქალწული' },
   { name: 'LIBRA', symbol: '♎', dates: '23 სექტემბერი - 22 ოქტომბერი', georgian: 'სასწორი' },
   { name: 'SCORPIO', symbol: '♏', dates: '23 ოქტომბერი - 21 ნოემბერი', georgian: 'მორიელი' },
   { name: 'SAGITTARIUS', symbol: '♐', dates: '22 ნოემბერი - 21 დეკემბერი', georgian: 'მშვილდოსანი' },
-  { name: 'CAPRICORN', symbol: '', dates: '22 დეკემბერი - 19 იანვარი', georgian: 'თხის რქა' },
+  { name: 'CAPRICORN', symbol: '♑', dates: '22 დეკემბერი - 19 იანვარი', georgian: 'თხის რქა' },
   { name: 'AQUARIUS', symbol: '♒', dates: '20 იანვარი - 18 თებერვალი', georgian: 'მერწყული' },
-  { name: 'PISCES', symbol: '', dates: '19 თებერვალი - 20 მარტი', georgian: 'თევზები' },
+  { name: 'PISCES', symbol: '♓', dates: '19 თებერვალი - 20 მარტი', georgian: 'თევზები' },
 ];
 
 export class InstagramAgent {
@@ -39,27 +37,22 @@ export class InstagramAgent {
       console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
       console.log(`📝 თემა: "${topic}"`);
       
-      // 1. ვირჩევთ ზოდიაქოს ნიშანს
       console.log('1️⃣ ვირჩევთ ზოდიაქოს ნიშანს...');
       const zodiac = this.getZodiacFromTopic(topic);
       console.log(`✅ არჩეული ზოდიაქო: ${zodiac.georgian} (${zodiac.name})`);
 
-      // 2. ვტვირთავთ მზა ფოტოს Supabase-იდან
       console.log('2️⃣ ვტვირთავთ მზა ფოტოს...');
       const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
       console.log(`✅ ფოტო ჩამოიტვირთა. ზომა: ${zodiacImageBuffer.length} ბაიტი`);
 
-      // 3. ვაგენერირებთ ჰოროსკოპის ტექსტს
       console.log('3️⃣ ვაგენერირებთ ჰოროსკოპის ტექსტს...');
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
       console.log(`✅ ტექსტი გენერირებულია. სიგრძე: ${horoscopeText.length} სიმბოლო`);
 
-      // 4. ვამატებთ ტექსტს ფოტოს
       console.log('4️⃣ ვამატებთ ტექსტს ფოტოს...');
       const finalImage = await this.addTextToImage(zodiacImageBuffer, zodiac.name, horoscopeText);
       console.log(`✅ ტექსტი დაემატა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
-      // 5. ვტვირთავთ საბოლოო სურათს Supabase-ში
       console.log('5️⃣ ვტვირთავთ საბოლოო სურათს...');
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `previews/${fileName}`;
@@ -119,7 +112,6 @@ export class InstagramAgent {
     }
   }
 
-  // ახალი მეთოდი: ვტვირთავთ მზა ოდიაქოს ფოტოს
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
     const fileName = `${zodiacName.toLowerCase()}.png`;
     const filePath = `${ZODIAC_SIGNS_FOLDER}/${fileName}`;
@@ -150,22 +142,19 @@ export class InstagramAgent {
     return buffer;
   }
 
-  // ახალი მეთოდი: ვამატებთ ტექსტს მზა ფოტოს
   private async addTextToImage(baseImageBuffer: Buffer, zodiacName: string, horoscopeText: string): Promise<Buffer> {
     console.log('   ⚙️ ვამატებთ ტექსტს Sharp-ით...');
     
-    // მივიღოთ სურათის ზომები
     const metadata = await sharp(baseImageBuffer).metadata();
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
     
-    console.log(`    სურათის ზომა: ${width}x${height}`);
+    console.log(`   📏 სურათის ზომა: ${width}x${height}`);
 
-    // 1. შევქმნათ "What's happening today with" ტექსტი (25-40% ზონა)
     const introText = `What's happening today with`;
     const introSvg = this.createSvgText(introText, {
       x: width / 2,
-      y: height * 0.35, // 35% (25-40% ზონის შუაში)
+      y: height * 0.35,
       fontSize: 28,
       fontFamily: 'Georgia, serif',
       fill: '#2D2D2D',
@@ -174,10 +163,8 @@ export class InstagramAgent {
       letterSpacing: '2px'
     });
 
-    // 2. შევქმნათ ჰოროსკოპის ტექსტი (50-85% ზონა)
-    // ტექსტს დავშლით რამდენიმე ხაზად
-    const textLines = this.wrapText(horoscopeText, 50); // მაქს 50 სიმბოლო ხაზზე
-    const textYStart = height * 0.55; // 55%-დან დაწყება
+    const textLines = this.wrapText(horoscopeText, 45);
+    const textYStart = height * 0.55;
     const lineHeight = 40;
     
     let horoscopeSvg = '';
@@ -186,7 +173,7 @@ export class InstagramAgent {
       horoscopeSvg += this.createSvgText(line, {
         x: width / 2,
         y: y,
-        fontSize: 24,
+        fontSize: 26,
         fontFamily: 'Georgia, serif',
         fill: '#2D2D2D',
         textAnchor: 'middle',
@@ -195,7 +182,6 @@ export class InstagramAgent {
       });
     });
 
-    // გავაერთიანოთ ყველა SVG
     const combinedSvg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         ${introSvg}
@@ -205,7 +191,6 @@ export class InstagramAgent {
 
     const svgBuffer = Buffer.from(combinedSvg);
 
-    // შევქმნათ კომპოზიცია
     try {
       const result = await sharp(baseImageBuffer)
         .composite([{ input: svgBuffer, top: 0, left: 0 }])
@@ -220,7 +205,6 @@ export class InstagramAgent {
     }
   }
 
-  // დამხმარე ფუნქცია: SVG ტექსტის შექმნა
   private createSvgText(text: string, options: {
     x: number;
     y: number;
@@ -245,7 +229,6 @@ export class InstagramAgent {
     `;
   }
 
-  // დამხმარე ფუნქცია: ტექსტის გადატანა ახალ ხაზზე
   private wrapText(text: string, maxCharsPerLine: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
@@ -264,7 +247,6 @@ export class InstagramAgent {
     return lines;
   }
 
-  // დამხმარე ფუნქცია: XML სიმბოლოების ექსკეიპი
   private escapeXml(text: string): string {
     return text
       .replace(/&/g, '&amp;')
