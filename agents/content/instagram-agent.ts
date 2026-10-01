@@ -78,7 +78,6 @@ export class InstagramAgent {
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `previews/${fileName}`;
       
-      // ✅ გამოსწორებულია: წაშლილია unused 'uploadData'
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(uploadPath, finalImage, {
@@ -188,26 +187,32 @@ export class InstagramAgent {
     const header = buffer.slice(0, 4).toString('hex');
     console.log(`   🔎 ფაილის ჰედერი (Hex): ${header}`);
     if (header === '89504e47') {
-        console.log('   ℹ️ ეს არის PNG ფაილი (მიუხედავად იმისა, რომ გაფართოება შეიძლება .jpg იყოს).');
+        console.log('   ℹ️ ეს არის PNG ფაილი.');
     } else if (header.startsWith('ffd8ff')) {
         console.log('   ℹ️ ეს არის ნამდვილი JPEG ფაილი.');
     } else if (header.startsWith('52494646') && buffer.slice(8, 12).toString('ascii') === 'WEBP') {
-        console.log('   ℹ️ ეს არის WebP ფაილი (მიუხედავად .jpg გაფართოებისა).');
+        console.log('   ℹ️ ეს არის WebP ფაილი.');
     } else {
-        console.warn('   ⚠️ გაფრთხილება: ფაილის ჰედერი არ ემთხვევა სტანდარტულ JPEG/PNG/WebP ჰედერს. შესაძლოა ფაილი დაზიანებული იყოს ან სხვა ფორმატი იყოს.');
+        console.warn('   ⚠️ გაფრთხილება: ფაილის ჰედერი არ ემთხვევა სტანდარტულ ჰედერს.');
     }
 
     return buffer;
   }
 
+  // ✅ განახლებული მეთოდი: იყენებს დროებით ფაილს Sharp-ის WASM ბაფერის პრობლემების თავიდან ასაცილებლად
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
     console.log('   ⚙️ ვამზადებ Sharp კომპოზიციას...');
     const svgBuffer = Buffer.from(svgTemplate);
     console.log(`   📏 SVG ბაფერის ზომა: ${svgBuffer.length} ბაიტი`);
     console.log(`   📏 ფონის ბაფერის ზომა: ${backgroundBuffer.length} ბაიტი`);
     
+    // Workaround: ვწერთ ბაფერს დროებით ფაილში, რადგან Sharp-ის WASM ვერსიას ზოგჯერ უჭირს პირდაპირ ბაფერის წაკითხვა
+    const tempBgPath = path.join(process.cwd(), `temp-bg-${Date.now()}.jpg`);
+    fs.writeFileSync(tempBgPath, backgroundBuffer);
+    console.log(`   💾 ფონი ჩაიწერა დროებით ფაილში: ${tempBgPath}`);
+
     try {
-      const result = await sharp(backgroundBuffer)
+      const result = await sharp(tempBgPath, { failOnError: false })
         .composite([{ input: svgBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
@@ -216,6 +221,12 @@ export class InstagramAgent {
     } catch (sharpError: any) {
       console.error('   ❌ Sharp შეცდომა დეტალურად:', sharpError.message);
       throw sharpError;
+    } finally {
+      // ვასუფთავებთ დროებით ფაილს
+      if (fs.existsSync(tempBgPath)) {
+        fs.unlinkSync(tempBgPath);
+        console.log('   🧹 დროებითი ფაილი წაიშალა.');
+      }
     }
   }
 
