@@ -38,7 +38,7 @@ export class InstagramAgent {
   /**
    * ქმნის და აქვეყნებს ჰოროსკოპის პოსტს
    */
-  // შენიშვნა: _style გამოყენებულია TypeScript-ის ლინტერის შეცდომის თავიდან ასაცილებლად
+  // 👇 აქ არის გამოსწორებული: _style (რათა TS-მა არ ჩათვალოს გამოუყენებლად)
   async createAndPublish(topic: string, _style: string = 'dark-luxury') {
     try {
       console.log('🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტს...');
