@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as path from 'path';
 import * as fs from 'fs';
 import sharp from 'sharp';
+import { Resvg, initWasm } from '@resvg/resvg-wasm'; // ✅ სუფთა WASM ვერსია
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -70,7 +71,7 @@ export class InstagramAgent {
         .replace('{{HOROSCOPE_TEXT}}', horoscopeText);
       console.log('✅ პლეისჰოლდერები წარმატებით ჩანაცვლდა');
 
-      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს (Sharp)...');
+      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს...');
       const finalImage = await this.compositeImage(backgroundBuffer, svgTemplate);
       console.log(`✅ კომპოზიცია წარმატებით შეიქმნა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
@@ -186,16 +187,31 @@ export class InstagramAgent {
     return buffer;
   }
 
-  // ✅ მარტივი და საიმედო ვერსია: Vercel-ის ნატიურ sharp-ს აქვს SVG მხარდაჭერა
+  // ✅ საბოლოო, უნივერსალური მეთოდი: ჯერ SVG -> PNG (WASM-ით), შემდეგ Sharp
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
-    console.log('   ⚙️ ვამზადებ Sharp კომპოზიციას...');
-    const svgBuffer = Buffer.from(svgTemplate);
-    console.log(`   📏 SVG ბაფერის ზომა: ${svgBuffer.length} ბაიტი`);
-    console.log(`   📏 ფონის ბაფერის ზომა: ${backgroundBuffer.length} ბაიტი`);
+    console.log('   ⚙️ ვამზადებ კომპოზიციას (WASM SVG -> PNG -> Sharp)...');
     
+    // 1. Resvg WASM-ის ინიციალიზაცია (მხოლოდ ერთხელ პროცესის განმავლობაში)
+    if (!(global as any).__resvgWasmInitialized) {
+      const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
+      const wasmBuffer = fs.readFileSync(wasmPath);
+      await initWasm(wasmBuffer);
+      (global as any).__resvgWasmInitialized = true;
+      console.log('   ✅ Resvg WASM ინიციალიზებულია');
+    }
+
+    // 2. SVG ტექსტის გარდაქმნა PNG ბაფერად
+    const resvg = new Resvg(svgTemplate, {
+      fitTo: { mode: 'width', value: 1024 }, // ჩვენი SVG არის 1024x1024
+    });
+    const pngData = resvg.render();
+    const svgPngBuffer = pngData.asPng();
+    console.log(`   ✅ SVG გადაიქცა PNG-დ. ზომა: ${svgPngBuffer.length} ბაიტი`);
+
+    // 3. Sharp-ით გაერთიანება (ახლა უკვე PNG ბაფერთან, რასაც WASM sharp-იც კი მხარს უჭერს)
     try {
       const result = await sharp(backgroundBuffer)
-        .composite([{ input: svgBuffer, top: 0, left: 0 }])
+        .composite([{ input: svgPngBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
       console.log('   ✅ Sharp კომპოზიცია წარმატებულია.');
