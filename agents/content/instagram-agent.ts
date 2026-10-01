@@ -205,10 +205,12 @@ export class InstagramAgent {
       fitTo: { mode: 'width', value: 1024 }, // ჩვენი SVG არის 1024x1024
     });
     const pngData = resvg.render();
-    const svgPngBuffer = pngData.asPng();
+    
+    // ✅ გამოსწორება: Uint8Array-ის გადაყვანა Node.js Buffer-ში, რათა sharp-მა მიიღოს
+    const svgPngBuffer = Buffer.from(pngData.asPng());
     console.log(`   ✅ SVG გადაიქცა PNG-დ. ზომა: ${svgPngBuffer.length} ბაიტი`);
 
-    // 3. Sharp-ით გაერთიანება (ახლა უკვე PNG ბაფერთან, რასაც WASM sharp-იც კი მხარს უჭერს)
+    // 3. Sharp-ით გაერთიანება
     try {
       const result = await sharp(backgroundBuffer)
         .composite([{ input: svgPngBuffer, top: 0, left: 0 }])
