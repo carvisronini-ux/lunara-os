@@ -15,13 +15,14 @@ import { CredentialsPanel } from "@/components/credentials/CredentialsPanel";
 import E2ETestPanel from "@/components/e2e/E2ETestPanel";
 import DepartmentModal from "@/components/office/DepartmentModal";
 import AgentDetailModal from "@/components/agents/AgentDetailModal";
+import type { AgentStatus } from "@/core/contracts"; // ✅ გამოსწორებულია: იმპორტი აქედან
 import type { PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
 
-// ✅ იმპორტი ახალი მოდულებიდან (დამატებულია AgentStatus)
+// ✅ იმპორტი ახალი მოდულებიდან (AgentStatus ამოღებულია აქედან)
 import { 
   departments, initialAgents, initialTasks, initialResources, initialKnowledge, 
-  type Department, type Agent, type Task, type EventLog, type Resource, type EmergencyState, type AgentStatus
+  type Department, type Agent, type Task, type EventLog, type Resource, type EmergencyState
 } from "@/lib/office-data";
 import { formatTime, getStatusColor, getStatusLabel, mapEngineTypeToUI, generateMessageFromEvent } from "@/lib/dashboard-utils";
 import { StatBadge, StatBox, EmergencyButton, EmergencyStatusItem, AnalyticsModal } from "@/components/dashboard/ui-components";
