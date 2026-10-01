@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as path from 'path';
 import * as fs from 'fs';
 import sharp from 'sharp';
-import { Resvg, initWasm } from '@resvg/resvg-wasm'; // ✅ ტექსტის PNG-დ გადასაყვანად
+import { Resvg, initWasm } from '@resvg/resvg-wasm';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -117,7 +117,6 @@ export class InstagramAgent {
   }
 
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
-    // ვცდილობთ ჯერ .png-ს, თუ არ იმუშავებს, ვცდილობთ .jpg-ს (რადგან ზოგჯერ AI jpeg-ს ინახავს png გაფართოებით)
     const fileName = `${zodiacName.toLowerCase()}.png`;
     const filePath = `${ZODIAC_SIGNS_FOLDER}/${fileName}`;
     
@@ -128,7 +127,6 @@ export class InstagramAgent {
     
     const response = await fetch(publicUrl);
     
-    // თუ 404 ან სხვა შეცდომაა, ვცადოთ .jpg
     if (!response.ok) {
       const jpgFilePath = `${ZODIAC_SIGNS_FOLDER}/${zodiacName.toLowerCase()}.jpg`;
       const { data: jpgUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(jpgFilePath);
@@ -170,7 +168,6 @@ export class InstagramAgent {
     
     console.log(`   📏 სურათის ზომა: ${width}x${height}`);
 
-    // 1. Resvg WASM-ის ინიციალიზაცია (მხოლოდ ერთხელ)
     if (!this.isWasmInitialized) {
       const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
       const wasmBuffer = fs.readFileSync(wasmPath);
@@ -179,7 +176,6 @@ export class InstagramAgent {
       console.log('   ✅ Resvg WASM ინიციალიზებულია');
     }
 
-    // 2. ვქმნით SVG-ს ტექსტისთვის
     const introText = `What's happening today with`;
     const introSvg = this.createSvgText(introText, {
       x: width / 2,
@@ -218,7 +214,6 @@ export class InstagramAgent {
       </svg>
     `;
 
-    // 3. ვაქცევთ SVG-ს გამჭვირვალე PNG ბაფერად
     const resvg = new Resvg(combinedSvg, {
       fitTo: { mode: 'width', value: width },
     });
@@ -226,7 +221,6 @@ export class InstagramAgent {
     const textOverlayBuffer = Buffer.from(pngData.asPng());
     console.log(`   ✅ ტექსტი გადაიქცა PNG ოვერლეიდ. ზომა: ${textOverlayBuffer.length} ბაიტი`);
 
-    // 4. ვაერთიანებთ მთავარ სურათს და ტექსტის PNG ოვერლეის
     try {
       const result = await sharp(baseImageBuffer)
         .composite([{ input: textOverlayBuffer, top: 0, left: 0 }])
@@ -241,6 +235,7 @@ export class InstagramAgent {
     }
   }
 
+  // ✅ გამოსწორებულია: მოშორებულია შიდა ბრჭყალები fontFamily-ს გარშემო
   private createSvgText(text: string, options: {
     x: number;
     y: number;
@@ -254,15 +249,12 @@ export class InstagramAgent {
   }): string {
     const { x, y, fontSize, fontFamily, fill, textAnchor, fontWeight, letterSpacing } = options;
     
-    let style = `font-family: "${fontFamily}"; font-size: ${fontSize}px; fill: ${fill}; text-anchor: ${textAnchor};`;
+    // აქ არის გამოსწორება: fontFamily აღარ არის გაშორებული ბრჭყალებით, რათა არ გაწყვიტოს style="..."
+    let style = `font-family: ${fontFamily}; font-size: ${fontSize}px; fill: ${fill}; text-anchor: ${textAnchor};`;
     if (fontWeight) style += ` font-weight: ${fontWeight};`;
     if (letterSpacing) style += ` letter-spacing: ${letterSpacing};`;
 
-    return `
-      <text x="${x}" y="${y}" style="${style}">
-        ${this.escapeXml(text)}
-      </text>
-    `;
+    return `<text x="${x}" y="${y}" style="${style}">${this.escapeXml(text)}</text>`;
   }
 
   private wrapText(text: string, maxCharsPerLine: number): string[] {
