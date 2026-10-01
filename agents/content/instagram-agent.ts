@@ -12,7 +12,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const BUCKET_NAME = 'lunara-assets';
 const BACKGROUNDS_FOLDER = 'backgrounds/post';
 
-// ზოდიაქოს ნიშნების მონაცემები (დამატებულია georgian ველი)
 const ZODIAC_SIGNS = [
   { name: 'ARIES', symbol: '♈', dates: '21 მარტი - 19 აპრილი', georgian: 'ვერძი' },
   { name: 'TAURUS', symbol: '♉', dates: '20 აპრილი - 20 მაისი', georgian: 'კურო' },
@@ -35,29 +34,24 @@ export class InstagramAgent {
     this.instagramAdapter = new InstagramAdapter();
   }
 
-  /**
-   * 1️⃣ მხოლოდ გენერირება და გადახედვა (არ აქვეყნებს)
-   */
   async generatePreview(topic: string, _style: string = 'dark-luxury') {
     try {
       console.log('🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტის გადახედვას...');
       
-      const backgroundUrl = await this.getRandomBackground();
+      // პირდაპირ ვიღებთ Buffer-ს, URL-ის ნაცვლად
+      const backgroundBuffer = await this.getRandomBackgroundBuffer();
       const zodiac = this.getZodiacFromTopic(topic);
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
       
       const templatePath = path.join(process.cwd(), 'services', 'templates', 'horoscope-template.svg');
       let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
       
-      // საიმედო Placeholder ჩანაცვლება
       svgTemplate = svgTemplate
         .replace('{{ZODIAC_SYMBOL}}', zodiac.symbol)
         .replace('{{ZODIAC_NAME}}', zodiac.name)
         .replace('{{ZODIAC_DATE}}', zodiac.dates)
         .replace('{{HOROSCOPE_TEXT}}', horoscopeText);
 
-      const backgroundResponse = await fetch(backgroundUrl);
-      const backgroundBuffer = Buffer.from(await backgroundResponse.arrayBuffer());
       const finalImage = await this.compositeImage(backgroundBuffer, svgTemplate);
 
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
@@ -86,9 +80,6 @@ export class InstagramAgent {
     }
   }
 
-  /**
-   * 2️⃣ უკვე გენერირებული სურათის გამოქვეყნება
-   */
   async publishExisting(imageUrl: string, caption: string) {
     try {
       console.log('🚀 [InstagramAgent] ვაქვეყნებ არსებულ სურათს...');
@@ -110,10 +101,8 @@ export class InstagramAgent {
     }
   }
 
-  /**
-   * იღებს რენდომულ ფონს Supabase-დან
-   */
-  private async getRandomBackground(): Promise<string> {
+  // ✅ განახლებული მეთოდი: პირდაპირ ჩამოტვირთავს ფაილს Supabase-იდან
+  private async getRandomBackgroundBuffer(): Promise<Buffer> {
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
       .list(BACKGROUNDS_FOLDER, { limit: 100 });
@@ -121,17 +110,27 @@ export class InstagramAgent {
     if (error) throw new Error(`Failed to list backgrounds: ${error.message}`);
 
     const imageFiles = data.filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.png'));
-    if (imageFiles.length === 0) throw new Error('No background images found in bucket');
+    if (imageFiles.length === 0) {
+      throw new Error('No background images found in bucket. Please upload images to backgrounds/post/');
+    }
 
     const randomFile = imageFiles[Math.floor(Math.random() * imageFiles.length)];
-    const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(`${BACKGROUNDS_FOLDER}/${randomFile.name}`);
+    const filePath = `${BACKGROUNDS_FOLDER}/${randomFile.name}`;
     
-    return urlData.publicUrl;
+    console.log(`📥 Downloading background: ${filePath}`);
+    
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .download(filePath);
+
+    if (downloadError || !fileData) {
+      throw new Error(`Failed to download background: ${downloadError?.message || 'No data returned'}`);
+    }
+
+    const arrayBuffer = await fileData.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   }
 
-  /**
-   * აერთიანებს ფონს და SVG-ს ერთ სურათად
-   */
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
     const svgBuffer = Buffer.from(svgTemplate);
     return await sharp(backgroundBuffer)
@@ -140,9 +139,6 @@ export class InstagramAgent {
       .toBuffer();
   }
 
-  /**
-   * აგენერირებს ჰოროსკოპის ტექსტს (Mock ვერსია)
-   */
   private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
     const mockTexts: Record<string, string> = {
       'ARIES': 'დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის, რადგან სამყარო შენს თამამ ნაბიჯებს უჭერს მხარს. მოუსმინე შენს შინაგან ხმას.',
@@ -162,9 +158,6 @@ export class InstagramAgent {
     return mockTexts[zodiacName] || 'დღეს კარგი დღეა ახალი შესაძლებლობებისთვის. იყავი ღია ცვლილებების მიმართ და ენდე სამყაროს ნაკადს.';
   }
 
-  /**
-   * ამოიცნობს ზოდიაქოს ნიშანს topic-დან
-   */
   private getZodiacFromTopic(topic: string) {
     const topicUpper = topic.toUpperCase();
     for (const sign of ZODIAC_SIGNS) {
