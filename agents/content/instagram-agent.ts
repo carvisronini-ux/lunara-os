@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as path from 'path';
 import * as fs from 'fs';
 import sharp from 'sharp';
-import { Resvg, initWasm } from '@resvg/resvg-wasm'; // ✅ სუფთა WASM ვერსია
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -11,21 +10,21 @@ const supabaseKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BUCKET_NAME = 'lunara-assets';
-const BACKGROUNDS_FOLDER = 'backgrounds/post';
+const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', symbol: '♈', dates: '21 მარტი - 19 აპრილი', georgian: 'ვერძი' },
   { name: 'TAURUS', symbol: '♉', dates: '20 აპრილი - 20 მაისი', georgian: 'კურო' },
   { name: 'GEMINI', symbol: '♊', dates: '21 მაისი - 20 ივნისი', georgian: 'ტყუპი' },
-  { name: 'CANCER', symbol: '♋', dates: '21 ივნისი - 22 ივლისი', georgian: 'კირჩხიბი' },
+  { name: 'CANCER', symbol: '', dates: '21 ივნისი - 22 ივლისი', georgian: 'კირჩხიბი' },
   { name: 'LEO', symbol: '♌', dates: '23 ივლისი - 22 აგვისტო', georgian: 'ლომი' },
-  { name: 'VIRGO', symbol: '♍', dates: '23 აგვისტო - 22 სექტემბერი', georgian: 'ქალწული' },
+  { name: 'VIRGO', symbol: '', dates: '23 აგვისტო - 22 სექტემბერი', georgian: 'ქალწული' },
   { name: 'LIBRA', symbol: '♎', dates: '23 სექტემბერი - 22 ოქტომბერი', georgian: 'სასწორი' },
   { name: 'SCORPIO', symbol: '♏', dates: '23 ოქტომბერი - 21 ნოემბერი', georgian: 'მორიელი' },
   { name: 'SAGITTARIUS', symbol: '♐', dates: '22 ნოემბერი - 21 დეკემბერი', georgian: 'მშვილდოსანი' },
-  { name: 'CAPRICORN', symbol: '♑', dates: '22 დეკემბერი - 19 იანვარი', georgian: 'თხის რქა' },
+  { name: 'CAPRICORN', symbol: '', dates: '22 დეკემბერი - 19 იანვარი', georgian: 'თხის რქა' },
   { name: 'AQUARIUS', symbol: '♒', dates: '20 იანვარი - 18 თებერვალი', georgian: 'მერწყული' },
-  { name: 'PISCES', symbol: '♓', dates: '19 თებერვალი - 20 მარტი', georgian: 'თევზები' },
+  { name: 'PISCES', symbol: '', dates: '19 თებერვალი - 20 მარტი', georgian: 'თევზები' },
 ];
 
 export class InstagramAgent {
@@ -35,47 +34,33 @@ export class InstagramAgent {
     this.instagramAdapter = new InstagramAdapter();
   }
 
-  async generatePreview(topic: string, _style: string = 'dark-luxury') {
+  async generatePreview(topic: string, _style: string = 'default') {
     try {
       console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
-      console.log(`📝 თემა: "${topic}", სტილი: "${_style}"`);
+      console.log(`📝 თემა: "${topic}"`);
       
-      console.log('1️⃣ ვიღებ ფონის ბაფერს...');
-      const backgroundBuffer = await this.getRandomBackgroundBuffer();
-      console.log(`✅ ფონის ბაფერი მიღებულია. ზომა: ${backgroundBuffer.length} ბაიტი`);
-      
-      console.log('2️⃣ ვადგენ ზოდიაქოს ნიშანს...');
+      // 1. ვირჩევთ ზოდიაქოს ნიშანს
+      console.log('1️⃣ ვირჩევთ ზოდიაქოს ნიშანს...');
       const zodiac = this.getZodiacFromTopic(topic);
       console.log(`✅ არჩეული ზოდიაქო: ${zodiac.georgian} (${zodiac.name})`);
-      
-      console.log('3️⃣ ვაგენერირებ ჰოროსკოპის ტექსტს...');
+
+      // 2. ვტვირთავთ მზა ფოტოს Supabase-იდან
+      console.log('2️⃣ ვტვირთავთ მზა ფოტოს...');
+      const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
+      console.log(`✅ ფოტო ჩამოიტვირთა. ზომა: ${zodiacImageBuffer.length} ბაიტი`);
+
+      // 3. ვაგენერირებთ ჰოროსკოპის ტექსტს
+      console.log('3️⃣ ვაგენერირებთ ჰოროსკოპის ტექსტს...');
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
       console.log(`✅ ტექსტი გენერირებულია. სიგრძე: ${horoscopeText.length} სიმბოლო`);
-      
-      console.log('4️⃣ ვკითხულობ SVG შაბლონს...');
-      const templatePath = path.join(process.cwd(), 'services', 'templates', 'horoscope-template.svg');
-      console.log(`📂 შაბლონის გზა: ${templatePath}`);
-      
-      if (!fs.existsSync(templatePath)) {
-        throw new Error(`SVG შაბლონი ვერ მოიძებნა მისამართზე: ${templatePath}`);
-      }
-      
-      let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
-      console.log(`✅ შაბლონი წაკითხულია. ზომა: ${svgTemplate.length} ბაიტი`);
-      
-      console.log('5️⃣ ვანაცვლებ პლეისჰოლდერებს შაბლონში...');
-      svgTemplate = svgTemplate
-        .replace('{{ZODIAC_SYMBOL}}', zodiac.symbol)
-        .replace('{{ZODIAC_NAME}}', zodiac.name)
-        .replace('{{ZODIAC_DATE}}', zodiac.dates)
-        .replace('{{HOROSCOPE_TEXT}}', horoscopeText);
-      console.log('✅ პლეისჰოლდერები წარმატებით ჩანაცვლდა');
 
-      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს...');
-      const finalImage = await this.compositeImage(backgroundBuffer, svgTemplate);
-      console.log(`✅ კომპოზიცია წარმატებით შეიქმნა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
+      // 4. ვამატებთ ტექსტს ფოტოს
+      console.log('4️⃣ ვამატებთ ტექსტს ფოტოს...');
+      const finalImage = await this.addTextToImage(zodiacImageBuffer, zodiac.name, horoscopeText);
+      console.log(`✅ ტექსტი დაემატა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
-      console.log('7️⃣ ვტვირთავ საბოლოო სურათს Supabase-ში...');
+      // 5. ვტვირთავთ საბოლოო სურათს Supabase-ში
+      console.log('5️⃣ ვტვირთავთ საბოლოო სურათს...');
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `previews/${fileName}`;
       
@@ -134,51 +119,29 @@ export class InstagramAgent {
     }
   }
 
-  private async getRandomBackgroundBuffer(): Promise<Buffer> {
-    console.log(`   🔍 ვეძებ ფაილებს ბაქეტში: ${BUCKET_NAME} / ${BACKGROUNDS_FOLDER}`);
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .list(BACKGROUNDS_FOLDER, { limit: 100 });
-
-    if (error) {
-      console.error('   ❌ ბაქეტის სიის მიღების შეცდომა:', error);
-      throw new Error(`Failed to list backgrounds: ${error.message}`);
-    }
-
-    console.log(`   📂 ნაპოვნია ${data.length} ფაილი ბაქეტში.`);
-    const imageFiles = data.filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.png') || file.name.endsWith('.jpeg'));
+  // ახალი მეთოდი: ვტვირთავთ მზა ოდიაქოს ფოტოს
+  private async getZodiacImage(zodiacName: string): Promise<Buffer> {
+    const fileName = `${zodiacName.toLowerCase()}.png`;
+    const filePath = `${ZODIAC_SIGNS_FOLDER}/${fileName}`;
     
-    if (imageFiles.length === 0) {
-      console.error('   ❌ სურათის ფაილები ვერ მოიძებნა! ნაპოვნი ფაილები:', data.map(f => f.name));
-      throw new Error('No background images found in bucket.');
-    }
-
-    const randomFile = imageFiles[Math.floor(Math.random() * imageFiles.length)];
-    const filePath = `${BACKGROUNDS_FOLDER}/${randomFile.name}`;
-    console.log(`   🎲 არჩეულია შემთხვევითი ფაილი: ${randomFile.name} (ზომა ბაქეტში: ${randomFile.metadata?.size || 'უცნობი'} ბაიტი)`);
+    console.log(`   📥 ვტვირთავთ: ${filePath}`);
     
     const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
-    console.log(`   🔗 გენერირებული საჯარო URL: ${publicUrl}`);
     
-    console.log('   ⬇️ ვიწყებ fetch-ს...');
     const response = await fetch(publicUrl);
-    console.log(`   📡 Fetch პასუხი: სტატუსი ${response.status} ${response.statusText}`);
-    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('   ❌ Fetch შეცდომა. პასუხის ტექსტი:', errorText.substring(0, 300));
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch zodiac image: ${response.status} ${response.statusText}`);
     }
 
     const contentType = response.headers.get('content-type');
-    console.log(`   🏷️ მიღებული Content-Type: "${contentType}"`);
+    console.log(`   🏷️ Content-Type: "${contentType}"`);
 
     if (!contentType || !contentType.startsWith('image/')) {
       const textPreview = await response.text();
-      console.error('   ⚠️ შეცდომა: ფაილი არ არის სურათი! Content-Type არ არის image/...');
-      console.error('   📄 პასუხის დასაწყისი (პირველი 300 სიმბოლო):', textPreview.substring(0, 300));
-      throw new Error(`Downloaded file is not a valid image. Content-Type: ${contentType}. Preview: ${textPreview.substring(0, 100)}`);
+      console.error('   ⚠️ შეცდომა: ფაილი არ არის სურათი!');
+      console.error('   📄 პასუხის დასაწყისი:', textPreview.substring(0, 200));
+      throw new Error(`Downloaded file is not a valid image. Content-Type: ${contentType}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -187,41 +150,128 @@ export class InstagramAgent {
     return buffer;
   }
 
-  // ✅ საბოლოო, უნივერსალური მეთოდი: ჯერ SVG -> PNG (WASM-ით), შემდეგ Sharp
-  private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
-    console.log('   ⚙️ ვამზადებ კომპოზიციას (WASM SVG -> PNG -> Sharp)...');
+  // ახალი მეთოდი: ვამატებთ ტექსტს მზა ფოტოს
+  private async addTextToImage(baseImageBuffer: Buffer, zodiacName: string, horoscopeText: string): Promise<Buffer> {
+    console.log('   ⚙️ ვამატებთ ტექსტს Sharp-ით...');
     
-    // 1. Resvg WASM-ის ინიციალიზაცია (მხოლოდ ერთხელ პროცესის განმავლობაში)
-    if (!(global as any).__resvgWasmInitialized) {
-      const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
-      const wasmBuffer = fs.readFileSync(wasmPath);
-      await initWasm(wasmBuffer);
-      (global as any).__resvgWasmInitialized = true;
-      console.log('   ✅ Resvg WASM ინიციალიზებულია');
-    }
+    // მივიღოთ სურათის ზომები
+    const metadata = await sharp(baseImageBuffer).metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1350;
+    
+    console.log(`    სურათის ზომა: ${width}x${height}`);
 
-    // 2. SVG ტექსტის გარდაქმნა PNG ბაფერად
-    const resvg = new Resvg(svgTemplate, {
-      fitTo: { mode: 'width', value: 1024 }, // ჩვენი SVG არის 1024x1024
+    // 1. შევქმნათ "What's happening today with" ტექსტი (25-40% ზონა)
+    const introText = `What's happening today with`;
+    const introSvg = this.createSvgText(introText, {
+      x: width / 2,
+      y: height * 0.35, // 35% (25-40% ზონის შუაში)
+      fontSize: 28,
+      fontFamily: 'Georgia, serif',
+      fill: '#2D2D2D',
+      textAnchor: 'middle',
+      fontWeight: '400',
+      letterSpacing: '2px'
     });
-    const pngData = resvg.render();
-    
-    // ✅ გამოსწორება: Uint8Array-ის გადაყვანა Node.js Buffer-ში, რათა sharp-მა მიიღოს
-    const svgPngBuffer = Buffer.from(pngData.asPng());
-    console.log(`   ✅ SVG გადაიქცა PNG-დ. ზომა: ${svgPngBuffer.length} ბაიტი`);
 
-    // 3. Sharp-ით გაერთიანება
+    // 2. შევქმნათ ჰოროსკოპის ტექსტი (50-85% ზონა)
+    // ტექსტს დავშლით რამდენიმე ხაზად
+    const textLines = this.wrapText(horoscopeText, 50); // მაქს 50 სიმბოლო ხაზზე
+    const textYStart = height * 0.55; // 55%-დან დაწყება
+    const lineHeight = 40;
+    
+    let horoscopeSvg = '';
+    textLines.forEach((line, index) => {
+      const y = textYStart + (index * lineHeight);
+      horoscopeSvg += this.createSvgText(line, {
+        x: width / 2,
+        y: y,
+        fontSize: 24,
+        fontFamily: 'Georgia, serif',
+        fill: '#2D2D2D',
+        textAnchor: 'middle',
+        fontWeight: '400',
+        lineHeight: lineHeight
+      });
+    });
+
+    // გავაერთიანოთ ყველა SVG
+    const combinedSvg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        ${introSvg}
+        ${horoscopeSvg}
+      </svg>
+    `;
+
+    const svgBuffer = Buffer.from(combinedSvg);
+
+    // შევქმნათ კომპოზიცია
     try {
-      const result = await sharp(backgroundBuffer)
-        .composite([{ input: svgPngBuffer, top: 0, left: 0 }])
+      const result = await sharp(baseImageBuffer)
+        .composite([{ input: svgBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
+      
       console.log('   ✅ Sharp კომპოზიცია წარმატებულია.');
       return result;
     } catch (sharpError: any) {
       console.error('   ❌ Sharp შეცდომა დეტალურად:', sharpError.message);
       throw sharpError;
     }
+  }
+
+  // დამხმარე ფუნქცია: SVG ტექსტის შექმნა
+  private createSvgText(text: string, options: {
+    x: number;
+    y: number;
+    fontSize: number;
+    fontFamily: string;
+    fill: string;
+    textAnchor: string;
+    fontWeight?: string;
+    letterSpacing?: string;
+    lineHeight?: number;
+  }): string {
+    const { x, y, fontSize, fontFamily, fill, textAnchor, fontWeight, letterSpacing } = options;
+    
+    let style = `font-family: "${fontFamily}"; font-size: ${fontSize}px; fill: ${fill}; text-anchor: ${textAnchor};`;
+    if (fontWeight) style += ` font-weight: ${fontWeight};`;
+    if (letterSpacing) style += ` letter-spacing: ${letterSpacing};`;
+
+    return `
+      <text x="${x}" y="${y}" style="${style}">
+        ${this.escapeXml(text)}
+      </text>
+    `;
+  }
+
+  // დამხმარე ფუნქცია: ტექსტის გადატანა ახალ ხაზზე
+  private wrapText(text: string, maxCharsPerLine: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    words.forEach(word => {
+      if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
+        currentLine = (currentLine + ' ' + word).trim();
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    });
+
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  }
+
+  // დამხმარე ფუნქცია: XML სიმბოლოების ექსკეიპი
+  private escapeXml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
   }
 
   private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
