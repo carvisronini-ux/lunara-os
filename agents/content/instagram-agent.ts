@@ -78,7 +78,8 @@ export class InstagramAgent {
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `previews/${fileName}`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // ✅ გამოსწორებულია: წაშლილია unused 'uploadData'
+      const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(uploadPath, finalImage, {
           contentType: 'image/jpeg',
@@ -173,7 +174,6 @@ export class InstagramAgent {
     const contentType = response.headers.get('content-type');
     console.log(`   🏷️ მიღებული Content-Type: "${contentType}"`);
 
-    // კრიტიკული შემოწმება: დარწმუნება, რომ ეს ნამდვილად სურათია და არა HTML შეცდომის გვერდი
     if (!contentType || !contentType.startsWith('image/')) {
       const textPreview = await response.text();
       console.error('   ⚠️ შეცდომა: ფაილი არ არის სურათი! Content-Type არ არის image/...');
@@ -185,7 +185,6 @@ export class InstagramAgent {
     const buffer = Buffer.from(arrayBuffer);
     console.log(`   ✅ წარმატებით ჩამოიტვირთა ${buffer.length} ბაიტი.`);
     
-    // დამატებითი დიაგნოსტიკა: ვამოწმებთ ფაილის რეალურ ჰექს-ჰედერს (Magic Number)
     const header = buffer.slice(0, 4).toString('hex');
     console.log(`   🔎 ფაილის ჰედერი (Hex): ${header}`);
     if (header === '89504e47') {
