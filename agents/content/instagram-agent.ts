@@ -1,18 +1,15 @@
 // ============================================================
-// LUNARA OS — Instagram Agent
+// LUNARA OS — Instagram Agent (Professional Version)
 // Foundation: §4 (Brand Visuals), §28 (Echo Distribution)
-// Purpose: Generate AI image, upload to get public URL, generate IG caption, and publish.
+// Purpose: Creative Director (Prompt/Caption Gen) -> Image Gen -> Upload -> Publish.
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js';
-
-// ყურადღება: ბილიკები შეცვლილია (../../), რადგან ფაილი agents/content/ საქაღალდეშია
 import { generateImage, ImageGenerationOptions } from '../../services/image/image-generator';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateWithProvider } from '../../services/credentials/providers/adapter';
 import { credentialVault } from '../../services/credentials/credential-vault';
 
-// Supabase კლიენტის ინიციალიზაცია (.env-დან)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
 const supabaseKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -22,6 +19,7 @@ const STORAGE_BUCKET = 'lunara-assets';
 export interface InstagramPostResult {
   success: boolean;
   imageUrl?: string;
+  imagePrompt?: string;
   caption?: string;
   postId?: string;
   error?: string;
@@ -35,16 +33,59 @@ export class InstagramAgent {
   }
 
   /**
-   * სრული ციკლი: სურათის გენერაცია -> ატვირთვა -> კაფშენის შექმნა -> პუბლიკაცია
+   * სრული ციკლი: კრეატიული გენერაცია -> სურათის შექმნა -> ატვირთვა -> პუბლიკაცია
    */
   async createAndPublish(topic: string, style: 'dark-luxury' | 'cosmic-editorial' | 'mystic-minimal' = 'dark-luxury'): Promise<InstagramPostResult> {
-    console.log(`[InstagramAgent] 🚀 Starting full cycle for topic: "${topic}"`);
+    console.log(`[InstagramAgent] 🚀 Starting professional cycle for topic: "${topic}"`);
 
     try {
-      // 1. AI სურათის გენერაცია
+      // 0. კრეატიული დირექტორი: პრომპტისა და კაფშენის გენერაცია ერთი LLM ზარით
+      console.log('[InstagramAgent] 🧠 Creative Director generating prompts...');
+      const activeCred = credentialVault.getMetadata().find(c => c.status === 'ACTIVE');
+      if (!activeCred) throw new Error('No active credentials for creative generation');
+      
+      const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
+      const modelName = activeCred.metadata?.recommendedModel || '';
+
+      const creativeSystemPrompt = `You are the Creative Director for LUNARA, a Dark Luxury / Cosmic Astrology brand. 
+Given the topic: "${topic}", generate a JSON object with exactly two keys:
+1. "imagePrompt": A highly detailed, visually evocative prompt for an AI image generator. Focus on lighting, composition, colors, and atmosphere. Style: ${style}. NO text or words in the image.
+2. "caption": A very short, mystical, and engaging Instagram caption (max 2-3 sentences). Use 1-2 relevant emojis. End with exactly 3-5 aesthetic hashtags (e.g., #LunaraOS #CosmicEnergy #DarkLuxury). NO links.
+Output MUST be valid JSON only.`;
+
+      const creativeGen = await generateWithProvider(
+        activeCred.provider,
+        apiKey!,
+        modelName,
+        `Topic: ${topic}`,
+        creativeSystemPrompt
+      );
+
+      // ფოლბექი, თუ JSON-ის პარსინგი ვერ მოხერხდა
+      let imagePrompt = `A mystical glowing tarot card floating in deep cosmic space, ${style} aesthetic, highly detailed, cinematic lighting, 8k resolution`;
+      let caption = `🌙 ${topic}\n\n#LUNARA #CosmicEnergy #DarkLuxury`;
+
+      if (creativeGen.success && creativeGen.content) {
+        try {
+          // ვასუფთავებთ ზედმეტ სიმბოლოებს (ზოგჯერ LLM ამატებს ```json ... ```)
+          const cleanJson = creativeGen.content.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          if (parsed.imagePrompt) imagePrompt = parsed.imagePrompt;
+          if (parsed.caption) caption = parsed.caption;
+          console.log('[InstagramAgent] ✅ Creative Director succeeded.');
+        } catch (e) {
+          console.warn('[InstagramAgent] ⚠️ JSON parse failed, using fallback prompts. Raw output:', creativeGen.content.substring(0, 100));
+          imagePrompt = `${topic}, ${style} aesthetic, highly detailed, cinematic lighting, 8k resolution, masterpiece`;
+        }
+      }
+
+      console.log(`[InstagramAgent] 🎨 Final Image Prompt: "${imagePrompt.substring(0, 60)}..."`);
+      console.log(`[InstagramAgent] ✍️ Final Caption: "${caption.substring(0, 60)}..."`);
+
+      // 1. AI სურათის გენერაცია (ახლა უკვე "ჭკვიანი" პრომპტით)
       console.log('[InstagramAgent] 🎨 Generating image...');
       const imageOptions: ImageGenerationOptions = {
-        visualPrompt: topic,
+        visualPrompt: imagePrompt,
         style: style,
         aspectRatio: '1:1'
       };
@@ -56,7 +97,7 @@ export class InstagramAgent {
       }
       console.log(`[InstagramAgent] ✅ Image generated successfully (${imgResult.imageBuffer.length} bytes) via ${imgResult.provider}`);
 
-      // 2. სურათის ატვირთვა Supabase-ში (გამოსწორებულია TypeScript შეცდომა)
+      // 2. სურათის ატვირთვა Supabase-ში
       console.log('[InstagramAgent] ☁️ Uploading to Supabase Storage...');
       const fileName = `ig-post-${Date.now()}-${Math.floor(Math.random() * 1000)}.jpg`;
       
@@ -78,32 +119,7 @@ export class InstagramAgent {
       
       console.log(`[InstagramAgent] ✅ Uploaded. Public URL: ${publicUrl}`);
 
-      // 3. Instagram-სპეციფიკური კაფშენის გენერაცია
-      console.log('[InstagramAgent] ✍️ Generating Instagram-specific caption...');
-      const activeCred = credentialVault.getMetadata().find(c => c.status === 'ACTIVE');
-      if (!activeCred) throw new Error('No active credentials for caption generation');
-      
-      const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
-      const modelName = activeCred.metadata?.recommendedModel || '';
-
-      const igSystemPrompt = `You are an expert Instagram Copywriter for LUNARA (Dark Luxury / Cosmic Astrology brand). 
-      Write a VERY SHORT, visually evocative caption (max 2-3 sentences). 
-      Use 1-2 relevant emojis. 
-      End with exactly 3-5 highly relevant, aesthetic hashtags (e.g., #LunaraOS #CosmicEnergy #DarkLuxury). 
-      Do NOT include links. Do NOT be generic.`;
-
-      const captionGen = await generateWithProvider(
-        activeCred.provider,
-        apiKey!,
-        modelName,
-        `Topic: ${topic}`,
-        igSystemPrompt
-      );
-
-      const caption = captionGen.success ? captionGen.content.trim() : `🌙 ${topic}\n\n#LUNARA #CosmicEnergy #DarkLuxury`;
-      console.log(`[InstagramAgent] ✅ Caption generated: "${caption.substring(0, 50)}..."`);
-
-      // 4. გამოქვეყნება Instagram-ზე
+      // 3. გამოქვეყნება Instagram-ზე
       console.log('[InstagramAgent] 📤 Publishing to Instagram via Graph API...');
       const publishResult = await this.instagramAdapter.publishPost(publicUrl, caption);
 
@@ -112,6 +128,7 @@ export class InstagramAgent {
         return {
           success: true,
           imageUrl: publicUrl,
+          imagePrompt: imagePrompt,
           caption: caption,
           postId: publishResult.postId
         };

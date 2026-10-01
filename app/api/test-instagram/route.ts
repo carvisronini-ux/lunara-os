@@ -8,10 +8,11 @@ export async function GET() {
   try {
     const agent = new InstagramAgent();
     
-    const testTopic = "A mystical glowing tarot card floating in deep cosmic space, dark luxury aesthetic, highly detailed, cinematic lighting, 8k resolution";
+    // აქ ვწერთ მხოლოდ ზოგად თემას/იდეას. აგენტი თავად შექმნის დეტალურ ვიზუალურ პრომპტს.
+    const testTopic = "ვერძის მთვარე, ენერგიის ახალი ტალღა და შინაგანი ცეცხლი";
     
-    console.log(`📝 Topic: "${testTopic}"`);
-    console.log("⏳ Waiting for image generation and upload (may take 15-30 seconds)...");
+    console.log(`📝 შეყვანილი თემა: "${testTopic}"`);
+    console.log("⏳ ველოდებით კრეატიულ გენერაციას, სურათის შექმნას და ატვირთვას (შეიძლება 20-40 წამი დასჭირდეს)...");
     
     const result = await agent.createAndPublish(testTopic, 'dark-luxury');
     
@@ -19,9 +20,11 @@ export async function GET() {
       console.log("✅ SUCCESS! Published to Instagram.");
       return NextResponse.json({
         success: true,
-        message: "Post published successfully!",
+        message: "პოსტი წარმატებით გამოქვეყნდა!",
+        originalTopic: testTopic,
+        aiGeneratedImagePrompt: result.imagePrompt, // აქ ნახავ, რა დაფიქრდა აგენტმა
+        aiGeneratedCaption: result.caption,
         imageUrl: result.imageUrl,
-        caption: result.caption,
         postId: result.postId,
         instagramUrl: `https://www.instagram.com/p/${result.postId}`
       }, { status: 200 });
@@ -30,7 +33,7 @@ export async function GET() {
       return NextResponse.json({
         success: false,
         error: result.error,
-        hint: "Check if Instagram Access Token is still valid (expires in 1 hour in Dev mode)."
+        hint: "შეამოწმე ტერმინალის ლოგები დეტალური ინფორმაციისთვის."
       }, { status: 500 });
     }
     
