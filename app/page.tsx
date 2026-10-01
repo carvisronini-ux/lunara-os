@@ -18,10 +18,10 @@ import AgentDetailModal from "@/components/agents/AgentDetailModal";
 import type { PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
 
-// ✅ იმპორტი ახალი მოდულებიდან
+// ✅ იმპორტი ახალი მოდულებიდან (დამატებულია AgentStatus)
 import { 
   departments, initialAgents, initialTasks, initialResources, initialKnowledge, 
-  type Department, type Agent, type Task, type EventLog, type Resource, type EmergencyState 
+  type Department, type Agent, type Task, type EventLog, type Resource, type EmergencyState, type AgentStatus
 } from "@/lib/office-data";
 import { formatTime, getStatusColor, getStatusLabel, mapEngineTypeToUI, generateMessageFromEvent } from "@/lib/dashboard-utils";
 import { StatBadge, StatBox, EmergencyButton, EmergencyStatusItem, AnalyticsModal } from "@/components/dashboard/ui-components";
