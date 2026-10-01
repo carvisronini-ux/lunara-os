@@ -1,0 +1,30 @@
+<!-- services/templates/horoscope-template.svg -->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- ფონი გამჭვირვალეა - ქვემოთ ფოტო გამოჩნდება -->
+  
+  <!-- ზედა ნაწილი: ზოდიაქოს სიმბოლო -->
+  <text id="zodiac-symbol" x="512" y="200" font-family="'Playfair Display', 'Georgia', serif" font-size="180" fill="#D4AF37" text-anchor="middle">♈</text>
+  
+  <!-- ზოდიაქოს სახელი -->
+  <text id="zodiac-name" x="512" y="320" font-family="'Playfair Display', 'Georgia', serif" font-size="72" fill="#FFFFFF" text-anchor="middle" font-weight="bold" letter-spacing="8">ARIES</text>
+  
+  <!-- თარიღი -->
+  <text id="zodiac-dates" x="512" y="380" font-family="'Inter', 'Arial', sans-serif" font-size="28" fill="#A0A0A0" text-anchor="middle" letter-spacing="3">21 მარტი - 19 აპრილი</text>
+
+  <!-- დეკორატიული ხაზი -->
+  <line x1="362" y1="430" x2="662" y2="430" stroke="#D4AF37" stroke-width="2" opacity="0.8"/>
+
+  <!-- ჰოროსკოპის ტექსტი (ეს Stella-მ უნდა შეცვალოს) -->
+  <foreignObject x="112" y="480" width="800" height="380">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: 'Inter', 'Arial', sans-serif; font-size: 32px; line-height: 1.7; color: #FFFFFF; text-align: center; font-weight: 300;">
+      დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის, რადგან სამყარო შენს თამამ ნაბიჯებს უჭერს მხარს. მოუსმინე შენს შინაგან ხმას და იმოქმედე გაბედულად.
+    </div>
+  </foreignObject>
+
+  <!-- ქვედა დეკორატიული ხაზი -->
+  <line x1="362" y1="900" x2="662" y2="900" stroke="#D4AF37" stroke-width="1" opacity="0.5"/>
+  
+  <!-- ბრენდინგი -->
+  <text x="512" y="950" font-family="'Playfair Display', 'Georgia', serif" font-size="36" fill="#FFFFFF" text-anchor="middle" letter-spacing="8">LUNARA</text>
+  <text x="512" y="990" font-family="'Inter', 'Arial', sans-serif" font-size="18" fill="#A0A0A0" text-anchor="middle" letter-spacing="3">@lunaraosapp</text>
+</svg>
