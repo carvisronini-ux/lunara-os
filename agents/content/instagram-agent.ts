@@ -38,7 +38,6 @@ export class InstagramAgent {
     try {
       console.log('🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტის გადახედვას...');
       
-      // პირდაპირ ვიღებთ Buffer-ს, URL-ის ნაცვლად
       const backgroundBuffer = await this.getRandomBackgroundBuffer();
       const zodiac = this.getZodiacFromTopic(topic);
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
@@ -101,7 +100,7 @@ export class InstagramAgent {
     }
   }
 
-  // ✅ განახლებული მეთოდი: პირდაპირ ჩამოტვირთავს ფაილს Supabase-იდან
+  // ✅ განახლებული, 100%-ით საიმედო მეთოდი ფაილის ჩამოსატვირთად Next.js-ში
   private async getRandomBackgroundBuffer(): Promise<Buffer> {
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
@@ -109,26 +108,43 @@ export class InstagramAgent {
 
     if (error) throw new Error(`Failed to list backgrounds: ${error.message}`);
 
-    const imageFiles = data.filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.png'));
+    const imageFiles = data.filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.png') || file.name.endsWith('.jpeg'));
     if (imageFiles.length === 0) {
-      throw new Error('No background images found in bucket. Please upload images to backgrounds/post/');
+      throw new Error('No background images found in bucket. Please upload valid images to backgrounds/post/');
     }
 
     const randomFile = imageFiles[Math.floor(Math.random() * imageFiles.length)];
     const filePath = `${BACKGROUNDS_FOLDER}/${randomFile.name}`;
     
-    console.log(`📥 Downloading background: ${filePath}`);
+    console.log(`📥 ვცდილობ ჩამოვტვირთო: ${filePath} (ფაილის ზომა ბაქეტში: ${randomFile.metadata?.size || 'უცნობი'} bytes)`);
     
-    const { data: fileData, error: downloadError } = await supabase.storage
+    // ვქმნით დროებით Signed URL-ს (მუშაობს მაშინაც კი, თუ ბაქეტი private-ია)
+    const { data: signedUrlData, error: signError } = await supabase.storage
       .from(BUCKET_NAME)
-      .download(filePath);
+      .createSignedUrl(filePath, 60); // 60 წამი საკმარისია ჩამოსატვირთად
 
-    if (downloadError || !fileData) {
-      throw new Error(`Failed to download background: ${downloadError?.message || 'No data returned'}`);
+    if (signError || !signedUrlData) {
+      throw new Error(`Failed to create signed URL: ${signError?.message}`);
     }
 
-    const arrayBuffer = await fileData.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+    // ვიყენებთ fetch-ს, რაც Next.js/Node.js-ში ყველაზე საიმედო გზაა ბინარული მონაცემების მისაღებად
+    const response = await fetch(signedUrlData.signedUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image from Supabase: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    console.log(`✅ წარმატებით ჩამოიტვირთა ${buffer.length} ბაიტი.`);
+    
+    // დიაგნოსტიკა: თუ ფაილი ძალიან მცირეა, ის ალბათ HTML შეცდომაა და არა სურათი
+    if (buffer.length < 1000) {
+      console.warn('⚠️ გაფრთხილება: ჩამოტვირთული ფაილი ძალიან მცირეა. შესაძლოა ეს იყოს HTML შეცდომის გვერდი და არა რეალური სურათი.');
+      console.warn('პირველი 50 ბაიტი:', buffer.slice(0, 50).toString('utf8'));
+    }
+
+    return buffer;
   }
 
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
