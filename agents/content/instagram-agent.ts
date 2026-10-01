@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as path from 'path';
 import * as fs from 'fs';
 import sharp from 'sharp';
-import { Resvg } from '@resvg/resvg-js'; // ✅ ახალი იმპორტი SVG-ს PNG-დ გადასაყვანად
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -71,7 +70,7 @@ export class InstagramAgent {
         .replace('{{HOROSCOPE_TEXT}}', horoscopeText);
       console.log('✅ პლეისჰოლდერები წარმატებით ჩანაცვლდა');
 
-      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს...');
+      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს (Sharp)...');
       const finalImage = await this.compositeImage(backgroundBuffer, svgTemplate);
       console.log(`✅ კომპოზიცია წარმატებით შეიქმნა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
@@ -184,29 +183,19 @@ export class InstagramAgent {
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     console.log(`   ✅ წარმატებით ჩამოიტვირთა ${buffer.length} ბაიტი.`);
-    
     return buffer;
   }
 
-  // ✅ განახლებული მეთოდი: ჯერ ვაქცევთ SVG-ს PNG-დ, შემდეგ ვაერთიანებთ
+  // ✅ მარტივი და საიმედო ვერსია: Vercel-ის ნატიურ sharp-ს აქვს SVG მხარდაჭერა
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
-    console.log('   ⚙️ ვამზადებ კომპოზიციას...');
+    console.log('   ⚙️ ვამზადებ Sharp კომპოზიციას...');
+    const svgBuffer = Buffer.from(svgTemplate);
+    console.log(`   📏 SVG ბაფერის ზომა: ${svgBuffer.length} ბაიტი`);
+    console.log(`   📏 ფონის ბაფერის ზომა: ${backgroundBuffer.length} ბაიტი`);
     
-    // 1. ვაქცევთ SVG-ს PNG ბაფერად @resvg/resvg-js-ის გამოყენებით
-    // (რადგან sharp-ის WASM ვერსიას ხშირად არ აქვს SVG მხარდაჭერა)
-    console.log('   🔄 ვაქცევ SVG-ს PNG-დ...');
-    const resvg = new Resvg(svgTemplate, {
-      fitTo: { mode: 'width', value: 1024 }, // SVG არის 1024x1024
-    });
-    const pngData = resvg.render();
-    const svgPngBuffer = pngData.asPng();
-    console.log(`   ✅ SVG გადაიქცა PNG-დ. ზომა: ${svgPngBuffer.length} ბაიტი`);
-
-    // 2. ვაერთიანებთ ფონს და SVG-ს (ახლა უკვე PNG-ს) sharp-ით
-    console.log('   🖼️ ვაერთიანებ ფონს და PNG ოვერლეის...');
     try {
       const result = await sharp(backgroundBuffer)
-        .composite([{ input: svgPngBuffer, top: 0, left: 0 }])
+        .composite([{ input: svgBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
       console.log('   ✅ Sharp კომპოზიცია წარმატებულია.');

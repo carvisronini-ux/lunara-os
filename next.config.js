@@ -14,17 +14,6 @@ const nextConfig = {
       },
     ],
   },
-
-  // ✅ დამატებულია Webpack კონფიგურაცია .node ფაილების სწორად დასამუშავებლად
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.module.rules.push({
-        test: /\.node$/,
-        loader: 'next/dist/build/webpack/loaders/native-module-loader',
-      });
-    }
-    return config;
-  },
 };
 
 module.exports = nextConfig;
