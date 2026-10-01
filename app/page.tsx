@@ -15,7 +15,7 @@ import { CredentialsPanel } from "@/components/credentials/CredentialsPanel";
 import E2ETestPanel from "@/components/e2e/E2ETestPanel";
 import DepartmentModal from "@/components/office/DepartmentModal";
 import AgentDetailModal from "@/components/agents/AgentDetailModal";
-import type { EventType, TaskStatus, AgentStatus } from "@/core/contracts";
+import type { TaskStatus, AgentStatus } from "@/core/contracts";
 import type { PipelineDefinition } from "@/core/orchestration/orchestrator";
 import type { Opportunity } from "@/core/intelligence/opportunity";
 
