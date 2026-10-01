@@ -45,7 +45,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     
     if (found) {
       setSelectedZodiac(found);
-      pushEvent("system", `✅ არჩეულია ოდიაქო: ${found.georgian} (${found.name})`);
+      pushEvent("system", `✅ არჩეულია ზოდიაქო: ${found.georgian} (${found.name})`);
       setStep("format");
     } else {
       pushEvent("error", `❌ ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
@@ -169,19 +169,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1: ზუსტად შუაში ილუსტრაციასა და LEO-ს შორის (35% სიმაღლეზე - ჩაწეული) */}
+                    {/* ტექსტი1: 40% სიმაღლეზე, გადიდებული შრიფტით */}
                     {text1 && (
                       <div 
                         className="absolute w-full text-center px-8"
                         style={{ 
-                          top: '35%',
+                          top: '40%',
                           transform: 'translateY(-50%)'
                         }}
                       >
                         <div 
                           className="text-[#2D2D2D] font-serif italic tracking-wide font-medium"
                           style={{ 
-                            fontSize: '22px',
+                            fontSize: '26px',
                             textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)',
                             WebkitTextStroke: '0.6px rgba(255,255,255,0.5)'
                           }}
@@ -191,13 +191,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2: LEO-ს ქვემოთ (63%-დან დაწყებული - ჩაწეული) */}
+                    {/* ტექსტი2: 65%-დან დაწყებული */}
                     {text2 && (
                       <div 
                         className="absolute w-full px-8 overflow-hidden"
                         style={{ 
-                          top: '63%',
-                          height: '25%',
+                          top: '65%',
+                          height: '23%',
                           display: 'flex',
                           alignItems: 'flex-start',
                           justifyContent: 'center'
