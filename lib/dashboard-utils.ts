@@ -1,5 +1,5 @@
 // lib/dashboard-utils.ts
-import type { EventType, AgentStatus } from "@/core/contracts"; // ✅ გამოსწორებულია: AgentStatus აქედან მოდის
+import type { EventType } from "@/core/contracts"; // ✅ AgentStatus ამოღებულია, რადგან არ გამოიყენება
 import type { EventLog } from "./office-data";
 
 export function formatTime(timestamp = Date.now()) {
@@ -57,7 +57,7 @@ export function getStatusLabel(status: string) {
 }
 
 export function mapEngineTypeToUI(type: EventType): EventLog["type"] {
-  const mapping: Record<EventType, EventLog["type"]> = {
+  const mapping: Record<string, EventLog["type"]> = {
     TASK_CREATED: "task",
     TASK_STARTED: "task",
     TASK_COMPLETED: "task",
@@ -102,7 +102,7 @@ export function mapEngineTypeToUI(type: EventType): EventLog["type"] {
 }
 
 export function generateMessageFromEvent(event: any): string {
-  const type = event.type as EventType;
+  const type = event.type as string;
   const payload = event.payload || {};
   
   switch (type) {
