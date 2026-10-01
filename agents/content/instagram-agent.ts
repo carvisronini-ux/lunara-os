@@ -36,36 +36,65 @@ export class InstagramAgent {
 
   async generatePreview(topic: string, _style: string = 'dark-luxury') {
     try {
-      console.log('🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტის გადახედვას...');
+      console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
+      console.log(`📝 თემა: "${topic}", სტილი: "${_style}"`);
       
+      console.log('1️⃣ ვიღებ ფონის ბაფერს...');
       const backgroundBuffer = await this.getRandomBackgroundBuffer();
+      console.log(`✅ ფონის ბაფერი მიღებულია. ზომა: ${backgroundBuffer.length} ბაიტი`);
+      
+      console.log('2️⃣ ვადგენ ზოდიაქოს ნიშანს...');
       const zodiac = this.getZodiacFromTopic(topic);
+      console.log(`✅ არჩეული ზოდიაქო: ${zodiac.georgian} (${zodiac.name})`);
+      
+      console.log('3️⃣ ვაგენერირებ ჰოროსკოპის ტექსტს...');
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
+      console.log(`✅ ტექსტი გენერირებულია. სიგრძე: ${horoscopeText.length} სიმბოლო`);
       
+      console.log('4️⃣ ვკითხულობ SVG შაბლონს...');
       const templatePath = path.join(process.cwd(), 'services', 'templates', 'horoscope-template.svg');
-      let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
+      console.log(`📂 შაბლონის გზა: ${templatePath}`);
       
+      if (!fs.existsSync(templatePath)) {
+        throw new Error(`SVG შაბლონი ვერ მოიძებნა მისამართზე: ${templatePath}`);
+      }
+      
+      let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
+      console.log(`✅ შაბლონი წაკითხულია. ზომა: ${svgTemplate.length} ბაიტი`);
+      
+      console.log('5️⃣ ვანაცვლებ პლეისჰოლდერებს შაბლონში...');
       svgTemplate = svgTemplate
         .replace('{{ZODIAC_SYMBOL}}', zodiac.symbol)
         .replace('{{ZODIAC_NAME}}', zodiac.name)
         .replace('{{ZODIAC_DATE}}', zodiac.dates)
         .replace('{{HOROSCOPE_TEXT}}', horoscopeText);
+      console.log('✅ პლეისჰოლდერები წარმატებით ჩანაცვლდა');
 
+      console.log('6️⃣ ვაერთიანებ ფონს და SVG-ს (Sharp)...');
       const finalImage = await this.compositeImage(backgroundBuffer, svgTemplate);
+      console.log(`✅ კომპოზიცია წარმატებით შეიქმნა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
+      console.log('7️⃣ ვტვირთავ საბოლოო სურათს Supabase-ში...');
       const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
-      const { error: uploadError } = await supabase.storage
+      const uploadPath = `previews/${fileName}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(`previews/${fileName}`, finalImage, {
+        .upload(uploadPath, finalImage, {
           contentType: 'image/jpeg',
           upsert: false
         });
 
-      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+      if (uploadError) {
+        console.error('❌ Supabase ატვირთვის შეცდომა:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+      console.log(`✅ სურათი ატვირთულია: ${uploadPath}`);
 
-      const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(`previews/${fileName}`).data.publicUrl;
+      const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(uploadPath).data.publicUrl;
       const caption = `${zodiac.symbol} ${zodiac.georgian} - დღის ჰოროსკოპი\n\n${horoscopeText}\n\n#LUNARA #Horoscope #${zodiac.georgian} #Astrology #DailyHoroscope`;
 
+      console.log('🎉 === გენერაცია წარმატებით დასრულდა ===\n');
       return {
         success: true,
         imageUrl: publicUrl,
@@ -74,7 +103,11 @@ export class InstagramAgent {
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('❌ [InstagramAgent] Preview error:', errorMsg);
+      console.error('\n❌ [InstagramAgent] Preview error:', errorMsg);
+      if (error instanceof Error && error.stack) {
+        console.error('📚 Stack trace:', error.stack);
+      }
+      console.log('===================================================\n');
       return { success: false, error: errorMsg };
     }
   }
@@ -101,44 +134,90 @@ export class InstagramAgent {
   }
 
   private async getRandomBackgroundBuffer(): Promise<Buffer> {
+    console.log(`   🔍 ვეძებ ფაილებს ბაქეტში: ${BUCKET_NAME} / ${BACKGROUNDS_FOLDER}`);
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
       .list(BACKGROUNDS_FOLDER, { limit: 100 });
 
-    if (error) throw new Error(`Failed to list backgrounds: ${error.message}`);
+    if (error) {
+      console.error('   ❌ ბაქეტის სიის მიღების შეცდომა:', error);
+      throw new Error(`Failed to list backgrounds: ${error.message}`);
+    }
 
+    console.log(`   📂 ნაპოვნია ${data.length} ფაილი ბაქეტში.`);
     const imageFiles = data.filter(file => file.name.endsWith('.jpg') || file.name.endsWith('.png') || file.name.endsWith('.jpeg'));
+    
     if (imageFiles.length === 0) {
+      console.error('   ❌ სურათის ფაილები ვერ მოიძებნა! ნაპოვნი ფაილები:', data.map(f => f.name));
       throw new Error('No background images found in bucket.');
     }
 
     const randomFile = imageFiles[Math.floor(Math.random() * imageFiles.length)];
     const filePath = `${BACKGROUNDS_FOLDER}/${randomFile.name}`;
+    console.log(`   🎲 არჩეულია შემთხვევითი ფაილი: ${randomFile.name} (ზომა ბაქეტში: ${randomFile.metadata?.size || 'უცნობი'} ბაიტი)`);
     
-    // ვიყენებთ საჯარო URL-ს, რადგან ბაქეტი public-ია
     const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
+    console.log(`   🔗 გენერირებული საჯარო URL: ${publicUrl}`);
     
-    console.log(`📥 ვცდილობ ჩამოვტვირთო საჯარო URL-ით: ${publicUrl}`);
-    
+    console.log('   ⬇️ ვიწყებ fetch-ს...');
     const response = await fetch(publicUrl);
+    console.log(`   📡 Fetch პასუხი: სტატუსი ${response.status} ${response.statusText}`);
+    
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('   ❌ Fetch შეცდომა. პასუხის ტექსტი:', errorText.substring(0, 300));
       throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+
+    const contentType = response.headers.get('content-type');
+    console.log(`   🏷️ მიღებული Content-Type: "${contentType}"`);
+
+    // კრიტიკული შემოწმება: დარწმუნება, რომ ეს ნამდვილად სურათია და არა HTML შეცდომის გვერდი
+    if (!contentType || !contentType.startsWith('image/')) {
+      const textPreview = await response.text();
+      console.error('   ⚠️ შეცდომა: ფაილი არ არის სურათი! Content-Type არ არის image/...');
+      console.error('   📄 პასუხის დასაწყისი (პირველი 300 სიმბოლო):', textPreview.substring(0, 300));
+      throw new Error(`Downloaded file is not a valid image. Content-Type: ${contentType}. Preview: ${textPreview.substring(0, 100)}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    console.log(`   ✅ წარმატებით ჩამოიტვირთა ${buffer.length} ბაიტი.`);
     
-    console.log(`✅ წარმატებით ჩამოიტვირთა ${buffer.length} ბაიტი.`);
+    // დამატებითი დიაგნოსტიკა: ვამოწმებთ ფაილის რეალურ ჰექს-ჰედერს (Magic Number)
+    const header = buffer.slice(0, 4).toString('hex');
+    console.log(`   🔎 ფაილის ჰედერი (Hex): ${header}`);
+    if (header === '89504e47') {
+        console.log('   ℹ️ ეს არის PNG ფაილი (მიუხედავად იმისა, რომ გაფართოება შეიძლება .jpg იყოს).');
+    } else if (header.startsWith('ffd8ff')) {
+        console.log('   ℹ️ ეს არის ნამდვილი JPEG ფაილი.');
+    } else if (header.startsWith('52494646') && buffer.slice(8, 12).toString('ascii') === 'WEBP') {
+        console.log('   ℹ️ ეს არის WebP ფაილი (მიუხედავად .jpg გაფართოებისა).');
+    } else {
+        console.warn('   ⚠️ გაფრთხილება: ფაილის ჰედერი არ ემთხვევა სტანდარტულ JPEG/PNG/WebP ჰედერს. შესაძლოა ფაილი დაზიანებული იყოს ან სხვა ფორმატი იყოს.');
+    }
+
     return buffer;
   }
 
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
+    console.log('   ⚙️ ვამზადებ Sharp კომპოზიციას...');
     const svgBuffer = Buffer.from(svgTemplate);
-    return await sharp(backgroundBuffer)
-      .composite([{ input: svgBuffer, top: 0, left: 0 }])
-      .jpeg({ quality: 95 })
-      .toBuffer();
+    console.log(`   📏 SVG ბაფერის ზომა: ${svgBuffer.length} ბაიტი`);
+    console.log(`   📏 ფონის ბაფერის ზომა: ${backgroundBuffer.length} ბაიტი`);
+    
+    try {
+      const result = await sharp(backgroundBuffer)
+        .composite([{ input: svgBuffer, top: 0, left: 0 }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      console.log('   ✅ Sharp კომპოზიცია წარმატებულია.');
+      return result;
+    } catch (sharpError: any) {
+      console.error('   ❌ Sharp შეცდომა დეტალურად:', sharpError.message);
+      throw sharpError;
+    }
   }
 
   private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
