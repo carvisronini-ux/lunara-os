@@ -36,10 +36,11 @@ export type Task = {
   createdAt: number;
 };
 
+// ✅ გამოსწორებულია: დამატებულია "knowledge" | "content" | "intelligence" | "distribution"
 export type EventLog = {
   id: string;
   timestamp: string;
-  type: "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
+  type: "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval" | "knowledge" | "content" | "intelligence" | "distribution";
   message: string;
 };
 
