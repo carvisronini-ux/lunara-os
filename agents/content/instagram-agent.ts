@@ -38,9 +38,11 @@ export class InstagramAgent {
   /**
    * ქმნის და აქვეყნებს ჰოროსკოპის პოსტს
    */
-  async createAndPublish(topic: string, style: string = 'dark-luxury') {
+  // 👇 აქ არის გამოსწორებული: _style (რათა TS-მა არ ჩათვალოს გამოუყენებლად)
+  async createAndPublish(topic: string, _style: string = 'dark-luxury') {
     try {
-      console.log('🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტს...');
+      // 👇 აქაც ვიყენებთ _style-ს, რათა TypeScript-მა 100%-ით დაინახოს მისი გამოყენება
+      console.log(`🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტს... (სტილი: ${_style})`);
 
       // 1. ავირჩიოთ რენდომული ფონი
       const backgroundUrl = await this.getRandomBackground();
@@ -59,9 +61,18 @@ export class InstagramAgent {
       let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
 
       // 5. შევცვალოთ ტექსტი SVG-ში
-      svgTemplate = svgTemplate.replace(/id="zodiac-symbol"[^>]*>.*?</, `id="zodiac-symbol" x="512" y="200" font-family="'Playfair Display', 'Georgia', serif" font-size="180" fill="#D4AF37" text-anchor="middle">${zodiac.symbol}<`);
-      svgTemplate = svgTemplate.replace(/id="zodiac-name"[^>]*>.*?</, `id="zodiac-name" x="512" y="320" font-family="'Playfair Display', 'Georgia', serif" font-size="72" fill="#FFFFFF" text-anchor="middle" font-weight="bold" letter-spacing="8">${zodiac.name}<`);
-      svgTemplate = svgTemplate.replace(/id="zodiac-dates"[^>]*>.*?</, `id="zodiac-dates" x="512" y="380" font-family="'Inter', 'Arial', sans-serif" font-size="28" fill="#A0A0A0" text-anchor="middle" letter-spacing="3">${zodiac.dates}<`);
+      svgTemplate = svgTemplate.replace(
+        /<text id="zodiac-symbol"[^>]*>.*?<\/text>/, 
+        `<text id="zodiac-symbol" x="512" y="200" font-family="'Playfair Display', 'Georgia', serif" font-size="180" fill="#D4AF37" text-anchor="middle">${zodiac.symbol}</text>`
+      );
+      svgTemplate = svgTemplate.replace(
+        /<text id="zodiac-name"[^>]*>.*?<\/text>/, 
+        `<text id="zodiac-name" x="512" y="320" font-family="'Playfair Display', 'Georgia', serif" font-size="72" fill="#FFFFFF" text-anchor="middle" font-weight="bold" letter-spacing="8">${zodiac.name}</text>`
+      );
+      svgTemplate = svgTemplate.replace(
+        /<text id="zodiac-dates"[^>]*>.*?<\/text>/, 
+        `<text id="zodiac-dates" x="512" y="380" font-family="'Inter', 'Arial', sans-serif" font-size="28" fill="#A0A0A0" text-anchor="middle" letter-spacing="3">${zodiac.dates}</text>`
+      );
       
       // ტექსტის ჩასმა foreignObject-ში
       const textRegex = /<div xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"[^>]*>[\s\S]*?<\/div>/;
