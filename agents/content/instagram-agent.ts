@@ -199,7 +199,7 @@ export class InstagramAgent {
     return buffer;
   }
 
-  // ✅ განახლებული მეთოდი: იყენებს დროებით ფაილს Sharp-ის WASM ბაფერის პრობლემების თავიდან ასაცილებლად
+  // ✅ განახლებული მეთოდი: ამოღებულია failOnError, რომელიც TS-ში შეცდომას იწვევდა
   private async compositeImage(backgroundBuffer: Buffer, svgTemplate: string): Promise<Buffer> {
     console.log('   ⚙️ ვამზადებ Sharp კომპოზიციას...');
     const svgBuffer = Buffer.from(svgTemplate);
@@ -212,7 +212,7 @@ export class InstagramAgent {
     console.log(`   💾 ფონი ჩაიწერა დროებით ფაილში: ${tempBgPath}`);
 
     try {
-      const result = await sharp(tempBgPath, { failOnError: false })
+      const result = await sharp(tempBgPath)
         .composite([{ input: svgBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
