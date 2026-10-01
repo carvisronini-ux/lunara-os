@@ -1,6 +1,9 @@
 // agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
+import * as path from 'path';
+import * as fs from 'fs';
 import sharp from 'sharp';
+import { Resvg, initWasm } from '@resvg/resvg-wasm'; // ✅ ტექსტის PNG-დ გადასაყვანად
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -27,6 +30,7 @@ const ZODIAC_SIGNS = [
 
 export class InstagramAgent {
   private instagramAdapter: InstagramAdapter;
+  private isWasmInitialized = false;
 
   constructor() {
     this.instagramAdapter = new InstagramAdapter();
@@ -50,7 +54,6 @@ export class InstagramAgent {
       console.log(`✅ ტექსტი გენერირებულია. სიგრძე: ${horoscopeText.length} სიმბოლო`);
 
       console.log('4️⃣ ვამატებთ ტექსტს ფოტოს...');
-      // ✅ გამოსწორებულია: zodiac.name ამოღებულია არგუმენტებიდან
       const finalImage = await this.addTextToImage(zodiacImageBuffer, horoscopeText);
       console.log(`✅ ტექსტი დაემატა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
@@ -114,19 +117,34 @@ export class InstagramAgent {
   }
 
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
+    // ვცდილობთ ჯერ .png-ს, თუ არ იმუშავებს, ვცდილობთ .jpg-ს (რადგან ზოგჯერ AI jpeg-ს ინახავს png გაფართოებით)
     const fileName = `${zodiacName.toLowerCase()}.png`;
     const filePath = `${ZODIAC_SIGNS_FOLDER}/${fileName}`;
     
-    console.log(`   📥 ვტვირთავთ: ${filePath}`);
+    console.log(`   📥 ვცდილობთ ჩამოვტვირთოთ: ${filePath}`);
     
     const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
     const publicUrl = urlData.publicUrl;
     
     const response = await fetch(publicUrl);
+    
+    // თუ 404 ან სხვა შეცდომაა, ვცადოთ .jpg
     if (!response.ok) {
-      throw new Error(`Failed to fetch zodiac image: ${response.status} ${response.statusText}`);
+      const jpgFilePath = `${ZODIAC_SIGNS_FOLDER}/${zodiacName.toLowerCase()}.jpg`;
+      const { data: jpgUrlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(jpgFilePath);
+      console.log(`   ⚠️ .png ვერ მოიძებნა, ვცდილობთ: ${jpgFilePath}`);
+      
+      const jpgResponse = await fetch(jpgUrlData.publicUrl);
+      if (!jpgResponse.ok) {
+        throw new Error(`Failed to fetch zodiac image (tried both .png and .jpg): ${response.status}`);
+      }
+      return this.processImageResponse(jpgResponse);
     }
 
+    return this.processImageResponse(response);
+  }
+
+  private async processImageResponse(response: Response): Promise<Buffer> {
     const contentType = response.headers.get('content-type');
     console.log(`   🏷️ Content-Type: "${contentType}"`);
 
@@ -143,9 +161,8 @@ export class InstagramAgent {
     return buffer;
   }
 
-  // ✅ გამოსწორებულია: zodiacName პარამეტრი ამოღებულია
   private async addTextToImage(baseImageBuffer: Buffer, horoscopeText: string): Promise<Buffer> {
-    console.log('   ⚙️ ვამატებთ ტექსტს Sharp-ით...');
+    console.log('   ⚙️ ვამზადებ ტექსტის ოვერლეის (WASM Resvg -> PNG -> Sharp)...');
     
     const metadata = await sharp(baseImageBuffer).metadata();
     const width = metadata.width || 1080;
@@ -153,6 +170,16 @@ export class InstagramAgent {
     
     console.log(`   📏 სურათის ზომა: ${width}x${height}`);
 
+    // 1. Resvg WASM-ის ინიციალიზაცია (მხოლოდ ერთხელ)
+    if (!this.isWasmInitialized) {
+      const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
+      const wasmBuffer = fs.readFileSync(wasmPath);
+      await initWasm(wasmBuffer);
+      this.isWasmInitialized = true;
+      console.log('   ✅ Resvg WASM ინიციალიზებულია');
+    }
+
+    // 2. ვქმნით SVG-ს ტექსტისთვის
     const introText = `What's happening today with`;
     const introSvg = this.createSvgText(introText, {
       x: width / 2,
@@ -191,11 +218,18 @@ export class InstagramAgent {
       </svg>
     `;
 
-    const svgBuffer = Buffer.from(combinedSvg);
+    // 3. ვაქცევთ SVG-ს გამჭვირვალე PNG ბაფერად
+    const resvg = new Resvg(combinedSvg, {
+      fitTo: { mode: 'width', value: width },
+    });
+    const pngData = resvg.render();
+    const textOverlayBuffer = Buffer.from(pngData.asPng());
+    console.log(`   ✅ ტექსტი გადაიქცა PNG ოვერლეიდ. ზომა: ${textOverlayBuffer.length} ბაიტი`);
 
+    // 4. ვაერთიანებთ მთავარ სურათს და ტექსტის PNG ოვერლეის
     try {
       const result = await sharp(baseImageBuffer)
-        .composite([{ input: svgBuffer, top: 0, left: 0 }])
+        .composite([{ input: textOverlayBuffer, top: 0, left: 0 }])
         .jpeg({ quality: 95 })
         .toBuffer();
       
