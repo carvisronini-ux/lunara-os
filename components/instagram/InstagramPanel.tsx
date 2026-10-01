@@ -45,10 +45,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     
     if (found) {
       setSelectedZodiac(found);
-      pushEvent("system", `✅ არჩეულია ზოდიაქო: ${found.georgian} (${found.name})`);
+      pushEvent("system", `✅ არჩეულია ოდიაქო: ${found.georgian} (${found.name})`);
       setStep("format");
     } else {
-      pushEvent("error", ` ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
+      pushEvent("error", `❌ ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
     }
   };
 
@@ -101,7 +101,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   return (
     <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
-        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram მენეჯერი (მანუალური რეიმი)</h2>
+        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram მენეჯერი (მანუალური რეჟიმი)</h2>
         <p className="text-base text-slate-400">ეტაპობრივად შექმენი და გამოაქვეყნე ჰოროსკოპის პოსტი სრული ვიზუალური კონტროლით.</p>
       </div>
 
@@ -169,12 +169,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1: ზუსტად შუაში ილუსტრაციასა და LEO-ს შორის (32% სიმაღლეზე) */}
+                    {/* ტექსტი1: ზუსტად შუაში ილუსტრაციასა და LEO-ს შორის (35% სიმაღლეზე - ჩაწეული) */}
                     {text1 && (
                       <div 
                         className="absolute w-full text-center px-8"
                         style={{ 
-                          top: '32%',
+                          top: '35%',
                           transform: 'translateY(-50%)'
                         }}
                       >
@@ -191,13 +191,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2: LEO-ს ქვემოთ (60%-დან დაწყებული) */}
+                    {/* ტექსტი2: LEO-ს ქვემოთ (63%-დან დაწყებული - ჩაწეული) */}
                     {text2 && (
                       <div 
                         className="absolute w-full px-8 overflow-hidden"
                         style={{ 
-                          top: '60%',
-                          height: '28%',
+                          top: '63%',
+                          height: '25%',
                           display: 'flex',
                           alignItems: 'flex-start',
                           justifyContent: 'center'
