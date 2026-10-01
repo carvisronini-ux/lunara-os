@@ -31,8 +31,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<PostFormat | null>(null);
-  const [text1, setText1] = useState(""); // ტექსტი1: ილუსტრაციასა და სახელს შორის
-  const [text2, setText2] = useState(""); // ტექსტი2: სახელის ქვემოთ (ჰოროსკოპი)
+  const [text1, setText1] = useState("");
+  const [text2, setText2] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
 
   const imageUrl = selectedZodiac 
@@ -48,7 +48,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       pushEvent("system", `✅ არჩეულია ზოდიაქო: ${found.georgian} (${found.name})`);
       setStep("format");
     } else {
-      pushEvent("error", `❌ ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
+      pushEvent("error", ` ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
     }
   };
 
@@ -88,11 +88,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         setText1("");
         setText2("");
       } else {
-        pushEvent("error", ` შეცდომა: ${data.error}`);
+        pushEvent("error", `❌ შეცდომა: ${data.error}`);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      pushEvent("error", ` კრიტიკული შეცდომა: ${errorMsg}`);
+      pushEvent("error", `❌ კრიტიკული შეცდომა: ${errorMsg}`);
     } finally {
       setIsPublishing(false);
     }
@@ -101,11 +101,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   return (
     <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
-        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram მენეჯერი (მანუალური რეჟიმი)</h2>
+        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram მენეჯერი (მანუალური რეიმი)</h2>
         <p className="text-base text-slate-400">ეტაპობრივად შექმენი და გამოაქვეყნე ჰოროსკოპის პოსტი სრული ვიზუალური კონტროლით.</p>
       </div>
 
-      {/* ნაბიჯი 1: ზოდიაქოს არჩევა */}
       {step === "input" && (
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center">
           <h3 className="text-xl font-black text-white mb-4">ნაბიჯი 1: აირჩიე ზოდიაქოს ნიშანი</h3>
@@ -126,7 +125,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </div>
       )}
 
-      {/* ნაბიჯი 2: ფორმატის არჩევა */}
       {step === "format" && selectedZodiac && (
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8">
           <h3 className="text-xl font-black text-white mb-6 text-center">ნაბიჯი 2: რა ფორმატის პოსტი გინდა {selectedZodiac.georgian}-სთვის?</h3>
@@ -151,7 +149,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </div>
       )}
 
-      {/* ნაბიჯი 3: ვიზუალური გადახედვა და ტექსტის დამატება */}
       {step === "preview" && selectedZodiac && imageUrl && (
         <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/50 backdrop-blur-xl p-8">
           <div className="flex items-center justify-between mb-6">
@@ -170,23 +167,23 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
-                {/* Live CSS Preview - მხოლოდ ტექსტი1 და ტექსტი2 (LEO უკვე ფოტოზეა) */}
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1: ილუსტრაციასა და სახელს შორის (33-38% სიმაღლე) */}
+                    {/* ტექსტი1: ზუსტად შუაში ილუსტრაციასა და LEO-ს შორის (32% სიმაღლეზე) */}
                     {text1 && (
                       <div 
                         className="absolute w-full text-center px-8"
                         style={{ 
-                          top: '35%',
+                          top: '32%',
                           transform: 'translateY(-50%)'
                         }}
                       >
                         <div 
-                          className="text-[#2D2D2D] text-sm font-serif italic tracking-wide font-medium"
+                          className="text-[#2D2D2D] font-serif italic tracking-wide font-medium"
                           style={{ 
-                            textShadow: '0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.7), 2px 2px 4px rgba(0,0,0,0.3)',
-                            WebkitTextStroke: '0.5px rgba(255,255,255,0.4)'
+                            fontSize: '22px',
+                            textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)',
+                            WebkitTextStroke: '0.6px rgba(255,255,255,0.5)'
                           }}
                         >
                           {text1}
@@ -194,23 +191,24 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2: სახელის ქვემოთ (55%-დან 85%-მდე) */}
+                    {/* ტექსტი2: LEO-ს ქვემოთ (60%-დან დაწყებული) */}
                     {text2 && (
                       <div 
                         className="absolute w-full px-8 overflow-hidden"
                         style={{ 
-                          top: '55%',
-                          height: '30%',
+                          top: '60%',
+                          height: '28%',
                           display: 'flex',
                           alignItems: 'flex-start',
                           justifyContent: 'center'
                         }}
                       >
                         <div 
-                          className="text-[#2D2D2D] text-base font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
+                          className="text-[#2D2D2D] font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
                           style={{ 
-                            textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
-                            WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
+                            fontSize: '18px',
+                            textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)',
+                            WebkitTextStroke: '0.4px rgba(255,255,255,0.4)',
                             maxHeight: '100%',
                             overflow: 'hidden'
                           }}
@@ -226,7 +224,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
             {/* ტექსტების შეყვანა */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
-              {/* ტექსტი1 */}
               <div>
                 <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი1 (ილუსტრაციასა და სახელს შორის)</div>
                 <textarea
@@ -237,13 +234,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 />
               </div>
 
-              {/* ტექსტი2 */}
               <div className="flex-1">
                 <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი2 (სახელის ქვემოთ - ჰოროსკოპის აღწერა)</div>
                 <textarea
                   value={text2}
                   onChange={(e) => setText2(e.target.value)}
-                  placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი... მაგალითად: დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის..."
+                  placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი..."
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none min-h-[200px]"
                 />
               </div>
@@ -259,7 +255,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     მუშავდება და ქვეყნდება...
                   </>
                 ) : (
-                  <> დადასტურება და გამოქვეყნება</>
+                  <>🚀 დადასტურება და გამოქვეყნება</>
                 )}
               </button>
             </div>
