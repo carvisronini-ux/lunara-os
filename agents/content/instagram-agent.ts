@@ -38,10 +38,8 @@ export class InstagramAgent {
   /**
    * ქმნის და აქვეყნებს ჰოროსკოპის პოსტს
    */
-  // 👇 აქ არის გამოსწორებული: _style (რათა TS-მა არ ჩათვალოს გამოუყენებლად)
   async createAndPublish(topic: string, _style: string = 'dark-luxury') {
     try {
-      // 👇 აქაც ვიყენებთ _style-ს, რათა TypeScript-მა 100%-ით დაინახოს მისი გამოყენება
       console.log(`🎨 [InstagramAgent] ვქმნი ჰოროსკოპის პოსტს... (სტილი: ${_style})`);
 
       // 1. ავირჩიოთ რენდომული ფონი
@@ -52,11 +50,11 @@ export class InstagramAgent {
       const zodiac = this.getZodiacFromTopic(topic);
       console.log('♈ ზოდიაქო:', zodiac.name);
 
-      // 3. დავაგენერიროთ ჰოროსკოპის ტექსტი (ჯერჯერობით Mock, მომავალში AI)
+      // 3. დავაგენერიროთ ჰოროსკოპის ტექსტი
       const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
       console.log('📝 ტექსტი დაგენერირებულია');
 
-      // 4. წავიკითხოთ SVG თემფლეითი (საიმედო აბსოლუტური ბილიკი)
+      // 4. წავიკითხოთ SVG თემფლეითი
       const templatePath = path.join(process.cwd(), 'services', 'templates', 'horoscope-template.svg');
       let svgTemplate = fs.readFileSync(templatePath, 'utf-8');
 
@@ -178,7 +176,8 @@ export class InstagramAgent {
   /**
    * აგენერირებს ჰოროსკოპის ტექსტს (Mock ვერსია)
    */
-  private async generateHoroscopeText(zodiacName: string, topic: string): Promise<string> {
+  // 👇 აქ არის გამოსწორებული: _topic (რათა TS-მა არ ჩათვალოს გამოუყენებლად)
+  private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
     const mockTexts: Record<string, string> = {
       'ARIES': 'დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის, რადგან სამყარო შენს თამამ ნაბიჯებს უჭერს მხარს.',
       'TAURUS': 'სტაბილურობა და კომფორტი დღეს შენი მთავარი თემებია. მოუსმინე შენს სხეულს და მიეცი მას დასვენება.',
