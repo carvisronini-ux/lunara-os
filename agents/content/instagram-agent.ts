@@ -41,12 +41,12 @@ export class InstagramAgent {
     console.log(`[InstagramAgent] 🚀 Starting full cycle for topic: "${topic}"`);
 
     try {
-      // 1. AI სურათის გენერაცია (ვიყენებთ შენს არსებულ სერვისს)
+      // 1. AI სურათის გენერაცია
       console.log('[InstagramAgent] 🎨 Generating image...');
       const imageOptions: ImageGenerationOptions = {
         visualPrompt: topic,
         style: style,
-        aspectRatio: '1:1' // Instagram-ისთვის იდეალურია 1:1
+        aspectRatio: '1:1'
       };
       
       const imgResult = await generateImage(imageOptions);
@@ -56,11 +56,11 @@ export class InstagramAgent {
       }
       console.log(`[InstagramAgent] ✅ Image generated successfully (${imgResult.imageBuffer.length} bytes) via ${imgResult.provider}`);
 
-      // 2. სურათის ატვირთვა Supabase-ში საჯარო URL-ის მისაღებად
+      // 2. სურათის ატვირთვა Supabase-ში (გამოსწორებულია TypeScript შეცდომა)
       console.log('[InstagramAgent] ☁️ Uploading to Supabase Storage...');
       const fileName = `ig-post-${Date.now()}-${Math.floor(Math.random() * 1000)}.jpg`;
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(fileName, imgResult.imageBuffer, {
           contentType: 'image/jpeg',
