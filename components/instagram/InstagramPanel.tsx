@@ -31,10 +31,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<PostFormat | null>(null);
-  const [horoscopeText, setHoroscopeText] = useState("");
+  const [text1, setText1] = useState(""); // ტექსტი1: ილუსტრაციასა და სახელს შორის
+  const [text2, setText2] = useState(""); // ტექსტი2: სახელის ქვემოთ (ჰოროსკოპი)
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // რადგან ბაქეტი საჯაროა, URL-ს პირდაპირ ვაგებთ მყისიერი ვიზუალიზაციისთვის!
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
     : null;
@@ -60,7 +60,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   };
 
   const handlePublish = async () => {
-    if (!imageUrl || !horoscopeText || !selectedZodiac || !selectedFormat) return;
+    if (!imageUrl || !text2 || !selectedZodiac || !selectedFormat) return;
     setIsPublishing(true);
     pushEvent("system", `🚀 იწყება საბოლოო კომპოზიცია და გამოქვეყნება...`);
 
@@ -71,7 +71,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         body: JSON.stringify({
           zodiacName: selectedZodiac.name,
           format: selectedFormat,
-          horoscopeText: horoscopeText
+          text1: text1,
+          text2: text2
         })
       });
       
@@ -80,18 +81,18 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         pushEvent("success", `🎉 წარმატებით გამოქვეყნდა! ID: ${data.postId}`);
         alert(`წარმატებით გამოქვეყნდა!\nInstagram URL: ${data.instagramUrl}`);
         
-        // რესეტი
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
         setSelectedFormat(null);
-        setHoroscopeText("");
+        setText1("");
+        setText2("");
       } else {
-        pushEvent("error", `❌ შეცდომა: ${data.error}`);
+        pushEvent("error", ` შეცდომა: ${data.error}`);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      pushEvent("error", `❌ კრიტიკული შეცდომა: ${errorMsg}`);
+      pushEvent("error", ` კრიტიკული შეცდომა: ${errorMsg}`);
     } finally {
       setIsPublishing(false);
     }
@@ -131,9 +132,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <h3 className="text-xl font-black text-white mb-6 text-center">ნაბიჯი 2: რა ფორმატის პოსტი გინდა {selectedZodiac.georgian}-სთვის?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { id: 'post', title: ' პოსტი', desc: '1080x1350 (პორტრეტი)', color: 'blue' },
-              { id: 'story', title: '⚡ სთორი', desc: '1080x1920 (ვერტიკალური)', color: 'purple' },
-              { id: 'carousel', title: '🖼️ კარუსელი', desc: '1080x1080 (კვადრატული)', color: 'emerald' }
+              { id: 'post', title: '📱 პოსტი', desc: '1080x1350 (პორტრეტი)' },
+              { id: 'story', title: '⚡ სთორი', desc: '1080x1920 (ვერტიკალური)' },
+              { id: 'carousel', title: '🖼️ კარუსელი', desc: '1080x1080 (კვადრატული)' }
             ].map((fmt) => (
               <button
                 key={fmt.id}
@@ -169,118 +170,98 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
-                {/* Live CSS Preview of Text Overlay - იდეალური პოზიციებით და ფერებით */}
-                {horoscopeText && (
+                {/* Live CSS Preview - მხოლოდ ტექსტი1 და ტექსტი2 (LEO უკვე ფოტოზეა) */}
+                {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* "What's happening today with" - 35% სიმაღლეზე */}
-                    <div 
-                      className="absolute w-full text-center px-8"
-                      style={{ 
-                        top: '33%',
-                        transform: 'translateY(-50%)'
-                      }}
-                    >
+                    {/* ტექსტი1: ილუსტრაციასა და სახელს შორის (33-38% სიმაღლე) */}
+                    {text1 && (
                       <div 
-                        className="text-[#2D2D2D] text-sm font-serif italic tracking-wide font-medium"
+                        className="absolute w-full text-center px-8"
                         style={{ 
-                          textShadow: '0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.7), 2px 2px 4px rgba(0,0,0,0.3)',
-                          WebkitTextStroke: '0.5px rgba(255,255,255,0.4)'
+                          top: '35%',
+                          transform: 'translateY(-50%)'
                         }}
                       >
-                        What's happening today with
+                        <div 
+                          className="text-[#2D2D2D] text-sm font-serif italic tracking-wide font-medium"
+                          style={{ 
+                            textShadow: '0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.7), 2px 2px 4px rgba(0,0,0,0.3)',
+                            WebkitTextStroke: '0.5px rgba(255,255,255,0.4)'
+                          }}
+                        >
+                          {text1}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* ზოდიაქოს სახელი - 42% სიმაღლეზე */}
-                    <div 
-                      className="absolute w-full text-center px-8"
-                      style={{ 
-                        top: '42%',
-                        transform: 'translateY(-50%)'
-                      }}
-                    >
+                    {/* ტექსტი2: სახელის ქვემოთ (55%-დან 85%-მდე) */}
+                    {text2 && (
                       <div 
-                        className="text-[#2D2D2D] text-3xl font-serif font-bold uppercase tracking-widest"
+                        className="absolute w-full px-8 overflow-hidden"
                         style={{ 
-                          textShadow: '0 0 15px rgba(255,255,255,0.95), 0 0 30px rgba(255,255,255,0.8), 2px 2px 6px rgba(0,0,0,0.4)',
-                          WebkitTextStroke: '1px rgba(255,255,255,0.5)'
+                          top: '55%',
+                          height: '30%',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'center'
                         }}
                       >
-                        {selectedZodiac.name}
+                        <div 
+                          className="text-[#2D2D2D] text-base font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
+                          style={{ 
+                            textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
+                            WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
+                            maxHeight: '100%',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {text2}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* დეკორატიული ხაზი - 47% სიმაღლეზე */}
-                    <div 
-                      className="absolute w-full flex justify-center"
-                      style={{ 
-                        top: '47%',
-                        transform: 'translateY(-50%)'
-                      }}
-                    >
-                      <div 
-                        className="w-16 h-px"
-                        style={{ 
-                          backgroundColor: 'rgba(45, 45, 45, 0.6)',
-                          boxShadow: '0 0 10px rgba(255,255,255,0.9)'
-                        }}
-                      ></div>
-                    </div>
-
-                    {/* ჰოროსკოპის ტექსტი - 55%-დან 85%-მდე */}
-                    <div 
-                      className="absolute w-full px-8 overflow-hidden"
-                      style={{ 
-                        top: '55%',
-                        height: '30%',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <div 
-                        className="text-[#2D2D2D] text-base font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
-                        style={{ 
-                          textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
-                          WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
-                          maxHeight: '100%',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        {horoscopeText}
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* ტექსტის შეყვანა */}
-            <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col">
-              <div className="text-xs font-bold text-slate-400 mb-3">ჰოროსკოპის ტექსტი (ჩაწერე ან ჩააკოპირე)</div>
-              <textarea
-                value={horoscopeText}
-                onChange={(e) => setHoroscopeText(e.target.value)}
-                placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი... მაგალითად: დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის..."
-                className="flex-1 w-full bg-slate-900 border border-white/10 rounded-lg p-4 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none min-h-[300px]"
-              />
-              
-              <div className="mt-4 flex gap-3">
-                <button 
-                  onClick={handlePublish}
-                  disabled={isPublishing || !horoscopeText}
-                  className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2"
-                >
-                  {isPublishing ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      მუშავდება და ქვეყნდება...
-                    </>
-                  ) : (
-                    <>🚀 დადასტურება და გამოქვეყნება</>
-                  )}
-                </button>
+            {/* ტექსტების შეყვანა */}
+            <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
+              {/* ტექსტი1 */}
+              <div>
+                <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი1 (ილუსტრაციასა და სახელს შორის)</div>
+                <textarea
+                  value={text1}
+                  onChange={(e) => setText1(e.target.value)}
+                  placeholder="მაგალითად: What's happening today with"
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20"
+                />
               </div>
+
+              {/* ტექსტი2 */}
+              <div className="flex-1">
+                <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი2 (სახელის ქვემოთ - ჰოროსკოპის აღწერა)</div>
+                <textarea
+                  value={text2}
+                  onChange={(e) => setText2(e.target.value)}
+                  placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი... მაგალითად: დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის..."
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none min-h-[200px]"
+                />
+              </div>
+              
+              <button 
+                onClick={handlePublish}
+                disabled={isPublishing || !text2}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2"
+              >
+                {isPublishing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    მუშავდება და ქვეყნდება...
+                  </>
+                ) : (
+                  <> დადასტურება და გამოქვეყნება</>
+                )}
+              </button>
             </div>
           </div>
         </div>
