@@ -1,19 +1,19 @@
 // app/api/test-instagram/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { InstagramAgent } from '@/agents/content/instagram-agent';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   console.log("🚀 [API] Instagram Test Route called!");
   
   try {
-    const agent = new InstagramAgent();
-    
-    // აქ ვწერთ მხოლოდ ზოგად თემას/იდეას. აგენტი თავად შექმნის დეტალურ ვიზუალურ პრომპტს.
-    const testTopic = "ვერძის მთვარე, ენერგიის ახალი ტალღა და შინაგანი ცეცხლი";
+    const searchParams = request.nextUrl.searchParams;
+    const topicParam = searchParams.get('topic');
+    const testTopic = topicParam || "ვერძის მთვარე, ენერგიის ახალი ტალღა და შინაგანი ცეცხლი";
     
     console.log(`📝 შეყვანილი თემა: "${testTopic}"`);
-    console.log("⏳ ველოდებით კრეატიულ გენერაციას, სურათის შექმნას და ატვირთვას (შეიძლება 20-40 წამი დასჭირდეს)...");
+    console.log("⏳ ველოდებით კრეატიულ გენერაციას, სურათის შექმნას და ატვირთვას...");
     
+    const agent = new InstagramAgent();
     const result = await agent.createAndPublish(testTopic, 'dark-luxury');
     
     if (result.success) {
@@ -22,7 +22,7 @@ export async function GET() {
         success: true,
         message: "პოსტი წარმატებით გამოქვეყნდა!",
         originalTopic: testTopic,
-        aiGeneratedImagePrompt: result.imagePrompt, // აქ ნახავ, რა დაფიქრდა აგენტმა
+        aiGeneratedImagePrompt: result.imagePrompt,
         aiGeneratedCaption: result.caption,
         imageUrl: result.imageUrl,
         postId: result.postId,
@@ -36,7 +36,6 @@ export async function GET() {
         hint: "შეამოწმე ტერმინალის ლოგები დეტალური ინფორმაციისთვის."
       }, { status: 500 });
     }
-    
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     console.error("💥 CRITICAL ERROR:", errorMsg);

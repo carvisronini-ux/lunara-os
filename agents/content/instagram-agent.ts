@@ -39,10 +39,19 @@ export class InstagramAgent {
     console.log(`[InstagramAgent] 🚀 Starting professional cycle for topic: "${topic}"`);
 
     try {
-      // 0. კრეატიული დირექტორი: პრომპტისა და კაფშენის გენერაცია ერთი LLM ზარით
+      // 0. დავრწმუნდეთ, რომ Credential Vault ჩატვირთულია
+      await credentialVault.ready;
+      
       console.log('[InstagramAgent] 🧠 Creative Director generating prompts...');
-      const activeCred = credentialVault.getMetadata().find(c => c.status === 'ACTIVE');
-      if (!activeCred) throw new Error('No active credentials for creative generation');
+      const credentials = credentialVault.getMetadata();
+      
+      // ვეძებთ ნებისმიერ აქტიურ გასაღებს (ტექსტის გენერაციისთვის)
+      const activeCred = credentials.find(c => c.status === 'ACTIVE');
+      
+      if (!activeCred) {
+        console.error('[InstagramAgent] ❌ Available credentials:', credentials.map(c => `${c.provider} (${c.status})`));
+        throw new Error('No active credentials found in Vault for creative generation');
+      }
       
       const apiKey = credentialVault.getDecryptedValueForTesting(activeCred.credential_id);
       const modelName = activeCred.metadata?.recommendedModel || '';
@@ -67,7 +76,6 @@ Output MUST be valid JSON only.`;
 
       if (creativeGen.success && creativeGen.content) {
         try {
-          // ვასუფთავებთ ზედმეტ სიმბოლოებს (ზოგჯერ LLM ამატებს ```json ... ```)
           const cleanJson = creativeGen.content.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
           if (parsed.imagePrompt) imagePrompt = parsed.imagePrompt;
@@ -79,10 +87,10 @@ Output MUST be valid JSON only.`;
         }
       }
 
-      console.log(`[InstagramAgent] 🎨 Final Image Prompt: "${imagePrompt.substring(0, 60)}..."`);
-      console.log(`[InstagramAgent] ✍️ Final Caption: "${caption.substring(0, 60)}..."`);
+      console.log(`[InstagramAgent] 🎨 Final Image Prompt: "${imagePrompt.substring(0, 80)}..."`);
+      console.log(`[InstagramAgent] ✍️ Final Caption: "${caption.substring(0, 80)}..."`);
 
-      // 1. AI სურათის გენერაცია (ახლა უკვე "ჭკვიანი" პრომპტით)
+      // 1. AI სურათის გენერაცია
       console.log('[InstagramAgent] 🎨 Generating image...');
       const imageOptions: ImageGenerationOptions = {
         visualPrompt: imagePrompt,
