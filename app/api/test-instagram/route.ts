@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const testTopic = topicParam || "ვერძის მთვარე, ენერგიის ახალი ტალღა და შინაგანი ცეცხლი";
     
     console.log(`📝 შეყვანილი თემა: "${testTopic}"`);
-    console.log("⏳ ველოდებით კრეატიულ გენერაციას, სურათის შექმნას და ატვირთვას...");
+    console.log("⏳ ველოდებით ფონის შერჩევას, SVG თემფლეითის შევსებას და ატვირთვას...");
     
     const agent = new InstagramAgent();
     const result = await agent.createAndPublish(testTopic, 'dark-luxury');
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
         success: true,
         message: "პოსტი წარმატებით გამოქვეყნდა!",
         originalTopic: testTopic,
-        aiGeneratedImagePrompt: result.imagePrompt,
+        zodiacSign: result.zodiac, // ახალი ველი: რომელი ზოდიაქოს ნიშანი აირჩია
         aiGeneratedCaption: result.caption,
         imageUrl: result.imageUrl,
         postId: result.postId,
