@@ -50,7 +50,8 @@ export class InstagramAgent {
       console.log(`✅ ტექსტი გენერირებულია. სიგრძე: ${horoscopeText.length} სიმბოლო`);
 
       console.log('4️⃣ ვამატებთ ტექსტს ფოტოს...');
-      const finalImage = await this.addTextToImage(zodiacImageBuffer, zodiac.name, horoscopeText);
+      // ✅ გამოსწორებულია: zodiac.name ამოღებულია არგუმენტებიდან
+      const finalImage = await this.addTextToImage(zodiacImageBuffer, horoscopeText);
       console.log(`✅ ტექსტი დაემატა. საბოლოო ზომა: ${finalImage.length} ბაიტი`);
 
       console.log('5️⃣ ვტვირთავთ საბოლოო სურათს...');
@@ -142,7 +143,8 @@ export class InstagramAgent {
     return buffer;
   }
 
-  private async addTextToImage(baseImageBuffer: Buffer, zodiacName: string, horoscopeText: string): Promise<Buffer> {
+  // ✅ გამოსწორებულია: zodiacName პარამეტრი ამოღებულია
+  private async addTextToImage(baseImageBuffer: Buffer, horoscopeText: string): Promise<Buffer> {
     console.log('   ⚙️ ვამატებთ ტექსტს Sharp-ით...');
     
     const metadata = await sharp(baseImageBuffer).metadata();
