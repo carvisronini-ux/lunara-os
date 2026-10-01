@@ -131,7 +131,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <h3 className="text-xl font-black text-white mb-6 text-center">ნაბიჯი 2: რა ფორმატის პოსტი გინდა {selectedZodiac.georgian}-სთვის?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { id: 'post', title: '📱 პოსტი', desc: '1080x1350 (პორტრეტი)', color: 'blue' },
+              { id: 'post', title: ' პოსტი', desc: '1080x1350 (პორტრეტი)', color: 'blue' },
               { id: 'story', title: '⚡ სთორი', desc: '1080x1920 (ვერტიკალური)', color: 'purple' },
               { id: 'carousel', title: '🖼️ კარუსელი', desc: '1080x1080 (კვადრატული)', color: 'emerald' }
             ].map((fmt) => (
@@ -169,14 +169,86 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
-                {/* Live CSS Preview of Text Overlay */}
+                {/* Live CSS Preview of Text Overlay - იდეალური პოზიციებით და ფერებით */}
                 {horoscopeText && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center pointer-events-none z-10">
-                    <div className="text-white/80 text-sm font-serif italic mb-2 drop-shadow-md tracking-wide">What's happening today with</div>
-                    <div className="text-white text-3xl font-serif font-bold uppercase tracking-widest mb-4 drop-shadow-md">{selectedZodiac.name}</div>
-                    <div className="w-16 h-px bg-white/60 mb-6"></div>
-                    <div className="text-white text-base font-serif leading-relaxed drop-shadow-md whitespace-pre-wrap max-w-[90%]">
-                      {horoscopeText}
+                  <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
+                    {/* "What's happening today with" - 35% სიმაღლეზე */}
+                    <div 
+                      className="absolute w-full text-center px-8"
+                      style={{ 
+                        top: '33%',
+                        transform: 'translateY(-50%)'
+                      }}
+                    >
+                      <div 
+                        className="text-[#2D2D2D] text-sm font-serif italic tracking-wide font-medium"
+                        style={{ 
+                          textShadow: '0 0 10px rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.7), 2px 2px 4px rgba(0,0,0,0.3)',
+                          WebkitTextStroke: '0.5px rgba(255,255,255,0.4)'
+                        }}
+                      >
+                        What's happening today with
+                      </div>
+                    </div>
+
+                    {/* ზოდიაქოს სახელი - 42% სიმაღლეზე */}
+                    <div 
+                      className="absolute w-full text-center px-8"
+                      style={{ 
+                        top: '42%',
+                        transform: 'translateY(-50%)'
+                      }}
+                    >
+                      <div 
+                        className="text-[#2D2D2D] text-3xl font-serif font-bold uppercase tracking-widest"
+                        style={{ 
+                          textShadow: '0 0 15px rgba(255,255,255,0.95), 0 0 30px rgba(255,255,255,0.8), 2px 2px 6px rgba(0,0,0,0.4)',
+                          WebkitTextStroke: '1px rgba(255,255,255,0.5)'
+                        }}
+                      >
+                        {selectedZodiac.name}
+                      </div>
+                    </div>
+
+                    {/* დეკორატიული ხაზი - 47% სიმაღლეზე */}
+                    <div 
+                      className="absolute w-full flex justify-center"
+                      style={{ 
+                        top: '47%',
+                        transform: 'translateY(-50%)'
+                      }}
+                    >
+                      <div 
+                        className="w-16 h-px"
+                        style={{ 
+                          backgroundColor: 'rgba(45, 45, 45, 0.6)',
+                          boxShadow: '0 0 10px rgba(255,255,255,0.9)'
+                        }}
+                      ></div>
+                    </div>
+
+                    {/* ჰოროსკოპის ტექსტი - 55%-დან 85%-მდე */}
+                    <div 
+                      className="absolute w-full px-8 overflow-hidden"
+                      style={{ 
+                        top: '55%',
+                        height: '30%',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <div 
+                        className="text-[#2D2D2D] text-base font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
+                        style={{ 
+                          textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
+                          WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
+                          maxHeight: '100%',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        {horoscopeText}
+                      </div>
                     </div>
                   </div>
                 )}
