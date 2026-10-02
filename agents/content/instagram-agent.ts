@@ -32,26 +32,20 @@ export class InstagramAgent {
     this.instagramAdapter = new InstagramAdapter();
   }
 
-  // ==========================================
-  // ✅ ახალი მეთოდი: სრული ავტომატური ციკლი (დეტალური ლოგებით)
-  // ==========================================
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
     console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
-      // ნაბიჯი 1
       console.log('[Step 1] 🎲 Selecting random zodiac and period...');
       const zodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
       const period = Math.random() > 0.7 ? 'weekly' : 'daily';
       console.log(`[Step 1] ✅ Selected: ${zodiac.name} (${zodiac.georgian}), Period: ${period}`);
       onProgress?.('selecting', `🎲 Selected: ${zodiac.name} (${period} forecast)`);
 
-      // ნაბიჯი 2
       console.log('[Step 2] ✍️ Generating AI content...');
       onProgress?.('generating', `✍️ Generating English content for ${zodiac.name}...`);
       const aiContent = await generateHoroscopeContent(zodiac.name, period);
       console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2Length: aiContent.text2.length, hashtags: aiContent.hashtags });
 
-      // ნაბიჯი 3
       console.log('[Step 3] 📥 Fetching base image and logo...');
       onProgress?.('fetching', `📥 Fetching base image and logo...`);
       
@@ -64,23 +58,32 @@ export class InstagramAgent {
       if (!logoResponse.ok) {
         throw new Error(`Failed to fetch logo: ${logoResponse.status} ${logoResponse.statusText}`);
       }
+      
+      const contentType = logoResponse.headers.get('content-type');
+      console.log(`[Step 3b] Logo Content-Type header: ${contentType}`);
+      
       const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-      console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer.length} bytes`);
+      console.log(`[Step 3b] ✅ Logo buffer size: ${logoBuffer.length} bytes`);
 
-      // ნაბიჯი 4
+      // 🔍 კრიტიკული შემოწმება: არის თუ არა ეს რეალურად სურათი და არა HTML შეცდომის გვერდი?
+      const headerCheck = logoBuffer.toString('utf8', 0, 100).trim();
+      if (headerCheck.startsWith('<') || headerCheck.includes('<!DOCTYPE')) {
+        console.error('[Step 3b] ❌ CRITICAL: The fetched "image" is actually an HTML page!');
+        console.error('[Step 3b] HTML Preview:', headerCheck.substring(0, 300));
+        throw new Error('Logo URL returned an HTML error page instead of an image. Check Supabase bucket public access policies.');
+      }
+
       console.log('[Step 4] 🎨 Composing final image...');
       onProgress?.('composing', `🎨 Composing image (matching manual UI styles)...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
 
-      // ნაბიჯი 5
       console.log('[Step 5] ☁️ Uploading composed image to Supabase storage...');
       onProgress?.('uploading', `☁️ Uploading composed image to storage...`);
       const fileName = `post-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
       
       console.log(`[Step 5a] Uploading to bucket: ${BUCKET_NAME}, path: ${uploadPath}`);
-      // ✅ გამოსწორებულია: ამოღებულია unused 'uploadData'
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
@@ -97,7 +100,6 @@ export class InstagramAgent {
       const caption = `${aiContent.text1}\n\n${aiContent.text2}\n\n${aiContent.hashtags.join(' ')}`;
       console.log(`[Step 5c] ✅ Caption prepared. Length: ${caption.length}`);
 
-      // ნაბიჯი 6
       console.log('[Step 6] 📤 Publishing to Instagram via Adapter...');
       onProgress?.('publishing', `📤 Publishing to Instagram...`);
       console.log(`[Step 6a] Calling instagramAdapter.publishPost with URL: ${publicUrl}`);
@@ -130,9 +132,6 @@ export class InstagramAgent {
     }
   }
 
-  // ==========================================
-  // ✅ დამხმარე მეთოდები (დეტალური ლოგებით)
-  // ==========================================
   private async addTextAndLogoToImage(
     baseBuffer: Buffer, 
     logoBuffer: Buffer, 
@@ -189,10 +188,15 @@ export class InstagramAgent {
     const logoY = height * 0.03;
     console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
 
-    console.log('[addTextAndLogoToImage] Rounding logo corners...');
-    const roundedLogo = await sharp(logoBuffer)
-      .resize(logoSize, logoSize)
-      .composite([{ input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), blend: 'dest-in' }])
+    console.log('[addTextAndLogoToImage] Rounding logo corners and forcing PNG format...');
+    // ✅ კრიტიკული გამოსწორება: failOnError: false და მყისიერი კონვერტაცია PNG-ში
+    const roundedLogo = await sharp(logoBuffer, { failOnError: false })
+      .toFormat('png')
+      .resize(logoSize, logoSize, { fit: 'cover' })
+      .composite([{ 
+        input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+        blend: 'dest-in' 
+      }])
       .toBuffer();
     console.log('[addTextAndLogoToImage] Logo rounded successfully.');
 
@@ -246,9 +250,6 @@ export class InstagramAgent {
     return lines;
   }
 
-  // ==========================================
-  // ✅ არსებული მეთოდები (უცვლელი)
-  // ==========================================
   async generatePreview(topic: string, _style: string = 'default') {
     try {
       console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
