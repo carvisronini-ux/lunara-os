@@ -33,6 +33,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [selectedFormat, setSelectedFormat] = useState<PostFormat | null>(null);
   const [text1, setText1] = useState("");
   const [text2, setText2] = useState("");
+  const [text1FontSize, setText1FontSize] = useState(26);
+  const [text2FontSize, setText2FontSize] = useState(24);
   const [isPublishing, setIsPublishing] = useState(false);
 
   const imageUrl = selectedZodiac 
@@ -48,7 +50,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       pushEvent("system", `✅ არჩეულია ზოდიაქო: ${found.georgian} (${found.name})`);
       setStep("format");
     } else {
-      pushEvent("error", `❌ ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
+      pushEvent("error", ` ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
     }
   };
 
@@ -72,7 +74,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           zodiacName: selectedZodiac.name,
           format: selectedFormat,
           text1: text1,
-          text2: text2
+          text2: text2,
+          text1FontSize: text1FontSize,
+          text2FontSize: text2FontSize
         })
       });
       
@@ -87,6 +91,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         setSelectedFormat(null);
         setText1("");
         setText2("");
+        setText1FontSize(26);
+        setText2FontSize(24);
       } else {
         pushEvent("error", `❌ შეცდომა: ${data.error}`);
       }
@@ -169,21 +175,29 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1: 40% სიმაღლეზე, 26px შრიფტით */}
+                    {/* ტექსტი1 - სწორი word-wrap და overflow კონტროლით */}
                     {text1 && (
                       <div 
-                        className="absolute w-full text-center px-8"
+                        className="absolute w-full px-10"
                         style={{ 
                           top: '40%',
-                          transform: 'translateY(-50%)'
+                          transform: 'translateY(-50%)',
+                          maxWidth: '100%',
+                          boxSizing: 'border-box'
                         }}
                       >
                         <div 
-                          className="text-[#2D2D2D] font-serif italic tracking-wide font-medium"
+                          className="text-[#2D2D2D] font-serif italic tracking-wide font-medium text-center"
                           style={{ 
-                            fontSize: '26px',
+                            fontSize: `${text1FontSize}px`,
                             textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)',
-                            WebkitTextStroke: '0.6px rgba(255,255,255,0.5)'
+                            WebkitTextStroke: '0.6px rgba(255,255,255,0.5)',
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.3',
+                            margin: '0 auto',
+                            maxWidth: '90%'
                           }}
                         >
                           {text1}
@@ -191,26 +205,34 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2: 65%-დან დაწყებული, 24px შრიფტით */}
+                    {/* ტექსტი2 - სწორი word-wrap და overflow კონტროლით */}
                     {text2 && (
                       <div 
-                        className="absolute w-full px-8 overflow-hidden"
+                        className="absolute w-full px-10"
                         style={{ 
                           top: '65%',
                           height: '25%',
                           display: 'flex',
                           alignItems: 'flex-start',
-                          justifyContent: 'center'
+                          justifyContent: 'center',
+                          maxWidth: '100%',
+                          boxSizing: 'border-box',
+                          overflow: 'hidden'
                         }}
                       >
                         <div 
-                          className="text-[#2D2D2D] font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
+                          className="text-[#2D2D2D] font-serif text-center"
                           style={{ 
-                            fontSize: '24px',
+                            fontSize: `${text2FontSize}px`,
                             textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)',
                             WebkitTextStroke: '0.4px rgba(255,255,255,0.4)',
-                            maxHeight: '100%',
-                            overflow: 'hidden'
+                            wordWrap: 'break-word',
+                            overflowWrap: 'break-word',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.4',
+                            margin: '0 auto',
+                            maxWidth: '90%',
+                            whiteSpace: 'normal'
                           }}
                         >
                           {text2}
@@ -222,25 +244,75 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               </div>
             </div>
 
-            {/* ტექსტების შეყვანა */}
+            {/* ტექსტების შეყვანა + შრიფტის კონტროლი */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
+              {/* ტექსტი1 + შრიფტის კონტროლი */}
               <div>
-                <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი1 (ილუსტრაციასა და სახელს შორის)</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-slate-400">ტექსტი1 (ილუსტრაციასა და სახელს შორის)</div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                      title="შრიფტის შემცირება"
+                    >
+                      −
+                    </button>
+                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
+                    <button 
+                      onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                      title="შრიფტის გადიდება"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   value={text1}
                   onChange={(e) => setText1(e.target.value)}
                   placeholder="მაგალითად: What's happening today with"
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20"
+                  style={{ 
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap'
+                  }}
                 />
               </div>
 
+              {/* ტექსტი2 + შრიფტის კონტროლი */}
               <div className="flex-1">
-                <div className="text-xs font-bold text-slate-400 mb-2">ტექსტი2 (სახელის ქვემოთ - ჰოროსკოპის აღწერა)</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-bold text-slate-400">ტექსტი2 (სახელის ქვემოთ - ჰოროსკოპის აღწერა)</div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                      title="შრიფტის შემცირება"
+                    >
+                      −
+                    </button>
+                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
+                    <button 
+                      onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))}
+                      className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
+                      title="შრიფტის გადიდება"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   value={text2}
                   onChange={(e) => setText2(e.target.value)}
                   placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი..."
                   className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none min-h-[200px]"
+                  style={{ 
+                    wordWrap: 'break-word',
+                    overflowWrap: 'break-word',
+                    whiteSpace: 'pre-wrap'
+                  }}
                 />
               </div>
               
