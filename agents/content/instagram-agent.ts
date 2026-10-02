@@ -35,7 +35,7 @@ export class InstagramAgent {
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
     console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
-      console.log('[Step 1]  Selecting random zodiac and period...');
+      console.log('[Step 1] 🎲 Selecting random zodiac and period...');
       const zodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
       const period = Math.random() > 0.7 ? 'weekly' : 'daily';
       console.log(`[Step 1] ✅ Selected: ${zodiac.name} (${zodiac.georgian}), Period: ${period}`);
@@ -67,7 +67,7 @@ export class InstagramAgent {
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
 
-      console.log('[Step 5] ️ Uploading composed image to Supabase storage...');
+      console.log('[Step 5] ☁️ Uploading composed image to Supabase storage...');
       onProgress?.('uploading', `☁️ Uploading composed image to storage...`);
       const fileName = `post-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
@@ -96,7 +96,7 @@ export class InstagramAgent {
       console.log(`[Step 6b] Instagram Adapter Response:`, publishResult);
       
       if (!publishResult.success) {
-        console.error(`[Step 6c]  Publish failed with error:`, publishResult.error);
+        console.error(`[Step 6c] ❌ Publish failed with error:`, publishResult.error);
         throw new Error(`Publish failed: ${publishResult.error}`);
       }
 
@@ -129,8 +129,6 @@ export class InstagramAgent {
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
     console.log('[addTextAndLogoToImage] Starting image composition...');
-    console.log('[addTextAndLogoToImage] Text1:', aiContent.text1);
-    console.log('[addTextAndLogoToImage] Text2:', aiContent.text2);
     
     const metadata = await sharp(baseBuffer).metadata();
     const width = metadata.width || 1080;
@@ -142,95 +140,79 @@ export class InstagramAgent {
       const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
       await initWasm(fs.readFileSync(wasmPath));
       this.isWasmInitialized = true;
-      console.log('[addTextAndLogoToImage] Resvg WASM initialized.');
     }
 
     const now = new Date();
     const dateStr = period === 'daily' 
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-    console.log(`[addTextAndLogoToImage] Date string: "${dateStr}"`);
 
     const logoSize = Math.min(width * 0.12, 50);
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
-    const logoCx = logoX + logoSize / 2;
-    const logoCy = logoY + logoSize / 2;
-    const logoR = logoSize / 2;
 
-    const logoBase64 = logoBuffer.toString('base64');
-    const logoDataUrl = `data:image/png;base64,${logoBase64}`;
-    console.log('[addTextAndLogoToImage] Logo converted to base64');
+    // ✅ FIX 1: ჯერ გადავიყვანოთ ლოგო PNG-ში, რათა თავიდან ავიცილოთ sharp WASM-ის JPEG ბაგი
+    console.log('[addTextAndLogoToImage] Converting logo to PNG to ensure compatibility...');
+    const pngLogoBuffer = await sharp(logoBuffer, { failOnError: false }).png().toBuffer();
+    
+    console.log('[addTextAndLogoToImage] Rounding logo corners using sharp...');
+    const roundedLogo = await sharp(pngLogoBuffer)
+      .resize(logoSize, logoSize, { fit: 'cover' })
+      .composite([{ 
+        input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+        blend: 'dest-in' 
+      }])
+      .toBuffer();
+    console.log('[addTextAndLogoToImage] Logo rounded successfully.');
 
     const escapedText1 = this.escapeXml(aiContent.text1);
     const escapedText2 = this.escapeXml(aiContent.text2);
     const escapedDate = this.escapeXml(dateStr);
 
-    console.log('[addTextAndLogoToImage] Escaped Text1:', escapedText1);
-    console.log('[addTextAndLogoToImage] Escaped Text2:', escapedText2);
-
-    // ✅ კრიტიკული ცვლილება: Georgia შეცვლილია უნივერსალური 'serif'-ით
+    // ✅ FIX 2: მაქსიმალურად გამარტივებული SVG. 
+    // ამოღებულია filter და clip-path (რაც resvg-ს აბნევს).
+    // გამოყენებულია sans-serif (რომელიც ჩაშენებულია), თეთრი ტექსტი შავი კონტურით (100% ხილული ნებისმიერ ფონზე).
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <clipPath id="logoClip">
-            <circle cx="${logoCx}" cy="${logoCy}" r="${logoR}" />
-          </clipPath>
-          <filter id="shadow1"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.5)"/></filter>
-          <filter id="shadow2"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.5)"/></filter>
-          <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/></filter>
-        </defs>
-        
-        <image href="${logoDataUrl}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" clip-path="url(#logoClip)" />
-
-        <text x="50%" y="38%" font-family="serif" font-size="32" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="3px" paint-order="stroke fill" filter="url(#shadow1)">
+        <text x="50%" y="38%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
           ${escapedText1}
         </text>
         
-        <text x="50%" y="60%" font-family="serif" font-size="26" fill="#111111" text-anchor="middle" font-weight="500" stroke="#FFFFFF" stroke-width="2.5px" paint-order="stroke fill" filter="url(#shadow2)">
+        <text x="50%" y="60%" font-family="sans-serif" font-size="26" fill="#FFFFFF" text-anchor="middle" font-weight="500" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
           ${this.wrapTextForSvg(escapedText2, 35)}
         </text>
         
-        <text x="50%" y="95%" font-family="serif" font-size="18" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="2px" paint-order="stroke fill" filter="url(#shadow3)">
+        <text x="50%" y="95%" font-family="sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
           ${escapedDate}
         </text>
       </svg>
     `;
 
-    console.log('[addTextAndLogoToImage] SVG created, length:', svg.length);
-    console.log('[addTextAndLogoToImage] SVG preview (first 300 chars):', svg.substring(0, 300));
+    console.log('[addTextAndLogoToImage] Rendering text overlay with Resvg...');
+    const resvg = new Resvg(svg, { 
+      fitTo: { mode: 'width', value: width }
+    });
+    
+    const pngData = resvg.render();
+    const textOverlayBuffer = Buffer.from(pngData.asPng());
+    console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
-    console.log('[addTextAndLogoToImage] Rendering SVG with Resvg...');
-    try {
-      const resvg = new Resvg(svg, { 
-        fitTo: { mode: 'width', value: width },
-        font: {
-          loadSystemFonts: true,
-        }
-      });
-      
-      const pngData = resvg.render();
-      const overlayBuffer = Buffer.from(pngData.asPng());
-      
-      console.log(`[addTextAndLogoToImage] Overlay rendered. Size: ${overlayBuffer.length} bytes`);
-      
-      if (overlayBuffer.length < 100) {
-        console.error('[addTextAndLogoToImage] ⚠️ WARNING: Overlay is very small, might be empty!');
-      }
-
-      console.log('[addTextAndLogoToImage] Compositing final image...');
-      const finalBuffer = await sharp(baseBuffer)
-        .composite([{ input: overlayBuffer, top: 0, left: 0 }])
-        .jpeg({ quality: 95 })
-        .toBuffer();
-      
-      console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
-      
-      return finalBuffer;
-    } catch (resvgError) {
-      console.error('[addTextAndLogoToImage] ❌ Resvg error:', resvgError);
-      throw resvgError;
+    if (textOverlayBuffer.length < 1000) {
+      console.error('[addTextAndLogoToImage] ⚠️ WARNING: Text overlay is suspiciously small!');
     }
+
+    console.log('[addTextAndLogoToImage] Compositing final image (Base + Rounded Logo + Text Overlay)...');
+    const finalBuffer = await sharp(baseBuffer)
+      .composite([
+        { input: roundedLogo, top: logoY, left: logoX },
+        { input: textOverlayBuffer, top: 0, left: 0 }
+      ])
+      .jpeg({ quality: 95 })
+      .toBuffer();
+    
+    console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
+    
+    return finalBuffer;
   }
 
   private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
@@ -325,20 +307,16 @@ export class InstagramAgent {
       this.isWasmInitialized = true;
     }
 
-    // ✅ კრიტიკული ცვლილება: Georgia შეცვლილია 'serif'-ით
-    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'serif', fill: '#111111', textAnchor: 'middle', fontWeight: 'bold', stroke: '#FFFFFF', strokeWidth: '3px' });
+    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'sans-serif', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: 'bold', stroke: '#000000', strokeWidth: '2px' });
 
     const textLines = this.wrapText(horoscopeText, 45);
     let horoscopeSvg = '';
     textLines.forEach((line, index) => {
-      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'serif', fill: '#111111', textAnchor: 'middle', fontWeight: '500', stroke: '#FFFFFF', strokeWidth: '2.5px' });
+      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'sans-serif', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: '500', stroke: '#000000', strokeWidth: '2px' });
     });
 
     const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
-    const resvg = new Resvg(combinedSvg, { 
-      fitTo: { mode: 'width', value: width },
-      font: { loadSystemFonts: true }
-    });
+    const resvg = new Resvg(combinedSvg, { fitTo: { mode: 'width', value: width } });
     const textOverlayBuffer = Buffer.from(resvg.render().asPng());
 
     return sharp(baseImageBuffer).composite([{ input: textOverlayBuffer, top: 0, left: 0 }]).jpeg({ quality: 95 }).toBuffer();
