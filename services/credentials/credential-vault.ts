@@ -241,6 +241,18 @@ export class CredentialVault {
   public getAuditLog(limit = 20): CredentialAuditLog[] {
     return this.auditLog.slice(0, limit);
   }
+
+  // ✅ ახალი მეთოდი: სისტემის შიდა კომპონენტებისთვის (მაგ. AI გენერატორი)
+  // იღებს აქტიურ გასაღებს პროვაიდერის სახელის მიხედვით, ლიზინგის შემოწმების გარეშე.
+  public getDecryptedValueByProvider(provider: string): string | null {
+    const cred = Array.from(this.cache.values()).find(
+      c => c.provider.toLowerCase() === provider.toLowerCase() && c.status === "ACTIVE"
+    );
+    if (!cred) return null;
+    
+    // ვიყენებთ უკვე არსებულ, გამართულ mockDecrypt ფუნქციას უსაფრთხოებისთვის
+    return mockDecrypt(cred.encrypted_value);
+  }
 }
 
 export const credentialVault = new CredentialVault();
