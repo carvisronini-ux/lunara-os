@@ -44,7 +44,7 @@ export class InstagramAgent {
       console.log('[Step 2] ✍️ Generating AI content...');
       onProgress?.('generating', `✍️ Generating English content for ${zodiac.name}...`);
       const aiContent = await generateHoroscopeContent(zodiac.name, period);
-      console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2Length: aiContent.text2.length, hashtags: aiContent.hashtags });
+      console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2: aiContent.text2, hashtags: aiContent.hashtags });
 
       console.log('[Step 3] 📥 Fetching base image and logo...');
       onProgress?.('fetching', `📥 Fetching base image and logo...`);
@@ -156,37 +156,39 @@ export class InstagramAgent {
     const logoCy = logoY + logoSize / 2;
     const logoR = logoSize / 2;
 
-    // ✅ ულტიმატიური გამოსწორება: ლოგოს Base64-ად ქცევა, რათა თავიდან ავიცილოთ sharp WASM ბაგი
     const logoBase64 = logoBuffer.toString('base64');
-    const logoDataUrl = `data:image/jpeg;base64,${logoBase64}`;
-    console.log('[addTextAndLogoToImage] Logo converted to base64 data URL to bypass sharp WASM issues');
+    // უსაფრთხოებისთვის ვიყენებთ image/png-ს, რადგან ფაილი .png-ია და გამჭვირვალობა სჭირდება
+    const logoDataUrl = `data:image/png;base64,${logoBase64}`;
+    console.log('[addTextAndLogoToImage] Logo converted to base64 data URL');
 
+    // ✅ კრიტიკული გამოსწორება: ტექსტს აქვს სქელი თეთრი შტრიხი (stroke) და მუქი შევსება (fill),
+    // რაც გარანტირებულად ხილულს ხდის მას ნებისმიერ ფონზე!
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <clipPath id="logoClip">
             <circle cx="${logoCx}" cy="${logoCy}" r="${logoR}" />
           </clipPath>
-          <filter id="shadow1"><feDropShadow dx="2" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.4)"/><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgba(255,255,255,0.95)"/></filter>
-          <filter id="shadow2"><feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.4)"/><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgba(255,255,255,0.95)"/></filter>
-          <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.3)"/><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgba(255,255,255,0.9)"/></filter>
+          <filter id="shadow1"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.5)"/></filter>
+          <filter id="shadow2"><feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.5)"/></filter>
+          <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/></filter>
         </defs>
         
-        <!-- დამრგვალებული ლოგო (resvg უმკლავდება იდეალურად) -->
+        <!-- დამრგვალებული ლოგო -->
         <image href="${logoDataUrl}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" clip-path="url(#logoClip)" />
 
-        <!-- ტექსტი 1 -->
-        <text x="50%" y="40%" font-family="Georgia, serif" font-size="24" fill="#2D2D2D" text-anchor="middle" font-weight="500" letter-spacing="0.02em" filter="url(#shadow1)" stroke="rgba(255,255,255,0.5)" stroke-width="0.6px" paint-order="stroke fill">
+        <!-- ტექსტი 1 (Hook) - ზემოთ, დიდი და ხილული -->
+        <text x="50%" y="38%" font-family="Georgia, serif" font-size="32" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="3px" paint-order="stroke fill" filter="url(#shadow1)">
           ${this.escapeXml(aiContent.text1)}
         </text>
         
-        <!-- ტექსტი 2 -->
-        <text x="50%" y="66%" font-family="Georgia, serif" font-size="20" fill="#2D2D2D" text-anchor="middle" font-weight="400" filter="url(#shadow2)" stroke="rgba(255,255,255,0.4)" stroke-width="0.4px" paint-order="stroke fill">
+        <!-- ტექსტი 2 (Forecast) - შუაში, კარგად წასაკითხი -->
+        <text x="50%" y="60%" font-family="Georgia, serif" font-size="26" fill="#111111" text-anchor="middle" font-weight="500" stroke="#FFFFFF" stroke-width="2.5px" paint-order="stroke fill" filter="url(#shadow2)">
           ${this.wrapTextForSvg(aiContent.text2, 35)}
         </text>
         
-        <!-- თარიღი -->
-        <text x="50%" y="97%" font-family="Georgia, serif" font-size="14" fill="#2D2D2D" text-anchor="middle" font-style="italic" filter="url(#shadow3)" stroke="rgba(255,255,255,0.3)" stroke-width="0.3px" paint-order="stroke fill">
+        <!-- თარიღი - ქვემოთ -->
+        <text x="50%" y="95%" font-family="Georgia, serif" font-size="18" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="2px" paint-order="stroke fill" filter="url(#shadow3)">
           ${this.escapeXml(dateStr)}
         </text>
       </svg>
@@ -299,12 +301,12 @@ export class InstagramAgent {
       this.isWasmInitialized = true;
     }
 
-    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'Georgia, serif', fill: '#2D2D2D', textAnchor: 'middle', fontWeight: '400', letterSpacing: '2px' });
+    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'Georgia, serif', fill: '#111111', textAnchor: 'middle', fontWeight: 'bold', stroke: '#FFFFFF', strokeWidth: '3px' });
 
     const textLines = this.wrapText(horoscopeText, 45);
     let horoscopeSvg = '';
     textLines.forEach((line, index) => {
-      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'Georgia, serif', fill: '#2D2D2D', textAnchor: 'middle', fontWeight: '400' });
+      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'Georgia, serif', fill: '#111111', textAnchor: 'middle', fontWeight: '500', stroke: '#FFFFFF', strokeWidth: '2.5px' });
     });
 
     const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
@@ -314,11 +316,11 @@ export class InstagramAgent {
     return sharp(baseImageBuffer).composite([{ input: textOverlayBuffer, top: 0, left: 0 }]).jpeg({ quality: 95 }).toBuffer();
   }
 
-  private createSvgText(text: string, options: { x: number; y: number; fontSize: number; fontFamily: string; fill: string; textAnchor: string; fontWeight?: string; letterSpacing?: string }): string {
-    const { x, y, fontSize, fontFamily, fill, textAnchor, fontWeight, letterSpacing } = options;
+  private createSvgText(text: string, options: { x: number; y: number; fontSize: number; fontFamily: string; fill: string; textAnchor: string; fontWeight?: string; stroke?: string; strokeWidth?: string }): string {
+    const { x, y, fontSize, fontFamily, fill, textAnchor, fontWeight, stroke, strokeWidth } = options;
     let style = `font-family: ${fontFamily}; font-size: ${fontSize}px; fill: ${fill}; text-anchor: ${textAnchor};`;
     if (fontWeight) style += ` font-weight: ${fontWeight};`;
-    if (letterSpacing) style += ` letter-spacing: ${letterSpacing};`;
+    if (stroke && strokeWidth) style += ` stroke: ${stroke}; stroke-width: ${strokeWidth}; paint-order: stroke fill;`;
     return `<text x="${x}" y="${y}" style="${style}">${this.escapeXml(text)}</text>`;
   }
 
