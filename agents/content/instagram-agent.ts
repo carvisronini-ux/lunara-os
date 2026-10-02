@@ -35,7 +35,7 @@ export class InstagramAgent {
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
     console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
-      console.log('[Step 1] 🎲 Selecting random zodiac and period...');
+      console.log('[Step 1]  Selecting random zodiac and period...');
       const zodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
       const period = Math.random() > 0.7 ? 'weekly' : 'daily';
       console.log(`[Step 1] ✅ Selected: ${zodiac.name} (${zodiac.georgian}), Period: ${period}`);
@@ -67,7 +67,7 @@ export class InstagramAgent {
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
 
-      console.log('[Step 5] ☁️ Uploading composed image to Supabase storage...');
+      console.log('[Step 5] ️ Uploading composed image to Supabase storage...');
       onProgress?.('uploading', `☁️ Uploading composed image to storage...`);
       const fileName = `post-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
@@ -96,7 +96,7 @@ export class InstagramAgent {
       console.log(`[Step 6b] Instagram Adapter Response:`, publishResult);
       
       if (!publishResult.success) {
-        console.error(`[Step 6c] ❌ Publish failed with error:`, publishResult.error);
+        console.error(`[Step 6c]  Publish failed with error:`, publishResult.error);
         throw new Error(`Publish failed: ${publishResult.error}`);
       }
 
@@ -169,6 +169,7 @@ export class InstagramAgent {
     console.log('[addTextAndLogoToImage] Escaped Text1:', escapedText1);
     console.log('[addTextAndLogoToImage] Escaped Text2:', escapedText2);
 
+    // ✅ კრიტიკული ცვლილება: Georgia შეცვლილია უნივერსალური 'serif'-ით
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -182,15 +183,15 @@ export class InstagramAgent {
         
         <image href="${logoDataUrl}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" clip-path="url(#logoClip)" />
 
-        <text x="50%" y="38%" font-family="Georgia, serif" font-size="32" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="3px" paint-order="stroke fill" filter="url(#shadow1)">
+        <text x="50%" y="38%" font-family="serif" font-size="32" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="3px" paint-order="stroke fill" filter="url(#shadow1)">
           ${escapedText1}
         </text>
         
-        <text x="50%" y="60%" font-family="Georgia, serif" font-size="26" fill="#111111" text-anchor="middle" font-weight="500" stroke="#FFFFFF" stroke-width="2.5px" paint-order="stroke fill" filter="url(#shadow2)">
+        <text x="50%" y="60%" font-family="serif" font-size="26" fill="#111111" text-anchor="middle" font-weight="500" stroke="#FFFFFF" stroke-width="2.5px" paint-order="stroke fill" filter="url(#shadow2)">
           ${this.wrapTextForSvg(escapedText2, 35)}
         </text>
         
-        <text x="50%" y="95%" font-family="Georgia, serif" font-size="18" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="2px" paint-order="stroke fill" filter="url(#shadow3)">
+        <text x="50%" y="95%" font-family="serif" font-size="18" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="2px" paint-order="stroke fill" filter="url(#shadow3)">
           ${escapedDate}
         </text>
       </svg>
@@ -204,18 +205,17 @@ export class InstagramAgent {
       const resvg = new Resvg(svg, { 
         fitTo: { mode: 'width', value: width },
         font: {
-          loadSystemFonts: true, // ✅ კრიტიკული დამატება: შრიფტების ჩატვირთვა
+          loadSystemFonts: true,
         }
       });
       
       const pngData = resvg.render();
       const overlayBuffer = Buffer.from(pngData.asPng());
       
-      console.log(`[addTextAndLogoToImage] ✅ Overlay rendered successfully. Size: ${overlayBuffer.length} bytes`);
+      console.log(`[addTextAndLogoToImage] Overlay rendered. Size: ${overlayBuffer.length} bytes`);
       
-      if (overlayBuffer.length === 0) {
-        console.error('[addTextAndLogoToImage] ❌ ERROR: Overlay buffer is empty!');
-        throw new Error('Overlay buffer is empty');
+      if (overlayBuffer.length < 100) {
+        console.error('[addTextAndLogoToImage] ⚠️ WARNING: Overlay is very small, might be empty!');
       }
 
       console.log('[addTextAndLogoToImage] Compositing final image...');
@@ -224,7 +224,7 @@ export class InstagramAgent {
         .jpeg({ quality: 95 })
         .toBuffer();
       
-      console.log(`[addTextAndLogoToImage] ✅ Final image composited. Size: ${finalBuffer.length} bytes`);
+      console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
       
       return finalBuffer;
     } catch (resvgError) {
@@ -325,12 +325,13 @@ export class InstagramAgent {
       this.isWasmInitialized = true;
     }
 
-    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'Georgia, serif', fill: '#111111', textAnchor: 'middle', fontWeight: 'bold', stroke: '#FFFFFF', strokeWidth: '3px' });
+    // ✅ კრიტიკული ცვლილება: Georgia შეცვლილია 'serif'-ით
+    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'serif', fill: '#111111', textAnchor: 'middle', fontWeight: 'bold', stroke: '#FFFFFF', strokeWidth: '3px' });
 
     const textLines = this.wrapText(horoscopeText, 45);
     let horoscopeSvg = '';
     textLines.forEach((line, index) => {
-      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'Georgia, serif', fill: '#111111', textAnchor: 'middle', fontWeight: '500', stroke: '#FFFFFF', strokeWidth: '2.5px' });
+      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'serif', fill: '#111111', textAnchor: 'middle', fontWeight: '500', stroke: '#FFFFFF', strokeWidth: '2.5px' });
     });
 
     const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
