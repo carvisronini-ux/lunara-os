@@ -28,13 +28,48 @@ const ZODIAC_SIGNS = [
 
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.jpg';
 
-const generateSmartHashtags = (zodiacName: string, zodiacGeorgian: string): string => {
-  const specificTags = [`#${zodiacGeorgian}`, `#${zodiacName}`];
-  const generalTags = ["#ჰოროსკოპი", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
-  const extraTags = ["#SelfCare", "#Universe", "#Mindfulness", "#AstrologyLovers", "#ZodiacSigns", "#CosmicEnergy"];
-  const shuffledExtras = extraTags.sort(() => 0.5 - Math.random()).slice(0, 2);
+// ✅ ჭკვიანი ჰეშთეგების გენერატორი ტექსტის ანალიზით
+const generateDynamicHashtags = (text2: string, zodiacGeorgian: string, zodiacName: string): string => {
+  const baseTags = [`#${zodiacGeorgian}`, `#${zodiacName}`, "#LUNARA", "#ჰოროსკოპი", "#Astrology"];
   
-  return [...specificTags, ...generalTags, ...shuffledExtras].join(" ");
+  if (!text2 || text2.trim().length < 10) {
+    return [...baseTags, "#DailyHoroscope"].join(" ");
+  }
+
+  // ქართული და ინგლისური ხმოვანი/მსაზღვრელი სიტყვები, რომლებიც უნდა გამოირიცხოს
+  const stopWords = new Set([
+    "და", "ის", "რომ", "არის", "შენ", "შენი", "დღეს", "რომელიც", "თუ", "ან", "ამ", "ეს", "იქნება", "უნდა", "ნუ", "რადგან", 
+    "თავს", "ენდე", "იყავი", "გაანათე", "ოთახი", "აზრები", "რათა", "ჰარმონია", "მიზანია", "ეძებე", "გელით", "გაათავისუფლე", 
+    "რაც", "გჭირდება", "მიეცი", "ადგილი", "ახალ", "გეძახის", "გაფართოვება", "სულს", "სჭირდება", "დარჩი", "უნიკალური", 
+    "ხედვა", "სხვებს", "შთააგონებს", "შეგეშინდება", "ვინც", "ხარ", "საშუალება", "კარგი", "ღია", "ცვლილებების", "მიმართ", 
+    "ნაკადს", "ენერგია", "მხარესაა", "ახალი", "დასაწყისის", "სამყარო", "თამამ", "ნაბიჯებს", "უჭერს", "მხარს", "მოუსმინე", 
+    "შინაგან", "ხმას", "სტაბილურობა", "კომფორტი", "მთავარი", "თემებია", "სხეულს", "მას", "დასვენება", "ხვალ", "უფრო", 
+    "ძლიერი", "იყო", "კომუნიკაცია", "მხარეა", "გამოიყენე", "დრო", "მნიშვნელოვანი", "საუბრებისთვის", "იდეების", "გაზიარებისთვის", 
+    "ინტუიცია", "განსაკუთრებით", "მწვავეა", "გრძნობებს", "იჩქარებ", "გადაწყვეტილებების", "მიღებას", "ბუნებრივი", "ქარიზმა", 
+    "ყველას", "ყურადღებას", "მიიპყრობს", "დარწმუნებული", "ენერგიით", "დეტალებზე", "ორიენტირება", "უდიდეს", "ძალას", 
+    "წარმოადგენს", "მოაწესრიგე", "სივრცე", "შეინარჩუნო", "ბალანსი", "კომპრომისი", "აირიდე", "კონფლიქტები", "ღრმა", 
+    "ტრანსფორმაცია", "შესაძლებლობებს", "თავგადასავალი", "აღმოჩენა", "შრომისმოყვარეობა", "ნაყოფს", "გამოიღებს", 
+    "ფოკუსირებული", "გრძელვადიან", "მიზნებზე", "შემოქმედებითი", "პიკზეა", "გამოხატვის", "ხელოვნებაში", "სიზმრებში",
+    "the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", 
+    "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were"
+  ]);
+
+  // ტექსტის გასუფთავება და სიტყვებად დაშლა
+  const words = text2
+    .toLowerCase()
+    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "")
+    .split(/\s+/);
+
+  // მნიშვნელოვანი სიტყვების ამოღება (სიგრძე > 3 და არ არის stopWord)
+  const extractedTags = words
+    .filter(word => word.length > 3)
+    .filter(word => !stopWords.has(word))
+    .map(word => `#${word}`);
+
+  // უნიკალური ტეგების მიღება და მაქსიმუმ 4-მდე შეზღუდვა
+  const uniqueExtractedTags = Array.from(new Set(extractedTags)).slice(0, 4);
+
+  return [...baseTags, ...uniqueExtractedTags].join(" ");
 };
 
 export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
@@ -44,8 +79,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [selectedFormat, setSelectedFormat] = useState<PostFormat | null>(null);
   const [text1, setText1] = useState("");
   const [text2, setText2] = useState("");
-  const [text1FontSize, setText1FontSize] = useState(24); // ✅ 26px → 24px
-  const [text2FontSize, setText2FontSize] = useState(20); // ✅ 24px → 20px
+  const [text1FontSize, setText1FontSize] = useState(24);
+  const [text2FontSize, setText2FontSize] = useState(20);
   const [isPublishing, setIsPublishing] = useState(false);
   
   const [showDate, setShowDate] = useState(true);
@@ -80,6 +115,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     
     return `${startDay} - ${endDay} ${month} ${year}`;
   };
+
+  // ✅ დინამიურად გენერირებული ჰეშთეგები
+  const generatedHashtags = showHashtags && selectedZodiac 
+    ? generateDynamicHashtags(text2, selectedZodiac.georgian, selectedZodiac.name) 
+    : "";
 
   const handleZodiacSubmit = () => {
     const upperInput = inputValue.trim().toUpperCase();
@@ -121,6 +161,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           showWeekRange: showWeekRange,
           showLogo: showLogo,
           showHashtags: showHashtags,
+          generatedHashtags: generatedHashtags || undefined, // ✅ ჭკვიანი ჰეშთეგები გადაეცემა ბექენდს
           logoUrl: isLogoValid ? logoUrl : undefined
         })
       });
@@ -159,7 +200,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
         <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram მენეჯერი (მანუალური რეჟიმი)</h2>
-        <p className="text-base text-slate-400">ეტაპობრივად შექმენი და გამოაქვეყნე ოროსკოპის პოსტი სრული ვიზუალური კონტროლით.</p>
+        <p className="text-base text-slate-400">ეტაპობრივად შექმენი და გამოაქვეყნე ჰოროსკოპის პოსტი სრული ვიზუალური კონტროლით.</p>
       </div>
 
       {step === "input" && (
@@ -226,7 +267,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
 
-                {/* ✅ ოგო დაპატარავებულია: 14% → 12%, maxWidth 60px → 50px */}
                 {showLogo && logoUrl && isLogoValid && (
                   <div className="absolute z-20 transition-all duration-300" style={{ top: '3%', right: '3%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
@@ -329,17 +369,30 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">#️⃣</span>
-                    <div>
-                      <div className="text-sm font-bold text-white">ავტო-ეშთეგები</div>
-                      <div className="text-xs text-slate-400">დაემატოს პოსტის ტექსტში (Caption)</div>
+                {/* ✅ ჭკვიანი ჰეშთეგების Toggle + Preview */}
+                <div className="bg-slate-900 rounded-lg p-3 border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">#️⃣</span>
+                      <div>
+                        <div className="text-sm font-bold text-white">ავტო-ჰეშთეგები (AI)</div>
+                        <div className="text-xs text-slate-400">ტექსტი2-ის ანალიზით</div>
+                      </div>
                     </div>
+                    <button onClick={() => setShowHashtags(!showHashtags)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showHashtags ? 'bg-emerald-600' : 'bg-slate-700'}`}>
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
-                  <button onClick={() => setShowHashtags(!showHashtags)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showHashtags ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
+                  
+                  {/* ჰეშთეგების ვიზუალური Preview */}
+                  {showHashtags && selectedZodiac && (
+                    <div className="mt-2 p-2 bg-slate-800/50 rounded-lg border border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="text-[10px] text-slate-400 mb-1">გენერირებული ჰეშთეგები:</div>
+                      <div className="text-xs text-emerald-400 font-mono break-words leading-relaxed">
+                        {generatedHashtags}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
@@ -367,7 +420,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               </div>
               
               <button onClick={handlePublish} disabled={isPublishing || !text2} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20">
-                {isPublishing ? (<><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />მუშავდება და ქვეყნდება...</>) : (<> დადასტურება და გამოქვეყნება</>)}
+                {isPublishing ? (<><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />მუშავდება და ქვეყნდება...</>) : (<>🚀 დადასტურება და გამოქვეყნება</>)}
               </button>
             </div>
           </div>
