@@ -59,22 +59,8 @@ export class InstagramAgent {
         throw new Error(`Failed to fetch logo: ${logoResponse.status} ${logoResponse.statusText}`);
       }
       
-      const contentType = logoResponse.headers.get('content-type');
-      console.log(`[Step 3b] Logo Content-Type header: ${contentType}`);
-      
       const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
       console.log(`[Step 3b] ✅ Logo buffer size: ${logoBuffer.length} bytes`);
-      
-      // 🔍 ულტიმატიური დიაგნოსტიკა: ვამოწმებთ პირველ 20 ბაიტს ჰექსადეციმალურად
-      console.log(`[Step 3b] 🔍 Logo buffer first 20 bytes (hex): ${logoBuffer.subarray(0, 20).toString('hex')}`);
-      
-      // 🔍 კრიტიკული შემოწმება: არის თუ არა ეს რეალურად სურათი?
-      const headerCheck = logoBuffer.toString('utf8', 0, 100).trim();
-      if (headerCheck.startsWith('<') || headerCheck.includes('<!DOCTYPE') || headerCheck.includes('<html')) {
-        console.error('[Step 3b] ❌ CRITICAL: The fetched "image" is actually an HTML page!');
-        console.error('[Step 3b] HTML Preview:', headerCheck.substring(0, 300));
-        throw new Error('Logo URL returned an HTML error page instead of an image.');
-      }
 
       console.log('[Step 4] 🎨 Composing final image...');
       onProgress?.('composing', `🎨 Composing image (matching manual UI styles)...`);
@@ -162,65 +148,63 @@ export class InstagramAgent {
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
     console.log(`[addTextAndLogoToImage] Date string to be rendered: "${dateStr}"`);
 
+    // ლოგოს პოზიციის და ზომის გამოთვლა
+    const logoSize = Math.min(width * 0.12, 50);
+    const logoX = width - logoSize - (width * 0.03);
+    const logoY = height * 0.03;
+    const logoCx = logoX + logoSize / 2;
+    const logoCy = logoY + logoSize / 2;
+    const logoR = logoSize / 2;
+
+    // ✅ ულტიმატიური გამოსწორება: ლოგოს Base64-ად ქცევა, რათა თავიდან ავიცილოთ sharp WASM ბაგი
+    const logoBase64 = logoBuffer.toString('base64');
+    const logoDataUrl = `data:image/jpeg;base64,${logoBase64}`;
+    console.log('[addTextAndLogoToImage] Logo converted to base64 data URL to bypass sharp WASM issues');
+
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
+          <clipPath id="logoClip">
+            <circle cx="${logoCx}" cy="${logoCy}" r="${logoR}" />
+          </clipPath>
           <filter id="shadow1"><feDropShadow dx="2" dy="2" stdDeviation="2.5" flood-color="rgba(0,0,0,0.4)"/><feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="rgba(255,255,255,0.95)"/></filter>
           <filter id="shadow2"><feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.4)"/><feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="rgba(255,255,255,0.95)"/></filter>
           <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.3)"/><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgba(255,255,255,0.9)"/></filter>
         </defs>
+        
+        <!-- დამრგვალებული ლოგო (resvg უმკლავდება იდეალურად) -->
+        <image href="${logoDataUrl}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" clip-path="url(#logoClip)" />
+
+        <!-- ტექსტი 1 -->
         <text x="50%" y="40%" font-family="Georgia, serif" font-size="24" fill="#2D2D2D" text-anchor="middle" font-weight="500" letter-spacing="0.02em" filter="url(#shadow1)" stroke="rgba(255,255,255,0.5)" stroke-width="0.6px" paint-order="stroke fill">
           ${this.escapeXml(aiContent.text1)}
         </text>
+        
+        <!-- ტექსტი 2 -->
         <text x="50%" y="66%" font-family="Georgia, serif" font-size="20" fill="#2D2D2D" text-anchor="middle" font-weight="400" filter="url(#shadow2)" stroke="rgba(255,255,255,0.4)" stroke-width="0.4px" paint-order="stroke fill">
           ${this.wrapTextForSvg(aiContent.text2, 35)}
         </text>
+        
+        <!-- თარიღი -->
         <text x="50%" y="97%" font-family="Georgia, serif" font-size="14" fill="#2D2D2D" text-anchor="middle" font-style="italic" filter="url(#shadow3)" stroke="rgba(255,255,255,0.3)" stroke-width="0.3px" paint-order="stroke fill">
           ${this.escapeXml(dateStr)}
         </text>
       </svg>
     `;
 
-    console.log('[addTextAndLogoToImage] Rendering SVG to PNG overlay...');
+    console.log('[addTextAndLogoToImage] Rendering full SVG overlay (Logo + Text)...');
     const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
-    const textOverlayBuffer = Buffer.from(resvg.render().asPng());
-    console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
+    const overlayBuffer = Buffer.from(resvg.render().asPng());
+    console.log(`[addTextAndLogoToImage] Overlay rendered successfully. Size: ${overlayBuffer.length} bytes`);
 
-    const logoSize = Math.min(width * 0.12, 50);
-    const logoX = width - logoSize - (width * 0.03);
-    const logoY = height * 0.03;
-    console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
-
-    console.log('[addTextAndLogoToImage] Forcing logo to clean PNG format and rounding corners...');
-    try {
-      // ჯერ ვამოწმებთ metadata-ს, რომ დავინახოთ რას ფიქრობს sharp ამ ბაფერზე
-      const logoMeta = await sharp(logoBuffer).metadata();
-      console.log('[addTextAndLogoToImage] Logo metadata recognized by sharp:', logoMeta);
-      
-      const roundedLogo = await sharp(logoBuffer)
-        .ensureAlpha()
-        .toFormat('png')
-        .resize(logoSize, logoSize, { fit: 'cover' })
-        .composite([{ 
-          input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
-          blend: 'dest-in' 
-        }])
-        .png()
-        .toBuffer();
-      console.log('[addTextAndLogoToImage] Logo rounded successfully.');
-
-      console.log('[addTextAndLogoToImage] Compositing final image (Base + Logo + Text)...');
-      const finalBuffer = await sharp(baseBuffer)
-        .composite([{ input: roundedLogo, top: logoY, left: logoX }, { input: textOverlayBuffer, top: 0, left: 0 }])
-        .jpeg({ quality: 95 })
-        .toBuffer();
-      console.log(`[addTextAndLogoToImage] Final image composited successfully. Size: ${finalBuffer.length} bytes`);
-      
-      return finalBuffer;
-    } catch (sharpError) {
-      console.error('[addTextAndLogoToImage] ❌ Sharp failed to process logo buffer:', sharpError);
-      throw sharpError;
-    }
+    console.log('[addTextAndLogoToImage] Compositing final image (Base + Overlay)...');
+    const finalBuffer = await sharp(baseBuffer)
+      .composite([{ input: overlayBuffer, top: 0, left: 0 }])
+      .jpeg({ quality: 95 })
+      .toBuffer();
+    console.log(`[addTextAndLogoToImage] Final image composited successfully. Size: ${finalBuffer.length} bytes`);
+    
+    return finalBuffer;
   }
 
   private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
