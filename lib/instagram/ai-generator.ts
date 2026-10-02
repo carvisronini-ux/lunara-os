@@ -2,9 +2,9 @@
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export interface HoroscopeGenerationResult {
-  text1: string; // Hook (max 50 chars)
-  text2: string; // Body (max 150 chars)
-  hashtags: string[]; // 5-7 tags
+  text1: string; // მხოლოდ ჰუკი/შეკითხვა (მაქს 50 სიმბოლო)
+  text2: string; // მხოლოდ პროგნოზი (მაქს 150 სიმბოლო)
+  hashtags: string[]; // 5-7 ჰეშთეგი
 }
 
 export async function generateHoroscopeContent(
@@ -18,7 +18,6 @@ export async function generateHoroscopeContent(
   // 2. ვითხოვთ როგორც გასაღებს, ისე რეკომენდებულ მოდელს ჭკვიანი საცავიდან
   const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
 
-  // 🔍 დიაგნოსტიკური ლოგები: ზუსტად რას გვაძლევს Vault?
   console.log('[AI Generator] 🔑 გასაღები მოიძებნა Vault-ში:', !!vaultApiKey);
   console.log('[AI Generator] 🎯 რეკომენდებული მოდელი Vault-იდან:', recommendedModel || 'არ არის მითითებული (Fallback-ი გამოიყენება)');
 
@@ -33,23 +32,23 @@ export async function generateHoroscopeContent(
     throw new Error('GROQ API Key ვერ მოიძებნა. გთხოვთ, შეამოწმოთ CredentialVault ან .env ფაილი.');
   }
 
-  // 4. ვიყენებთ Vault-ის რეკომენდებულ მოდელს (მაგ: openai/gpt-oss-120b)
-  // თუ საცავში არ არის მითითებული, ვიყენებთ სტანდარტულ fallback მოდელს
+  // 4. ვიყენებთ Vault-ის რეკომენდებულ მოდელს
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
-
   const periodText = period === 'daily' ? 'daily' : 'weekly';
 
+  // ✅ ულტრა-მკაცრი პრომფტი ზუსტი დაყოფისთვის
   const systemPrompt = `You are an expert astrologer and Instagram copywriter for LUNARA OS.
 Generate a ${periodText} horoscope post in ENGLISH.
-Strict constraints:
-1. text1: A short, engaging hook/question (e.g., "What's happening this ${periodText} with ${zodiacName}?"). Max 50 characters.
-2. text2: Informative, interesting, and positive forecast. Max 150 characters.
-3. hashtags: Exactly 5-7 relevant English hashtags, always including #LUNARA and #${zodiacName}.
+
+STRICT VISUAL LAYOUT RULES (DO NOT BREAK):
+1. "text1" MUST BE ONLY a short, engaging hook or question (e.g., "What's in store for ${zodiacName} this ${periodText}?"). MAX 50 characters. DO NOT include the actual forecast here.
+2. "text2" MUST BE ONLY the actual horoscope forecast, advice, or prediction. MAX 150 characters. DO NOT repeat the hook here.
+3. "hashtags": Exactly 5-7 relevant English hashtags, always including #LUNARA and #${zodiacName}.
 
 Return ONLY valid JSON in this exact format:
 {
-  "text1": "Your hook here",
-  "text2": "Your forecast here",
+  "text1": "Your short hook/question here",
+  "text2": "Your actual forecast/advice here",
   "hashtags": ["#LUNARA", "#${zodiacName}", "#Astrology", "#Horoscope", "#Zodiac"]
 }`;
 
@@ -61,7 +60,7 @@ Return ONLY valid JSON in this exact format:
         'Authorization': `Bearer ${finalApiKey}`
       },
       body: JSON.stringify({
-        model: modelToUse, // ✅ ჭკვიანი საცავიდან აღებული მოდელი
+        model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
         response_format: { type: 'json_object' },
         temperature: 0.7,
