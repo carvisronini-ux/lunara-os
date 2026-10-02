@@ -26,6 +26,9 @@ const ZODIAC_SIGNS = [
   { name: 'PISCES', georgian: 'თევზები' },
 ];
 
+// დეფოლტი ლოგოს URL (შეგიძლია შეცვალო შენი ლოგოს URL-ით)
+const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo/lunara-logo.png';
+
 export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
@@ -36,10 +39,34 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text1FontSize, setText1FontSize] = useState(26);
   const [text2FontSize, setText2FontSize] = useState(24);
   const [isPublishing, setIsPublishing] = useState(false);
+  
+  // ახალი state ცვლადები თარიღისა და ლოგოსთვის
+  const [showDate, setShowDate] = useState(true);
+  const [showLogo, setShowLogo] = useState(true);
+  const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
+  const [dateFormat, setDateFormat] = useState<'long' | 'short'>('long');
 
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
     : null;
+
+  // მიმდინარე თარიღის ფორმატირება
+  const getCurrentDate = () => {
+    const now = new Date();
+    if (dateFormat === 'long') {
+      return now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    } else {
+      return now.toLocaleDateString('ka-GE', { 
+        year: 'numeric', 
+        month: '2-digit', 
+        day: '2-digit' 
+      });
+    }
+  };
 
   const handleZodiacSubmit = () => {
     const upperInput = inputValue.trim().toUpperCase();
@@ -76,7 +103,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           text1: text1,
           text2: text2,
           text1FontSize: text1FontSize,
-          text2FontSize: text2FontSize
+          text2FontSize: text2FontSize,
+          showDate: showDate,
+          showLogo: showLogo,
+          logoUrl: logoUrl,
+          dateFormat: dateFormat
         })
       });
       
@@ -173,9 +204,39 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
+                {/* ლოგო - ზედა მარჯვენა კუთხეში */}
+                {showLogo && logoUrl && (
+                  <div 
+                    className="absolute z-20"
+                    style={{ 
+                      top: '3%',
+                      right: '3%',
+                      width: '12%',
+                      maxWidth: '60px'
+                    }}
+                  >
+                    <div 
+                      className="w-full h-full rounded-lg overflow-hidden border-2 border-white/30 shadow-lg"
+                      style={{
+                        backgroundColor: 'rgba(255,255,255,0.1)',
+                        backdropFilter: 'blur(10px)'
+                      }}
+                    >
+                      <img 
+                        src={logoUrl} 
+                        alt="Channel Logo" 
+                        className="w-full h-full object-contain p-1"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1 - სწორი word-wrap და overflow კონტროლით */}
+                    {/* ტექსტი1 */}
                     {text1 && (
                       <div 
                         className="absolute w-full px-10"
@@ -205,7 +266,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2 - სწორი word-wrap და overflow კონტროლით */}
+                    {/* ტექსტი2 */}
                     {text2 && (
                       <div 
                         className="absolute w-full px-10"
@@ -241,10 +302,34 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     )}
                   </div>
                 )}
+
+                {/* თარიღი - ფოტოს ბოლოში */}
+                {showDate && (
+                  <div 
+                    className="absolute z-20 text-center"
+                    style={{ 
+                      bottom: '3%',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '90%'
+                    }}
+                  >
+                    <div 
+                      className="text-[#2D2D2D] font-serif italic text-sm"
+                      style={{ 
+                        textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
+                        WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {getCurrentDate()} • t.me/LunaraOS
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* ტექსტების შეყვანა + შრიფტის კონტროლი */}
+            {/* ტექსტების შეყვანა + კონტროლები */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
               {/* ტექსტი1 + შრიფტის კონტროლი */}
               <div>
@@ -314,6 +399,71 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     whiteSpace: 'pre-wrap'
                   }}
                 />
+              </div>
+
+              {/* თარიღის და ლოგოს კონტროლები */}
+              <div className="border-t border-white/10 pt-4 space-y-3">
+                <div className="text-xs font-bold text-slate-400 mb-2">დამატებითი ელემენტები</div>
+                
+                {/* თარიღის Toggle */}
+                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">📅</span>
+                    <div>
+                      <div className="text-sm font-bold text-white">დღევანდელი თარიღი</div>
+                      <div className="text-xs text-slate-400">{getCurrentDate()}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowDate(!showDate)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showDate ? 'bg-emerald-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        showDate ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* ლოგოს Toggle */}
+                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg"></span>
+                    <div>
+                      <div className="text-sm font-bold text-white">არხის ლოგო</div>
+                      <div className="text-xs text-slate-400">ზედა მარჯვენა კუთხეში</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowLogo(!showLogo)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showLogo ? 'bg-emerald-600' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        showLogo ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* ლოგოს URL */}
+                {showLogo && (
+                  <div>
+                    <div className="text-xs font-bold text-slate-400 mb-2">ლოგოს URL</div>
+                    <input
+                      type="text"
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      placeholder="https://example.com/logo.png"
+                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50"
+                    />
+                  </div>
+                )}
               </div>
               
               <button 
