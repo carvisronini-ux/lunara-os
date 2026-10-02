@@ -13,7 +13,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
-const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.jpg';
+// ✅ განახლებული ლინკი: ახლა ვიყენებთ PNG ვერსიას გამჭვირვალე ფონისთვის
+const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', georgian: 'ვერძი' }, { name: 'TAURUS', georgian: 'კურო' },
@@ -188,10 +189,9 @@ export class InstagramAgent {
     const logoY = height * 0.03;
     console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
 
-    console.log('[addTextAndLogoToImage] Rounding logo corners and forcing PNG format...');
-    // ✅ კრიტიკული გამოსწორება: failOnError: false და მყისიერი კონვერტაცია PNG-ში
+    console.log('[addTextAndLogoToImage] Rounding logo corners (PNG handles this perfectly)...');
+    // ✅ კრიტიკული გამოსწორება: failOnError: false უზრუნველყოფს, რომ sharp-მა არ გამოტოვოს შეცდომა
     const roundedLogo = await sharp(logoBuffer, { failOnError: false })
-      .toFormat('png')
       .resize(logoSize, logoSize, { fit: 'cover' })
       .composite([{ 
         input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
