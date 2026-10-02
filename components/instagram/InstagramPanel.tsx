@@ -40,32 +40,23 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text2FontSize, setText2FontSize] = useState(24);
   const [isPublishing, setIsPublishing] = useState(false);
   
-  // ახალი state ცვლადები თარიღისა და ლოგოსთვის
+  // თარიღისა და ლოგოს კონტროლი
   const [showDate, setShowDate] = useState(true);
   const [showLogo, setShowLogo] = useState(true);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
-  const [dateFormat, setDateFormat] = useState<'long' | 'short'>('long');
 
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
     : null;
 
-  // მიმდინარე თარიღის ფორმატირება
+  // მიმდინარე თარიღის ფორმატირება (გრძელი ფორმატი)
   const getCurrentDate = () => {
     const now = new Date();
-    if (dateFormat === 'long') {
-      return now.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    } else {
-      return now.toLocaleDateString('ka-GE', { 
-        year: 'numeric', 
-        month: '2-digit', 
-        day: '2-digit' 
-      });
-    }
+    return now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
   const handleZodiacSubmit = () => {
@@ -77,7 +68,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       pushEvent("system", `✅ არჩეულია ზოდიაქო: ${found.georgian} (${found.name})`);
       setStep("format");
     } else {
-      pushEvent("error", ` ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
+      pushEvent("error", `❌ ზოდიაქო ვერ მოიძებნა. სცადეთ: ARIES, ვერძი, Taurus, კურო და ა.შ.`);
     }
   };
 
@@ -106,8 +97,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           text2FontSize: text2FontSize,
           showDate: showDate,
           showLogo: showLogo,
-          logoUrl: logoUrl,
-          dateFormat: dateFormat
+          logoUrl: logoUrl
         })
       });
       
@@ -431,7 +421,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 {/* ლოგოს Toggle */}
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg"></span>
+                    <span className="text-lg">🖼️</span>
                     <div>
                       <div className="text-sm font-bold text-white">არხის ლოგო</div>
                       <div className="text-xs text-slate-400">ზედა მარჯვენა კუთხეში</div>
