@@ -169,7 +169,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {/* ტექსტი1: 40% სიმაღლეზე, გადიდებული შრიფტით */}
+                    {/* ტექსტი1: 40% სიმაღლეზე, 26px შრიფტით */}
                     {text1 && (
                       <div 
                         className="absolute w-full text-center px-8"
@@ -191,13 +191,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       </div>
                     )}
 
-                    {/* ტექსტი2: 65%-დან დაწყებული */}
+                    {/* ტექსტი2: 65%-დან დაწყებული, 24px შრიფტით */}
                     {text2 && (
                       <div 
                         className="absolute w-full px-8 overflow-hidden"
                         style={{ 
                           top: '65%',
-                          height: '23%',
+                          height: '25%',
                           display: 'flex',
                           alignItems: 'flex-start',
                           justifyContent: 'center'
@@ -206,7 +206,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                         <div 
                           className="text-[#2D2D2D] font-serif leading-relaxed text-center whitespace-pre-wrap max-w-[90%]"
                           style={{ 
-                            fontSize: '18px',
+                            fontSize: '24px',
                             textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)',
                             WebkitTextStroke: '0.4px rgba(255,255,255,0.4)',
                             maxHeight: '100%',
