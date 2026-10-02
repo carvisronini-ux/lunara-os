@@ -80,7 +80,8 @@ export class InstagramAgent {
       const uploadPath = `posts/${fileName}`;
       
       console.log(`[Step 5a] Uploading to bucket: ${BUCKET_NAME}, path: ${uploadPath}`);
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // ✅ გამოსწორებულია: ამოღებულია unused 'uploadData'
+      const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
         
