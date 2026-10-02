@@ -26,7 +26,6 @@ const ZODIAC_SIGNS = [
   { name: 'PISCES', georgian: 'თევზები' },
 ];
 
-// დეფოლტი ლოგოს URL (შეგიძლია შეცვალო შენი ლოგოს URL-ით)
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo/lunara-logo.png';
 
 export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
@@ -40,19 +39,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text2FontSize, setText2FontSize] = useState(24);
   const [isPublishing, setIsPublishing] = useState(false);
   
-  // თარიღისა და ლოგოს კონტროლი
   const [showDate, setShowDate] = useState(true);
   const [showLogo, setShowLogo] = useState(true);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
+  const [isLogoValid, setIsLogoValid] = useState(true);
 
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
     : null;
 
-  // მიმდინარე თარიღის ფორმატირება (გრძელი ფორმატი)
+  // ლამაზი, პროფესიონალური თარიღის ფორმატი (ქართულად)
   const getCurrentDate = () => {
     const now = new Date();
-    return now.toLocaleDateString('en-US', { 
+    return now.toLocaleDateString('ka-GE', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
@@ -97,7 +96,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           text2FontSize: text2FontSize,
           showDate: showDate,
           showLogo: showLogo,
-          logoUrl: logoUrl
+          logoUrl: isLogoValid ? logoUrl : undefined
         })
       });
       
@@ -106,6 +105,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         pushEvent("success", `🎉 წარმატებით გამოქვეყნდა! ID: ${data.postId}`);
         alert(`წარმატებით გამოქვეყნდა!\nInstagram URL: ${data.instagramUrl}`);
         
+        // სრული რესეტი
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
@@ -114,6 +114,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         setText2("");
         setText1FontSize(26);
         setText2FontSize(24);
+        setShowDate(true);
+        setShowLogo(true);
+        setLogoUrl(DEFAULT_LOGO_URL);
+        setIsLogoValid(true);
       } else {
         pushEvent("error", `❌ შეცდომა: ${data.error}`);
       }
@@ -133,19 +137,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       </div>
 
       {step === "input" && (
-        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center">
+        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-4">ნაბიჯი 1: აირჩიე ზოდიაქოს ნიშანი</h3>
           <input 
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="მაგალითად: ARIES ან ვერძი"
-            className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 mb-4"
+            className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-4"
             onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()}
           />
           <button 
             onClick={handleZodiacSubmit}
-            className="px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all"
+            className="px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95"
           >
             გაგრძელება ➔
           </button>
@@ -153,7 +157,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       )}
 
       {step === "format" && selectedZodiac && (
-        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8">
+        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">ნაბიჯი 2: რა ფორმატის პოსტი გინდა {selectedZodiac.georgian}-სთვის?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
@@ -164,7 +168,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <button
                 key={fmt.id}
                 onClick={() => handleFormatSelect(fmt.id as PostFormat)}
-                className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group"
+                className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]"
               >
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -172,53 +176,48 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               </button>
             ))}
           </div>
-          <button onClick={() => setStep("input")} className="mt-6 text-slate-400 hover:text-white text-sm flex items-center gap-1">← უკან დაბრუნება</button>
+          <button onClick={() => setStep("input")} className="mt-6 text-slate-400 hover:text-white text-sm flex items-center gap-1 transition-colors">← უკან დაბრუნება</button>
         </div>
       )}
 
       {step === "preview" && selectedZodiac && imageUrl && (
-        <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/50 backdrop-blur-xl p-8">
+        <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-black text-emerald-400">ნაბიჯი 3: ვიზუალური გადახედვა და ტექსტი</h3>
-            <button onClick={() => setStep("format")} className="text-sm text-slate-400 hover:text-white">← ფორმატის შეცვლა</button>
+            <button onClick={() => setStep("format")} className="text-sm text-slate-400 hover:text-white transition-colors">← ფორმატის შეცვლა</button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* ვიზუალური Preview */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">ვიზუალური გადახედვა (Live Preview)</div>
-              <div className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center" style={{ 
+              <div className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ 
                 aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
                 width: selectedFormat === 'story' ? '300px' : '400px',
                 maxHeight: '600px'
               }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
-                {/* ლოგო - ზედა მარჯვენა კუთხეში */}
-                {showLogo && logoUrl && (
+                {/* ლოგო - ზედა მარჯვენა კუთხეში, იდეალურად მრგვალი ჩარჩოთი */}
+                {showLogo && logoUrl && isLogoValid && (
                   <div 
-                    className="absolute z-20"
+                    className="absolute z-20 transition-all duration-300"
                     style={{ 
                       top: '3%',
                       right: '3%',
-                      width: '12%',
-                      maxWidth: '60px'
+                      width: '14%',
+                      maxWidth: '60px',
+                      aspectRatio: '1/1'
                     }}
                   >
                     <div 
-                      className="w-full h-full rounded-lg overflow-hidden border-2 border-white/30 shadow-lg"
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.1)',
-                        backdropFilter: 'blur(10px)'
-                      }}
+                      className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md"
                     >
                       <img 
                         src={logoUrl} 
                         alt="Channel Logo" 
-                        className="w-full h-full object-contain p-1"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
+                        className="w-full h-full object-cover"
+                        onError={() => setIsLogoValid(false)}
                       />
                     </div>
                   </div>
@@ -229,7 +228,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {/* ტექსტი1 */}
                     {text1 && (
                       <div 
-                        className="absolute w-full px-10"
+                        className="absolute w-full px-10 transition-all duration-300"
                         style={{ 
                           top: '40%',
                           transform: 'translateY(-50%)',
@@ -259,7 +258,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {/* ტექსტი2 */}
                     {text2 && (
                       <div 
-                        className="absolute w-full px-10"
+                        className="absolute w-full px-10 transition-all duration-300"
                         style={{ 
                           top: '65%',
                           height: '25%',
@@ -293,10 +292,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   </div>
                 )}
 
-                {/* თარიღი - ფოტოს ბოლოში */}
+                {/* თარიღი - ფოტოს ბოლოში (მხოლოდ თარიღი, ლინკის გარეშე) */}
                 {showDate && (
                   <div 
-                    className="absolute z-20 text-center"
+                    className="absolute z-20 text-center transition-all duration-300"
                     style={{ 
                       bottom: '3%',
                       left: '50%',
@@ -305,14 +304,14 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     }}
                   >
                     <div 
-                      className="text-[#2D2D2D] font-serif italic text-sm"
+                      className="text-[#2D2D2D] font-serif italic text-sm font-medium"
                       style={{ 
                         textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)',
                         WebkitTextStroke: '0.3px rgba(255,255,255,0.3)',
                         fontSize: '14px'
                       }}
                     >
-                      {getCurrentDate()} • t.me/LunaraOS
+                      {getCurrentDate()}
                     </div>
                   </div>
                 )}
@@ -326,6 +325,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">ტექსტი1 (ილუსტრაციასა და სახელს შორის)</div>
                   <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setText1("")}
+                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
+                      title="გასუფთავება"
+                    >
+                      გასუფთავება
+                    </button>
                     <button 
                       onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))}
                       className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
@@ -343,17 +349,22 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     </button>
                   </div>
                 </div>
-                <textarea
-                  value={text1}
-                  onChange={(e) => setText1(e.target.value)}
-                  placeholder="მაგალითად: What's happening today with"
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20"
-                  style={{ 
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                    whiteSpace: 'pre-wrap'
-                  }}
-                />
+                <div className="relative">
+                  <textarea
+                    value={text1}
+                    onChange={(e) => setText1(e.target.value)}
+                    placeholder="მაგალითად: What's happening today with"
+                    className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 resize-none h-20 transition-all"
+                    style={{ 
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                  />
+                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-500 font-mono">
+                    {text1.length} სიმბოლო
+                  </div>
+                </div>
               </div>
 
               {/* ტექსტი2 + შრიფტის კონტროლი */}
@@ -361,6 +372,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">ტექსტი2 (სახელის ქვემოთ - ჰოროსკოპის აღწერა)</div>
                   <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setText2("")}
+                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
+                      title="გასუფთავება"
+                    >
+                      გასუფთავება
+                    </button>
                     <button 
                       onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))}
                       className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors"
@@ -378,17 +396,22 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     </button>
                   </div>
                 </div>
-                <textarea
-                  value={text2}
-                  onChange={(e) => setText2(e.target.value)}
-                  placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი..."
-                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none min-h-[200px]"
-                  style={{ 
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                    whiteSpace: 'pre-wrap'
-                  }}
-                />
+                <div className="relative h-full">
+                  <textarea
+                    value={text2}
+                    onChange={(e) => setText2(e.target.value)}
+                    placeholder="აქ ჩაწერე ჰოროსკოპის ტექსტი..."
+                    className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 resize-none transition-all"
+                    style={{ 
+                      wordWrap: 'break-word',
+                      overflowWrap: 'break-word',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                  />
+                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-500 font-mono">
+                    {text2.length} სიმბოლო
+                  </div>
+                </div>
               </div>
 
               {/* თარიღის და ლოგოს კონტროლები */}
@@ -396,7 +419,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="text-xs font-bold text-slate-400 mb-2">დამატებითი ელემენტები</div>
                 
                 {/* თარიღის Toggle */}
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3">
+                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
                   <div className="flex items-center gap-3">
                     <span className="text-lg">📅</span>
                     <div>
@@ -406,12 +429,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   </div>
                   <button
                     onClick={() => setShowDate(!showDate)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${
                       showDate ? 'bg-emerald-600' : 'bg-slate-700'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${
                         showDate ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -419,22 +442,22 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
 
                 {/* ლოგოს Toggle */}
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3">
+                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
                   <div className="flex items-center gap-3">
                     <span className="text-lg">🖼️</span>
                     <div>
                       <div className="text-sm font-bold text-white">არხის ლოგო</div>
-                      <div className="text-xs text-slate-400">ზედა მარჯვენა კუთხეში</div>
+                      <div className="text-xs text-slate-400">ზედა მარჯვენა კუთხეში (მრგვალი)</div>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowLogo(!showLogo)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${
                       showLogo ? 'bg-emerald-600' : 'bg-slate-700'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${
                         showLogo ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
@@ -443,15 +466,25 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
                 {/* ლოგოს URL */}
                 {showLogo && (
-                  <div>
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="text-xs font-bold text-slate-400 mb-2">ლოგოს URL</div>
-                    <input
-                      type="text"
-                      value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                      className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={logoUrl}
+                        onChange={(e) => {
+                          setLogoUrl(e.target.value);
+                          setIsLogoValid(true);
+                        }}
+                        placeholder="https://example.com/logo.png"
+                        className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+                      />
+                      {!isLogoValid && (
+                        <div className="flex items-center text-red-400 text-xs font-bold px-2 whitespace-nowrap">
+                          ⚠️ URL არასწორია
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -459,7 +492,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <button 
                 onClick={handlePublish}
                 disabled={isPublishing || !text2}
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2"
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20"
               >
                 {isPublishing ? (
                   <>
