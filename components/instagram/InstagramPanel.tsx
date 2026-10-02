@@ -1,4 +1,4 @@
-// components/instagram/InstagramPanel.tsx
+// /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
 import { useState } from "react";
@@ -36,7 +36,6 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
     return [...baseTags].join(" ");
   }
 
-  // Comprehensive English & Georgian stop words to filter out
   const stopWords = new Set([
     "the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", 
     "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were",
@@ -49,19 +48,16 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
     "ძლიერი", "იყო", "კომუნიკაცია", "მხარეა", "გამოიყენე", "დრო", "მნიშვნელოვანი", "საუბრებისთვის", "იდეების", "გაზიარებისთვის"
   ]);
 
-  // Clean text and split into words
   const words = text2
     .toLowerCase()
     .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "")
     .split(/\s+/);
 
-  // Extract meaningful words (length > 3, not a stop word)
   const extractedTags = words
     .filter(word => word.length > 3)
     .filter(word => !stopWords.has(word))
     .map(word => `#${word}`);
 
-  // Get unique tags, limit to 4 extracted tags
   const uniqueExtractedTags = Array.from(new Set(extractedTags)).slice(0, 4);
 
   return [...baseTags, ...uniqueExtractedTags].join(" ");
@@ -77,6 +73,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text1FontSize, setText1FontSize] = useState(24);
   const [text2FontSize, setText2FontSize] = useState(20);
   const [isPublishing, setIsPublishing] = useState(false);
+  
+  // ✅ ახალი სტეიტი ავტომატური პოსტინგისთვის
+  const [isAutoPosting, setIsAutoPosting] = useState(false);
   
   const [showDate, setShowDate] = useState(true);
   const [showWeekRange, setShowWeekRange] = useState(false);
@@ -129,6 +128,53 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     const formatName = format === 'post' ? 'Post (Portrait)' : format === 'story' ? 'Story (Vertical)' : 'Carousel (Square)';
     pushEvent("system", `✅ Format selected: ${formatName}`);
     setStep("preview");
+  };
+
+  // ✅ ახალი ფუნქცია: AI Auto-Post Streaming
+  const handleAutoPost = async () => {
+    setIsAutoPosting(true);
+    pushEvent("agent", "🚀 Initiating Auto-Post Agent...");
+    
+    try {
+      const response = await fetch('/api/instagram/auto-post-stream');
+      if (!response.body) throw new Error("No response body");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.step === 'complete') {
+                const result = JSON.parse(data.message);
+                pushEvent("success", `🎉 Published ${result.zodiac}! URL: ${result.url}`);
+                alert(`Successfully published ${result.zodiac} post!`);
+              } else if (data.step === 'error') {
+                pushEvent("error", `❌ ${data.message}`);
+              } else {
+                // ეს აჩვენებს რეალურ დროში პროგრესს Event Log-ში!
+                pushEvent("agent", data.message);
+              }
+            } catch (e) {
+              // Ignore JSON parse errors for incomplete chunks
+            }
+          }
+        }
+      }
+    } catch (error) {
+      pushEvent("error", `❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } finally {
+      setIsAutoPosting(false);
+    }
   };
 
   const handlePublish = async () => {
@@ -191,8 +237,33 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   return (
     <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
-        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram Manager (Manual Mode)</h2>
-        <p className="text-base text-slate-400">Step-by-step create and publish horoscope posts with full visual control.</p>
+        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram Manager</h2>
+        <p className="text-base text-slate-400">Create and publish horoscope posts manually or let the AI Agent handle it.</p>
+      </div>
+
+      {/* ✨ ახალი ბლოკი: AI Auto-Post Agent */}
+      <div className="mb-8 rounded-2xl border border-purple-500/30 bg-slate-900/50 backdrop-blur-xl p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <h3 className="text-lg font-black text-white mb-2">🤖 AI Auto-Post Agent</h3>
+        <p className="text-sm text-slate-400 mb-4">Let the agent randomly select a zodiac sign, generate English content, compose the image, and publish it automatically.</p>
+        <button 
+          onClick={handleAutoPost}
+          disabled={isAutoPosting}
+          className="w-full max-w-md mx-auto block py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-lg transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2"
+        >
+          {isAutoPosting ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Agent is working...
+            </>
+          ) : (
+            <>✨ Create & Publish Auto Post</>
+          )}
+        </button>
+      </div>
+
+      {/* ⚙️ არსებული მანუალური რეჟიმი (უცვლელი) */}
+      <div className="mb-4">
+        <h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3>
       </div>
 
       {step === "input" && (
@@ -361,7 +432,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   </button>
                 </div>
 
-                {/* ✅ Smart Hashtags Toggle + Preview */}
                 <div className="bg-slate-900 rounded-lg p-3 border border-white/5">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
