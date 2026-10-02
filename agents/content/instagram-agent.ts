@@ -129,6 +129,9 @@ export class InstagramAgent {
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
     console.log('[addTextAndLogoToImage] Starting image composition...');
+    console.log('[addTextAndLogoToImage] Text1:', aiContent.text1);
+    console.log('[addTextAndLogoToImage] Text2:', aiContent.text2);
+    
     const metadata = await sharp(baseBuffer).metadata();
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
@@ -146,9 +149,8 @@ export class InstagramAgent {
     const dateStr = period === 'daily' 
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-    console.log(`[addTextAndLogoToImage] Date string to be rendered: "${dateStr}"`);
+    console.log(`[addTextAndLogoToImage] Date string: "${dateStr}"`);
 
-    // ლოგოს პოზიციის და ზომის გამოთვლა
     const logoSize = Math.min(width * 0.12, 50);
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
@@ -157,12 +159,16 @@ export class InstagramAgent {
     const logoR = logoSize / 2;
 
     const logoBase64 = logoBuffer.toString('base64');
-    // უსაფრთხოებისთვის ვიყენებთ image/png-ს, რადგან ფაილი .png-ია და გამჭვირვალობა სჭირდება
     const logoDataUrl = `data:image/png;base64,${logoBase64}`;
-    console.log('[addTextAndLogoToImage] Logo converted to base64 data URL');
+    console.log('[addTextAndLogoToImage] Logo converted to base64');
 
-    // ✅ კრიტიკული გამოსწორება: ტექსტს აქვს სქელი თეთრი შტრიხი (stroke) და მუქი შევსება (fill),
-    // რაც გარანტირებულად ხილულს ხდის მას ნებისმიერ ფონზე!
+    const escapedText1 = this.escapeXml(aiContent.text1);
+    const escapedText2 = this.escapeXml(aiContent.text2);
+    const escapedDate = this.escapeXml(dateStr);
+
+    console.log('[addTextAndLogoToImage] Escaped Text1:', escapedText1);
+    console.log('[addTextAndLogoToImage] Escaped Text2:', escapedText2);
+
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -174,39 +180,57 @@ export class InstagramAgent {
           <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/></filter>
         </defs>
         
-        <!-- დამრგვალებული ლოგო -->
         <image href="${logoDataUrl}" x="${logoX}" y="${logoY}" width="${logoSize}" height="${logoSize}" clip-path="url(#logoClip)" />
 
-        <!-- ტექსტი 1 (Hook) - ზემოთ, დიდი და ხილული -->
         <text x="50%" y="38%" font-family="Georgia, serif" font-size="32" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="3px" paint-order="stroke fill" filter="url(#shadow1)">
-          ${this.escapeXml(aiContent.text1)}
+          ${escapedText1}
         </text>
         
-        <!-- ტექსტი 2 (Forecast) - შუაში, კარგად წასაკითხი -->
         <text x="50%" y="60%" font-family="Georgia, serif" font-size="26" fill="#111111" text-anchor="middle" font-weight="500" stroke="#FFFFFF" stroke-width="2.5px" paint-order="stroke fill" filter="url(#shadow2)">
-          ${this.wrapTextForSvg(aiContent.text2, 35)}
+          ${this.wrapTextForSvg(escapedText2, 35)}
         </text>
         
-        <!-- თარიღი - ქვემოთ -->
         <text x="50%" y="95%" font-family="Georgia, serif" font-size="18" fill="#111111" text-anchor="middle" font-weight="bold" stroke="#FFFFFF" stroke-width="2px" paint-order="stroke fill" filter="url(#shadow3)">
-          ${this.escapeXml(dateStr)}
+          ${escapedDate}
         </text>
       </svg>
     `;
 
-    console.log('[addTextAndLogoToImage] Rendering full SVG overlay (Logo + Text)...');
-    const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
-    const overlayBuffer = Buffer.from(resvg.render().asPng());
-    console.log(`[addTextAndLogoToImage] Overlay rendered successfully. Size: ${overlayBuffer.length} bytes`);
+    console.log('[addTextAndLogoToImage] SVG created, length:', svg.length);
+    console.log('[addTextAndLogoToImage] SVG preview (first 300 chars):', svg.substring(0, 300));
 
-    console.log('[addTextAndLogoToImage] Compositing final image (Base + Overlay)...');
-    const finalBuffer = await sharp(baseBuffer)
-      .composite([{ input: overlayBuffer, top: 0, left: 0 }])
-      .jpeg({ quality: 95 })
-      .toBuffer();
-    console.log(`[addTextAndLogoToImage] Final image composited successfully. Size: ${finalBuffer.length} bytes`);
-    
-    return finalBuffer;
+    console.log('[addTextAndLogoToImage] Rendering SVG with Resvg...');
+    try {
+      const resvg = new Resvg(svg, { 
+        fitTo: { mode: 'width', value: width },
+        font: {
+          loadSystemFonts: true, // ✅ კრიტიკული დამატება: შრიფტების ჩატვირთვა
+        }
+      });
+      
+      const pngData = resvg.render();
+      const overlayBuffer = Buffer.from(pngData.asPng());
+      
+      console.log(`[addTextAndLogoToImage] ✅ Overlay rendered successfully. Size: ${overlayBuffer.length} bytes`);
+      
+      if (overlayBuffer.length === 0) {
+        console.error('[addTextAndLogoToImage] ❌ ERROR: Overlay buffer is empty!');
+        throw new Error('Overlay buffer is empty');
+      }
+
+      console.log('[addTextAndLogoToImage] Compositing final image...');
+      const finalBuffer = await sharp(baseBuffer)
+        .composite([{ input: overlayBuffer, top: 0, left: 0 }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      
+      console.log(`[addTextAndLogoToImage] ✅ Final image composited. Size: ${finalBuffer.length} bytes`);
+      
+      return finalBuffer;
+    } catch (resvgError) {
+      console.error('[addTextAndLogoToImage] ❌ Resvg error:', resvgError);
+      throw resvgError;
+    }
   }
 
   private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
@@ -310,7 +334,10 @@ export class InstagramAgent {
     });
 
     const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
-    const resvg = new Resvg(combinedSvg, { fitTo: { mode: 'width', value: width } });
+    const resvg = new Resvg(combinedSvg, { 
+      fitTo: { mode: 'width', value: width },
+      font: { loadSystemFonts: true }
+    });
     const textOverlayBuffer = Buffer.from(resvg.render().asPng());
 
     return sharp(baseImageBuffer).composite([{ input: textOverlayBuffer, top: 0, left: 0 }]).jpeg({ quality: 95 }).toBuffer();
