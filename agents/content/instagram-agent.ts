@@ -13,7 +13,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
-// ✅ განახლებული ლინკი: ახლა ვიყენებთ PNG ვერსიას გამჭვირვალე ფონისთვის
 const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const ZODIAC_SIGNS = [
@@ -66,12 +65,11 @@ export class InstagramAgent {
       const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
       console.log(`[Step 3b] ✅ Logo buffer size: ${logoBuffer.length} bytes`);
 
-      // 🔍 კრიტიკული შემოწმება: არის თუ არა ეს რეალურად სურათი და არა HTML შეცდომის გვერდი?
+      // 🔍 კრიტიკული შემოწმება: არის თუ არა ეს რეალურად სურათი?
       const headerCheck = logoBuffer.toString('utf8', 0, 100).trim();
       if (headerCheck.startsWith('<') || headerCheck.includes('<!DOCTYPE')) {
         console.error('[Step 3b] ❌ CRITICAL: The fetched "image" is actually an HTML page!');
-        console.error('[Step 3b] HTML Preview:', headerCheck.substring(0, 300));
-        throw new Error('Logo URL returned an HTML error page instead of an image. Check Supabase bucket public access policies.');
+        throw new Error('Logo URL returned an HTML error page instead of an image.');
       }
 
       console.log('[Step 4] 🎨 Composing final image...');
@@ -189,14 +187,21 @@ export class InstagramAgent {
     const logoY = height * 0.03;
     console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
 
-    console.log('[addTextAndLogoToImage] Rounding logo corners (PNG handles this perfectly)...');
-    // ✅ გამოსწორებულია: წაშლილია failOnError, რადგან ის იწვევდა TypeScript-ის შეცდომას. PNG ფორმატი ნატიურად მუშაობს.
+    console.log('[addTextAndLogoToImage] Forcing logo to clean PNG format and rounding corners...');
+    
+    // ✅ საბოლოო გამოსწორება: 
+    // 1. .ensureAlpha() - ვრწმუნდებით, რომ აქვს გამჭვირვალე ფონი
+    // 2. .toFormat('png') - ძალით გადაგვყავს სუფთა PNG-ში (მაშინაც კი, თუ შიგნით JPEG-ის მონაცემებია)
+    // ეს აგვარებს "unsupported image format" შეცდომას!
     const roundedLogo = await sharp(logoBuffer)
+      .ensureAlpha()
+      .toFormat('png')
       .resize(logoSize, logoSize, { fit: 'cover' })
       .composite([{ 
         input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
         blend: 'dest-in' 
       }])
+      .png()
       .toBuffer();
     console.log('[addTextAndLogoToImage] Logo rounded successfully.');
 
