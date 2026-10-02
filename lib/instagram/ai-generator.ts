@@ -1,22 +1,41 @@
 // /home/carvisronini-ux/lunara-os/lib/instagram/ai-generator.ts
+import { credentialVault } from '@/services/credentials/credential-vault';
 
 export interface HoroscopeGenerationResult {
-  text1: string; // Hook (max 50 chars)
-  text2: string; // Body (max 150 chars)
-  hashtags: string[]; // 5-7 tags
+  text1: string;
+  text2: string;
+  hashtags: string[];
 }
 
 export async function generateHoroscopeContent(
   zodiacName: string,
   period: 'daily' | 'weekly'
 ): Promise<HoroscopeGenerationResult> {
-  const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+  
+  // 1. ველოდებით, სანამ CredentialVault ჩატვირთავს მონაცემებს
+  await credentialVault.ready;
 
-  if (!apiKey) {
-    throw new Error('GROQ_API_KEY ან OPENAI_API_KEY ვერ მოიძებნა გარემოს ცვლადებში ან Vault-ში');
+  // 2. ვცდილობთ გასაღების აღებას Vault-იდან
+  let apiKey = credentialVault.getDecryptedValueByProvider('groq');
+
+  // 🔍 დიაგნოსტიკური ლოგები: ზუსტად რას გვაძლევს Vault?
+  console.log('[AI Generator] 🔍 Vault-მა დააბრუნა გასაღები?', apiKey !== null);
+  if (apiKey) {
+    console.log('[AI Generator] 🔑 გასაღების სიგრძე:', apiKey.length);
+    console.log('[AI Generator] 🔑 გასაღების დასაწყისი (პირველი 10 სიმბოლო):', apiKey.substring(0, 10));
+  } else {
+    console.log('[AI Generator] ⚠️ Vault-მა დააბრუნა null. გადავდივართ .env-ზე.');
   }
 
-  // ✅ ახლა period გამოიყენება პრომფთში, რაც ხდის AI-ს პასუხს უფრო ზუსტს
+  // 3. Fallback: თუ Vault-ში არ არის, ვცდილობთ .env-დან წაკითხვას
+  if (!apiKey) {
+    apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+  }
+
+  if (!apiKey) {
+    throw new Error('GROQ API Key ვერ მოიძებნა. გთხოვთ, შეამოწმოთ CredentialVault ან .env ფაილი.');
+  }
+
   const periodText = period === 'daily' ? 'daily' : 'weekly';
 
   const systemPrompt = `You are an expert astrologer and Instagram copywriter for LUNARA OS.
