@@ -151,9 +151,9 @@ export class InstagramAgent {
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
 
-    // ✅ FIX 1: ჯერ გადავიყვანოთ ლოგო PNG-ში, რათა თავიდან ავიცილოთ sharp WASM-ის JPEG ბაგი
+    // ✅ FIX 1: ჯერ გადავიყვანოთ ლოგო PNG-ში, რათა თავიდან ავიცილოთ sharp-ის პრობლემები (failOnError წაშლილია TypeScript-ის თავსებადობისთვის)
     console.log('[addTextAndLogoToImage] Converting logo to PNG to ensure compatibility...');
-    const pngLogoBuffer = await sharp(logoBuffer, { failOnError: false }).png().toBuffer();
+    const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
     
     console.log('[addTextAndLogoToImage] Rounding logo corners using sharp...');
     const roundedLogo = await sharp(pngLogoBuffer)
@@ -169,9 +169,8 @@ export class InstagramAgent {
     const escapedText2 = this.escapeXml(aiContent.text2);
     const escapedDate = this.escapeXml(dateStr);
 
-    // ✅ FIX 2: მაქსიმალურად გამარტივებული SVG. 
-    // ამოღებულია filter და clip-path (რაც resvg-ს აბნევს).
-    // გამოყენებულია sans-serif (რომელიც ჩაშენებულია), თეთრი ტექსტი შავი კონტურით (100% ხილული ნებისმიერ ფონზე).
+    // ✅ FIX 2: მაქსიმალურად გამარტივებული SVG. ამოღებულია filter და clip-path.
+    // გამოყენებულია sans-serif (ჩაშენებულია), თეთრი ტექსტი შავი კონტურით (100% ხილული).
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <text x="50%" y="38%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
