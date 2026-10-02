@@ -2,7 +2,8 @@
 import { NextRequest } from 'next/server';
 import { InstagramAgent } from '@/agents/content/instagram-agent';
 
-export async function GET(request: NextRequest) {
+// ✅ გამოსწორებულია: request -> _request (ქვედატირე აღნიშნავს, რომ ცვლადი განზრახ არ გამოიყენება)
+export async function GET(_request: NextRequest) {
   const encoder = new TextEncoder();
   const agent = new InstagramAgent();
 
