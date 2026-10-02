@@ -242,16 +242,20 @@ export class CredentialVault {
     return this.auditLog.slice(0, limit);
   }
 
-  // ✅ ახალი მეთოდი: სისტემის შიდა კომპონენტებისთვის (მაგ. AI გენერატორი)
-  // იღებს აქტიურ გასაღებს პროვაიდერის სახელის მიხედვით, ლიზინგის შემოწმების გარეშე.
-  public getDecryptedValueByProvider(provider: string): string | null {
+  // ✅ ჭკვიანი მეთოდი: აბრუნებს როგორც გაშიფრულ გასაღებს, ისე რეკომენდებულ მოდელს მეტამონაცემებიდან
+  public getCredentialDetailsByProvider(provider: string): { apiKey: string | null, recommendedModel: string | null } {
     const cred = Array.from(this.cache.values()).find(
       c => c.provider.toLowerCase() === provider.toLowerCase() && c.status === "ACTIVE"
     );
-    if (!cred) return null;
     
-    // ვიყენებთ უკვე არსებულ, გამართულ mockDecrypt ფუნქციას უსაფრთხოებისთვის
-    return mockDecrypt(cred.encrypted_value);
+    if (!cred) {
+      return { apiKey: null, recommendedModel: null };
+    }
+    
+    return { 
+      apiKey: mockDecrypt(cred.encrypted_value),
+      recommendedModel: cred.metadata?.recommendedModel || null
+    };
   }
 }
 

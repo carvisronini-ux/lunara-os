@@ -2,9 +2,9 @@
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export interface HoroscopeGenerationResult {
-  text1: string;
-  text2: string;
-  hashtags: string[];
+  text1: string; // Hook (max 50 chars)
+  text2: string; // Body (max 150 chars)
+  hashtags: string[]; // 5-7 tags
 }
 
 export async function generateHoroscopeContent(
@@ -12,30 +12,30 @@ export async function generateHoroscopeContent(
   period: 'daily' | 'weekly'
 ): Promise<HoroscopeGenerationResult> {
   
-  // 1. ველოდებით, სანამ CredentialVault ჩატვირთავს მონაცემებს
+  // 1. ველოდებით, სანამ CredentialVault ჩატვირთავს მონაცემებს ბაზიდან
   await credentialVault.ready;
 
-  // 2. ვცდილობთ გასაღების აღებას Vault-იდან
-  let apiKey: string | null = credentialVault.getDecryptedValueByProvider('groq');
+  // 2. ვითხოვთ როგორც გასაღებს, ისე რეკომენდებულ მოდელს ჭკვიანი საცავიდან
+  const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
 
   // 🔍 დიაგნოსტიკური ლოგები: ზუსტად რას გვაძლევს Vault?
-  console.log('[AI Generator] 🔍 Vault-მა დააბრუნა გასაღები?', apiKey !== null);
-  if (apiKey) {
-    console.log('[AI Generator] 🔑 გასაღების სიგრძე:', apiKey.length);
-    console.log('[AI Generator] 🔑 გასაღების დასაწყისი (პირველი 10 სიმბოლო):', apiKey.substring(0, 10));
-  } else {
-    console.log('[AI Generator] ⚠️ Vault-მა დააბრუნა null. გადავდივართ .env-ზე.');
+  console.log('[AI Generator] 🔑 გასაღები მოიძებნა Vault-ში:', !!vaultApiKey);
+  console.log('[AI Generator] 🎯 რეკომენდებული მოდელი Vault-იდან:', recommendedModel || 'არ არის მითითებული (Fallback-ი გამოიყენება)');
+
+  // 3. Fallback: თუ Vault-ში რატომღაც არ არის, ვცდილობთ .env-დან წაკითხვას
+  let finalApiKey: string | null = vaultApiKey;
+  if (!finalApiKey) {
+    console.log('[AI Generator] ⚠️ Vault-მა ვერ მოიძებნა. გადავდივართ .env-ზე.');
+    finalApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
   }
 
-  // 3. Fallback: თუ Vault-ში არ არის, ვცდილობთ .env-დან წაკითხვას
-  if (!apiKey) {
-    // ✅ დამატებულია || null, რათა TypeScript-ის ტიპი (string | null) დაცული იყოს
-    apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
-  }
-
-  if (!apiKey) {
+  if (!finalApiKey) {
     throw new Error('GROQ API Key ვერ მოიძებნა. გთხოვთ, შეამოწმოთ CredentialVault ან .env ფაილი.');
   }
+
+  // 4. ვიყენებთ Vault-ის რეკომენდებულ მოდელს (მაგ: openai/gpt-oss-120b)
+  // თუ საცავში არ არის მითითებული, ვიყენებთ სტანდარტულ fallback მოდელს
+  const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
 
   const periodText = period === 'daily' ? 'daily' : 'weekly';
 
@@ -58,10 +58,10 @@ Return ONLY valid JSON in this exact format:
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${finalApiKey}`
       },
       body: JSON.stringify({
-        model: 'llama3-70b-8192',
+        model: modelToUse, // ✅ ჭკვიანი საცავიდან აღებული მოდელი
         messages: [{ role: 'user', content: systemPrompt }],
         response_format: { type: 'json_object' },
         temperature: 0.7,
