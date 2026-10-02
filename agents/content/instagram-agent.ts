@@ -64,11 +64,15 @@ export class InstagramAgent {
       
       const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
       console.log(`[Step 3b] ✅ Logo buffer size: ${logoBuffer.length} bytes`);
-
+      
+      // 🔍 ულტიმატიური დიაგნოსტიკა: ვამოწმებთ პირველ 20 ბაიტს ჰექსადეციმალურად
+      console.log(`[Step 3b] 🔍 Logo buffer first 20 bytes (hex): ${logoBuffer.subarray(0, 20).toString('hex')}`);
+      
       // 🔍 კრიტიკული შემოწმება: არის თუ არა ეს რეალურად სურათი?
       const headerCheck = logoBuffer.toString('utf8', 0, 100).trim();
-      if (headerCheck.startsWith('<') || headerCheck.includes('<!DOCTYPE')) {
+      if (headerCheck.startsWith('<') || headerCheck.includes('<!DOCTYPE') || headerCheck.includes('<html')) {
         console.error('[Step 3b] ❌ CRITICAL: The fetched "image" is actually an HTML page!');
+        console.error('[Step 3b] HTML Preview:', headerCheck.substring(0, 300));
         throw new Error('Logo URL returned an HTML error page instead of an image.');
       }
 
@@ -188,31 +192,35 @@ export class InstagramAgent {
     console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
 
     console.log('[addTextAndLogoToImage] Forcing logo to clean PNG format and rounding corners...');
-    
-    // ✅ საბოლოო გამოსწორება: 
-    // 1. .ensureAlpha() - ვრწმუნდებით, რომ აქვს გამჭვირვალე ფონი
-    // 2. .toFormat('png') - ძალით გადაგვყავს სუფთა PNG-ში (მაშინაც კი, თუ შიგნით JPEG-ის მონაცემებია)
-    // ეს აგვარებს "unsupported image format" შეცდომას!
-    const roundedLogo = await sharp(logoBuffer)
-      .ensureAlpha()
-      .toFormat('png')
-      .resize(logoSize, logoSize, { fit: 'cover' })
-      .composite([{ 
-        input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
-        blend: 'dest-in' 
-      }])
-      .png()
-      .toBuffer();
-    console.log('[addTextAndLogoToImage] Logo rounded successfully.');
+    try {
+      // ჯერ ვამოწმებთ metadata-ს, რომ დავინახოთ რას ფიქრობს sharp ამ ბაფერზე
+      const logoMeta = await sharp(logoBuffer).metadata();
+      console.log('[addTextAndLogoToImage] Logo metadata recognized by sharp:', logoMeta);
+      
+      const roundedLogo = await sharp(logoBuffer)
+        .ensureAlpha()
+        .toFormat('png')
+        .resize(logoSize, logoSize, { fit: 'cover' })
+        .composite([{ 
+          input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+          blend: 'dest-in' 
+        }])
+        .png()
+        .toBuffer();
+      console.log('[addTextAndLogoToImage] Logo rounded successfully.');
 
-    console.log('[addTextAndLogoToImage] Compositing final image (Base + Logo + Text)...');
-    const finalBuffer = await sharp(baseBuffer)
-      .composite([{ input: roundedLogo, top: logoY, left: logoX }, { input: textOverlayBuffer, top: 0, left: 0 }])
-      .jpeg({ quality: 95 })
-      .toBuffer();
-    console.log(`[addTextAndLogoToImage] Final image composited successfully. Size: ${finalBuffer.length} bytes`);
-    
-    return finalBuffer;
+      console.log('[addTextAndLogoToImage] Compositing final image (Base + Logo + Text)...');
+      const finalBuffer = await sharp(baseBuffer)
+        .composite([{ input: roundedLogo, top: logoY, left: logoX }, { input: textOverlayBuffer, top: 0, left: 0 }])
+        .jpeg({ quality: 95 })
+        .toBuffer();
+      console.log(`[addTextAndLogoToImage] Final image composited successfully. Size: ${finalBuffer.length} bytes`);
+      
+      return finalBuffer;
+    } catch (sharpError) {
+      console.error('[addTextAndLogoToImage] ❌ Sharp failed to process logo buffer:', sharpError);
+      throw sharpError;
+    }
   }
 
   private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
