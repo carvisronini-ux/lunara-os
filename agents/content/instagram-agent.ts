@@ -73,11 +73,12 @@ export class InstagramAgent {
     }
   }
 
+  // ✅ გამოსწორებულია: _zodiacName (ქვედატირე აღნიშნავს, რომ ცვლადი განზრახ არ გამოიყენება)
   private async addTextAndLogoToImage(
     baseBuffer: Buffer, 
     logoBuffer: Buffer, 
     aiContent: { text1: string, text2: string }, 
-    zodiacName: string,
+    _zodiacName: string, 
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
     const metadata = await sharp(baseBuffer).metadata();
@@ -95,7 +96,6 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    // SVG ზუსტად InstagramPanel.tsx-ის CSS სტილების მიხედვით
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -104,17 +104,14 @@ export class InstagramAgent {
           <filter id="shadow3"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.3)"/><feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="rgba(255,255,255,0.9)"/></filter>
         </defs>
         
-        <!-- Text 1: Top 40%, 24px, Georgia -->
         <text x="50%" y="40%" font-family="Georgia, serif" font-size="24" fill="#2D2D2D" text-anchor="middle" font-weight="500" letter-spacing="0.02em" filter="url(#shadow1)" stroke="rgba(255,255,255,0.5)" stroke-width="0.6px" paint-order="stroke fill">
           ${this.escapeXml(aiContent.text1)}
         </text>
 
-        <!-- Text 2: Top 66%, 20px, Georgia, Wrapped -->
         <text x="50%" y="66%" font-family="Georgia, serif" font-size="20" fill="#2D2D2D" text-anchor="middle" font-weight="400" filter="url(#shadow2)" stroke="rgba(255,255,255,0.4)" stroke-width="0.4px" paint-order="stroke fill">
           ${this.wrapTextForSvg(aiContent.text2, 35)}
         </text>
 
-        <!-- Date: Bottom 3% (y=97%), 14px, Italic -->
         <text x="50%" y="97%" font-family="Georgia, serif" font-size="14" fill="#2D2D2D" text-anchor="middle" font-style="italic" filter="url(#shadow3)" stroke="rgba(255,255,255,0.3)" stroke-width="0.3px" paint-order="stroke fill">
           ${this.escapeXml(dateStr)}
         </text>
@@ -124,7 +121,6 @@ export class InstagramAgent {
     const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
     const textOverlayBuffer = Buffer.from(resvg.render().asPng());
 
-    // ლოგოს დამრგვალება (ზუსტად როგორც ფრონტენდზე)
     const logoSize = Math.min(width * 0.12, 50);
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
