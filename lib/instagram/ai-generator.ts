@@ -16,7 +16,7 @@ export async function generateHoroscopeContent(
   await credentialVault.ready;
 
   // 2. ვცდილობთ გასაღების აღებას Vault-იდან
-  let apiKey = credentialVault.getDecryptedValueByProvider('groq');
+  let apiKey: string | null = credentialVault.getDecryptedValueByProvider('groq');
 
   // 🔍 დიაგნოსტიკური ლოგები: ზუსტად რას გვაძლევს Vault?
   console.log('[AI Generator] 🔍 Vault-მა დააბრუნა გასაღები?', apiKey !== null);
@@ -29,7 +29,8 @@ export async function generateHoroscopeContent(
 
   // 3. Fallback: თუ Vault-ში არ არის, ვცდილობთ .env-დან წაკითხვას
   if (!apiKey) {
-    apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+    // ✅ დამატებულია || null, რათა TypeScript-ის ტიპი (string | null) დაცული იყოს
+    apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
   }
 
   if (!apiKey) {
