@@ -190,8 +190,8 @@ export class InstagramAgent {
     console.log(`[addTextAndLogoToImage] Logo placement: x=${logoX}, y=${logoY}, size=${logoSize}`);
 
     console.log('[addTextAndLogoToImage] Rounding logo corners (PNG handles this perfectly)...');
-    // ✅ კრიტიკული გამოსწორება: failOnError: false უზრუნველყოფს, რომ sharp-მა არ გამოტოვოს შეცდომა
-    const roundedLogo = await sharp(logoBuffer, { failOnError: false })
+    // ✅ გამოსწორებულია: წაშლილია failOnError, რადგან ის იწვევდა TypeScript-ის შეცდომას. PNG ფორმატი ნატიურად მუშაობს.
+    const roundedLogo = await sharp(logoBuffer)
       .resize(logoSize, logoSize, { fit: 'cover' })
       .composite([{ 
         input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
