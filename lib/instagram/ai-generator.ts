@@ -1,97 +1,70 @@
 // /home/carvisronini-ux/lunara-os/lib/instagram/ai-generator.ts
+import OpenAI from 'openai';
 
-import { openai } from '@/lib/openai'; // ან შენი AI სერვისის იმპორტი (მაგ. Anthropic, Custom API)
-
-// --- ინტერფეისები ---
-
-export interface GenerateCaptionOptions {
-  topic: string;
-  tone: 'professional' | 'casual' | 'funny' | 'inspirational' | 'educational';
-  targetAudience?: string;
-  includeCallToAction?: boolean;
-  language?: string; // მაგ: 'ka', 'en', 'ru'
+export interface HoroscopeGenerationResult {
+  text1: string; // Hook (max 40-50 chars)
+  text2: string; // Body (max 120-150 chars)
+  hashtags: string[]; // 5-7 tags
 }
 
-export interface GenerateHashtagsOptions {
-  keywords: string[];
-  niche: string;
-  count?: number; // რამდენი ჰეშთეგი გვინდა (რეკომენდირებულია 10-30)
-}
-
-export interface GenerateImagePromptOptions {
-  subject: string;
-  style: 'photorealistic' | 'illustration' | '3d-render' | 'minimalist';
-  mood: string;
-}
-
-// --- კლასი / ფუნქციები ---
-
-export class InstagramAIGenerator {
+export async function generateHoroscopeContent(
+  zodiacName: string,
+  period: 'daily' | 'weekly'
+): Promise<HoroscopeGenerationResult> {
+  // 1. ვამოწმებთ გასაღებს (ჯერ Groq-ს, მერე OpenAI-ს)
+  // შენიშვნა: თუ გსურს Credential Vault-ის გამოყენება, აქ ჩასვი შენი ფუნქცია, მაგ: const apiKey = await getVaultKey('GROQ');
+  const apiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
   
-  /**
-   * გენერირებს პოსტის აღწერას (Caption)
-   */
-  async generateCaption(options: GenerateCaptionOptions): Promise<string> {
-    const { topic, tone, targetAudience, includeCallToAction, language = 'en' } = options;
+  if (!apiKey) {
+    throw new Error('Missing GROQ_API_KEY or OPENAI_API_KEY in environment variables or Vault');
+  }
 
-    const prompt = `
-      You are an expert Instagram copywriter. 
-      Write an engaging Instagram caption about "${topic}".
-      Tone: ${tone}.
-      ${targetAudience ? `Target audience: ${targetAudience}.` : ''}
-      ${includeCallToAction ? 'Include a strong Call to Action (CTA) at the end.' : ''}
-      Use appropriate emojis. Keep it formatted with line breaks for readability.
-      Language: ${language}.
-    `;
+  // 2. კონფიგურაცია: თუ Groq-ს ვიყენებთ, ვცვლით baseURL-ს და მოდელს
+  const isGroq = !!process.env.GROQ_API_KEY;
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: isGroq ? 'https://api.groq.com/openai/v1' : undefined,
+  });
+  
+  const model = isGroq ? 'llama3-70b-8192' : 'gpt-4o'; // Groq-სთვის ოპტიმალური მოდელი
 
-    // აქ გამოიძახება შენი AI API
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // ან შენი არჩეული მოდელი
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.8,
+  const periodText = period === 'daily' ? 'daily' : 'weekly';
+  
+  const systemPrompt = `You are an expert astrologer and Instagram copywriter for LUNARA OS.
+Generate a horoscope post in ENGLISH.
+Strict constraints:
+1. text1: A short, engaging hook/question (e.g., "What's happening today with ${zodiacName}?"). Max 50 characters.
+2. text2: Informative, interesting, and positive forecast. Max 150 characters.
+3. hashtags: Exactly 5-7 relevant English hashtags, always including #LUNARA and #${zodiacName}.
+
+Return ONLY valid JSON in this exact format:
+{
+  "text1": "Your hook here",
+  "text2": "Your forecast here",
+  "hashtags": ["#LUNARA", "#${zodiacName}", "#Astrology", "#Horoscope", "#Zodiac"]
+}`;
+
+  try {
+    const response = await client.chat.completions.create({
+      model: model,
+      messages: [{ role: 'user', content: systemPrompt }],
+      response_format: { type: 'json_object' }, // ვაიძულებთ JSON პასუხს
+      temperature: 0.7,
     });
 
-    return response.choices[0].message.content || '';
-  }
+    const content = response.choices[0].message.content;
+    if (!content) throw new Error('Empty AI response');
 
-  /**
-   * გენერირებს რელევანტურ ჰეშთეგებს
-   */
-  async generateHashtags(options: GenerateHashtagsOptions): Promise<string[]> {
-    const { keywords, niche, count = 20 } = options;
-
-    const prompt = `
-      Generate exactly ${count} highly relevant Instagram hashtags for the niche "${niche}".
-      Keywords to include/consider: ${keywords.join(', ')}.
-      Mix broad, niche-specific, and trending hashtags.
-      Return ONLY an array of strings, without the '#' symbol, separated by commas.
-    `;
-
-    // AI API გამოძახება...
-    // const response = ...
+    const parsed = JSON.parse(content) as HoroscopeGenerationResult;
     
-    // დროებითი დაბრუნება (სანამ API-ს არ ჩავსვამთ)
-    return []; 
-  }
+    // ვალიდაცია
+    if (!parsed.text1 || !parsed.text2 || !Array.isArray(parsed.hashtags)) {
+      throw new Error('Invalid JSON structure from AI');
+    }
 
-  /**
-   * გენერირებს პრომფთს სურათების AI გენერატორებისთვის (DALL-E, Midjourney)
-   */
-  async generateImagePrompt(options: GenerateImagePromptOptions): Promise<string> {
-    const { subject, style, mood } = options;
-
-    const prompt = `
-      Create a highly detailed image generation prompt for an AI art generator.
-      Subject: ${subject}.
-      Style: ${style}.
-      Mood/Lighting: ${mood}.
-      Include details about composition, camera angle, and color palette.
-    `;
-
-    // AI API გამოძახება...
-    return '';
+    return parsed;
+  } catch (error) {
+    console.error('[AI Generator] Error:', error);
+    throw new Error(`AI Generation failed: ${error instanceof Error ? error.message : 'Unknown'}`);
   }
 }
-
-// ექსპორტი ინსტანსის სახით (Singleton pattern)
-export const aiGenerator = new InstagramAIGenerator();
