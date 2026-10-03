@@ -1,6 +1,5 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
 import { Canvas, Image } from 'skia-canvas';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
@@ -43,7 +42,7 @@ export class InstagramAgent {
       const aiContent = await generateHoroscopeContent(zodiac.name, period);
       console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2: aiContent.text2, hashtags: aiContent.hashtags });
 
-      console.log('[Step 3] 📥 Fetching base image and logo...');
+      console.log('[Step 3]  Fetching base image and logo...');
       onProgress?.('fetching', `📥 Fetching base image and logo...`);
       
       console.log(`[Step 3a] Fetching base image for ${zodiac.name}...`);
@@ -112,27 +111,23 @@ export class InstagramAgent {
   ): Promise<Buffer> {
     console.log('[addTextAndLogoToImage] Starting image composition with skia-canvas...');
     
-    const metadata = await sharp(baseBuffer).metadata();
-    const width = metadata.width || 1080;
-    const height = metadata.height || 1350;
-
-    // 1. Canvas-ის ინიციალიზაცია
-    const canvas = new Canvas(width, height);
+    const canvas = new Canvas(1080, 1350);
     const ctx = canvas.getContext('2d');
 
-    // 2. საბაზისო სურათის დახატვა
+    // 1. საბაზისო სურათის დახატვა
     const bgImage = new Image();
     bgImage.src = baseBuffer;
-    ctx.drawImage(bgImage, 0, 0, width, height);
+    ctx.drawImage(bgImage, 0, 0, 1080, 1350);
 
-    // 3. ტექსტის სტილის მორგება (თეთრი ტექსტი შავი კონტურით, ჩაშენებული Arial შრიფტი)
+    // 2. ტექსტის სტილის მორგება (თეთრი ტექსტი შავი კონტურით, ჩაშენებული Arial შრიფტი)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FFFFFF';
 
-    const centerX = width / 2;
+    const centerX = 1080 / 2;
+    const height = 1350;
 
     // ტექსტი 1 (Header)
     ctx.font = 'bold 42px Arial';
@@ -141,7 +136,7 @@ export class InstagramAgent {
 
     // ტექსტი 2 (Body) - სიტყვების გადატანით
     ctx.font = 'normal 32px Arial';
-    const lines = this.getLines(ctx, aiContent.text2, width * 0.85);
+    const lines = this.getLines(ctx, aiContent.text2, 1080 * 0.85);
     const startY = height * 0.55;
     const lineHeight = 45;
     
@@ -161,14 +156,14 @@ export class InstagramAgent {
     ctx.strokeText(dateStr, centerX, height * 0.92);
     ctx.fillText(dateStr, centerX, height * 0.92);
 
-    // 4. ლოგოს დახატვა (თუ მოგვეწოდა)
+    // 3. ლოგოს დახატვა (თუ მოგვეწოდა)
     if (logoBuffer) {
       try {
         const logoImg = new Image();
         logoImg.src = logoBuffer;
-        const logoSize = Math.min(width * 0.12, 60);
-        const logoX = width - logoSize - (width * 0.03);
-        const logoY = height * 0.03;
+        const logoSize = Math.min(1080 * 0.12, 60);
+        const logoX = 1080 - logoSize - (1080 * 0.03);
+        const logoY = 1350 * 0.03;
         const radius = logoSize / 2;
         
         // მრგვალი ლოგოს ეფექტი
@@ -185,14 +180,9 @@ export class InstagramAgent {
       }
     }
 
-    // 5. Canvas-ის ექსპორტი და sharp-ით შეკუმშვა
-    console.log('[addTextAndLogoToImage] Exporting canvas to buffer...');
-    const canvasBuffer = await canvas.encode('png');
-    
-    // ვიყენებთ sharp-ს მხოლოდ მაღალი ხარისხის JPEG კომპრესიისთვის
-    const finalBuffer = await sharp(canvasBuffer)
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    // 4. Canvas-ის პირდაპირ JPEG-ში ექსპორტი (skia-canvas აკეთებს ამას ჩაშენებული შრიფტებით)
+    console.log('[addTextAndLogoToImage] Exporting canvas to JPEG buffer...');
+    const finalBuffer = await canvas.toBuffer('image/jpeg', { quality: 0.9 });
       
     console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
     return finalBuffer;
@@ -235,7 +225,7 @@ export class InstagramAgent {
 
   async generatePreview(topic: string, _style: string = 'default') {
     try {
-      console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
+      console.log('\n [InstagramAgent] === დაწყება: ოროსკოპის პოსტის გენერაცია ===');
       const zodiac = this.getZodiacFromTopic(topic);
       
       const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
@@ -275,30 +265,27 @@ export class InstagramAgent {
   }
 
   private async addTextToImage(baseImageBuffer: Buffer, horoscopeText: string): Promise<Buffer> {
-    const metadata = await sharp(baseImageBuffer).metadata();
-    const width = metadata.width || 1080;
-    const height = metadata.height || 1350;
-
-    const canvas = new Canvas(width, height);
+    const canvas = new Canvas(1080, 1350);
     const ctx = canvas.getContext('2d');
 
     const bgImage = new Image();
     bgImage.src = baseImageBuffer;
-    ctx.drawImage(bgImage, 0, 0, width, height);
+    ctx.drawImage(bgImage, 0, 0, 1080, 1350);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#000000';
     ctx.fillStyle = '#FFFFFF';
-    const centerX = width / 2;
+    const centerX = 1080 / 2;
+    const height = 1350;
 
     ctx.font = 'bold 36px Arial';
     ctx.strokeText("What's happening today with", centerX, height * 0.35);
     ctx.fillText("What's happening today with", centerX, height * 0.35);
 
     ctx.font = 'normal 32px Arial';
-    const lines = this.getLines(ctx, horoscopeText, width * 0.85);
+    const lines = this.getLines(ctx, horoscopeText, 1080 * 0.85);
     const startY = height * 0.55;
     lines.forEach((line, i) => {
       const y = startY + (i * 45);
@@ -306,8 +293,7 @@ export class InstagramAgent {
       ctx.fillText(line, centerX, y);
     });
 
-    const canvasBuffer = await canvas.encode('png');
-    return await sharp(canvasBuffer).jpeg({ quality: 90 }).toBuffer();
+    return await canvas.toBuffer('image/jpeg', { quality: 0.9 });
   }
 
   private getZodiacFromTopic(topic: string) {
@@ -326,7 +312,7 @@ export class InstagramAgent {
       'CANCER': 'შენი ინტუიცია დღეს განსაკუთრებით მწვავეა.',
       'LEO': 'შენი ბუნებრივი ქარიზმა დღეს ყველას ყურადღებას მიიპყრობს.',
       'VIRGO': 'დეტალებზე ორიენტირება დღეს შენს უდიდეს ძალას წარმოადგენს.',
-      'LIBRA': 'ჰარმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
+      'LIBRA': 'არმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
       'SCORPIO': 'ღრმა ტრანსფორმაცია გელით.',
       'SAGITTARIUS': 'თავგადასავალი გეძახის.',
       'CAPRICORN': 'შენი შრომისმოყვარეობა დღეს ნაყოფს გამოიღებს.',
