@@ -121,13 +121,13 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    console.log('[addTextAndLogoToImage] Fetching Roboto fonts from reliable CDN...');
-    // ✅ ვიყენებთ @fontsource-ს, რომელიც 100%-ით საიმედოა და აბრუნებს ვალიდურ შრიფტებს
-    const fontRegularResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2');
-    const fontBoldResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-700-normal.woff2');
+    console.log('[addTextAndLogoToImage] Fetching Roboto .ttf fonts from Google Fonts (100% reliable)...');
+    // ✅ ვიყენებთ პირდაპირ .ttf ლინკებს Google Fonts-ის სერვერებიდან. ეს ფორმატი 100%-ით თავსებადია satori-სთან.
+    const fontRegularResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
+    const fontBoldResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf');
     
     if (!fontRegularResponse.ok || !fontBoldResponse.ok) {
-      throw new Error('Failed to fetch Roboto font files from CDN.');
+      throw new Error('Failed to fetch Roboto .ttf font files from Google Fonts.');
     }
     
     const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
@@ -304,9 +304,9 @@ export class InstagramAgent {
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
 
-    console.log('[addTextToImage] Fetching Roboto fonts from reliable CDN...');
-    const fontRegularResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2');
-    const fontBoldResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-700-normal.woff2');
+    console.log('[addTextToImage] Fetching Roboto .ttf fonts from Google Fonts...');
+    const fontRegularResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
+    const fontBoldResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf');
     
     const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
     const fontBoldBuffer = await fontBoldResponse.arrayBuffer();
