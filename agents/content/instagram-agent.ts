@@ -121,7 +121,7 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    // 1. ✅ შრიფტის დინამიური ჩატვირთვა სანდო CDN-იდან
+    // 1. ✅ შრიფტის დინამიური ჩატვირთვა სანდო CDN-იდან (არ სჭირდება ხელით ჩამოტვირთვა)
     console.log('[addTextAndLogoToImage] Fetching Roboto font...');
     const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
     const fontBuffer = await fontResponse.arrayBuffer();
@@ -252,6 +252,143 @@ export class InstagramAgent {
     return buffer;
   }
 
-  async generatePreview(topic: string, _style: string = 'default') { return { success: false, error: 'Refactored' }; }
-  async publishExisting(imageUrl: string, caption: string) { return { success: false, error: 'Refactored' }; }
+  async generatePreview(topic: string, _style: string = 'default') {
+    try {
+      console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
+      const zodiac = this.getZodiacFromTopic(topic);
+      
+      const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
+      const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
+      const finalImage = await this.addTextToImage(zodiacImageBuffer, horoscopeText);
+
+      const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
+      const uploadPath = `previews/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
+      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+      const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(uploadPath).data.publicUrl;
+      const caption = `${zodiac.name} ${zodiac.georgian} - დღის ჰოროსკოპი\n\n${horoscopeText}\n\n#LUNARA #Horoscope #${zodiac.georgian} #Astrology #DailyHoroscope`;
+
+      return { success: true, imageUrl: publicUrl, caption: caption, zodiac: zodiac.georgian };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('\n❌ [InstagramAgent] Preview error:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  async publishExisting(imageUrl: string, caption: string) {
+    try {
+      const publishResult = await this.instagramAdapter.publishPost(imageUrl, caption);
+      if (publishResult.success) {
+        return { success: true, postId: publishResult.postId, instagramUrl: `https://www.instagram.com/p/${publishResult.postId}` };
+      } else {
+        throw new Error(`Publish failed: ${publishResult.error}`);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [InstagramAgent] Publish error:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  private async addTextToImage(baseImageBuffer: Buffer, horoscopeText: string): Promise<Buffer> {
+    const metadata = await sharp(baseImageBuffer).metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1350;
+
+    console.log('[addTextToImage] Fetching Roboto font...');
+    const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
+    const fontBuffer = await fontResponse.arrayBuffer();
+
+    console.log('[addTextToImage] Generating text overlay with Satori...');
+    const svg = await satori(
+      {
+        type: 'div',
+        props: {
+          style: { 
+            width: width, 
+            height: height, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: 40
+          },
+          children: [
+            { 
+              type: 'div', 
+              props: { 
+                style: { 
+                  fontSize: 36, 
+                  fontWeight: 'bold', 
+                  color: '#FFFFFF', 
+                  textAlign: 'center', 
+                  textShadow: '3px 3px 6px #000000', 
+                  marginBottom: 40 
+                }, 
+                children: "What's happening today with" 
+              } 
+            },
+            { 
+              type: 'div', 
+              props: { 
+                style: { 
+                  fontSize: 32, 
+                  color: '#FFFFFF', 
+                  textAlign: 'center', 
+                  textShadow: '2px 2px 4px #000000', 
+                  lineHeight: 1.4,
+                  maxWidth: width * 0.9
+                }, 
+                children: horoscopeText 
+              } 
+            }
+          ]
+        }
+      },
+      {
+        width: width,
+        height: height,
+        fonts: [
+          { name: 'Roboto', data: fontBuffer, weight: 400, style: 'normal' },
+          { name: 'Roboto', data: fontBuffer, weight: 700, style: 'normal' }
+        ]
+      }
+    );
+
+    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+
+    return sharp(baseImageBuffer)
+      .composite([{ input: textOverlayBuffer, top: 0, left: 0 }])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+
+  private getZodiacFromTopic(topic: string) {
+    const topicUpper = topic.toUpperCase();
+    for (const sign of ZODIAC_SIGNS) {
+      if (topicUpper.includes(sign.name) || topicUpper.includes(sign.georgian)) return sign;
+    }
+    return ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
+  }
+
+  private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
+    const mockTexts: Record<string, string> = {
+      'ARIES': 'დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის.',
+      'TAURUS': 'სტაბილურობა და კომფორტი დღეს შენი მთავარი თემებია.',
+      'GEMINI': 'კომუნიკაცია დღეს შენი ძლიერი მხარეა.',
+      'CANCER': 'შენი ინტუიცია დღეს განსაკუთრებით მწვავეა.',
+      'LEO': 'შენი ბუნებრივი ქარიზმა დღეს ყველას ყურადღებას მიიპყრობს.',
+      'VIRGO': 'დეტალებზე ორიენტირება დღეს შენს უდიდეს ძალას წარმოადგენს.',
+      'LIBRA': 'ჰარმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
+      'SCORPIO': 'ღრმა ტრანსფორმაცია გელით.',
+      'SAGITTARIUS': 'თავგადასავალი გეძახის.',
+      'CAPRICORN': 'შენი შრომისმოყვარეობა დღეს ნაყოფს გამოიღებს.',
+      'AQUARIUS': 'შენი უნიკალური ხედვა დღეს სხვებს შთააგონებს.',
+      'PISCES': 'შენი შემოქმედებითი ენერგია დღეს პიკზეა.'
+    };
+    return mockTexts[zodiacName] || 'დღეს კარგი დღეა ახალი შესაძლებლობებისთვის.';
+  }
 }
