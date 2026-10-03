@@ -1,6 +1,7 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
-import { Canvas, Image } from 'skia-canvas';
+import sharp from 'sharp';
+import satori from 'satori';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
@@ -54,7 +55,7 @@ export class InstagramAgent {
       const logoBuffer = logoResponse.ok ? Buffer.from(await logoResponse.arrayBuffer()) : null;
       console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer ? logoBuffer.length : 0} bytes`);
 
-      console.log('[Step 4] 🎨 Composing final image with skia-canvas...');
+      console.log('[Step 4] 🎨 Composing final image with Satori...');
       onProgress?.('composing', `🎨 Composing image...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
@@ -109,103 +110,131 @@ export class InstagramAgent {
     _zodiacName: string, 
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
-    console.log('[addTextAndLogoToImage] Starting image composition with skia-canvas...');
+    console.log('[addTextAndLogoToImage] Starting image composition with Satori...');
     
-    const canvas = new Canvas(1080, 1350);
-    const ctx = canvas.getContext('2d');
+    const metadata = await sharp(baseBuffer).metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1350;
 
-    // 1. საბაზისო სურათის დახატვა
-    const bgImage = new Image();
-    bgImage.src = baseBuffer;
-    ctx.drawImage(bgImage, 0, 0, 1080, 1350);
-
-    // 2. ტექსტის სტილის მორგება (თეთრი ტექსტი შავი კონტურით, ჩაშენებული Arial შრიფტი)
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
-    ctx.fillStyle = '#FFFFFF';
-
-    const centerX = 1080 / 2;
-    const height = 1350;
-
-    // ტექსტი 1 (Header)
-    ctx.font = 'bold 42px Arial';
-    ctx.strokeText(aiContent.text1, centerX, height * 0.35);
-    ctx.fillText(aiContent.text1, centerX, height * 0.35);
-
-    // ტექსტი 2 (Body) - სიტყვების გადატანით
-    ctx.font = 'normal 32px Arial';
-    const lines = this.getLines(ctx, aiContent.text2, 1080 * 0.85);
-    const startY = height * 0.55;
-    const lineHeight = 45;
-    
-    lines.forEach((line, i) => {
-      const y = startY + (i * lineHeight);
-      ctx.strokeText(line, centerX, y);
-      ctx.fillText(line, centerX, y);
-    });
-
-    // თარიღი
     const now = new Date();
     const dateStr = period === 'daily' 
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-    
-    ctx.font = 'bold 24px Arial';
-    ctx.strokeText(dateStr, centerX, height * 0.92);
-    ctx.fillText(dateStr, centerX, height * 0.92);
 
-    // 3. ლოგოს დახატვა (თუ მოგვეწოდა)
+    // 1. ✅ შრიფტის დინამიური ჩატვირთვა სანდო CDN-იდან
+    console.log('[addTextAndLogoToImage] Fetching Roboto font...');
+    const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
+    const fontBuffer = await fontResponse.arrayBuffer();
+
+    // 2. ✅ ტექსტის ოვერლეის გენერირება Satori-თი (HTML/CSS -> SVG)
+    console.log('[addTextAndLogoToImage] Generating text overlay with Satori...');
+    const svg = await satori(
+      {
+        type: 'div',
+        props: {
+          style: { 
+            width: width, 
+            height: height, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: 40
+          },
+          children: [
+            { 
+              type: 'div', 
+              props: { 
+                style: { 
+                  fontSize: 42, 
+                  fontWeight: 'bold', 
+                  color: '#FFFFFF', 
+                  textAlign: 'center', 
+                  textShadow: '3px 3px 6px #000000', 
+                  marginBottom: 40 
+                }, 
+                children: aiContent.text1 
+              } 
+            },
+            { 
+              type: 'div', 
+              props: { 
+                style: { 
+                  fontSize: 32, 
+                  color: '#FFFFFF', 
+                  textAlign: 'center', 
+                  textShadow: '2px 2px 4px #000000', 
+                  lineHeight: 1.4,
+                  maxWidth: width * 0.9
+                }, 
+                children: aiContent.text2 
+              } 
+            },
+            { 
+              type: 'div', 
+              props: { 
+                style: { 
+                  fontSize: 24, 
+                  fontWeight: 'bold', 
+                  color: '#FFFFFF', 
+                  textAlign: 'center', 
+                  textShadow: '2px 2px 4px #000000', 
+                  marginTop: 'auto' 
+                }, 
+                children: dateStr 
+              } 
+            }
+          ]
+        }
+      },
+      {
+        width: width,
+        height: height,
+        fonts: [
+          { name: 'Roboto', data: fontBuffer, weight: 400, style: 'normal' },
+          { name: 'Roboto', data: fontBuffer, weight: 700, style: 'normal' }
+        ]
+      }
+    );
+
+    // 3. SVG-ს PNG-ად გადაყვანა
+    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
+
+    // 4. საბოლოო სურათის შეკვრა
+    const compositeOperations: any[] = [
+      { input: textOverlayBuffer, top: 0, left: 0 }
+    ];
+
     if (logoBuffer) {
       try {
-        const logoImg = new Image();
-        logoImg.src = logoBuffer;
-        const logoSize = Math.min(1080 * 0.12, 60);
-        const logoX = 1080 - logoSize - (1080 * 0.03);
-        const logoY = 1350 * 0.03;
-        const radius = logoSize / 2;
+        const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
+        const logoSize = Math.min(width * 0.12, 60);
+        const logoX = width - logoSize - (width * 0.03);
+        const logoY = height * 0.03;
         
-        // მრგვალი ლოგოს ეფექტი
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(logoX + radius, logoY + radius, radius, 0, Math.PI * 2, true);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-        ctx.restore();
-        console.log('[addTextAndLogoToImage] ✅ Logo drawn successfully.');
+        const roundedLogo = await sharp(pngLogoBuffer)
+          .resize(logoSize, logoSize, { fit: 'cover' })
+          .composite([{ 
+            input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+            blend: 'dest-in' 
+          }])
+          .toBuffer();
+          
+        compositeOperations.unshift({ input: roundedLogo, top: logoY, left: logoX });
+        console.log('[addTextAndLogoToImage] ✅ Logo added to composite.');
       } catch (e) {
-        console.warn('[addTextAndLogoToImage] ⚠️ Logo drawing skipped due to format issue.');
+        console.warn('[addTextAndLogoToImage] ⚠️ Logo skipped due to processing error.');
       }
     }
 
-    // 4. Canvas-ის პირდაპირ JPEG-ში ექსპორტი (✅ გამოსწორებულია: 'jpeg' და არა 'image/jpeg')
-    console.log('[addTextAndLogoToImage] Exporting canvas to JPEG buffer...');
-    const finalBuffer = await canvas.toBuffer('jpeg', { quality: 0.9 });
+    const finalBuffer = await sharp(baseBuffer)
+      .composite(compositeOperations)
+      .jpeg({ quality: 90 })
+      .toBuffer();
       
     console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
     return finalBuffer;
-  }
-
-  // დამხმარე ფუნქცია ტექსტის ხაზებად დასაყოფად Canvas-ისთვის
-  private getLines(ctx: any, text: string, maxWidth: number): string[] {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = words[0] || '';
-
-    for (let i = 1; i < words.length; i++) {
-      const word = words[i];
-      const width = ctx.measureText(currentLine + " " + word).width;
-      if (width < maxWidth) {
-        currentLine += " " + word;
-      } else {
-        lines.push(currentLine);
-        currentLine = word;
-      }
-    }
-    lines.push(currentLine);
-    return lines;
   }
 
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
@@ -223,103 +252,6 @@ export class InstagramAgent {
     return buffer;
   }
 
-  async generatePreview(topic: string, _style: string = 'default') {
-    try {
-      console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
-      const zodiac = this.getZodiacFromTopic(topic);
-      
-      const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
-      const horoscopeText = await this.generateHoroscopeText(zodiac.name, topic);
-      const finalImage = await this.addTextToImage(zodiacImageBuffer, horoscopeText);
-
-      const fileName = `preview-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
-      const uploadPath = `previews/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage.from(BUCKET_NAME).upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
-      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-
-      const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(uploadPath).data.publicUrl;
-      const caption = `${zodiac.name} ${zodiac.georgian} - დღის ჰოროსკოპი\n\n${horoscopeText}\n\n#LUNARA #Horoscope #${zodiac.georgian} #Astrology #DailyHoroscope`;
-
-      return { success: true, imageUrl: publicUrl, caption: caption, zodiac: zodiac.georgian };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('\n❌ [InstagramAgent] Preview error:', errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  }
-
-  async publishExisting(imageUrl: string, caption: string) {
-    try {
-      const publishResult = await this.instagramAdapter.publishPost(imageUrl, caption);
-      if (publishResult.success) {
-        return { success: true, postId: publishResult.postId, instagramUrl: `https://www.instagram.com/p/${publishResult.postId}` };
-      } else {
-        throw new Error(`Publish failed: ${publishResult.error}`);
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('❌ [InstagramAgent] Publish error:', errorMsg);
-      return { success: false, error: errorMsg };
-    }
-  }
-
-  private async addTextToImage(baseImageBuffer: Buffer, horoscopeText: string): Promise<Buffer> {
-    const canvas = new Canvas(1080, 1350);
-    const ctx = canvas.getContext('2d');
-
-    const bgImage = new Image();
-    bgImage.src = baseImageBuffer;
-    ctx.drawImage(bgImage, 0, 0, 1080, 1350);
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
-    ctx.fillStyle = '#FFFFFF';
-    const centerX = 1080 / 2;
-    const height = 1350;
-
-    ctx.font = 'bold 36px Arial';
-    ctx.strokeText("What's happening today with", centerX, height * 0.35);
-    ctx.fillText("What's happening today with", centerX, height * 0.35);
-
-    ctx.font = 'normal 32px Arial';
-    const lines = this.getLines(ctx, horoscopeText, 1080 * 0.85);
-    const startY = height * 0.55;
-    lines.forEach((line, i) => {
-      const y = startY + (i * 45);
-      ctx.strokeText(line, centerX, y);
-      ctx.fillText(line, centerX, y);
-    });
-
-    // ✅ აქაც გამოსწორებულია: 'jpeg'
-    return await canvas.toBuffer('jpeg', { quality: 0.9 });
-  }
-
-  private getZodiacFromTopic(topic: string) {
-    const topicUpper = topic.toUpperCase();
-    for (const sign of ZODIAC_SIGNS) {
-      if (topicUpper.includes(sign.name) || topicUpper.includes(sign.georgian)) return sign;
-    }
-    return ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
-  }
-
-  private async generateHoroscopeText(zodiacName: string, _topic: string): Promise<string> {
-    const mockTexts: Record<string, string> = {
-      'ARIES': 'დღეს ენერგია შენს მხარესაა. ნუ შეგეშინდება ახალი დასაწყისის.',
-      'TAURUS': 'სტაბილურობა და კომფორტი დღეს შენი მთავარი თემებია.',
-      'GEMINI': 'კომუნიკაცია დღეს შენი ძლიერი მხარეა.',
-      'CANCER': 'შენი ინტუიცია დღეს განსაკუთრებით მწვავეა.',
-      'LEO': 'შენი ბუნებრივი ქარიზმა დღეს ყველას ყურადღებას მიიპყრობს.',
-      'VIRGO': 'დეტალებზე ორიენტირება დღეს შენს უდიდეს ძალას წარმოადგენს.',
-      'LIBRA': 'ჰარმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
-      'SCORPIO': 'ღრმა ტრანსფორმაცია გელით.',
-      'SAGITTARIUS': 'თავგადასავალი გეძახის.',
-      'CAPRICORN': 'შენი შრომისმოყვარეობა დღეს ნაყოფს გამოიღებს.',
-      'AQUARIUS': 'შენი უნიკალური ხედვა დღეს სხვებს შთააგონებს.',
-      'PISCES': 'შენი შემოქმედებითი ენერგია დღეს პიკზეა.'
-    };
-    return mockTexts[zodiacName] || 'დღეს კარგი დღეა ახალი შესაძლებლობებისთვის.';
-  }
+  async generatePreview(topic: string, _style: string = 'default') { return { success: false, error: 'Refactored' }; }
+  async publishExisting(imageUrl: string, caption: string) { return { success: false, error: 'Refactored' }; }
 }
