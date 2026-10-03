@@ -151,26 +151,48 @@ export class InstagramAgent {
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
 
-    // ✅ FIX 1: ჯერ გადავიყვანოთ ლოგო PNG-ში, რათა თავიდან ავიცილოთ sharp-ის პრობლემები (failOnError წაშლილია TypeScript-ის თავსებადობისთვის)
-    console.log('[addTextAndLogoToImage] Converting logo to PNG to ensure compatibility...');
-    const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
-    
-    console.log('[addTextAndLogoToImage] Rounding logo corners using sharp...');
-    const roundedLogo = await sharp(pngLogoBuffer)
-      .resize(logoSize, logoSize, { fit: 'cover' })
-      .composite([{ 
-        input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
-        blend: 'dest-in' 
-      }])
-      .toBuffer();
-    console.log('[addTextAndLogoToImage] Logo rounded successfully.');
+    console.log('[addTextAndLogoToImage] Processing logo...');
+    let roundedLogo: Buffer;
+    try {
+      // მცდელობა 1: პირდაპირი ბაფერის დამუშავება
+      const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
+      roundedLogo = await sharp(pngLogoBuffer)
+        .resize(logoSize, logoSize, { fit: 'cover' })
+        .composite([{ 
+          input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+          blend: 'dest-in' 
+        }])
+        .toBuffer();
+    } catch (sharpError) {
+      console.warn('[addTextAndLogoToImage] Sharp buffer processing failed, trying file fallback...', sharpError);
+      // მცდელობა 2: დისკზე ჩაწერა და წაკითხვა (ეს აგვარებს sharp WASM-ის ბაფერის პარსინგის ბაგებს)
+      const tempLogoPath = path.join(process.cwd(), `temp-logo-${Date.now()}.jpg`);
+      fs.writeFileSync(tempLogoPath, logoBuffer);
+      try {
+        roundedLogo = await sharp(tempLogoPath)
+          .resize(logoSize, logoSize, { fit: 'cover' })
+          .composite([{ 
+            input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
+            blend: 'dest-in' 
+          }])
+          .toFormat('png')
+          .toBuffer();
+      } catch (fileError) {
+        console.error('[addTextAndLogoToImage] File fallback also failed:', fileError);
+        throw new Error('Failed to process logo in all attempts');
+      } finally {
+        if (fs.existsSync(tempLogoPath)) {
+          fs.unlinkSync(tempLogoPath);
+        }
+      }
+    }
+    console.log('[addTextAndLogoToImage] Logo processed successfully.');
 
     const escapedText1 = this.escapeXml(aiContent.text1);
     const escapedText2 = this.escapeXml(aiContent.text2);
     const escapedDate = this.escapeXml(dateStr);
 
-    // ✅ FIX 2: მაქსიმალურად გამარტივებული SVG. ამოღებულია filter და clip-path.
-    // გამოყენებულია sans-serif (ჩაშენებულია), თეთრი ტექსტი შავი კონტურით (100% ხილული).
+    // SVG მხოლოდ ტექსტისთვის (ლოგოს დამუშავება უკვე sharp-ით მოხდა)
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <text x="50%" y="38%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
@@ -195,10 +217,6 @@ export class InstagramAgent {
     const pngData = resvg.render();
     const textOverlayBuffer = Buffer.from(pngData.asPng());
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
-
-    if (textOverlayBuffer.length < 1000) {
-      console.error('[addTextAndLogoToImage] ⚠️ WARNING: Text overlay is suspiciously small!');
-    }
 
     console.log('[addTextAndLogoToImage] Compositing final image (Base + Rounded Logo + Text Overlay)...');
     const finalBuffer = await sharp(baseBuffer)
