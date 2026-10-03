@@ -1,9 +1,7 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
-import * as path from 'path';
-import * as fs from 'fs';
 import sharp from 'sharp';
-import { Resvg, initWasm } from '@resvg/resvg-wasm';
+import { Canvas, Image } from 'skia-canvas';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
@@ -14,8 +12,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
 const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
-// ✅ შრიფტის ზუსტი მისამართი
-const FONT_PATH = path.join(process.cwd(), 'fonts', 'Roboto-Regular.ttf');
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', georgian: 'ვერძი' }, { name: 'TAURUS', georgian: 'კურო' },
@@ -28,7 +24,6 @@ const ZODIAC_SIGNS = [
 
 export class InstagramAgent {
   private instagramAdapter: InstagramAdapter;
-  private isWasmInitialized = false;
 
   constructor() {
     this.instagramAdapter = new InstagramAdapter();
@@ -57,15 +52,11 @@ export class InstagramAgent {
       
       console.log(`[Step 3b] Fetching logo from ${LOGO_URL}...`);
       const logoResponse = await fetch(LOGO_URL);
-      if (!logoResponse.ok) {
-        throw new Error(`Failed to fetch logo: ${logoResponse.status} ${logoResponse.statusText}`);
-      }
-      
-      const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
-      console.log(`[Step 3b] ✅ Logo buffer size: ${logoBuffer.length} bytes`);
+      const logoBuffer = logoResponse.ok ? Buffer.from(await logoResponse.arrayBuffer()) : null;
+      console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer ? logoBuffer.length : 0} bytes`);
 
-      console.log('[Step 4] 🎨 Composing final image...');
-      onProgress?.('composing', `🎨 Composing image (matching manual UI styles)...`);
+      console.log('[Step 4] 🎨 Composing final image with skia-canvas...');
+      onProgress?.('composing', `🎨 Composing image...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
 
@@ -74,15 +65,11 @@ export class InstagramAgent {
       const fileName = `post-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
       
-      console.log(`[Step 5a] Uploading to bucket: ${BUCKET_NAME}, path: ${uploadPath}`);
       const { error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
         .upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
         
-      if (uploadError) {
-        console.error(`[Step 5a] ❌ Supabase Upload Error:`, uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
+      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
       console.log(`[Step 5a] ✅ Uploaded to Supabase. Path: ${uploadPath}`);
       
       const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(uploadPath).data.publicUrl;
@@ -93,12 +80,9 @@ export class InstagramAgent {
 
       console.log('[Step 6] 📤 Publishing to Instagram via Adapter...');
       onProgress?.('publishing', `📤 Publishing to Instagram...`);
-      console.log(`[Step 6a] Calling instagramAdapter.publishPost with URL: ${publicUrl}`);
       const publishResult = await this.instagramAdapter.publishPost(publicUrl, caption);
-      console.log(`[Step 6b] Instagram Adapter Response:`, publishResult);
       
       if (!publishResult.success) {
-        console.error(`[Step 6c] ❌ Publish failed with error:`, publishResult.error);
         throw new Error(`Publish failed: ${publishResult.error}`);
       }
 
@@ -113,11 +97,7 @@ export class InstagramAgent {
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('\n❌ [InstagramAgent] CRITICAL FAILURE in autoCreateAndPublish:');
-      console.error('Error Message:', errorMsg);
-      if (error instanceof Error && error.stack) {
-        console.error('Stack Trace:', error.stack);
-      }
+      console.error('\n❌ [InstagramAgent] CRITICAL FAILURE:', errorMsg);
       onProgress?.('error', `❌ Failed: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
@@ -125,130 +105,117 @@ export class InstagramAgent {
 
   private async addTextAndLogoToImage(
     baseBuffer: Buffer, 
-    logoBuffer: Buffer, 
+    logoBuffer: Buffer | null, 
     aiContent: { text1: string, text2: string }, 
     _zodiacName: string, 
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
-    console.log('[addTextAndLogoToImage] Starting image composition...');
+    console.log('[addTextAndLogoToImage] Starting image composition with skia-canvas...');
     
-    try {
-      const metadata = await sharp(baseBuffer).metadata();
-      const width = metadata.width || 1080;
-      const height = metadata.height || 1350;
-      console.log(`[addTextAndLogoToImage] Base image dimensions: ${width}x${height}`);
+    const metadata = await sharp(baseBuffer).metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1350;
 
-      if (!this.isWasmInitialized) {
-        console.log('[addTextAndLogoToImage] Initializing Resvg WASM...');
-        const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
-        await initWasm(fs.readFileSync(wasmPath));
-        this.isWasmInitialized = true;
-        console.log('[addTextAndLogoToImage] Resvg WASM initialized.');
-      }
+    // 1. Canvas-ის ინიციალიზაცია
+    const canvas = new Canvas(width, height);
+    const ctx = canvas.getContext('2d');
 
-      const now = new Date();
-      const dateStr = period === 'daily' 
-        ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-        : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    // 2. საბაზისო სურათის დახატვა
+    const bgImage = new Image();
+    bgImage.src = baseBuffer;
+    ctx.drawImage(bgImage, 0, 0, width, height);
 
-      const logoSize = Math.min(width * 0.12, 50);
-      const logoX = width - logoSize - (width * 0.03);
-      const logoY = height * 0.03;
+    // 3. ტექსტის სტილის მორგება (თეთრი ტექსტი შავი კონტურით, ჩაშენებული Arial შრიფტი)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#FFFFFF';
 
-      // 1. ლოგოს დამუშავება (Graceful Fallback)
-      let roundedLogo: Buffer | null = null;
+    const centerX = width / 2;
+
+    // ტექსტი 1 (Header)
+    ctx.font = 'bold 42px Arial';
+    ctx.strokeText(aiContent.text1, centerX, height * 0.35);
+    ctx.fillText(aiContent.text1, centerX, height * 0.35);
+
+    // ტექსტი 2 (Body) - სიტყვების გადატანით
+    ctx.font = 'normal 32px Arial';
+    const lines = this.getLines(ctx, aiContent.text2, width * 0.85);
+    const startY = height * 0.55;
+    const lineHeight = 45;
+    
+    lines.forEach((line, i) => {
+      const y = startY + (i * lineHeight);
+      ctx.strokeText(line, centerX, y);
+      ctx.fillText(line, centerX, y);
+    });
+
+    // თარიღი
+    const now = new Date();
+    const dateStr = period === 'daily' 
+      ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    
+    ctx.font = 'bold 24px Arial';
+    ctx.strokeText(dateStr, centerX, height * 0.92);
+    ctx.fillText(dateStr, centerX, height * 0.92);
+
+    // 4. ლოგოს დახატვა (თუ მოგვეწოდა)
+    if (logoBuffer) {
       try {
-        console.log('[addTextAndLogoToImage] Attempting to process logo with sharp...');
-        const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
-        roundedLogo = await sharp(pngLogoBuffer)
-          .resize(logoSize, logoSize, { fit: 'cover' })
-          .composite([{ 
-            input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
-            blend: 'dest-in' 
-          }])
-          .toBuffer();
-        console.log('[addTextAndLogoToImage] ✅ Logo processed successfully.');
-      } catch (sharpError) {
-        console.warn('[addTextAndLogoToImage] ⚠️ Sharp failed to process logo (WASM bug). Skipping logo to ensure text renders.');
+        const logoImg = new Image();
+        logoImg.src = logoBuffer;
+        const logoSize = Math.min(width * 0.12, 60);
+        const logoX = width - logoSize - (width * 0.03);
+        const logoY = height * 0.03;
+        const radius = logoSize / 2;
+        
+        // მრგვალი ლოგოს ეფექტი
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(logoX + radius, logoY + radius, radius, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+        ctx.restore();
+        console.log('[addTextAndLogoToImage] ✅ Logo drawn successfully.');
+      } catch (e) {
+        console.warn('[addTextAndLogoToImage] ⚠️ Logo drawing skipped due to format issue.');
       }
-
-      const escapedText1 = this.escapeXml(aiContent.text1);
-      const escapedText2 = this.escapeXml(aiContent.text2);
-      const escapedDate = this.escapeXml(dateStr);
-
-      // 2. ✅ კრიტიკული: შრიფტის ფაილის არსებობის შემოწმება
-      if (!fs.existsSync(FONT_PATH)) {
-        throw new Error(`Font file not found at: ${FONT_PATH}. Please download Roboto-Regular.ttf to the /fonts/ directory.`);
-      }
-      console.log('[addTextAndLogoToImage] ✅ Font file found:', FONT_PATH);
-
-      // 3. SVG შრიფტის მითითებით
-      const svg = `
-        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-          <text x="50%" y="38%" font-family="Roboto" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
-            ${escapedText1}
-          </text>
-          
-          <text x="50%" y="60%" font-family="Roboto" font-size="26" fill="#FFFFFF" text-anchor="middle" font-weight="normal" stroke="#000000" stroke-width="1.5px" paint-order="stroke fill">
-            ${this.wrapTextForSvg(escapedText2, 35)}
-          </text>
-          
-          <text x="50%" y="95%" font-family="Roboto" font-size="18" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="1px" paint-order="stroke fill">
-            ${escapedDate}
-          </text>
-        </svg>
-      `;
-
-      console.log('[addTextAndLogoToImage] Rendering text overlay with Resvg (using Roboto font)...');
-      const resvg = new Resvg(svg, { 
-        fitTo: { mode: 'width', value: width },
-        font: {
-          fontFiles: [FONT_PATH],
-          loadSystemFonts: false // ვკრძალავთ სისტემური შრიფტების ძიებას
-        }
-      });
-      
-      const pngData = resvg.render();
-      const textOverlayBuffer = Buffer.from(pngData.asPng());
-      console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
-
-      if (textOverlayBuffer.length < 50000) {
-        console.error('[addTextAndLogoToImage] ⚠️ WARNING: Overlay is too small! Font may not have loaded correctly.');
-      }
-
-      console.log('[addTextAndLogoToImage] Compositing final image...');
-      const compositeOperations: any[] = [
-        { input: textOverlayBuffer, top: 0, left: 0 }
-      ];
-      
-      if (roundedLogo) {
-        compositeOperations.unshift({ input: roundedLogo, top: logoY, left: logoX });
-        console.log('[addTextAndLogoToImage] Adding rounded logo to composite.');
-      } else {
-        console.log('[addTextAndLogoToImage] Skipping logo in composite.');
-      }
-
-      const finalBuffer = await sharp(baseBuffer)
-        .composite(compositeOperations)
-        .jpeg({ quality: 95 })
-        .toBuffer();
-      
-      console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
-      
-      return finalBuffer;
-    } catch (error) {
-      console.error('[addTextAndLogoToImage] ❌ Critical error:', error);
-      throw error;
     }
+
+    // 5. Canvas-ის ექსპორტი და sharp-ით შეკუმშვა
+    console.log('[addTextAndLogoToImage] Exporting canvas to buffer...');
+    const canvasBuffer = await canvas.encode('png');
+    
+    // ვიყენებთ sharp-ს მხოლოდ მაღალი ხარისხის JPEG კომპრესიისთვის
+    const finalBuffer = await sharp(canvasBuffer)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+      
+    console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
+    return finalBuffer;
   }
 
-  private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
-    const lines = this.wrapText(text, maxCharsPerLine);
-    return lines.map((line, i) => `<tspan x="50%" dy="${i === 0 ? '0' : '1.5em'}">${this.escapeXml(line)}</tspan>`).join('\n');
-  }
+  // დამხმარე ფუნქცია ტექსტის ხაზებად დასაყოფად Canvas-ისთვის
+  private getLines(ctx: any, text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = words[0] || '';
 
-  private escapeXml(text: string): string {
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = ctx.measureText(currentLine + " " + word).width;
+      if (width < maxWidth) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+    return lines;
   }
 
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
@@ -264,22 +231,6 @@ export class InstagramAgent {
     const buffer = Buffer.from(await response.arrayBuffer());
     console.log(`[getZodiacImage] Successfully fetched ${buffer.length} bytes`);
     return buffer;
-  }
-
-  private wrapText(text: string, maxCharsPerLine: number): string[] {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
-    words.forEach(word => {
-      if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
-        currentLine = (currentLine + ' ' + word).trim();
-      } else {
-        if (currentLine) lines.push(currentLine);
-        currentLine = word;
-      }
-    });
-    if (currentLine) lines.push(currentLine);
-    return lines;
   }
 
   async generatePreview(topic: string, _style: string = 'default') {
@@ -328,40 +279,35 @@ export class InstagramAgent {
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
 
-    if (!this.isWasmInitialized) {
-      const wasmPath = path.join(process.cwd(), 'node_modules', '@resvg/resvg-wasm', 'index_bg.wasm');
-      await initWasm(fs.readFileSync(wasmPath));
-      this.isWasmInitialized = true;
-    }
+    const canvas = new Canvas(width, height);
+    const ctx = canvas.getContext('2d');
 
-    if (!fs.existsSync(FONT_PATH)) {
-      throw new Error(`Font file not found at: ${FONT_PATH}`);
-    }
+    const bgImage = new Image();
+    bgImage.src = baseImageBuffer;
+    ctx.drawImage(bgImage, 0, 0, width, height);
 
-    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'Roboto', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: 'bold', stroke: '#000000', strokeWidth: '2px' });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.fillStyle = '#FFFFFF';
+    const centerX = width / 2;
 
-    const textLines = this.wrapText(horoscopeText, 45);
-    let horoscopeSvg = '';
-    textLines.forEach((line, index) => {
-      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'Roboto', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: '500', stroke: '#000000', strokeWidth: '2px' });
+    ctx.font = 'bold 36px Arial';
+    ctx.strokeText("What's happening today with", centerX, height * 0.35);
+    ctx.fillText("What's happening today with", centerX, height * 0.35);
+
+    ctx.font = 'normal 32px Arial';
+    const lines = this.getLines(ctx, horoscopeText, width * 0.85);
+    const startY = height * 0.55;
+    lines.forEach((line, i) => {
+      const y = startY + (i * 45);
+      ctx.strokeText(line, centerX, y);
+      ctx.fillText(line, centerX, y);
     });
 
-    const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
-    const resvg = new Resvg(combinedSvg, { 
-      fitTo: { mode: 'width', value: width },
-      font: { fontFiles: [FONT_PATH], loadSystemFonts: false }
-    });
-    const textOverlayBuffer = Buffer.from(resvg.render().asPng());
-
-    return sharp(baseImageBuffer).composite([{ input: textOverlayBuffer, top: 0, left: 0 }]).jpeg({ quality: 95 }).toBuffer();
-  }
-
-  private createSvgText(text: string, options: { x: number; y: number; fontSize: number; fontFamily: string; fill: string; textAnchor: string; fontWeight?: string; stroke?: string; strokeWidth?: string }): string {
-    const { x, y, fontSize, fontFamily, fill, textAnchor, fontWeight, stroke, strokeWidth } = options;
-    let style = `font-family: ${fontFamily}; font-size: ${fontSize}px; fill: ${fill}; text-anchor: ${textAnchor};`;
-    if (fontWeight) style += ` font-weight: ${fontWeight};`;
-    if (stroke && strokeWidth) style += ` stroke: ${stroke}; stroke-width: ${strokeWidth}; paint-order: stroke fill;`;
-    return `<text x="${x}" y="${y}" style="${style}">${this.escapeXml(text)}</text>`;
+    const canvasBuffer = await canvas.encode('png');
+    return await sharp(canvasBuffer).jpeg({ quality: 90 }).toBuffer();
   }
 
   private getZodiacFromTopic(topic: string) {
