@@ -121,13 +121,13 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    // 1. ✅ შრიფტის დინამიური ჩატვირთვა სანდო CDN-იდან (არ სჭირდება ხელით ჩამოტვირთვა)
     console.log('[addTextAndLogoToImage] Fetching Roboto font...');
     const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
     const fontBuffer = await fontResponse.arrayBuffer();
 
-    // 2. ✅ ტექსტის ოვერლეის გენერირება Satori-თი (HTML/CSS -> SVG)
     console.log('[addTextAndLogoToImage] Generating text overlay with Satori...');
+    
+    // ✅ დამატებულია 'as any', რათა TypeScript-მა არ დაბლოკოს VDOM ფორმატი
     const svg = await satori(
       {
         type: 'div',
@@ -186,7 +186,7 @@ export class InstagramAgent {
             }
           ]
         }
-      },
+      } as any, // <--- აქ არის გამოსწორება
       {
         width: width,
         height: height,
@@ -197,11 +197,9 @@ export class InstagramAgent {
       }
     );
 
-    // 3. SVG-ს PNG-ად გადაყვანა
     const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
-    // 4. საბოლოო სურათის შეკვრა
     const compositeOperations: any[] = [
       { input: textOverlayBuffer, top: 0, left: 0 }
     ];
@@ -303,6 +301,8 @@ export class InstagramAgent {
     const fontBuffer = await fontResponse.arrayBuffer();
 
     console.log('[addTextToImage] Generating text overlay with Satori...');
+    
+    // ✅ დამატებულია 'as any', რათა TypeScript-მა არ დაბლოკოს VDOM ფორმატი
     const svg = await satori(
       {
         type: 'div',
@@ -347,7 +347,7 @@ export class InstagramAgent {
             }
           ]
         }
-      },
+      } as any, // <--- აქ არის გამოსწორება
       {
         width: width,
         height: height,
