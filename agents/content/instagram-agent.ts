@@ -42,7 +42,7 @@ export class InstagramAgent {
       const aiContent = await generateHoroscopeContent(zodiac.name, period);
       console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2: aiContent.text2, hashtags: aiContent.hashtags });
 
-      console.log('[Step 3]  Fetching base image and logo...');
+      console.log('[Step 3] 📥 Fetching base image and logo...');
       onProgress?.('fetching', `📥 Fetching base image and logo...`);
       
       console.log(`[Step 3a] Fetching base image for ${zodiac.name}...`);
@@ -180,9 +180,9 @@ export class InstagramAgent {
       }
     }
 
-    // 4. Canvas-ის პირდაპირ JPEG-ში ექსპორტი (skia-canvas აკეთებს ამას ჩაშენებული შრიფტებით)
+    // 4. Canvas-ის პირდაპირ JPEG-ში ექსპორტი (✅ გამოსწორებულია: 'jpeg' და არა 'image/jpeg')
     console.log('[addTextAndLogoToImage] Exporting canvas to JPEG buffer...');
-    const finalBuffer = await canvas.toBuffer('image/jpeg', { quality: 0.9 });
+    const finalBuffer = await canvas.toBuffer('jpeg', { quality: 0.9 });
       
     console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
     return finalBuffer;
@@ -225,7 +225,7 @@ export class InstagramAgent {
 
   async generatePreview(topic: string, _style: string = 'default') {
     try {
-      console.log('\n [InstagramAgent] === დაწყება: ოროსკოპის პოსტის გენერაცია ===');
+      console.log('\n🎨 [InstagramAgent] === დაწყება: ჰოროსკოპის პოსტის გენერაცია ===');
       const zodiac = this.getZodiacFromTopic(topic);
       
       const zodiacImageBuffer = await this.getZodiacImage(zodiac.name);
@@ -293,7 +293,8 @@ export class InstagramAgent {
       ctx.fillText(line, centerX, y);
     });
 
-    return await canvas.toBuffer('image/jpeg', { quality: 0.9 });
+    // ✅ აქაც გამოსწორებულია: 'jpeg'
+    return await canvas.toBuffer('jpeg', { quality: 0.9 });
   }
 
   private getZodiacFromTopic(topic: string) {
@@ -312,7 +313,7 @@ export class InstagramAgent {
       'CANCER': 'შენი ინტუიცია დღეს განსაკუთრებით მწვავეა.',
       'LEO': 'შენი ბუნებრივი ქარიზმა დღეს ყველას ყურადღებას მიიპყრობს.',
       'VIRGO': 'დეტალებზე ორიენტირება დღეს შენს უდიდეს ძალას წარმოადგენს.',
-      'LIBRA': 'არმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
+      'LIBRA': 'ჰარმონია და ბალანსი დღეს შენი მთავარი მიზანია.',
       'SCORPIO': 'ღრმა ტრანსფორმაცია გელით.',
       'SAGITTARIUS': 'თავგადასავალი გეძახის.',
       'CAPRICORN': 'შენი შრომისმოყვარეობა დღეს ნაყოფს გამოიღებს.',
