@@ -151,10 +151,10 @@ export class InstagramAgent {
     const logoX = width - logoSize - (width * 0.03);
     const logoY = height * 0.03;
 
-    console.log('[addTextAndLogoToImage] Processing logo...');
-    let roundedLogo: Buffer;
+    // ✅ მდგრადი ლოგოს დამუშავება: თუ sharp ვერ კითხულობს ბაფერს, ჩვენ უბრალოდ ვტოვებთ მას null-ად და ვაგრძელებთ ტექსტის დარენდერებას.
+    let roundedLogo: Buffer | null = null;
     try {
-      // მცდელობა 1: პირდაპირი ბაფერის დამუშავება
+      console.log('[addTextAndLogoToImage] Attempting to process logo with sharp...');
       const pngLogoBuffer = await sharp(logoBuffer).png().toBuffer();
       roundedLogo = await sharp(pngLogoBuffer)
         .resize(logoSize, logoSize, { fit: 'cover' })
@@ -163,36 +163,17 @@ export class InstagramAgent {
           blend: 'dest-in' 
         }])
         .toBuffer();
+      console.log('[addTextAndLogoToImage] ✅ Logo processed successfully.');
     } catch (sharpError) {
-      console.warn('[addTextAndLogoToImage] Sharp buffer processing failed, trying file fallback...', sharpError);
-      // მცდელობა 2: დისკზე ჩაწერა და წაკითხვა (ეს აგვარებს sharp WASM-ის ბაფერის პარსინგის ბაგებს)
-      const tempLogoPath = path.join(process.cwd(), `temp-logo-${Date.now()}.jpg`);
-      fs.writeFileSync(tempLogoPath, logoBuffer);
-      try {
-        roundedLogo = await sharp(tempLogoPath)
-          .resize(logoSize, logoSize, { fit: 'cover' })
-          .composite([{ 
-            input: Buffer.from(`<svg><rect x="0" y="0" width="${logoSize}" height="${logoSize}" rx="${logoSize/2}" fill="white"/></svg>`), 
-            blend: 'dest-in' 
-          }])
-          .toFormat('png')
-          .toBuffer();
-      } catch (fileError) {
-        console.error('[addTextAndLogoToImage] File fallback also failed:', fileError);
-        throw new Error('Failed to process logo in all attempts');
-      } finally {
-        if (fs.existsSync(tempLogoPath)) {
-          fs.unlinkSync(tempLogoPath);
-        }
-      }
+      console.warn('[addTextAndLogoToImage] ⚠️ Sharp failed to process logo (likely a WASM JPEG parsing bug). Skipping logo to ensure text is rendered.');
+      // roundedLogo remains null, and we will skip compositing it.
     }
-    console.log('[addTextAndLogoToImage] Logo processed successfully.');
 
     const escapedText1 = this.escapeXml(aiContent.text1);
     const escapedText2 = this.escapeXml(aiContent.text2);
     const escapedDate = this.escapeXml(dateStr);
 
-    // SVG მხოლოდ ტექსტისთვის (ლოგოს დამუშავება უკვე sharp-ით მოხდა)
+    // SVG მხოლოდ ტექსტისთვის
     const svg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <text x="50%" y="38%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
@@ -218,12 +199,20 @@ export class InstagramAgent {
     const textOverlayBuffer = Buffer.from(pngData.asPng());
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
-    console.log('[addTextAndLogoToImage] Compositing final image (Base + Rounded Logo + Text Overlay)...');
+    console.log('[addTextAndLogoToImage] Compositing final image...');
+    const compositeOperations: any[] = [
+      { input: textOverlayBuffer, top: 0, left: 0 }
+    ];
+    
+    if (roundedLogo) {
+      compositeOperations.unshift({ input: roundedLogo, top: logoY, left: logoX });
+      console.log('[addTextAndLogoToImage] Adding rounded logo to composite.');
+    } else {
+      console.log('[addTextAndLogoToImage] Skipping logo in composite due to processing error.');
+    }
+
     const finalBuffer = await sharp(baseBuffer)
-      .composite([
-        { input: roundedLogo, top: logoY, left: logoX },
-        { input: textOverlayBuffer, top: 0, left: 0 }
-      ])
+      .composite(compositeOperations)
       .jpeg({ quality: 95 })
       .toBuffer();
     
