@@ -14,12 +14,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
 const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
-
-// Instagram-ის მოთხოვნები: მინიმუმ 320px, მაქსიმუმ 1080px, ასპექტის შეფარდება 4:5-დან 1.91:1-მდე
-const INSTAGRAM_MIN_WIDTH = 320;
-const INSTAGRAM_MAX_WIDTH = 1080;
-const INSTAGRAM_MIN_HEIGHT = 566; // 4:5 ასპექტისთვის
-const INSTAGRAM_MAX_HEIGHT = 1350; // 4:5 ასპექტისთვის
+// ✅ შრიფტის ზუსტი მისამართი
+const FONT_PATH = path.join(process.cwd(), 'fonts', 'Roboto-Regular.ttf');
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', georgian: 'ვერძი' }, { name: 'TAURUS', georgian: 'კურო' },
@@ -39,22 +35,18 @@ export class InstagramAgent {
   }
 
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
-    console.log('\n [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
+    console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
       console.log('[Step 1] 🎲 Selecting random zodiac and period...');
       const zodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
       const period = Math.random() > 0.7 ? 'weekly' : 'daily';
       console.log(`[Step 1] ✅ Selected: ${zodiac.name} (${zodiac.georgian}), Period: ${period}`);
-      onProgress?.('selecting', ` Selected: ${zodiac.name} (${period} forecast)`);
+      onProgress?.('selecting', `🎲 Selected: ${zodiac.name} (${period} forecast)`);
 
       console.log('[Step 2] ✍️ Generating AI content...');
       onProgress?.('generating', `✍️ Generating English content for ${zodiac.name}...`);
       const aiContent = await generateHoroscopeContent(zodiac.name, period);
-      console.log(`[Step 2] ✅ AI Content Generated:`, { 
-        text1: aiContent.text1, 
-        text2: aiContent.text2, 
-        hashtags: aiContent.hashtags 
-      });
+      console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2: aiContent.text2, hashtags: aiContent.hashtags });
 
       console.log('[Step 3] 📥 Fetching base image and logo...');
       onProgress?.('fetching', `📥 Fetching base image and logo...`);
@@ -76,16 +68,6 @@ export class InstagramAgent {
       onProgress?.('composing', `🎨 Composing image (matching manual UI styles)...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
-
-      // ✅ ვალიდაცია: შევამოწმოთ, რომ სურათი აკმაყოფილებს Instagram-ის მოთხოვნებს
-      const finalMetadata = await sharp(finalImage).metadata();
-      console.log(`[Step 4]  Final image dimensions: ${finalMetadata.width}x${finalMetadata.height}`);
-      
-      if (!finalMetadata.width || !finalMetadata.height || 
-          finalMetadata.width < INSTAGRAM_MIN_WIDTH || 
-          finalMetadata.height < INSTAGRAM_MIN_HEIGHT) {
-        console.warn('[Step 4] ⚠️ Warning: Image dimensions may not meet Instagram requirements');
-      }
 
       console.log('[Step 5] ☁️ Uploading composed image to Supabase storage...');
       onProgress?.('uploading', `☁️ Uploading composed image to storage...`);
@@ -173,7 +155,7 @@ export class InstagramAgent {
       const logoX = width - logoSize - (width * 0.03);
       const logoY = height * 0.03;
 
-      // ✅ მდგრადი ლოგოს დამუშავება: თუ sharp ვერ კითხულობს ბაფერს, ვტოვებთ null-ს
+      // 1. ლოგოს დამუშავება (Graceful Fallback)
       let roundedLogo: Buffer | null = null;
       try {
         console.log('[addTextAndLogoToImage] Attempting to process logo with sharp...');
@@ -187,42 +169,51 @@ export class InstagramAgent {
           .toBuffer();
         console.log('[addTextAndLogoToImage] ✅ Logo processed successfully.');
       } catch (sharpError) {
-        console.warn('[addTextAndLogoToImage] ⚠️ Sharp failed to process logo. Skipping logo to ensure text is rendered.');
+        console.warn('[addTextAndLogoToImage] ⚠️ Sharp failed to process logo (WASM bug). Skipping logo to ensure text renders.');
       }
 
       const escapedText1 = this.escapeXml(aiContent.text1);
       const escapedText2 = this.escapeXml(aiContent.text2);
       const escapedDate = this.escapeXml(dateStr);
 
-      // ✅ SVG მხოლოდ ტექსტისთვის (გამოყენებულია sans-serif, რომელიც resvg-ს აქვს ჩაშენებული)
-      // ტექსტი არის თეთრი შავი კონტურით, რათა ნებისმიერ ფონზე ჩანდეს
+      // 2. ✅ კრიტიკული: შრიფტის ფაილის არსებობის შემოწმება
+      if (!fs.existsSync(FONT_PATH)) {
+        throw new Error(`Font file not found at: ${FONT_PATH}. Please download Roboto-Regular.ttf to the /fonts/ directory.`);
+      }
+      console.log('[addTextAndLogoToImage] ✅ Font file found:', FONT_PATH);
+
+      // 3. SVG შრიფტის მითითებით
       const svg = `
         <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-          <text x="50%" y="38%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
+          <text x="50%" y="38%" font-family="Roboto" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="2px" paint-order="stroke fill">
             ${escapedText1}
           </text>
           
-          <text x="50%" y="60%" font-family="sans-serif" font-size="26" fill="#FFFFFF" text-anchor="middle" font-weight="500" stroke="#000000" stroke-width="1.5px" paint-order="stroke fill">
+          <text x="50%" y="60%" font-family="Roboto" font-size="26" fill="#FFFFFF" text-anchor="middle" font-weight="normal" stroke="#000000" stroke-width="1.5px" paint-order="stroke fill">
             ${this.wrapTextForSvg(escapedText2, 35)}
           </text>
           
-          <text x="50%" y="95%" font-family="sans-serif" font-size="18" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="1px" paint-order="stroke fill">
+          <text x="50%" y="95%" font-family="Roboto" font-size="18" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="1px" paint-order="stroke fill">
             ${escapedDate}
           </text>
         </svg>
       `;
 
-      console.log('[addTextAndLogoToImage] Rendering text overlay with Resvg (using built-in sans-serif font)...');
+      console.log('[addTextAndLogoToImage] Rendering text overlay with Resvg (using Roboto font)...');
       const resvg = new Resvg(svg, { 
-        fitTo: { mode: 'width', value: width }
+        fitTo: { mode: 'width', value: width },
+        font: {
+          fontFiles: [FONT_PATH],
+          loadSystemFonts: false // ვკრძალავთ სისტემური შრიფტების ძიებას
+        }
       });
       
       const pngData = resvg.render();
       const textOverlayBuffer = Buffer.from(pngData.asPng());
       console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
-      if (textOverlayBuffer.length < 10000) {
-        console.error('[addTextAndLogoToImage] ⚠️ WARNING: Overlay is suspiciously small! Text may not be visible.');
+      if (textOverlayBuffer.length < 50000) {
+        console.error('[addTextAndLogoToImage] ⚠️ WARNING: Overlay is too small! Font may not have loaded correctly.');
       }
 
       console.log('[addTextAndLogoToImage] Compositing final image...');
@@ -234,7 +225,7 @@ export class InstagramAgent {
         compositeOperations.unshift({ input: roundedLogo, top: logoY, left: logoX });
         console.log('[addTextAndLogoToImage] Adding rounded logo to composite.');
       } else {
-        console.log('[addTextAndLogoToImage] Skipping logo in composite due to processing error.');
+        console.log('[addTextAndLogoToImage] Skipping logo in composite.');
       }
 
       const finalBuffer = await sharp(baseBuffer)
@@ -246,8 +237,8 @@ export class InstagramAgent {
       
       return finalBuffer;
     } catch (error) {
-      console.error('[addTextAndLogoToImage] ❌ Critical error in image composition:', error);
-      throw new Error(`Image composition failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[addTextAndLogoToImage] ❌ Critical error:', error);
+      throw error;
     }
   }
 
@@ -343,16 +334,23 @@ export class InstagramAgent {
       this.isWasmInitialized = true;
     }
 
-    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'sans-serif', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: 'bold', stroke: '#000000', strokeWidth: '2px' });
+    if (!fs.existsSync(FONT_PATH)) {
+      throw new Error(`Font file not found at: ${FONT_PATH}`);
+    }
+
+    const introSvg = this.createSvgText(`What's happening today with`, { x: width / 2, y: height * 0.35, fontSize: 28, fontFamily: 'Roboto', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: 'bold', stroke: '#000000', strokeWidth: '2px' });
 
     const textLines = this.wrapText(horoscopeText, 45);
     let horoscopeSvg = '';
     textLines.forEach((line, index) => {
-      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'sans-serif', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: '500', stroke: '#000000', strokeWidth: '2px' });
+      horoscopeSvg += this.createSvgText(line, { x: width / 2, y: (height * 0.55) + (index * 40), fontSize: 26, fontFamily: 'Roboto', fill: '#FFFFFF', textAnchor: 'middle', fontWeight: '500', stroke: '#000000', strokeWidth: '2px' });
     });
 
     const combinedSvg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${introSvg}${horoscopeSvg}</svg>`;
-    const resvg = new Resvg(combinedSvg, { fitTo: { mode: 'width', value: width } });
+    const resvg = new Resvg(combinedSvg, { 
+      fitTo: { mode: 'width', value: width },
+      font: { fontFiles: [FONT_PATH], loadSystemFonts: false }
+    });
     const textOverlayBuffer = Buffer.from(resvg.render().asPng());
 
     return sharp(baseImageBuffer).composite([{ input: textOverlayBuffer, top: 0, left: 0 }]).jpeg({ quality: 95 }).toBuffer();
