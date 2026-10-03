@@ -1,9 +1,6 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
-import * as path from 'path';
-import * as fs from 'fs';
 import sharp from 'sharp';
-import { ImageResponse } from '@vercel/og';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
@@ -57,7 +54,7 @@ export class InstagramAgent {
       const logoBuffer = logoResponse.ok ? Buffer.from(await logoResponse.arrayBuffer()) : null;
       console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer ? logoBuffer.length : 0} bytes`);
 
-      console.log('[Step 4] 🎨 Composing final image with @vercel/og...');
+      console.log('[Step 4] 🎨 Composing final image with sharp SVG...');
       onProgress?.('composing', `🎨 Composing image...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
@@ -112,7 +109,7 @@ export class InstagramAgent {
     _zodiacName: string, 
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
-    console.log('[addTextAndLogoToImage] Starting image composition with @vercel/og...');
+    console.log('[addTextAndLogoToImage] Starting image composition with sharp SVG...');
     
     const metadata = await sharp(baseBuffer).metadata();
     const width = metadata.width || 1080;
@@ -123,91 +120,30 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    console.log('[addTextAndLogoToImage] Loading local Roboto .ttf fonts (100% reliable, no network fetch)...');
-    // ✅ ვკითხულობთ შრიფტს პირდაპირ node_modules-იდან. ეს გამორიცხავს ქსელურ შეცდომებს!
-    const fontRegularPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-400.ttf');
-    const fontBoldPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-700.ttf');
-
-    if (!fs.existsSync(fontRegularPath) || !fs.existsSync(fontBoldPath)) {
-      throw new Error('Roboto font files not found. Please run: npm install @fontsource/roboto');
-    }
-
-    const fontRegularBuffer = fs.readFileSync(fontRegularPath);
-    const fontBoldBuffer = fs.readFileSync(fontBoldPath);
-
-    console.log('[addTextAndLogoToImage] Generating text overlay with ImageResponse...');
+    // ✅ ვიყენებთ sharp-ის SVG ტექსტის რენდერს (არ საჭიროებს შრიფტის ფაილებს!)
+    console.log('[addTextAndLogoToImage] Creating SVG text overlay...');
     
-    const response = new ImageResponse(
-      {
-        type: 'div',
-        props: {
-          style: { 
-            width: width, 
-            height: height, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: 40
-          },
-          children: [
-            { 
-              type: 'div', 
-              props: { 
-                style: { 
-                  fontSize: 42, 
-                  fontWeight: 'bold', 
-                  color: '#FFFFFF', 
-                  textAlign: 'center', 
-                  textShadow: '3px 3px 6px #000000', 
-                  marginBottom: 40 
-                }, 
-                children: aiContent.text1 
-              } 
-            },
-            { 
-              type: 'div', 
-              props: { 
-                style: { 
-                  fontSize: 32, 
-                  color: '#FFFFFF', 
-                  textAlign: 'center', 
-                  textShadow: '2px 2px 4px #000000', 
-                  lineHeight: 1.4,
-                  maxWidth: width * 0.9
-                }, 
-                children: aiContent.text2 
-              } 
-            },
-            { 
-              type: 'div', 
-              props: { 
-                style: { 
-                  fontSize: 24, 
-                  fontWeight: 'bold', 
-                  color: '#FFFFFF', 
-                  textAlign: 'center', 
-                  textShadow: '2px 2px 4px #000000', 
-                  marginTop: 'auto' 
-                }, 
-                children: dateStr 
-              } 
-            }
-          ]
-        }
-      } as any,
-      {
-        width: width,
-        height: height,
-        fonts: [
-          { name: 'Roboto', data: fontRegularBuffer, weight: 400, style: 'normal' },
-          { name: 'Roboto', data: fontBoldBuffer, weight: 700, style: 'normal' }
-        ]
-      }
-    );
+    const escapedText1 = this.escapeXml(aiContent.text1);
+    const escapedText2 = this.escapeXml(aiContent.text2);
+    const escapedDate = this.escapeXml(dateStr);
 
-    const arrayBuffer = await response.arrayBuffer();
-    const textOverlayBuffer = Buffer.from(arrayBuffer);
+    const svg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <text x="50%" y="38%" font-family="sans-serif" font-size="42" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="3" paint-order="stroke fill">
+          ${escapedText1}
+        </text>
+        
+        <text x="50%" y="58%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="normal" stroke="#000000" stroke-width="2" paint-order="stroke fill">
+          ${this.wrapTextForSvg(escapedText2, 35)}
+        </text>
+        
+        <text x="50%" y="92%" font-family="sans-serif" font-size="24" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="1.5" paint-order="stroke fill">
+          ${escapedDate}
+        </text>
+      </svg>
+    `;
+
+    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
     const compositeOperations: any[] = [
@@ -243,6 +179,31 @@ export class InstagramAgent {
       
     console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
     return finalBuffer;
+  }
+
+  private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
+    const lines = this.wrapText(text, maxCharsPerLine);
+    return lines.map((line, i) => `<tspan x="50%" dy="${i === 0 ? '0' : '1.5em'}">${this.escapeXml(line)}</tspan>`).join('\n');
+  }
+
+  private escapeXml(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  }
+
+  private wrapText(text: string, maxCharsPerLine: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    words.forEach(word => {
+      if ((currentLine + ' ' + word).trim().length <= maxCharsPerLine) {
+        currentLine = (currentLine + ' ' + word).trim();
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    return lines;
   }
 
   private async getZodiacImage(zodiacName: string): Promise<Buffer> {
@@ -306,72 +267,21 @@ export class InstagramAgent {
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
 
-    console.log('[addTextToImage] Loading local Roboto .ttf fonts...');
-    const fontRegularPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-400.ttf');
-    const fontBoldPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-700.ttf');
+    const escapedText = this.escapeXml(horoscopeText);
 
-    const fontRegularBuffer = fs.readFileSync(fontRegularPath);
-    const fontBoldBuffer = fs.readFileSync(fontBoldPath);
+    const svg = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <text x="50%" y="35%" font-family="sans-serif" font-size="36" fill="#FFFFFF" text-anchor="middle" font-weight="bold" stroke="#000000" stroke-width="3" paint-order="stroke fill">
+          What's happening today with
+        </text>
+        
+        <text x="50%" y="55%" font-family="sans-serif" font-size="32" fill="#FFFFFF" text-anchor="middle" font-weight="normal" stroke="#000000" stroke-width="2" paint-order="stroke fill">
+          ${this.wrapTextForSvg(escapedText, 45)}
+        </text>
+      </svg>
+    `;
 
-    console.log('[addTextToImage] Generating text overlay with ImageResponse...');
-    
-    const response = new ImageResponse(
-      {
-        type: 'div',
-        props: {
-          style: { 
-            width: width, 
-            height: height, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            padding: 40
-          },
-          children: [
-            { 
-              type: 'div', 
-              props: { 
-                style: { 
-                  fontSize: 36, 
-                  fontWeight: 'bold', 
-                  color: '#FFFFFF', 
-                  textAlign: 'center', 
-                  textShadow: '3px 3px 6px #000000', 
-                  marginBottom: 40 
-                }, 
-                children: "What's happening today with" 
-              } 
-            },
-            { 
-              type: 'div', 
-              props: { 
-                style: { 
-                  fontSize: 32, 
-                  color: '#FFFFFF', 
-                  textAlign: 'center', 
-                  textShadow: '2px 2px 4px #000000', 
-                  lineHeight: 1.4,
-                  maxWidth: width * 0.9
-                }, 
-                children: horoscopeText 
-              } 
-            }
-          ]
-        }
-      } as any,
-      {
-        width: width,
-        height: height,
-        fonts: [
-          { name: 'Roboto', data: fontRegularBuffer, weight: 400, style: 'normal' },
-          { name: 'Roboto', data: fontBoldBuffer, weight: 700, style: 'normal' }
-        ]
-      }
-    );
-
-    const arrayBuffer = await response.arrayBuffer();
-    const textOverlayBuffer = Buffer.from(arrayBuffer);
+    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
 
     return sharp(baseImageBuffer)
       .composite([{ input: textOverlayBuffer, top: 0, left: 0 }])
