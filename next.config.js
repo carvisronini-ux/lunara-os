@@ -14,6 +14,14 @@ const nextConfig = {
       },
     ],
   },
+
+  // ✅ დამატებულია: skia-canvas-ის გამოყოფა, რათა Webpack-მა არ სცადოს მისი ბანდლირება
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'skia-canvas'];
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;
