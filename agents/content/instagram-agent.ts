@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
-import { ImageResponse } from '@vercel/og'; // ✅ Vercel-ის ოფიციალური ბიბლიოთეკა
+import { ImageResponse } from '@vercel/og';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
@@ -121,13 +121,20 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    console.log('[addTextAndLogoToImage] Fetching Roboto font...');
-    const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
-    const fontBuffer = await fontResponse.arrayBuffer();
+    console.log('[addTextAndLogoToImage] Fetching Roboto fonts from reliable CDN...');
+    // ✅ ვიყენებთ @fontsource-ს, რომელიც 100%-ით საიმედოა და აბრუნებს ვალიდურ შრიფტებს
+    const fontRegularResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2');
+    const fontBoldResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-700-normal.woff2');
+    
+    if (!fontRegularResponse.ok || !fontBoldResponse.ok) {
+      throw new Error('Failed to fetch Roboto font files from CDN.');
+    }
+    
+    const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
+    const fontBoldBuffer = await fontBoldResponse.arrayBuffer();
 
     console.log('[addTextAndLogoToImage] Generating text overlay with ImageResponse...');
     
-    // ✅ ImageResponse იყენებს იგივე VDOM სინტაქსს, რაც satori, მაგრამ ავტომატურად აგვარებს WASM პრობლემას Next.js-ში
     const response = new ImageResponse(
       {
         type: 'div',
@@ -191,13 +198,12 @@ export class InstagramAgent {
         width: width,
         height: height,
         fonts: [
-          { name: 'Roboto', data: fontBuffer, weight: 400, style: 'normal' },
-          { name: 'Roboto', data: fontBuffer, weight: 700, style: 'normal' }
+          { name: 'Roboto', data: fontRegularBuffer, weight: 400, style: 'normal' },
+          { name: 'Roboto', data: fontBoldBuffer, weight: 700, style: 'normal' }
         ]
       }
     );
 
-    // ImageResponse-ს გარდაქმნა Buffer-ად
     const arrayBuffer = await response.arrayBuffer();
     const textOverlayBuffer = Buffer.from(arrayBuffer);
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
@@ -298,9 +304,12 @@ export class InstagramAgent {
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
 
-    console.log('[addTextToImage] Fetching Roboto font...');
-    const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
-    const fontBuffer = await fontResponse.arrayBuffer();
+    console.log('[addTextToImage] Fetching Roboto fonts from reliable CDN...');
+    const fontRegularResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-400-normal.woff2');
+    const fontBoldResponse = await fetch('https://cdn.jsdelivr.net/npm/@fontsource/roboto@5.0.8/files/roboto-latin-700-normal.woff2');
+    
+    const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
+    const fontBoldBuffer = await fontBoldResponse.arrayBuffer();
 
     console.log('[addTextToImage] Generating text overlay with ImageResponse...');
     
@@ -353,8 +362,8 @@ export class InstagramAgent {
         width: width,
         height: height,
         fonts: [
-          { name: 'Roboto', data: fontBuffer, weight: 400, style: 'normal' },
-          { name: 'Roboto', data: fontBuffer, weight: 700, style: 'normal' }
+          { name: 'Roboto', data: fontRegularBuffer, weight: 400, style: 'normal' },
+          { name: 'Roboto', data: fontBoldBuffer, weight: 700, style: 'normal' }
         ]
       }
     );
