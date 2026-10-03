@@ -1,5 +1,7 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
+import * as path from 'path';
+import * as fs from 'fs';
 import sharp from 'sharp';
 import { ImageResponse } from '@vercel/og';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
@@ -121,17 +123,17 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    console.log('[addTextAndLogoToImage] Fetching Roboto .ttf fonts from Google Fonts (100% reliable)...');
-    // ✅ ვიყენებთ პირდაპირ .ttf ლინკებს Google Fonts-ის სერვერებიდან. ეს ფორმატი 100%-ით თავსებადია satori-სთან.
-    const fontRegularResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
-    const fontBoldResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf');
-    
-    if (!fontRegularResponse.ok || !fontBoldResponse.ok) {
-      throw new Error('Failed to fetch Roboto .ttf font files from Google Fonts.');
+    console.log('[addTextAndLogoToImage] Loading local Roboto .ttf fonts (100% reliable, no network fetch)...');
+    // ✅ ვკითხულობთ შრიფტს პირდაპირ node_modules-იდან. ეს გამორიცხავს ქსელურ შეცდომებს!
+    const fontRegularPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-400.ttf');
+    const fontBoldPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-700.ttf');
+
+    if (!fs.existsSync(fontRegularPath) || !fs.existsSync(fontBoldPath)) {
+      throw new Error('Roboto font files not found. Please run: npm install @fontsource/roboto');
     }
-    
-    const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
-    const fontBoldBuffer = await fontBoldResponse.arrayBuffer();
+
+    const fontRegularBuffer = fs.readFileSync(fontRegularPath);
+    const fontBoldBuffer = fs.readFileSync(fontBoldPath);
 
     console.log('[addTextAndLogoToImage] Generating text overlay with ImageResponse...');
     
@@ -304,12 +306,12 @@ export class InstagramAgent {
     const width = metadata.width || 1080;
     const height = metadata.height || 1350;
 
-    console.log('[addTextToImage] Fetching Roboto .ttf fonts from Google Fonts...');
-    const fontRegularResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxP.ttf');
-    const fontBoldResponse = await fetch('https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlfBBc4.ttf');
-    
-    const fontRegularBuffer = await fontRegularResponse.arrayBuffer();
-    const fontBoldBuffer = await fontBoldResponse.arrayBuffer();
+    console.log('[addTextToImage] Loading local Roboto .ttf fonts...');
+    const fontRegularPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-400.ttf');
+    const fontBoldPath = path.join(process.cwd(), 'node_modules', '@fontsource', 'roboto', 'latin-700.ttf');
+
+    const fontRegularBuffer = fs.readFileSync(fontRegularPath);
+    const fontBoldBuffer = fs.readFileSync(fontBoldPath);
 
     console.log('[addTextToImage] Generating text overlay with ImageResponse...');
     
