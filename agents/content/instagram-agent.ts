@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/agents/content/instagram-agent.ts
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
-import satori from 'satori';
+import { ImageResponse } from '@vercel/og'; // ✅ Vercel-ის ოფიციალური ბიბლიოთეკა
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
 import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
@@ -55,7 +55,7 @@ export class InstagramAgent {
       const logoBuffer = logoResponse.ok ? Buffer.from(await logoResponse.arrayBuffer()) : null;
       console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer ? logoBuffer.length : 0} bytes`);
 
-      console.log('[Step 4] 🎨 Composing final image with Satori...');
+      console.log('[Step 4] 🎨 Composing final image with @vercel/og...');
       onProgress?.('composing', `🎨 Composing image...`);
       const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
       console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
@@ -110,7 +110,7 @@ export class InstagramAgent {
     _zodiacName: string, 
     period: 'daily' | 'weekly'
   ): Promise<Buffer> {
-    console.log('[addTextAndLogoToImage] Starting image composition with Satori...');
+    console.log('[addTextAndLogoToImage] Starting image composition with @vercel/og...');
     
     const metadata = await sharp(baseBuffer).metadata();
     const width = metadata.width || 1080;
@@ -125,10 +125,10 @@ export class InstagramAgent {
     const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
     const fontBuffer = await fontResponse.arrayBuffer();
 
-    console.log('[addTextAndLogoToImage] Generating text overlay with Satori...');
+    console.log('[addTextAndLogoToImage] Generating text overlay with ImageResponse...');
     
-    // ✅ დამატებულია 'as any', რათა TypeScript-მა არ დაბლოკოს VDOM ფორმატი
-    const svg = await satori(
+    // ✅ ImageResponse იყენებს იგივე VDOM სინტაქსს, რაც satori, მაგრამ ავტომატურად აგვარებს WASM პრობლემას Next.js-ში
+    const response = new ImageResponse(
       {
         type: 'div',
         props: {
@@ -186,7 +186,7 @@ export class InstagramAgent {
             }
           ]
         }
-      } as any, // <--- აქ არის გამოსწორება
+      } as any,
       {
         width: width,
         height: height,
@@ -197,7 +197,9 @@ export class InstagramAgent {
       }
     );
 
-    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    // ImageResponse-ს გარდაქმნა Buffer-ად
+    const arrayBuffer = await response.arrayBuffer();
+    const textOverlayBuffer = Buffer.from(arrayBuffer);
     console.log(`[addTextAndLogoToImage] Text overlay rendered. Size: ${textOverlayBuffer.length} bytes`);
 
     const compositeOperations: any[] = [
@@ -300,10 +302,9 @@ export class InstagramAgent {
     const fontResponse = await fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/roboto/Roboto-Regular.ttf');
     const fontBuffer = await fontResponse.arrayBuffer();
 
-    console.log('[addTextToImage] Generating text overlay with Satori...');
+    console.log('[addTextToImage] Generating text overlay with ImageResponse...');
     
-    // ✅ დამატებულია 'as any', რათა TypeScript-მა არ დაბლოკოს VDOM ფორმატი
-    const svg = await satori(
+    const response = new ImageResponse(
       {
         type: 'div',
         props: {
@@ -347,7 +348,7 @@ export class InstagramAgent {
             }
           ]
         }
-      } as any, // <--- აქ არის გამოსწორება
+      } as any,
       {
         width: width,
         height: height,
@@ -358,7 +359,8 @@ export class InstagramAgent {
       }
     );
 
-    const textOverlayBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    const arrayBuffer = await response.arrayBuffer();
+    const textOverlayBuffer = Buffer.from(arrayBuffer);
 
     return sharp(baseImageBuffer)
       .composite([{ input: textOverlayBuffer, top: 0, left: 0 }])
