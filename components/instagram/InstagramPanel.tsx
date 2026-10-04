@@ -220,7 +220,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       const uploadPath = `posts/${fileName}`;
       pushEvent("system", `⏳ [4/4] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      // ✅ გამოსწორებულია: ამოღებულია unused 'uploadData' ცვლადი
+      const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, {
           contentType: 'image/jpeg',
@@ -245,7 +246,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       pushEvent("error", `❌ CRITICAL FAILURE during upload: ${errorMsg}`);
-      console.error("Upload Error Details:", error); // დეველოპერის კონსოლისთვის
+      console.error("Upload Error Details:", error);
     } finally {
       setIsPublishing(false);
     }
