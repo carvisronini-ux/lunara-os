@@ -166,7 +166,7 @@ STRICT RULES:
   }
 }
 
-// ✅ New function: Generate Text 2 (meaningful forecast) that answers/flows from Text 1
+// ✅ New function: Generate Text 2 (meaningful forecast) that answers/flows from Text 1 WITHOUT repeating it
 export async function generateHoroscopeText2(zodiacName: string, text1Hook: string): Promise<string> {
   await credentialVault.ready;
 
@@ -183,18 +183,27 @@ export async function generateHoroscopeText2(zodiacName: string, text1Hook: stri
 
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
 
-  // ✅ Prompt optimized to create a meaningful, emotional response to Text 1
+  // ✅ Prompt optimized to create a meaningful, emotional response to Text 1 WITHOUT repeating it
   const systemPrompt = `You are a warm, engaging, and mystical astrologer for LUNARA OS.
 Your task is to write a SHORT, MEANINGFUL, and EMOTIONAL horoscope forecast for ${zodiacName}.
 
 CONTEXT: The post starts with this hook: "${text1Hook || 'the stars'}"
-Your Text 2 MUST naturally answer, complete, or flow directly from this hook. 
+
+⚠️ CRITICAL RULE - NO REPETITION:
+Your Text 2 MUST NOT repeat, restate, or include ANY part of the hook above. 
+The hook will already be displayed visually above your text. Start your forecast DIRECTLY with the actual prediction/advice.
+
+Examples of CORRECT Text 2 (DO NOT repeat the hook):
+- Hook: "a celestial secret waiting for you"
+- ✅ CORRECT Text 2: "this week, your quiet strength blossoms into radiant confidence, guiding love and purpose home."
+- ❌ WRONG Text 2: "a celestial secret waiting for you: this week, your quiet strength..."
 
 STRICT RULES:
 1. MUST BE in English.
 2. Tone: Alive, emotional, uplifting, deeply personal, and mystical. NEVER robotic, hardcore, dry, or generic.
 3. LENGTH: MAX 150 characters (1-2 short sentences). This is critical for the visual layout.
-4. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown, NO hashtags here.`;
+4. DO NOT start with the hook. DO NOT include the hook anywhere in your response.
+5. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown, NO hashtags here.`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {

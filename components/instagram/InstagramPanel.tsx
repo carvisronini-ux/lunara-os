@@ -3,7 +3,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator"; // ✅ განახლებული იმპორტი
+import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -72,7 +72,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
   const [isGeneratingText1, setIsGeneratingText1] = useState(false);
-  const [isGeneratingText2, setIsGeneratingText2] = useState(false); // ✅ ახალი სტეიტი Text 2-ისთვის
+  const [isGeneratingText2, setIsGeneratingText2] = useState(false);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -178,7 +178,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ ახალი ფუნქცია: Text 2-ის გენერირება, რომელიც პასუხობს Text 1-ს
+  // ✅ განახლებული ფუნქცია: Text 2-ის გენერირება + ავტომატური განმეორების წაშლა
   const handleGenerateText2 = async () => {
     if (!selectedZodiac) {
       addLog("❌ Please select a zodiac sign first!");
@@ -190,8 +190,36 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
     try {
       const generatedText = await generateHoroscopeText2(selectedZodiac.name, text1);
-      setText2(generatedText);
-      addLog(`✨ Successfully generated Text 2: "${generatedText}"`);
+      
+      // ✅ ავტომატური გასუფთავება: თუ Text 2 იწყება Text 1-ის ტექსტით, ვშლით მას
+      let cleanedText = generatedText;
+      if (text1 && text1.trim().length > 0) {
+        const text1Lower = text1.toLowerCase().trim();
+        const cleanedLower = cleanedText.toLowerCase().trim();
+        
+        // ვამოწმებთ, იწყება თუ არა Text 2 Text 1-ით
+        if (cleanedLower.startsWith(text1Lower)) {
+          // ვშლით Text 1-ის ნაწილს Text 2-ის დასაწყისიდან
+          cleanedText = cleanedText.slice(text1.length).trim();
+          // ვშლით ნებისმიერ გამყოფ სიმბოლოებს დასაწყისში (:, -, და ა.შ.)
+          cleanedText = cleanedText.replace(/^[:\-\s]+/, '').trim();
+          addLog(`🧹 Auto-cleaned: removed repeated hook from Text 2`);
+        }
+        
+        // დამატებითი შემოწმება: თუ Text 1 არის Text 2-ში როგორც ქვესტრიქონი დასაწყისში (პირველი 3 სიტყვა)
+        const text1Words = text1Lower.split(' ');
+        if (text1Words.length >= 3) {
+          const firstThreeWords = text1Words.slice(0, 3).join(' ');
+          if (cleanedLower.startsWith(firstThreeWords)) {
+            cleanedText = cleanedText.slice(firstThreeWords.length).trim();
+            cleanedText = cleanedText.replace(/^[:\-\s]+/, '').trim();
+            addLog(`🧹 Auto-cleaned: removed partial hook repetition`);
+          }
+        }
+      }
+      
+      setText2(cleanedText);
+      addLog(`✨ Successfully generated Text 2: "${cleanedText}"`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       addLog(`❌ Failed to generate Text 2: ${errorMsg}`);
@@ -567,7 +595,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
               </div>
 
-              {/* ✅ განახლებული Text 2 პანელი რეალური GENERATE ლოგიკით და დატვირთვის ანიმაციით */}
+              {/* ✅ განახლებული Text 2 პანელი რეალური GENERATE ლოგიკით და ავტო-გასუფთავებით */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
