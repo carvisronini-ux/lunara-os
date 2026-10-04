@@ -74,7 +74,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [isGeneratingText1, setIsGeneratingText1] = useState(false);
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   
-  // ✅ ახალი სტეიტი: ინახავს Supabase-ში ატვირთული ფოტოს ლინკს
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const addLog = (message: string) => {
@@ -162,7 +161,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleGenerateText1 = async () => {
     if (!selectedZodiac) {
-      addLog("❌ Please select a zodiac sign first!");
+      addLog(" Please select a zodiac sign first!");
       return;
     }
     setIsGeneratingText1(true);
@@ -180,7 +179,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleGenerateText2 = async () => {
     if (!selectedZodiac) {
-      addLog("❌ Please select a zodiac sign first!");
+      addLog(" Please select a zodiac sign first!");
       return;
     }
     setIsGeneratingText2(true);
@@ -231,7 +230,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      addLog("⏳ [3/6] Loading high-res zodiac image...");
+      addLog(" [3/6] Loading high-res zodiac image...");
       const zodiacImg = new Image();
       zodiacImg.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
@@ -263,7 +262,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         });
 
         const logoSize = Math.min(width * 0.12, 130);
-        const padding = width * 0.03;
+        const padding = width * 0.02; // ✅ 2% (უფრო ახლოს კიდესთან)
         const logoX = width - logoSize - padding;
         const logoY = padding;
 
@@ -280,24 +279,27 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         addLog("✅ Channel logo added to canvas.");
       }
 
+      // ✅ განახლებული: შავი ტექსტი მუქი კონტურით, ჩრდილების გარეშე
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = fontSize * 0.06;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(text, x, y);
-        ctx.fillStyle = '#2D2D2D';
-        ctx.fillText(text, x, y);
+        
+        // ❌ წაშლილია ყველა ჩრდილი!
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
+
+        // ✅ მუქი/სქელი კონტური (შავი, 0.8 opacity)
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = fontSize * 0.12; // უფრო სქელი კონტური
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, x, y);
+
+        // ✅ შავი შიგთავსი (ასოები)
+        ctx.fillStyle = '#000000';
+        ctx.fillText(text, x, y);
       };
 
       addLog("⏳ [4/6] Rendering typography elements...");
@@ -318,40 +320,39 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           const testLine = line + words[n] + ' ';
           const metrics = ctx.measureText(testLine);
           if (metrics.width > maxWidth && n > 0) {
-            ctx.shadowColor = 'rgba(0,0,0,0.5)';
-            ctx.shadowBlur = 8;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-            ctx.lineWidth = text2FontSize * 3 * 0.06;
-            ctx.lineJoin = 'round';
-            ctx.strokeText(line, width / 2, currentY);
-            ctx.fillStyle = '#2D2D2D';
-            ctx.fillText(line, width / 2, currentY);
+            // ❌ წაშლილია ჩრდილები
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
+            
+            // ✅ მუქი კონტური
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = text2FontSize * 3 * 0.12;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(line, width / 2, currentY);
+            
+            // ✅ შავი შიგთავსი
+            ctx.fillStyle = '#000000';
+            ctx.fillText(line, width / 2, currentY);
+            
             line = words[n] + ' ';
             currentY += lineHeight;
           } else {
             line = testLine;
           }
         }
-        ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = text2FontSize * 3 * 0.06;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(line, width / 2, currentY);
-        ctx.fillStyle = '#2D2D2D';
-        ctx.fillText(line, width / 2, currentY);
+        // ბოლო ხაზი
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = text2FontSize * 3 * 0.12;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(line, width / 2, currentY);
+        ctx.fillStyle = '#000000';
+        ctx.fillText(line, width / 2, currentY);
       }
 
       if (showDate || showWeekRange) {
@@ -385,7 +386,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       
       const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
       
-      // ✅ ვინახავთ ლინკს სტეიტში, რათა Publish ღილაკმა გამოიყენოს ის!
       setUploadedImageUrl(urlData.publicUrl);
       
       addLog("✅ Successfully uploaded to Supabase!");
@@ -403,7 +403,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ განახლებული Publish ფუნქცია, რომელიც იყენებს uploadedImageUrl-ს
   const handlePublish = async () => {
     if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
       addLog("❌ Please upload the image to Supabase first by clicking 'Ready (Upload to Supabase)'!");
@@ -423,7 +422,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           text1: text1,
           text2: text2,
           generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
-          imageUrl: uploadedImageUrl // ✅ ვუგზავნით Supabase-ის ლინკს API-ს
+          imageUrl: uploadedImageUrl
         })
       });
       
@@ -433,14 +432,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         addLog(`🎉 Successfully published to Instagram! Post ID: ${data.postId}`);
         alert(`Successfully published to Instagram!\nPost ID: ${data.postId}`);
         
-        // ფორმის გასუფთავება
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
         setSelectedFormat(null);
         setText1("");
         setText2("");
-        setUploadedImageUrl(null); // ლინკის გასუფთავება
+        setUploadedImageUrl(null);
         setText1FontSize(24);
         setText2FontSize(20);
         setShowDate(true);
@@ -502,7 +500,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: ' Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -528,7 +526,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
                 {showLogo && logoUrl && isLogoValid && (
-                  <div className="absolute z-20 transition-all duration-300" style={{ top: '3%', right: '3%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
+                  <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
                       <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" onError={() => setIsLogoValid(false)} />
                     </div>
@@ -596,19 +594,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
                   <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📆</span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
                   <button onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showWeekRange ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showWeekRange ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">🖼️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
                   <button onClick={() => setShowLogo(!showLogo)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showLogo ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showLogo ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -640,7 +638,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
-                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      const isWarning = log.includes('') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
                       return (
                         <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
                           <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
