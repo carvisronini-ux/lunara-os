@@ -33,15 +33,11 @@ const ZODIAC_SIGNS = [
   { name: 'PISCES', search: 'PISCES PISCES თევზები' },
 ];
 
-// ✅ განახლებულია: ლოგოს სწორი .png ლინკი
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const baseTags = [`#${zodiacName}`, "#Horoscope", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
-  
-  if (!text2 || text2.trim().length < 10) {
-    return [...baseTags].join(" ");
-  }
+  if (!text2 || text2.trim().length < 10) return [...baseTags].join(" ");
 
   const stopWords = new Set([
     "the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", 
@@ -55,18 +51,9 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
     "ძლიერი", "იყო", "კომუნიკაცია", "მხარეა", "გამოიყენე", "დრო", "მნიშვნელოვანი", "საუბრებისთვის", "იდეების", "გაზიარებისთვის"
   ]);
 
-  const words = text2
-    .toLowerCase()
-    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "")
-    .split(/\s+/);
-
-  const extractedTags = words
-    .filter(word => word.length > 3)
-    .filter(word => !stopWords.has(word))
-    .map(word => `#${word}`);
-
+  const words = text2.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").split(/\s+/);
+  const extractedTags = words.filter(word => word.length > 3).filter(word => !stopWords.has(word)).map(word => `#${word}`);
   const uniqueExtractedTags = Array.from(new Set(extractedTags)).slice(0, 4);
-
   return [...baseTags, ...uniqueExtractedTags].join(" ");
 };
 
@@ -80,7 +67,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text1FontSize, setText1FontSize] = useState(24);
   const [text2FontSize, setText2FontSize] = useState(20);
   const [isPublishing, setIsPublishing] = useState(false);
-  
   const [isAutoPosting, setIsAutoPosting] = useState(false);
   
   const [showDate, setShowDate] = useState(true);
@@ -90,137 +76,118 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const [isLogoValid, setIsLogoValid] = useState(true);
 
+  // ✅ ახალი: ლოგების შენახვის სტეიტი
+  const [logs, setLogs] = useState<string[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // ✅ ახალი: ფუნქცია ლოგების დასამატებლად (ბრაუზერში, ტერმინალში და მშობელ კომპონენტში)
+  const addLog = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const newLog = `[${timestamp}] ${message}`;
+    setLogs(prev => [...prev, newLog]);
+    console.log(newLog); // იბეჭდება ტერმინალშიც
+    pushEvent("system", message); // ინფორმირდება მშობელი კომპონენტი
+  };
 
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
     : null;
 
-  const getCurrentDate = () => {
-    const now = new Date();
-    return now.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  };
-
+  const getCurrentDate = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const getWeekRange = () => {
     const startDate = new Date();
     const endDate = new Date();
     endDate.setDate(startDate.getDate() + 7);
-    
-    const startDay = startDate.toLocaleDateString('en-US', { day: 'numeric' });
-    const endDay = endDate.toLocaleDateString('en-US', { day: 'numeric' });
-    const month = startDate.toLocaleDateString('en-US', { month: 'long' });
-    const year = startDate.toLocaleDateString('en-US', { year: 'numeric' });
-    
-    return `${startDay} - ${endDay} ${month} ${year}`;
+    return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   };
 
   const handleZodiacSubmit = () => {
     const upperInput = inputValue.trim().toUpperCase();
     const found = ZODIAC_SIGNS.find(z => z.search.toUpperCase().includes(upperInput));
-    
     if (found) {
       setSelectedZodiac(found);
-      pushEvent("system", `✅ Zodiac selected: ${found.name}`);
+      addLog(`✅ Zodiac selected: ${found.name}`);
       setStep("format");
     } else {
-      pushEvent("error", `❌ Zodiac not found. Try: ARIES, TAURUS, GEMINI, etc.`);
+      addLog(`❌ Zodiac not found.`);
     }
   };
 
   const handleFormatSelect = (format: PostFormat) => {
     setSelectedFormat(format);
-    const formatName = format === 'post' ? 'Post (Portrait)' : format === 'story' ? 'Story (Vertical)' : 'Carousel (Square)';
-    pushEvent("system", `✅ Format selected: ${formatName}`);
+    addLog(`✅ Format selected: ${format}`);
     setStep("preview");
   };
 
   const handleAutoPost = async () => {
     setIsAutoPosting(true);
-    pushEvent("agent", "🚀 Initiating Auto-Post Agent...");
-    
+    addLog("🚀 Initiating Auto-Post Agent...");
     try {
       const response = await fetch('/api/instagram/auto-post-stream');
       if (!response.body) throw new Error("No response body");
-
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
+        const lines = decoder.decode(value).split('\n');
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
               if (data.step === 'complete') {
                 const result = JSON.parse(data.message);
-                pushEvent("success", `🎉 Published ${result.zodiac}! URL: ${result.url}`);
-                alert(`Successfully published ${result.zodiac} post!`);
+                addLog(`🎉 Published ${result.zodiac}!`);
               } else if (data.step === 'error') {
-                pushEvent("error", `❌ ${data.message}`);
+                addLog(`❌ ${data.message}`);
               } else {
-                pushEvent("agent", data.message);
+                addLog(data.message);
               }
-            } catch (e) {
-              // Ignore JSON parse errors for incomplete chunks
-            }
+            } catch (e) {}
           }
         }
       }
     } catch (error) {
-      pushEvent("error", `❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsAutoPosting(false);
     }
   };
 
-  // ✅ მაქსიმალურად დეტალური ლოგირებით აღჭურვილი ფუნქცია
   const handleReadyAndUpload = async () => {
     if (!previewRef.current || !selectedZodiac) {
-      pushEvent("error", "❌ Preview not ready or Zodiac not selected.");
+      addLog("❌ Preview not ready or Zodiac not selected.");
       return;
     }
     
     setIsPublishing(true);
-    pushEvent("system", "📸 [1/4] Starting capture of visual preview...");
+    setLogs([]); // ვასუფთავებთ ძველ ლოგებს ახალი პროცესისთვის
+    addLog("📸 [1/4] Starting capture of visual preview...");
 
     try {
-      // 1. DOM-ის გადაღება
-      pushEvent("system", "⏳ [2/4] Rendering canvas from DOM (this might take a second)...");
+      addLog("⏳ [2/4] Rendering canvas from DOM (this might take a second)...");
       const canvas = await html2canvas(previewRef.current, {
-        scale: 3, // მაღალი ხარისხი (~1200px სიგანე)
-        useCORS: true, // აუცილებელია Supabase-ის სურათებისთვის
+        scale: 3,
+        useCORS: true,
         allowTaint: true,
         backgroundColor: '#0f172a',
         logging: false,
       });
-      pushEvent("system", `✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
+      addLog(`✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
 
-      // 2. Blob-ად კონვერტაცია
-      pushEvent("system", "⏳ [3/4] Converting canvas to high-quality JPEG...");
+      addLog("⏳ [3/4] Converting canvas to high-quality JPEG...");
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((b) => {
           if (b) resolve(b);
           else reject(new Error("Failed to create blob from canvas"));
-        }, 'image/jpeg', 0.95); // 95% ხარისხი
+        }, 'image/jpeg', 0.95);
       });
-      pushEvent("system", `✅ Image converted. Size: ${(blob.size / 1024).toFixed(2)} KB`);
+      addLog(`✅ Image converted. Size: ${(blob.size / 1024).toFixed(2)} KB`);
 
-      // 3. Supabase-ზე ატვირთვა
       const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
-      pushEvent("system", `⏳ [4/4] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
+      addLog(`⏳ [4/4] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
-      // ✅ გამოსწორებულია: ამოღებულია unused 'uploadData' ცვლადი
       const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, {
@@ -231,21 +198,18 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       if (uploadError) {
         throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
       }
-      pushEvent("success", `✅ Successfully uploaded to Supabase!`);
+      addLog("✅ Successfully uploaded to Supabase!");
 
-      // 4. საჯარო ლინკის მიღება
-      const { data: urlData } = supabase.storage
-        .from('lunara-assets')
-        .getPublicUrl(uploadPath);
-
-      pushEvent("success", `🎉 FINAL RESULT: Image is ready and live!`);
-      pushEvent("system", `🔗 Direct Link: ${urlData.publicUrl}`);
+      const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
+      
+      addLog(`🎉 FINAL RESULT: Image is ready and live!`);
+      addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
       
       alert(`✅ წარმატებით აიტვირთა!\n\nფაილის სახელი: ${fileName}\nლინკი: ${urlData.publicUrl}`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      pushEvent("error", `❌ CRITICAL FAILURE during upload: ${errorMsg}`);
+      addLog(`❌ CRITICAL FAILURE during upload: ${errorMsg}`);
       console.error("Upload Error Details:", error);
     } finally {
       setIsPublishing(false);
@@ -255,55 +219,32 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const handlePublish = async () => {
     if (!imageUrl || !text2 || !selectedZodiac || !selectedFormat) return;
     setIsPublishing(true);
-    pushEvent("system", `🚀 Starting final composition and publishing...`);
-
-    const finalHashtags = showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : "";
-
+    addLog(`🚀 Starting final composition and publishing...`);
     try {
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          zodiacName: selectedZodiac.name,
-          format: selectedFormat,
-          text1: text1,
-          text2: text2,
-          text1FontSize: text1FontSize,
-          text2FontSize: text2FontSize,
-          showDate: showDate,
-          showWeekRange: showWeekRange,
-          showLogo: showLogo,
-          showHashtags: showHashtags,
-          generatedHashtags: finalHashtags || undefined,
+          zodiacName: selectedZodiac.name, format: selectedFormat, text1, text2,
+          text1FontSize, text2FontSize, showDate, showWeekRange, showLogo, showHashtags,
+          generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
           logoUrl: isLogoValid ? logoUrl : undefined
         })
       });
-      
       const data = await response.json();
       if (data.success) {
-        pushEvent("success", `🎉 Successfully published! ID: ${data.postId}`);
+        addLog(`🎉 Successfully published! ID: ${data.postId}`);
         alert(`Successfully published!\nInstagram URL: ${data.instagramUrl}`);
-        
         setStep("input");
-        setInputValue("");
-        setSelectedZodiac(null);
-        setSelectedFormat(null);
-        setText1("");
-        setText2("");
-        setText1FontSize(24);
-        setText2FontSize(20);
-        setShowDate(true);
-        setShowWeekRange(false);
-        setShowLogo(true);
-        setShowHashtags(true);
-        setLogoUrl(DEFAULT_LOGO_URL);
-        setIsLogoValid(true);
+        setInputValue(""); setSelectedZodiac(null); setSelectedFormat(null);
+        setText1(""); setText2(""); setText1FontSize(24); setText2FontSize(20);
+        setShowDate(true); setShowWeekRange(false); setShowLogo(true); setShowHashtags(true);
+        setLogoUrl(DEFAULT_LOGO_URL); setIsLogoValid(true);
       } else {
-        pushEvent("error", `❌ Error: ${data.error}`);
+        addLog(`❌ Error: ${data.error}`);
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      pushEvent("error", `❌ Critical error: ${errorMsg}`);
+      addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsPublishing(false);
     }
@@ -320,42 +261,20 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <h3 className="text-lg font-black text-white mb-2">🤖 AI Auto-Post Agent</h3>
         <p className="text-sm text-slate-400 mb-4">Let the agent randomly select a zodiac sign, generate English content, compose the image, and publish it automatically.</p>
         <button 
-          onClick={handleAutoPost}
-          disabled={isAutoPosting}
+          onClick={handleAutoPost} disabled={isAutoPosting}
           className="w-full max-w-md mx-auto block py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-lg transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-purple-900/30 flex items-center justify-center gap-2"
         >
-          {isAutoPosting ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Agent is working...
-            </>
-          ) : (
-            <>✨ Create & Publish Auto Post</>
-          )}
+          {isAutoPosting ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Agent is working...</> : <>✨ Create & Publish Auto Post</>}
         </button>
       </div>
 
-      <div className="mb-4">
-        <h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3>
-      </div>
+      <div className="mb-4"><h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3></div>
 
       {step === "input" && (
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-4">Step 1: Choose a Zodiac Sign</h3>
-          <input 
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="e.g., ARIES or LEO"
-            className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-4"
-            onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()}
-          />
-          <button 
-            onClick={handleZodiacSubmit}
-            className="px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95"
-          >
-            Continue ➔
-          </button>
+          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="e.g., ARIES or LEO" className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-4" onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} />
+          <button onClick={handleZodiacSubmit} className="px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95">Continue ➔</button>
         </div>
       )}
 
@@ -363,16 +282,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' },
-              { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' },
-              { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }
-            ].map((fmt) => (
-              <button
-                key={fmt.id}
-                onClick={() => handleFormatSelect(fmt.id as PostFormat)}
-                className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]"
-              >
+            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+              <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
                 <div className="text-sm text-slate-400 mt-2">{fmt.desc}</div>
@@ -393,19 +304,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              <div 
-                ref={previewRef}
-                className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
-                style={{ 
-                  aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
-                  width: selectedFormat === 'story' ? '300px' : '400px',
-                  maxHeight: '600px'
-                }}
-              >
+              <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxHeight: '600px' }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
-                
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
-
                 {showLogo && logoUrl && isLogoValid && (
                   <div className="absolute z-20 transition-all duration-300" style={{ top: '3%', right: '3%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
                     <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
@@ -413,32 +314,23 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     </div>
                   </div>
                 )}
-
                 {(text1 || text2) && (
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
                     {text1 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
-                        <div className="text-[#2D2D2D] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)', WebkitTextStroke: '0.6px rgba(255,255,255,0.5)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {text1}
-                        </div>
+                        <div className="text-[#2D2D2D] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)', WebkitTextStroke: '0.6px rgba(255,255,255,0.5)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
                       </div>
                     )}
-
                     {text2 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
-                        <div className="text-[#2D2D2D] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)', WebkitTextStroke: '0.4px rgba(255,255,255,0.4)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {text2}
-                        </div>
+                        <div className="text-[#2D2D2D] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)', WebkitTextStroke: '0.4px rgba(255,255,255,0.4)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
                       </div>
                     )}
                   </div>
                 )}
-
                 {(showDate || showWeekRange) && (
                   <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
-                    <div className="text-[#2D2D2D] font-serif italic text-sm font-medium" style={{ textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.3px rgba(255,255,255,0.3)', fontSize: '14px' }}>
-                      {showWeekRange ? getWeekRange() : getCurrentDate()}
-                    </div>
+                    <div className="text-[#2D2D2D] font-serif italic text-sm font-medium" style={{ textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.3px rgba(255,255,255,0.3)', fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
                   </div>
                 )}
               </div>
@@ -447,109 +339,58 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-slate-400">Text 1 (Between illustration and name) - Max 2 lines</div>
+                  <div className="text-xs font-bold text-slate-400">Text 1 - Max 2 lines</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
-                    <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors">−</button>
+                    <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">Clear</button>
+                    <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
-                    <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors">+</button>
+                    <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <div className="relative">
-                  <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., What's happening today with" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 resize-none h-20 transition-all" style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }} />
-                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-500 font-mono">{text1.length} chars</div>
+                  <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., What's happening today with" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20" />
                 </div>
               </div>
 
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-slate-400">Text 2 (Below name - Horoscope description) - Max 5 lines</div>
+                  <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
-                    <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors">−</button>
+                    <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">Clear</button>
+                    <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
-                    <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold text-lg flex items-center justify-center transition-colors">+</button>
+                    <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <div className="relative h-full">
-                  <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 resize-none transition-all" style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }} />
-                  <div className="absolute bottom-2 right-2 text-[10px] text-slate-500 font-mono">{text2.length} chars</div>
+                  <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none" />
                 </div>
               </div>
 
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
-                
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">📅</span>
-                    <div>
-                      <div className="text-sm font-bold text-white">Today's Date</div>
-                      <div className="text-xs text-slate-400">{getCurrentDate()}</div>
-                    </div>
-                  </div>
+                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
                   <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
-
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">📆</span>
-                    <div>
-                      <div className="text-sm font-bold text-white">One Week Forecast</div>
-                      <div className="text-xs text-slate-400">{getWeekRange()}</div>
-                    </div>
-                  </div>
+                  <div className="flex items-center gap-3"><span className="text-lg">📆</span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
                   <button onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showWeekRange ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showWeekRange ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
-
-                <div className="bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">#️⃣</span>
-                      <div>
-                        <div className="text-sm font-bold text-white">Auto-Hashtags (AI)</div>
-                        <div className="text-xs text-slate-400">Analyzed from Text 2</div>
-                      </div>
-                    </div>
-                    <button onClick={() => setShowHashtags(!showHashtags)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showHashtags ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                  
-                  {showHashtags && selectedZodiac && (
-                    <div className="mt-2 p-2 bg-slate-800/50 rounded-lg border border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <div className="text-[10px] text-slate-400 mb-1">Generated Hashtags:</div>
-                      <div className="text-xs text-emerald-400 font-mono break-words leading-relaxed">
-                        {generateDynamicHashtags(text2, selectedZodiac.name)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">🖼️</span>
-                    <div>
-                      <div className="text-sm font-bold text-white">Channel Logo</div>
-                      <div className="text-xs text-slate-400">Top right corner (round)</div>
-                    </div>
-                  </div>
+                  <div className="flex items-center gap-3"><span className="text-lg">🖼️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
                   <button onClick={() => setShowLogo(!showLogo)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showLogo ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showLogo ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
-
                 {showLogo && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="text-xs font-bold text-slate-400 mb-2">Logo URL</div>
-                    <div className="flex gap-2">
-                      <input type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
-                      {!isLogoValid && <div className="flex items-center text-red-400 text-xs font-bold px-2 whitespace-nowrap">⚠️ Invalid URL</div>}
-                    </div>
+                    <input type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50" />
                   </div>
                 )}
               </div>
@@ -560,14 +401,33 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3"
               >
                 {isPublishing ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    გენერირება და ატვირთვა...
-                  </>
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> გენერირება და ატვირთვა...</>
                 ) : (
                   <>✅ მზადაა (ატვირთვა Supabase-ში)</>
                 )}
               </button>
+
+              {/* ✅ ახალი: ლოგების ვიზუალური ფანჯარა და კოპირების ღილაკი */}
+              {logs.length > 0 && (
+                <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                      <span>📜</span> პროცესის ლოგები
+                    </span>
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(logs.join('\n'))}
+                      className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-600"
+                    >
+                      📋 ლოგების კოპირება
+                    </button>
+                  </div>
+                  <div className="h-48 overflow-y-auto font-mono text-[11px] text-green-400 space-y-1 bg-black/60 p-3 rounded-lg border border-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+                    {logs.map((log, i) => (
+                      <div key={i} className="break-words">{log}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <button 
                 onClick={handlePublish} 
@@ -575,10 +435,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20"
               >
                 {isPublishing ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Processing & Publishing...
-                  </>
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing & Publishing...</>
                 ) : (
                   <>🚀 Confirm & Publish</>
                 )}
