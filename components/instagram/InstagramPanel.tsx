@@ -1,7 +1,9 @@
 // /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import html2canvas from "html2canvas";
+import { createClient } from "@supabase/supabase-js";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -10,6 +12,12 @@ type PostFormat = "post" | "story" | "carousel";
 interface InstagramPanelProps {
   pushEvent: (type: EventLogType, message: string) => void;
 }
+
+// ✅ გამოსწორებულია: ვიყენებთ ზუსტად იმ სახელს, რაც თქვენს .env ფაილში წერია
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY! 
+);
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', search: 'ARIES ARIES ვერძი' },
@@ -74,7 +82,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [text2FontSize, setText2FontSize] = useState(20);
   const [isPublishing, setIsPublishing] = useState(false);
   
-  // ✅ ახალი სტეიტი ავტომატური პოსტინგისთვის
   const [isAutoPosting, setIsAutoPosting] = useState(false);
   
   const [showDate, setShowDate] = useState(true);
@@ -83,6 +90,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [showHashtags, setShowHashtags] = useState(true);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const [isLogoValid, setIsLogoValid] = useState(true);
+
+  // ✅ Ref preview კონტეინერისთვის (სქრინშოტის გადასაღებად)
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const imageUrl = selectedZodiac 
     ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
@@ -130,7 +140,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     setStep("preview");
   };
 
-  // ✅ ახალი ფუნქცია: AI Auto-Post Streaming
   const handleAutoPost = async () => {
     setIsAutoPosting(true);
     pushEvent("agent", "🚀 Initiating Auto-Post Agent...");
@@ -161,7 +170,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               } else if (data.step === 'error') {
                 pushEvent("error", `❌ ${data.message}`);
               } else {
-                // ეს აჩვენებს რეალურ დროში პროგრესს Event Log-ში!
                 pushEvent("agent", data.message);
               }
             } catch (e) {
@@ -174,6 +182,65 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       pushEvent("error", `❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsAutoPosting(false);
+    }
+  };
+
+  // ✅ ახალი ფუნქცია: ვიღებთ სქრინშოტს preview-ს და ვტვირთავთ Supabase-ში
+  const handleReadyAndUpload = async () => {
+    if (!previewRef.current || !selectedZodiac) {
+      pushEvent("error", "❌ Preview not ready");
+      return;
+    }
+    
+    setIsPublishing(true);
+    pushEvent("system", "📸 Generating final image from preview...");
+
+    try {
+      // 1. ვიღებთ სქრინშოტს მაღალი ხარისხით (scale: 3 = ~1200px სიგანე)
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 3,
+        useCORS: true, // საშუალებას აძლევს Supabase-ის სურათების ჩატვირთვას
+        backgroundColor: '#0f172a',
+        logging: false,
+      });
+
+      pushEvent("system", "🔄 Converting to JPEG and uploading...");
+
+      // 2. ვაქცევთ Canvas-ს Blob-ად (JPEG, 90% ხარისხი)
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
+      });
+
+      // 3. ვტვირთავთ Supabase-ის 'posts' ფოლდერში
+      const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
+      const uploadPath = `posts/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('lunara-assets')
+        .upload(uploadPath, blob, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        });
+
+      if (error) {
+        throw new Error(`Upload failed: ${error.message}`);
+      }
+
+      // 4. ვიღებთ საჯარო ლინკს
+      const { data: urlData } = supabase.storage
+        .from('lunara-assets')
+        .getPublicUrl(uploadPath);
+
+      pushEvent("success", `✅ Successfully uploaded to Supabase posts folder!`);
+      pushEvent("system", `🔗 URL: ${urlData.publicUrl}`);
+      
+      alert(`ფოტო წარმატებით აიტვირთა Supabase-ში!\n\n${urlData.publicUrl}`);
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      pushEvent("error", `❌ Failed: ${errorMsg}`);
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -241,7 +308,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <p className="text-base text-slate-400">Create and publish horoscope posts manually or let the AI Agent handle it.</p>
       </div>
 
-      {/* ✨ ახალი ბლოკი: AI Auto-Post Agent */}
       <div className="mb-8 rounded-2xl border border-purple-500/30 bg-slate-900/50 backdrop-blur-xl p-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
         <h3 className="text-lg font-black text-white mb-2">🤖 AI Auto-Post Agent</h3>
         <p className="text-sm text-slate-400 mb-4">Let the agent randomly select a zodiac sign, generate English content, compose the image, and publish it automatically.</p>
@@ -261,7 +327,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </button>
       </div>
 
-      {/* ⚙️ არსებული მანუალური რეჟიმი (უცვლელი) */}
       <div className="mb-4">
         <h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3>
       </div>
@@ -318,14 +383,18 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Visual Preview */}
+            {/* Visual Preview - დამატებულია ref={previewRef} */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              <div className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ 
-                aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
-                width: selectedFormat === 'story' ? '300px' : '400px',
-                maxHeight: '600px'
-              }}>
+              <div 
+                ref={previewRef}
+                className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
+                style={{ 
+                  aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
+                  width: selectedFormat === 'story' ? '300px' : '400px',
+                  maxHeight: '600px'
+                }}
+              >
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
@@ -402,7 +471,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
               </div>
 
-              {/* Additional Elements */}
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
                 
@@ -480,7 +548,28 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </div>
               
-              <button onClick={handlePublish} disabled={isPublishing || !text2} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20">
+              {/* ✅ ახალი ღილაკი: მზადაა - ატვირთვა Supabase-ში */}
+              <button 
+                onClick={handleReadyAndUpload} 
+                disabled={isPublishing || !text2} 
+                className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3"
+              >
+                {isPublishing ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    გენერირება და ატვირთვა...
+                  </>
+                ) : (
+                  <>✅ მზადაა (ატვირთვა Supabase-ში)</>
+                )}
+              </button>
+
+              {/* არსებული Publish ღილაკი (უცვლელი) */}
+              <button 
+                onClick={handlePublish} 
+                disabled={isPublishing || !text2} 
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20"
+              >
                 {isPublishing ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
