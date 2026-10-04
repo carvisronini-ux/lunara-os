@@ -76,17 +76,15 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const [isLogoValid, setIsLogoValid] = useState(true);
 
-  // ✅ ახალი: ლოგების შენახვის სტეიტი
   const [logs, setLogs] = useState<string[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // ✅ ახალი: ფუნქცია ლოგების დასამატებლად (ბრაუზერში, ტერმინალში და მშობელ კომპონენტში)
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
     const newLog = `[${timestamp}] ${message}`;
     setLogs(prev => [...prev, newLog]);
-    console.log(newLog); // იბეჭდება ტერმინალშიც
-    pushEvent("system", message); // ინფორმირდება მშობელი კომპონენტი
+    console.log(newLog);
+    pushEvent("system", message);
   };
 
   const imageUrl = selectedZodiac 
@@ -161,18 +159,23 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
     
     setIsPublishing(true);
-    setLogs([]); // ვასუფთავებთ ძველ ლოგებს ახალი პროცესისთვის
+    setLogs([]);
     addLog("📸 [1/4] Starting capture of visual preview...");
 
     try {
-      addLog("⏳ [2/4] Rendering canvas from DOM (this might take a second)...");
+      addLog("⏳ [2/4] Rendering canvas from DOM...");
+      
+      // ✅ დამატებულია ზუსტი width და height, რათა html2canvas-მა ზუსტად იცოდეს საზღვრები და არაფერი ჩაჭრას
       const canvas = await html2canvas(previewRef.current, {
         scale: 3,
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#0f172a',
         logging: false,
+        width: previewRef.current.offsetWidth,
+        height: previewRef.current.offsetHeight,
       });
+      
       addLog(`✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
 
       addLog("⏳ [3/4] Converting canvas to high-quality JPEG...");
@@ -304,7 +307,16 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxHeight: '600px' }}>
+              
+              {/* ✅ წაშლილია maxHeight: '600px', რათა პროპორციები (aspectRatio) იყოს მკაცრად დაცული და html2canvas-მა არაფერი ჩაჭრას */}
+              <div 
+                ref={previewRef}
+                className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
+                style={{ 
+                  aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
+                  width: selectedFormat === 'story' ? '300px' : '400px'
+                }}
+              >
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
                 {showLogo && logoUrl && isLogoValid && (
@@ -407,7 +419,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </button>
 
-              {/* ✅ ახალი: ლოგების ვიზუალური ფანჯარა და კოპირების ღილაკი */}
               {logs.length > 0 && (
                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="flex items-center justify-between mb-2">
