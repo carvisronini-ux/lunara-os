@@ -154,7 +154,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleReadyAndUpload = async () => {
     if (!previewRef.current || !selectedZodiac) {
-      addLog("❌ Preview not ready or Zodiac not selected.");
+      addLog(" Preview not ready or Zodiac not selected.");
       return;
     }
     
@@ -165,15 +165,31 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     try {
       addLog("⏳ [2/4] Rendering canvas from DOM...");
       
-      // ✅ დამატებულია ზუსტი width და height, რათა html2canvas-მა ზუსტად იცოდეს საზღვრები და არაფერი ჩაჭრას
+      // ✅ მივიღოთ კონტეინერის რეალური ზომები
+      const rect = previewRef.current.getBoundingClientRect();
+      
       const canvas = await html2canvas(previewRef.current, {
-        scale: 3,
+        scale: 2, // ოდნავ შევამცირეთ 3-დან 2-მდე სტაბილურობისთვის
         useCORS: true,
         allowTaint: true,
         backgroundColor: '#0f172a',
         logging: false,
-        width: previewRef.current.offsetWidth,
-        height: previewRef.current.offsetHeight,
+        // ✅ ვაიძულებთ html2canvas-ს გამოიყენოს ზუსტი ზომები
+        width: rect.width,
+        height: rect.height,
+        // ✅ ვაიძულებთ რომ მთლიანი კონტენტი გადაიღოს
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: rect.width,
+        windowHeight: rect.height,
+        // ✅ ვაიძულებთ რომ დაელოდოს ყველა ელემენტის დატვირთვას
+        onclone: (documentClone) => {
+          // ვრწმუნდებით, რომ კლონში ყველაფერი ხილვადია
+          const clonedPreview = documentClone.querySelector('[data-preview="true"]');
+          if (clonedPreview) {
+            (clonedPreview as HTMLElement).style.overflow = 'visible';
+          }
+        }
       });
       
       addLog(`✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
@@ -236,7 +252,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       });
       const data = await response.json();
       if (data.success) {
-        addLog(`🎉 Successfully published! ID: ${data.postId}`);
+        addLog(` Successfully published! ID: ${data.postId}`);
         alert(`Successfully published!\nInstagram URL: ${data.instagramUrl}`);
         setStep("input");
         setInputValue(""); setSelectedZodiac(null); setSelectedFormat(null);
@@ -285,7 +301,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -308,9 +324,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
               
-              {/* ✅ წაშლილია maxHeight: '600px', რათა პროპორციები (aspectRatio) იყოს მკაცრად დაცული და html2canvas-მა არაფერი ჩაჭრას */}
+              {/* ✅ წაშლილია maxHeight: '600px', დასამატებელია data-preview="true" */}
               <div 
                 ref={previewRef}
+                data-preview="true"
                 className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
                 style={{ 
                   aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
