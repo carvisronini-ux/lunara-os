@@ -161,7 +161,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleGenerateText1 = async () => {
     if (!selectedZodiac) {
-      addLog(" Please select a zodiac sign first!");
+      addLog("❌ Please select a zodiac sign first!");
       return;
     }
     setIsGeneratingText1(true);
@@ -179,7 +179,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleGenerateText2 = async () => {
     if (!selectedZodiac) {
-      addLog(" Please select a zodiac sign first!");
+      addLog("❌ Please select a zodiac sign first!");
       return;
     }
     setIsGeneratingText2(true);
@@ -230,7 +230,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      addLog(" [3/6] Loading high-res zodiac image...");
+      addLog("⏳ [3/6] Loading high-res zodiac image...");
       const zodiacImg = new Image();
       zodiacImg.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
@@ -279,25 +279,13 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         addLog("✅ Channel logo added to canvas.");
       }
 
-      // ✅ განახლებული: შავი ტექსტი მუქი კონტურით, ჩრდილების გარეშე
+      // ✅ სუფთა ტექსტი - მხოლოდ შავი ფერი, ჩრდილების და კონტურების გარეშე
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
         
-        // ❌ წაშლილია ყველა ჩრდილი!
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-
-        // ✅ მუქი/სქელი კონტური (შავი, 0.8 opacity)
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = fontSize * 0.12; // უფრო სქელი კონტური
-        ctx.lineJoin = 'round';
-        ctx.strokeText(text, x, y);
-
-        // ✅ შავი შიგთავსი (ასოები)
+        // მხოლოდ სუფთა შავი ტექსტი, ყოველგვარი ეფექტის გარეშე
         ctx.fillStyle = '#000000';
         ctx.fillText(text, x, y);
       };
@@ -320,19 +308,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           const testLine = line + words[n] + ' ';
           const metrics = ctx.measureText(testLine);
           if (metrics.width > maxWidth && n > 0) {
-            // ❌ წაშლილია ჩრდილები
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
-            
-            // ✅ მუქი კონტური
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.lineWidth = text2FontSize * 3 * 0.12;
-            ctx.lineJoin = 'round';
-            ctx.strokeText(line, width / 2, currentY);
-            
-            // ✅ შავი შიგთავსი
+            // მხოლოდ სუფთა შავი ტექსტი
             ctx.fillStyle = '#000000';
             ctx.fillText(line, width / 2, currentY);
             
@@ -343,14 +319,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           }
         }
         // ბოლო ხაზი
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.lineWidth = text2FontSize * 3 * 0.12;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(line, width / 2, currentY);
         ctx.fillStyle = '#000000';
         ctx.fillText(line, width / 2, currentY);
       }
@@ -360,10 +328,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         ctx.font = `italic 36px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
         ctx.fillStyle = '#000000';
         ctx.fillText(dateText, width / 2, height * 0.94);
       }
@@ -500,7 +464,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: ' Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -536,19 +500,22 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
                     {text1 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
-                        <div className="text-[#2D2D2D] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, textShadow: '0 0 12px rgba(255,255,255,0.95), 0 0 25px rgba(255,255,255,0.8), 2px 2px 5px rgba(0,0,0,0.4)', WebkitTextStroke: '0.6px rgba(255,255,255,0.5)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
+                        {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
+                        <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
                       </div>
                     )}
                     {text2 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
-                        <div className="text-[#2D2D2D] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, textShadow: '0 0 10px rgba(255,255,255,0.95), 0 0 20px rgba(255,255,255,0.8), 2px 2px 4px rgba(0,0,0,0.4)', WebkitTextStroke: '0.4px rgba(255,255,255,0.4)', wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
+                        {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
+                        <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
                       </div>
                     )}
                   </div>
                 )}
                 {(showDate || showWeekRange) && (
                   <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
-                    <div className="text-[#2D2D2D] font-serif italic text-sm font-medium" style={{ textShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 15px rgba(255,255,255,0.7), 1px 1px 3px rgba(0,0,0,0.3)', WebkitTextStroke: '0.3px rgba(255,255,255,0.3)', fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
+                    {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
+                    <div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
                   </div>
                 )}
               </div>
@@ -594,19 +561,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
                   <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">📆</span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
                   <button onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showWeekRange ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showWeekRange ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">🖼️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
                   <button onClick={() => setShowLogo(!showLogo)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showLogo ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showLogo ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -638,7 +605,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
-                      const isWarning = log.includes('') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
                       return (
                         <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
                           <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
