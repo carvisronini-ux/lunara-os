@@ -2,9 +2,9 @@
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export interface HoroscopeGenerationResult {
-  text1: string; // მხოლოდ ჰუკი/შეკითხვა (მაქს 50 სიმბოლო)
-  text2: string; // მხოლოდ პროგნოზი (მაქს 150 სიმბოლო)
-  hashtags: string[]; // 5-7 ჰეშთეგი
+  text1: string; // Only hook/question (max 50 chars)
+  text2: string; // Only forecast (max 150 chars)
+  hashtags: string[]; // 5-7 hashtags
 }
 
 export async function generateHoroscopeContent(
@@ -12,43 +12,43 @@ export async function generateHoroscopeContent(
   period: 'daily' | 'weekly'
 ): Promise<HoroscopeGenerationResult> {
   
-  // 1. ველოდებით, სანამ CredentialVault ჩატვირთავს მონაცემებს ბაზიდან
+  // 1. Wait for CredentialVault to load data from DB
   await credentialVault.ready;
 
-  // 2. ვითხოვთ როგორც გასაღებს, ისე რეკომენდებულ მოდელს ჭკვიანი საცავიდან
+  // 2. Request both key and recommended model from smart vault
   const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
 
-  console.log('[AI Generator] 🔑 გასაღები მოიძებნა Vault-ში:', !!vaultApiKey);
-  console.log('[AI Generator] 🎯 რეკომენდებული მოდელი Vault-იდან:', recommendedModel || 'არ არის მითითებული (Fallback-ი გამოიყენება)');
+  console.log('[AI Generator] 🔑 Key found in Vault:', !!vaultApiKey);
+  console.log('[AI Generator] 🎯 Recommended model from Vault:', recommendedModel || 'Not specified (Fallback will be used)');
 
-  // 3. Fallback: თუ Vault-ში რატომღაც არ არის, ვცდილობთ .env-დან წაკითხვას
+  // 3. Fallback: If not in Vault, try reading from .env
   let finalApiKey: string | null = vaultApiKey;
   if (!finalApiKey) {
-    console.log('[AI Generator] ⚠️ Vault-მა ვერ მოიძებნა. გადავდივართ .env-ზე.');
+    console.log('[AI Generator] ⚠️ Vault not found. Falling back to .env.');
     finalApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
   }
 
   if (!finalApiKey) {
-    throw new Error('GROQ API Key ვერ მოიძებნა. გთხოვთ, შეამოწმოთ CredentialVault ან .env ფაილი.');
+    throw new Error('GROQ API Key not found. Please check CredentialVault or .env file.');
   }
 
-  // 4. ვიყენებთ Vault-ის რეკომენდებულ მოდელს
+  // 4. Use Vault's recommended model
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
   const periodText = period === 'daily' ? 'daily' : 'weekly';
 
-  // ✅ ულტრა-მკაცრი პრომფტი ზუსტი დაყოფისთვის
-  const systemPrompt = `You are an expert astrologer and Instagram copywriter for LUNARA OS.
-Generate a ${periodText} horoscope post in ENGLISH.
+  // ✅ Prompt optimized for WARM, EMOTIONAL, and ALIVE tone (No hardcore/robotic text)
+  const systemPrompt = `You are a warm, engaging, and mystical astrologer and Instagram copywriter for LUNARA OS.
+Generate a ${periodText} horoscope post in ENGLISH. The tone must be alive, emotional, uplifting, and deeply personal. NEVER use robotic, hardcore, dry, or generic language.
 
 STRICT VISUAL LAYOUT RULES (DO NOT BREAK):
-1. "text1" MUST BE ONLY a short, engaging hook or question (e.g., "What's in store for ${zodiacName} this ${periodText}?"). MAX 50 characters. DO NOT include the actual forecast here.
-2. "text2" MUST BE ONLY the actual horoscope forecast, advice, or prediction. MAX 150 characters. DO NOT repeat the hook here.
+1. "text1" MUST BE ONLY a short, engaging, emotional hook or question (e.g., "the universe is whispering to", "a beautiful secret about"). MAX 50 characters. DO NOT include the actual forecast here.
+2. "text2" MUST BE ONLY the actual horoscope forecast, advice, or prediction. Make it feel personal, warm, and inspiring. MAX 150 characters. DO NOT repeat the hook here.
 3. "hashtags": Exactly 5-7 relevant English hashtags, always including #LUNARA and #${zodiacName}.
 
 Return ONLY valid JSON in this exact format:
 {
-  "text1": "Your short hook/question here",
-  "text2": "Your actual forecast/advice here",
+  "text1": "Your short emotional hook here",
+  "text2": "Your warm, personal forecast here",
   "hashtags": ["#LUNARA", "#${zodiacName}", "#Astrology", "#Horoscope", "#Zodiac"]
 }`;
 
@@ -63,7 +63,7 @@ Return ONLY valid JSON in this exact format:
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
         response_format: { type: 'json_object' },
-        temperature: 0.7,
+        temperature: 0.8, // Slightly higher for more creative, emotional language
       })
     });
 
@@ -88,6 +88,80 @@ Return ONLY valid JSON in this exact format:
     return parsed;
   } catch (error) {
     console.error('[AI Generator] Error:', error);
+    throw new Error(`AI Generation failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+  }
+}
+
+// ✅ New function: Generate ONLY the viral, emotional Text 1 hook
+export async function generateViralText1(zodiacName: string): Promise<string> {
+  await credentialVault.ready;
+
+  const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
+
+  let finalApiKey: string | null = vaultApiKey;
+  if (!finalApiKey) {
+    finalApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
+  }
+
+  if (!finalApiKey) {
+    throw new Error('API Key not found in Vault or .env');
+  }
+
+  const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
+
+  // ✅ Prompt optimized for ALIVE, MYSTICAL, and EMOTIONAL hooks
+  const systemPrompt = `You are a warm, engaging, and mystical Instagram copywriter for LUNARA OS.
+Generate a SHORT, ALIVE, EMOTIONAL, and INTRIGUING hook or question for a horoscope post about ${zodiacName}.
+It should feel personal, cosmic, and seamlessly lead into the zodiac name (which will be displayed right below it visually).
+
+Examples of PERFECT hooks:
+- "the universe is whispering to"
+- "a beautiful secret about"
+- "what the stars are revealing for"
+- "your cosmic energy today for"
+- "a magical message for"
+
+STRICT RULES:
+1. MUST BE in English.
+2. MAX 40 characters.
+3. DO NOT include the zodiac name in the output.
+4. DO NOT include punctuation at the end (no period, no question mark).
+5. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown. Keep it warm and alive, never robotic or hardcore.`;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${finalApiKey}`
+      },
+      body: JSON.stringify({
+        model: modelToUse,
+        messages: [{ role: 'user', content: systemPrompt }],
+        temperature: 0.9, // High temperature for maximum creativity and emotion
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Groq API Error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    let content = data.choices[0].message.content?.trim();
+
+    // Cleanup: remove any quotes or markdown if the model adds them
+    if (content) {
+      content = content.replace(/^["']|["']$/g, '').replace(/^`+|`+$/g, '').trim();
+    }
+
+    if (!content) {
+      throw new Error('Empty AI response');
+    }
+
+    return content;
+  } catch (error) {
+    console.error('[AI Generator] Text1 Error:', error);
     throw new Error(`AI Generation failed: ${error instanceof Error ? error.message : 'Unknown'}`);
   }
 }

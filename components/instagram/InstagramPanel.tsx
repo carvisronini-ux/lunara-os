@@ -3,6 +3,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { generateViralText1 } from "@/lib/instagram/ai-generator";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -18,18 +19,18 @@ const supabase = createClient(
 );
 
 const ZODIAC_SIGNS = [
-  { name: 'ARIES', search: 'ARIES ARIES ვერძი' },
-  { name: 'TAURUS', search: 'TAURUS TAURUS კურო' },
-  { name: 'GEMINI', search: 'GEMINI GEMINI ტყუპი' },
-  { name: 'CANCER', search: 'CANCER CANCER კირჩხიბი' },
-  { name: 'LEO', search: 'LEO LEO ლომი' },
-  { name: 'VIRGO', search: 'VIRGO VIRGO ქალწული' },
-  { name: 'LIBRA', search: 'LIBRA LIBRA სასწორი' },
-  { name: 'SCORPIO', search: 'SCORPIO SCORPIO მორიელი' },
-  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS მშვილდოსანი' },
-  { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN თხის რქა' },
-  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS მერწყული' },
-  { name: 'PISCES', search: 'PISCES PISCES თევზები' },
+  { name: 'ARIES', search: 'ARIES ARIES' },
+  { name: 'TAURUS', search: 'TAURUS TAURUS' },
+  { name: 'GEMINI', search: 'GEMINI GEMINI' },
+  { name: 'CANCER', search: 'CANCER CANCER' },
+  { name: 'LEO', search: 'LEO LEO' },
+  { name: 'VIRGO', search: 'VIRGO VIRGO' },
+  { name: 'LIBRA', search: 'LIBRA LIBRA' },
+  { name: 'SCORPIO', search: 'SCORPIO SCORPIO' },
+  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS' },
+  { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN' },
+  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS' },
+  { name: 'PISCES', search: 'PISCES PISCES' },
 ];
 
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
@@ -40,14 +41,7 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
 
   const stopWords = new Set([
     "the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", 
-    "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were",
-    "და", "ის", "რომ", "არის", "შენ", "შენი", "დღეს", "რომელიც", "თუ", "ან", "ამ", "ეს", "იქნება", "უნდა", "ნუ", "რადგან",
-    "თავს", "ენდე", "იყავი", "გაანათე", "ოთახი", "აზრები", "რათა", "ჰარმონია", "მიზანია", "ეძებე", "გელით", "გაათავისუფლე",
-    "რაც", "გჭირდება", "მიეცი", "ადგილი", "ახალ", "გეძახის", "გაფართოვება", "სულს", "სჭირდება", "დარჩი", "უნიკალური",
-    "ხედვა", "სხვებს", "შთააგონებს", "შეგეშინდება", "ვინც", "ხარ", "საშუალება", "კარგი", "ღია", "ცვლილებების", "მიმართ",
-    "ნაკადს", "ენერგია", "მხარესაა", "ახალი", "დასაწყისის", "სამყარო", "თამამ", "ნაბიჯებს", "უჭერს", "მხარს", "მოუსმინე",
-    "შინაგან", "ხმას", "სტაბილურობა", "კომფორტი", "მთავარი", "თემებია", "სხეულს", "მას", "დასვენება", "ხვალ", "უფრო",
-    "ძლიერი", "იყო", "კომუნიკაცია", "მხარეა", "გამოიყენე", "დრო", "მნიშვნელოვანი", "საუბრებისთვის", "იდეების", "გაზიარებისთვის"
+    "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were"
   ]);
 
   const words = text2.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").split(/\s+/);
@@ -77,6 +71,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const [logs, setLogs] = useState<string[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingText1, setIsGeneratingText1] = useState(false);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -110,6 +105,16 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  const handleAiPost = () => {
+    const randomIndex = Math.floor(Math.random() * ZODIAC_SIGNS.length);
+    const randomZodiac = ZODIAC_SIGNS[randomIndex];
+    
+    setSelectedZodiac(randomZodiac);
+    setInputValue("");
+    addLog(`🤖 AI randomly selected: ${randomZodiac.name}`);
+    setStep("format");
+  };
+
   const handleFormatSelect = (format: PostFormat) => {
     setSelectedFormat(format);
     addLog(`✅ Format selected: ${format}`);
@@ -118,7 +123,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleAutoPost = async () => {
     setIsAutoPosting(true);
-    addLog(" Initiating Auto-Post Agent...");
+    addLog("🚀 Initiating Auto-Post Agent...");
     try {
       const response = await fetch('/api/instagram/auto-post-stream');
       if (!response.body) throw new Error("No response body");
@@ -151,7 +156,27 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ 100%-ით საიმედო Native Canvas API მიდგომა (გაუმჯობესებული ვიზუალით)
+  const handleGenerateText1 = async () => {
+    if (!selectedZodiac) {
+      addLog("❌ Please select a zodiac sign first!");
+      return;
+    }
+
+    setIsGeneratingText1(true);
+    addLog(`⏳ AI is generating an emotional, viral hook for ${selectedZodiac.name}...`);
+
+    try {
+      const generatedText = await generateViralText1(selectedZodiac.name);
+      setText1(generatedText);
+      addLog(`✨ Successfully generated Text 1: "${generatedText}"`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`❌ Failed to generate Text 1: ${errorMsg}`);
+    } finally {
+      setIsGeneratingText1(false);
+    }
+  };
+
   const handleReadyAndUpload = async () => {
     if (!selectedZodiac || !imageUrl) {
       addLog("❌ Preview not ready or Zodiac not selected.");
@@ -163,9 +188,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     addLog("📸 [1/6] Initializing Native Canvas Engine...");
 
     try {
-      // 1. ზომების განსაზღვრა
       let width = 1080;
-      let height = 1350; // Post (4:5)
+      let height = 1350;
       if (selectedFormat === 'story') { width = 1080; height = 1920; }
       else if (selectedFormat === 'carousel') { width = 1080; height = 1080; }
 
@@ -177,11 +201,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
       addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
 
-      // 2. ფონის დახატვა
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
-      // 3. ზოდიაქოს სურათის ჩატვირთვა და დახატვა
       addLog("⏳ [3/6] Loading high-res zodiac image...");
       const zodiacImg = new Image();
       zodiacImg.crossOrigin = 'anonymous';
@@ -191,13 +213,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         zodiacImg.src = imageUrl;
       });
       
-      // Object-fit: cover იმიტაცია
       const scale = Math.max(width / zodiacImg.width, height / zodiacImg.height);
       const x = (width / 2) - (zodiacImg.width / 2) * scale;
       const y = (height / 2) - (zodiacImg.height / 2) * scale;
       ctx.drawImage(zodiacImg, x, y, zodiacImg.width * scale, zodiacImg.height * scale);
       
-      // 4. გრადიენტის დადება
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
       gradient.addColorStop(0, 'rgba(0,0,0,0)');
       gradient.addColorStop(0.6, 'rgba(0,0,0,0)');
@@ -205,29 +225,24 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      // ტექსტის დახატვის დამხმარე ფუნქცია (გაუმჯობესებული - უფრო დახვეწილი კონტურით)
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
         
-        // მხოლოდ მსუბუქი ჩრდილი (უფრო დახვეწილი)
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
 
-        // უფრო თხელი და ნაზი კონტური
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-        ctx.lineWidth = fontSize * 0.06; // შევამცირეთ 0.12-დან 0.06-მდე
+        ctx.lineWidth = fontSize * 0.06;
         ctx.lineJoin = 'round';
         ctx.strokeText(text, x, y);
 
-        // შიგთავსი (Fill)
         ctx.fillStyle = '#2D2D2D';
         ctx.fillText(text, x, y);
 
-        // ჩრდილის გასუფთავება
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
@@ -236,12 +251,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
       addLog("⏳ [4/6] Rendering typography elements...");
 
-      // 5. ტექსტი 1
       if (text1) {
         drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
       }
 
-      // 6. ტექსტი 2 (Word Wrap-ით)
       if (text2) {
         const words = text2.split(' ');
         let line = '';
@@ -257,7 +270,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           const testLine = line + words[n] + ' ';
           const metrics = ctx.measureText(testLine);
           if (metrics.width > maxWidth && n > 0) {
-            // დახატვა (გაუმჯობესებული სტილი)
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 8;
             ctx.shadowOffsetX = 1;
@@ -281,7 +293,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             line = testLine;
           }
         }
-        // ბოლო ხაზის დახატვა
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 1;
@@ -298,34 +309,26 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         ctx.shadowOffsetY = 0;
       }
 
-      // 7. თარიღი (მხოლოდ მუქი შავი ტექსტი - კონტურისა და ჩრდილის გარეშე, ოდნავ ქვემოთ ჩამოწეული)
       if (showDate || showWeekRange) {
         const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
-        
         ctx.font = `italic 36px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        
-        // საერთოდ ამოღებულია ჩრდილი და კონტური
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
-        
-        // მხოლოდ სუფთა მუქი შავი ტექსტი (კონტურის გარეშე)
         ctx.fillStyle = '#000000';
-        ctx.fillText(dateText, width / 2, height * 0.94); // ოდნავ ქვემოთ ჩამოწეული (0.92 -> 0.94)
+        ctx.fillText(dateText, width / 2, height * 0.94);
       }
 
-      addLog(" [5/6] Encoding to high-quality JPEG...");
+      addLog("⏳ [5/6] Encoding to high-quality JPEG...");
       
-      // 8. Blob-ად კონვერტაცია
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95);
       });
       addLog(`✅ Image encoded. Size: ${(blob.size / 1024).toFixed(2)} KB`);
 
-      // 9. Supabase-ზე ატვირთვა
       const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
       addLog(`⏳ [6/6] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
@@ -347,7 +350,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       addLog("🎉 FINAL RESULT: Image is ready and live!");
       addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
       
-      alert(`✅ წარმატებით აიტვირთა!\n\nფაილის სახელი: ${fileName}\nლინკი: ${urlData.publicUrl}`);
+      alert(`✅ Successfully uploaded!\n\nFile name: ${fileName}\nLink: ${urlData.publicUrl}`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -415,8 +418,29 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       {step === "input" && (
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-4">Step 1: Choose a Zodiac Sign</h3>
-          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="e.g., ARIES or LEO" className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-4" onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} />
-          <button onClick={handleZodiacSubmit} className="px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95">Continue ➔</button>
+          <input 
+            type="text" 
+            value={inputValue} 
+            onChange={(e) => setInputValue(e.target.value)} 
+            placeholder="e.g., ARIES or LEO (or click AI POST)" 
+            className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-6" 
+            onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} 
+          />
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+            <button 
+              onClick={handleZodiacSubmit}
+              className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95"
+            >
+              Continue ➔
+            </button>
+            <button 
+              onClick={handleAiPost}
+              className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+            >
+              🤖 AI POST
+            </button>
+          </div>
         </div>
       )}
 
@@ -490,14 +514,33 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 1 - Max 2 lines</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">Clear</button>
+                    <button 
+                      onClick={handleGenerateText1}
+                      disabled={isGeneratingText1}
+                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      {isGeneratingText1 ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          AI...
+                        </>
+                      ) : (
+                        "GENERATE"
+                      )}
+                    </button>
+                    <button 
+                      onClick={() => setText1("")} 
+                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
+                    >
+                      Clear
+                    </button>
                     <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
                     <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <div className="relative">
-                  <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., What's happening today with" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20" />
+                  <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20" />
                 </div>
               </div>
 
@@ -505,14 +548,25 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold">Clear</button>
+                    <button 
+                      onClick={() => addLog("⏳ Generating Text 2... (Pending logic)")} 
+                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center transition-colors"
+                    >
+                      GENERATE
+                    </button>
+                    <button 
+                      onClick={() => setText2("")} 
+                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
+                    >
+                      Clear
+                    </button>
                     <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
                     <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <div className="relative h-full">
-                  <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none" />
+                  <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none" />
                 </div>
               </div>
 
@@ -550,13 +604,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3"
               >
                 {isPublishing ? (
-                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> გენერირება და ატვირთვა...</>
+                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating & Uploading...</>
                 ) : (
-                  <>✅ მზადაა (ატვირთვა Supabase-ში)</>
+                  <>✅ Ready (Upload to Supabase)</>
                 )}
               </button>
 
-              {/* ✅ პროფესიონალური ლოგერის ინტერფეისი */}
               {logs.length > 0 && (
                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-2xl">
                   <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
@@ -579,7 +632,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
-                      const isWarning = log.includes('') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
                       return (
                         <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
                           <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
