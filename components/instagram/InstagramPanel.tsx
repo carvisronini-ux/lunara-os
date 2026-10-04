@@ -118,7 +118,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleAutoPost = async () => {
     setIsAutoPosting(true);
-    addLog("🚀 Initiating Auto-Post Agent...");
+    addLog(" Initiating Auto-Post Agent...");
     try {
       const response = await fetch('/api/instagram/auto-post-stream');
       if (!response.body) throw new Error("No response body");
@@ -182,7 +182,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillRect(0, 0, width, height);
 
       // 3. ზოდიაქოს სურათის ჩატვირთვა და დახატვა
-      addLog(" [3/6] Loading high-res zodiac image...");
+      addLog("⏳ [3/6] Loading high-res zodiac image...");
       const zodiacImg = new Image();
       zodiacImg.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
@@ -298,39 +298,26 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         ctx.shadowOffsetY = 0;
       }
 
-      // 7. თარიღი (გაუმჯობესებული ხილვადობით - მკაფიო კონტური და მუქი ტექსტი)
+      // 7. თარიღი (მხოლოდ მუქი შავი ტექსტი - კონტურისა და ჩრდილის გარეშე, ოდნავ ქვემოთ ჩამოწეული)
       if (showDate || showWeekRange) {
         const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
         
-        // თარიღისთვის უფრო მკაფიო სტილი (ზომა უცვლელია - 36px)
         ctx.font = `italic 36px serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // ძლიერი ჩრდილი უკეთესი ხილვადობისთვის
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
-        
-        // მკაფიო თეთრი კონტური (უფრო სქელი)
-        ctx.strokeStyle = 'rgba(255,255,255,0.95)'; // თითქმის სრულიად თეთრი
-        ctx.lineWidth = 36 * 0.12; // უფრო სქელი კონტური
-        ctx.lineJoin = 'round';
-        ctx.strokeText(dateText, width / 2, height * 0.92);
-        
-        // მუქი ტექსტი უკეთესი კონტრასტისთვის (ამოღებულია fill - აღარ არის თეთრი ბექგრაუნდი)
-        ctx.fillStyle = '#1a1a1a'; // ძალიან მუქი
-        ctx.fillText(dateText, width / 2, height * 0.92);
-        
-        // ჩრდილის გასუფთავება
+        // საერთოდ ამოღებულია ჩრდილი და კონტური
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 0;
+        
+        // მხოლოდ სუფთა მუქი შავი ტექსტი (კონტურის გარეშე)
+        ctx.fillStyle = '#000000';
+        ctx.fillText(dateText, width / 2, height * 0.94); // ოდნავ ქვემოთ ჩამოწეული (0.92 -> 0.94)
       }
 
-      addLog("⏳ [5/6] Encoding to high-quality JPEG...");
+      addLog(" [5/6] Encoding to high-quality JPEG...");
       
       // 8. Blob-ად კონვერტაცია
       const blob = await new Promise<Blob>((resolve) => {
@@ -399,7 +386,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         addLog(`❌ Error: ${data.error}`);
       }
     } catch (error) {
-      addLog(` Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsPublishing(false);
     }
@@ -423,7 +410,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </button>
       </div>
 
-      <div className="mb-4"><h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">️ Manual Mode</h3></div>
+      <div className="mb-4"><h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3></div>
 
       {step === "input" && (
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -437,7 +424,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: ' Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -532,7 +519,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
                   <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -592,7 +579,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
-                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      const isWarning = log.includes('') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
                       return (
                         <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
                           <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
