@@ -165,3 +165,71 @@ STRICT RULES:
     throw new Error(`AI Generation failed: ${error instanceof Error ? error.message : 'Unknown'}`);
   }
 }
+
+// ✅ New function: Generate Text 2 (meaningful forecast) that answers/flows from Text 1
+export async function generateHoroscopeText2(zodiacName: string, text1Hook: string): Promise<string> {
+  await credentialVault.ready;
+
+  const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
+
+  let finalApiKey: string | null = vaultApiKey;
+  if (!finalApiKey) {
+    finalApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY || null;
+  }
+
+  if (!finalApiKey) {
+    throw new Error('API Key not found in Vault or .env');
+  }
+
+  const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
+
+  // ✅ Prompt optimized to create a meaningful, emotional response to Text 1
+  const systemPrompt = `You are a warm, engaging, and mystical astrologer for LUNARA OS.
+Your task is to write a SHORT, MEANINGFUL, and EMOTIONAL horoscope forecast for ${zodiacName}.
+
+CONTEXT: The post starts with this hook: "${text1Hook || 'the stars'}"
+Your Text 2 MUST naturally answer, complete, or flow directly from this hook. 
+
+STRICT RULES:
+1. MUST BE in English.
+2. Tone: Alive, emotional, uplifting, deeply personal, and mystical. NEVER robotic, hardcore, dry, or generic.
+3. LENGTH: MAX 150 characters (1-2 short sentences). This is critical for the visual layout.
+4. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown, NO hashtags here.`;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${finalApiKey}`
+      },
+      body: JSON.stringify({
+        model: modelToUse,
+        messages: [{ role: 'user', content: systemPrompt }],
+        temperature: 0.85, // Slightly higher for creativity and emotion
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Groq API Error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    let content = data.choices[0].message.content?.trim();
+
+    // Cleanup: remove any quotes or markdown if the model adds them
+    if (content) {
+      content = content.replace(/^["']|["']$/g, '').replace(/^`+|`+$/g, '').trim();
+    }
+
+    if (!content) {
+      throw new Error('Empty AI response');
+    }
+
+    return content;
+  } catch (error) {
+    console.error('[AI Generator] Text2 Error:', error);
+    throw new Error(`AI Generation failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+  }
+}

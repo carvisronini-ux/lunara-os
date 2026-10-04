@@ -3,7 +3,7 @@
 
 import { useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { generateViralText1 } from "@/lib/instagram/ai-generator";
+import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator"; // ✅ განახლებული იმპორტი
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -72,6 +72,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
   const [isGeneratingText1, setIsGeneratingText1] = useState(false);
+  const [isGeneratingText2, setIsGeneratingText2] = useState(false); // ✅ ახალი სტეიტი Text 2-ისთვის
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -174,6 +175,28 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       addLog(`❌ Failed to generate Text 1: ${errorMsg}`);
     } finally {
       setIsGeneratingText1(false);
+    }
+  };
+
+  // ✅ ახალი ფუნქცია: Text 2-ის გენერირება, რომელიც პასუხობს Text 1-ს
+  const handleGenerateText2 = async () => {
+    if (!selectedZodiac) {
+      addLog("❌ Please select a zodiac sign first!");
+      return;
+    }
+
+    setIsGeneratingText2(true);
+    addLog(`⏳ AI is generating a meaningful forecast for ${selectedZodiac.name} based on Text 1...`);
+
+    try {
+      const generatedText = await generateHoroscopeText2(selectedZodiac.name, text1);
+      setText2(generatedText);
+      addLog(`✨ Successfully generated Text 2: "${generatedText}"`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`❌ Failed to generate Text 2: ${errorMsg}`);
+    } finally {
+      setIsGeneratingText2(false);
     }
   };
 
@@ -544,15 +567,24 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
               </div>
 
+              {/* ✅ განახლებული Text 2 პანელი რეალური GENERATE ლოგიკით და დატვირთვის ანიმაციით */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => addLog("⏳ Generating Text 2... (Pending logic)")} 
-                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center transition-colors"
+                      onClick={handleGenerateText2}
+                      disabled={isGeneratingText2}
+                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      GENERATE
+                      {isGeneratingText2 ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          AI...
+                        </>
+                      ) : (
+                        "GENERATE"
+                      )}
                     </button>
                     <button 
                       onClick={() => setText2("")} 
