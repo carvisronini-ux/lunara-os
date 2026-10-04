@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import html2canvas from "html2canvas";
 import { createClient } from "@supabase/supabase-js";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
@@ -152,60 +151,153 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  // ✅ 100%-ით საიმედო Native Canvas API მიდგომა (არ იჭრება!)
   const handleReadyAndUpload = async () => {
-    if (!previewRef.current || !selectedZodiac) {
-      addLog(" Preview not ready or Zodiac not selected.");
+    if (!selectedZodiac || !imageUrl) {
+      addLog("❌ Preview not ready or Zodiac not selected.");
       return;
     }
     
     setIsPublishing(true);
     setLogs([]);
-    addLog("📸 [1/4] Starting capture of visual preview...");
+    addLog("📸 [1/6] Initializing Native Canvas Engine...");
 
     try {
-      addLog("⏳ [2/4] Rendering canvas from DOM...");
+      // 1. ზომების განსაზღვრა
+      let width = 1080;
+      let height = 1350; // Post (4:5)
+      if (selectedFormat === 'story') { width = 1080; height = 1920; }
+      else if (selectedFormat === 'carousel') { width = 1080; height = 1080; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Failed to get canvas context");
+
+      addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
+
+      // 2. ფონის დახატვა
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, width, height);
+
+      // 3. ზოდიაქოს სურათის ჩატვირთვა და დახატვა
+      addLog("⏳ [3/6] Loading high-res zodiac image...");
+      const zodiacImg = new Image();
+      zodiacImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        zodiacImg.onload = resolve;
+        zodiacImg.onerror = reject;
+        zodiacImg.src = imageUrl;
+      });
       
-      // ✅ მივიღოთ კონტეინერის რეალური ზომები
-      const rect = previewRef.current.getBoundingClientRect();
+      // Object-fit: cover იმიტაცია
+      const scale = Math.max(width / zodiacImg.width, height / zodiacImg.height);
+      const x = (width / 2) - (zodiacImg.width / 2) * scale;
+      const y = (height / 2) - (zodiacImg.height / 2) * scale;
+      ctx.drawImage(zodiacImg, x, y, zodiacImg.width * scale, zodiacImg.height * scale);
       
-      const canvas = await html2canvas(previewRef.current, {
-        scale: 2, // ოდნავ შევამცირეთ 3-დან 2-მდე სტაბილურობისთვის
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#0f172a',
-        logging: false,
-        // ✅ ვაიძულებთ html2canvas-ს გამოიყენოს ზუსტი ზომები
-        width: rect.width,
-        height: rect.height,
-        // ✅ ვაიძულებთ რომ მთლიანი კონტენტი გადაიღოს
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: rect.width,
-        windowHeight: rect.height,
-        // ✅ ვაიძულებთ რომ დაელოდოს ყველა ელემენტის დატვირთვას
-        onclone: (documentClone) => {
-          // ვრწმუნდებით, რომ კლონში ყველაფერი ხილვადია
-          const clonedPreview = documentClone.querySelector('[data-preview="true"]');
-          if (clonedPreview) {
-            (clonedPreview as HTMLElement).style.overflow = 'visible';
+      // 4. გრადიენტის დადება
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0.6, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      // ტექსტის დახატვის დამხმარე ფუნქცია (კონტურით და ჩრდილით)
+      const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
+        ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
+        ctx.textAlign = align;
+        ctx.textBaseline = 'middle';
+        
+        // ჩრდილი
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        // თეთრი კონტური (Stroke)
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = fontSize * 0.12;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, x, y);
+
+        // შიგთავსი (Fill)
+        ctx.fillStyle = '#2D2D2D';
+        ctx.fillText(text, x, y);
+
+        // ჩრდილის გასუფთავება
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      };
+
+      addLog("⏳ [4/6] Rendering typography elements...");
+
+      // 5. ტექსტი 1
+      if (text1) {
+        drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
+      }
+
+      // 6. ტექსტი 2 (Word Wrap-ით)
+      if (text2) {
+        const words = text2.split(' ');
+        let line = '';
+        let currentY = height * 0.66;
+        const lineHeight = text2FontSize * 3 * 1.4;
+        const maxWidth = width * 0.85;
+
+        ctx.font = `normal ${text2FontSize * 3}px serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (let n = 0; n < words.length; n++) {
+          const testLine = line + words[n] + ' ';
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && n > 0) {
+            // დახატვა
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+            ctx.lineWidth = text2FontSize * 3 * 0.12;
+            ctx.lineJoin = 'round';
+            ctx.strokeText(line, width / 2, currentY);
+            ctx.fillStyle = '#2D2D2D';
+            ctx.fillText(line, width / 2, currentY);
+            
+            line = words[n] + ' ';
+            currentY += lineHeight;
+          } else {
+            line = testLine;
           }
         }
-      });
+        // ბოლო ხაზის დახატვა
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = text2FontSize * 3 * 0.12;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(line, width / 2, currentY);
+        ctx.fillStyle = '#2D2D2D';
+        ctx.fillText(line, width / 2, currentY);
+      }
+
+      // 7. თარიღი
+      if (showDate || showWeekRange) {
+        const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
+        drawStyledText(dateText, width / 2, height * 0.97, 42, true);
+      }
+
+      addLog("⏳ [5/6] Encoding to high-quality JPEG...");
       
-      addLog(`✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
-
-      addLog("⏳ [3/4] Converting canvas to high-quality JPEG...");
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b) => {
-          if (b) resolve(b);
-          else reject(new Error("Failed to create blob from canvas"));
-        }, 'image/jpeg', 0.95);
+      // 8. Blob-ად კონვერტაცია
+      const blob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95);
       });
-      addLog(`✅ Image converted. Size: ${(blob.size / 1024).toFixed(2)} KB`);
+      addLog(`✅ Image encoded. Size: ${(blob.size / 1024).toFixed(2)} KB`);
 
+      // 9. Supabase-ზე ატვირთვა
       const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
-      addLog(`⏳ [4/4] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
+      addLog(`⏳ [6/6] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
       const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
@@ -221,14 +313,14 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
       const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
       
-      addLog(`🎉 FINAL RESULT: Image is ready and live!`);
+      addLog("🎉 FINAL RESULT: Image is ready and live!");
       addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
       
       alert(`✅ წარმატებით აიტვირთა!\n\nფაილის სახელი: ${fileName}\nლინკი: ${urlData.publicUrl}`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ CRITICAL FAILURE during upload: ${errorMsg}`);
+      addLog(`❌ CRITICAL FAILURE: ${errorMsg}`);
       console.error("Upload Error Details:", error);
     } finally {
       setIsPublishing(false);
@@ -252,7 +344,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       });
       const data = await response.json();
       if (data.success) {
-        addLog(` Successfully published! ID: ${data.postId}`);
+        addLog(`🎉 Successfully published! ID: ${data.postId}`);
         alert(`Successfully published!\nInstagram URL: ${data.instagramUrl}`);
         setStep("input");
         setInputValue(""); setSelectedZodiac(null); setSelectedFormat(null);
@@ -301,7 +393,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -323,11 +415,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              
-              {/* ✅ წაშლილია maxHeight: '600px', დასამატებელია data-preview="true" */}
               <div 
                 ref={previewRef}
-                data-preview="true"
                 className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
                 style={{ 
                   aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
@@ -436,23 +525,37 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </button>
 
+              {/* ✅ პროფესიონალური ლოგერის ინტერფეისი */}
               {logs.length > 0 && (
-                <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
-                      <span>📜</span> პროცესის ლოგები
+                <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-2xl">
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                      System Execution Log
                     </span>
                     <button 
-                      onClick={() => navigator.clipboard.writeText(logs.join('\n'))}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 border border-slate-600"
+                      onClick={() => {
+                        navigator.clipboard.writeText(logs.join('\n'));
+                        alert("Logs copied to clipboard!");
+                      }}
+                      className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 border border-slate-700 hover:border-slate-600"
                     >
-                      📋 ლოგების კოპირება
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                      Copy Logs
                     </button>
                   </div>
-                  <div className="h-48 overflow-y-auto font-mono text-[11px] text-green-400 space-y-1 bg-black/60 p-3 rounded-lg border border-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-                    {logs.map((log, i) => (
-                      <div key={i} className="break-words">{log}</div>
-                    ))}
+                  <div className="h-56 overflow-y-auto font-mono text-[11px] space-y-1.5 bg-black/80 p-3 rounded-lg border border-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent shadow-inner">
+                    {logs.map((log, i) => {
+                      const isError = log.includes('❌') || log.includes('FAILURE');
+                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
+                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      return (
+                        <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
+                          <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
+                          <span>{log.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/, '')}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
