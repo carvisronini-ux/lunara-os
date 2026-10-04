@@ -178,7 +178,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ განახლებული ფუნქცია: Text 2-ის გენერირება + ავტომატური განმეორების წაშლა
   const handleGenerateText2 = async () => {
     if (!selectedZodiac) {
       addLog("❌ Please select a zodiac sign first!");
@@ -191,22 +190,17 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     try {
       const generatedText = await generateHoroscopeText2(selectedZodiac.name, text1);
       
-      // ✅ ავტომატური გასუფთავება: თუ Text 2 იწყება Text 1-ის ტექსტით, ვშლით მას
       let cleanedText = generatedText;
       if (text1 && text1.trim().length > 0) {
         const text1Lower = text1.toLowerCase().trim();
         const cleanedLower = cleanedText.toLowerCase().trim();
         
-        // ვამოწმებთ, იწყება თუ არა Text 2 Text 1-ით
         if (cleanedLower.startsWith(text1Lower)) {
-          // ვშლით Text 1-ის ნაწილს Text 2-ის დასაწყისიდან
           cleanedText = cleanedText.slice(text1.length).trim();
-          // ვშლით ნებისმიერ გამყოფ სიმბოლოებს დასაწყისში (:, -, და ა.შ.)
           cleanedText = cleanedText.replace(/^[:\-\s]+/, '').trim();
           addLog(`🧹 Auto-cleaned: removed repeated hook from Text 2`);
         }
         
-        // დამატებითი შემოწმება: თუ Text 1 არის Text 2-ში როგორც ქვესტრიქონი დასაწყისში (პირველი 3 სიტყვა)
         const text1Words = text1Lower.split(' ');
         if (text1Words.length >= 3) {
           const firstThreeWords = text1Words.slice(0, 3).join(' ');
@@ -275,6 +269,42 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
+
+      // ✅ ახალი: ლოგოს დახატვა Canvas-ზე (ზუსტად ისე, როგორც პრევიუშია)
+      if (showLogo && logoUrl && isLogoValid) {
+        addLog("⏳ Loading channel logo...");
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+          logoImg.src = logoUrl;
+        });
+
+        // ზომების გამოთვლა (პრევიუს CSS-ის შესაბამისად: top 3%, right 3%, width 12%)
+        const logoSize = Math.min(width * 0.12, 130); // მაქს ~130px 1080p სიგანეზე
+        const padding = width * 0.03; // ~3% დაშორება კიდეებიდან
+        const logoX = width - logoSize - padding;
+        const logoY = padding;
+
+        ctx.save();
+        // წრიული ფორმის შექმნა
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+
+        // ლოგოს სურათის დახატვა
+        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+
+        // თხელი თეთრი ჩარჩო (CSS border-2 border-white/40-ის ანალოგი)
+        ctx.lineWidth = Math.max(2, width * 0.004);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.stroke();
+
+        ctx.restore();
+        addLog("✅ Channel logo added to canvas.");
+      }
 
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
@@ -595,7 +625,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
               </div>
 
-              {/* ✅ განახლებული Text 2 პანელი რეალური GENERATE ლოგიკით და ავტო-გასუფთავებით */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
