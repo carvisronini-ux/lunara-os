@@ -151,7 +151,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ 100%-ით საიმედო Native Canvas API მიდგომა (არ იჭრება!)
+  // ✅ 100%-ით საიმედო Native Canvas API მიდგომა (გაუმჯობესებული ვიზუალით)
   const handleReadyAndUpload = async () => {
     if (!selectedZodiac || !imageUrl) {
       addLog("❌ Preview not ready or Zodiac not selected.");
@@ -205,21 +205,21 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      // ტექსტის დახატვის დამხმარე ფუნქცია (კონტურით და ჩრდილით)
+      // ტექსტის დახატვის დამხმარე ფუნქცია (გაუმჯობესებული - უფრო დახვეწილი კონტურით)
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
         
-        // ჩრდილი
-        ctx.shadowColor = 'rgba(0,0,0,0.6)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
+        // მხოლოდ მსუბუქი ჩრდილი (უფრო დახვეწილი)
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
 
-        // თეთრი კონტური (Stroke)
-        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
-        ctx.lineWidth = fontSize * 0.12;
+        // უფრო თხელი და ნაზი კონტური
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = fontSize * 0.06; // შევამცირეთ 0.12-დან 0.06-მდე
         ctx.lineJoin = 'round';
         ctx.strokeText(text, x, y);
 
@@ -257,14 +257,24 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           const testLine = line + words[n] + ' ';
           const metrics = ctx.measureText(testLine);
           if (metrics.width > maxWidth && n > 0) {
-            // დახატვა
-            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-            ctx.lineWidth = text2FontSize * 3 * 0.12;
+            // დახატვა (გაუმჯობესებული სტილი)
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+            ctx.lineWidth = text2FontSize * 3 * 0.06;
             ctx.lineJoin = 'round';
             ctx.strokeText(line, width / 2, currentY);
+            
             ctx.fillStyle = '#2D2D2D';
             ctx.fillText(line, width / 2, currentY);
             
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
             line = words[n] + ' ';
             currentY += lineHeight;
           } else {
@@ -272,18 +282,26 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           }
         }
         // ბოლო ხაზის დახატვა
-        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-        ctx.lineWidth = text2FontSize * 3 * 0.12;
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.lineWidth = text2FontSize * 3 * 0.06;
         ctx.lineJoin = 'round';
         ctx.strokeText(line, width / 2, currentY);
         ctx.fillStyle = '#2D2D2D';
         ctx.fillText(line, width / 2, currentY);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
       }
 
-      // 7. თარიღი
+      // 7. თარიღი (გაუმჯობესებული პოზიცია - აწეული ზემოთ, რომ ტელეგრამის ლინკს არ დაეფაროს)
       if (showDate || showWeekRange) {
         const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
-        drawStyledText(dateText, width / 2, height * 0.97, 42, true);
+        drawStyledText(dateText, width / 2, height * 0.92, 36, true); // ავწიეთ 0.97-დან 0.92-მდე და შევამცირეთ ზომა 42-დან 36-მდე
       }
 
       addLog("⏳ [5/6] Encoding to high-quality JPEG...");
