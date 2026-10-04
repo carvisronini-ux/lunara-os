@@ -13,7 +13,6 @@ interface InstagramPanelProps {
   pushEvent: (type: EventLogType, message: string) => void;
 }
 
-// ✅ გამოსწორებულია: ვიყენებთ ზუსტად იმ სახელს, რაც თქვენს .env ფაილში წერია
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY! 
@@ -36,7 +35,6 @@ const ZODIAC_SIGNS = [
 
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.jpg';
 
-// ✅ Smart Hashtag Generator (English-focused)
 const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const baseTags = [`#${zodiacName}`, "#Horoscope", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
   
@@ -91,7 +89,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const [isLogoValid, setIsLogoValid] = useState(true);
 
-  // ✅ Ref preview კონტეინერისთვის (სქრინშოტის გადასაღებად)
   const previewRef = useRef<HTMLDivElement>(null);
 
   const imageUrl = selectedZodiac 
@@ -185,7 +182,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // ✅ ახალი ფუნქცია: ვიღებთ სქრინშოტს preview-ს და ვტვირთავთ Supabase-ში
   const handleReadyAndUpload = async () => {
     if (!previewRef.current || !selectedZodiac) {
       pushEvent("error", "❌ Preview not ready");
@@ -196,26 +192,24 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     pushEvent("system", "📸 Generating final image from preview...");
 
     try {
-      // 1. ვიღებთ სქრინშოტს მაღალი ხარისხით (scale: 3 = ~1200px სიგანე)
       const canvas = await html2canvas(previewRef.current, {
         scale: 3,
-        useCORS: true, // საშუალებას აძლევს Supabase-ის სურათების ჩატვირთვას
+        useCORS: true,
         backgroundColor: '#0f172a',
         logging: false,
       });
 
       pushEvent("system", "🔄 Converting to JPEG and uploading...");
 
-      // 2. ვაქცევთ Canvas-ს Blob-ად (JPEG, 90% ხარისხი)
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
       });
 
-      // 3. ვტვირთავთ Supabase-ის 'posts' ფოლდერში
       const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
 
-      const { data, error } = await supabase.storage
+      // ✅ გამოსწორებულია: წაშლილია unused 'data' ცვლადი, დარჩა მხოლოდ 'error'
+      const { error } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, {
           contentType: 'image/jpeg',
@@ -226,7 +220,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         throw new Error(`Upload failed: ${error.message}`);
       }
 
-      // 4. ვიღებთ საჯარო ლინკს
       const { data: urlData } = supabase.storage
         .from('lunara-assets')
         .getPublicUrl(uploadPath);
@@ -383,7 +376,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Visual Preview - დამატებულია ref={previewRef} */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
               <div 
@@ -437,7 +429,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               </div>
             </div>
 
-            {/* Text Input + Controls */}
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -548,7 +539,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </div>
               
-              {/* ✅ ახალი ღილაკი: მზადაა - ატვირთვა Supabase-ში */}
               <button 
                 onClick={handleReadyAndUpload} 
                 disabled={isPublishing || !text2} 
@@ -564,7 +554,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </button>
 
-              {/* არსებული Publish ღილაკი (უცვლელი) */}
               <button 
                 onClick={handlePublish} 
                 disabled={isPublishing || !text2} 
