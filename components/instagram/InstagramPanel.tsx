@@ -73,6 +73,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const previewRef = useRef<HTMLDivElement>(null);
   const [isGeneratingText1, setIsGeneratingText1] = useState(false);
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
+  
+  // ✅ ახალი სტეიტი: ინახავს Supabase-ში ატვირთული ფოტოს ლინკს
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -162,17 +165,14 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       addLog("❌ Please select a zodiac sign first!");
       return;
     }
-
     setIsGeneratingText1(true);
     addLog(`⏳ AI is generating an emotional, viral hook for ${selectedZodiac.name}...`);
-
     try {
       const generatedText = await generateViralText1(selectedZodiac.name);
       setText1(generatedText);
       addLog(`✨ Successfully generated Text 1: "${generatedText}"`);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ Failed to generate Text 1: ${errorMsg}`);
+      addLog(`❌ Failed to generate Text 1: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsGeneratingText1(false);
     }
@@ -183,40 +183,23 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       addLog("❌ Please select a zodiac sign first!");
       return;
     }
-
     setIsGeneratingText2(true);
     addLog(`⏳ AI is generating a meaningful forecast for ${selectedZodiac.name} based on Text 1...`);
-
     try {
       const generatedText = await generateHoroscopeText2(selectedZodiac.name, text1);
-      
       let cleanedText = generatedText;
       if (text1 && text1.trim().length > 0) {
         const text1Lower = text1.toLowerCase().trim();
         const cleanedLower = cleanedText.toLowerCase().trim();
-        
         if (cleanedLower.startsWith(text1Lower)) {
-          cleanedText = cleanedText.slice(text1.length).trim();
-          cleanedText = cleanedText.replace(/^[:\-\s]+/, '').trim();
+          cleanedText = cleanedText.slice(text1.length).trim().replace(/^[:\-\s]+/, '').trim();
           addLog(`🧹 Auto-cleaned: removed repeated hook from Text 2`);
         }
-        
-        const text1Words = text1Lower.split(' ');
-        if (text1Words.length >= 3) {
-          const firstThreeWords = text1Words.slice(0, 3).join(' ');
-          if (cleanedLower.startsWith(firstThreeWords)) {
-            cleanedText = cleanedText.slice(firstThreeWords.length).trim();
-            cleanedText = cleanedText.replace(/^[:\-\s]+/, '').trim();
-            addLog(`🧹 Auto-cleaned: removed partial hook repetition`);
-          }
-        }
       }
-      
       setText2(cleanedText);
       addLog(`✨ Successfully generated Text 2: "${cleanedText}"`);
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ Failed to generate Text 2: ${errorMsg}`);
+      addLog(`❌ Failed to generate Text 2: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsGeneratingText2(false);
     }
@@ -245,7 +228,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       if (!ctx) throw new Error("Failed to get canvas context");
 
       addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
-
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
@@ -270,7 +252,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
 
-      // ✅ ახალი: ლოგოს დახატვა Canvas-ზე (ზუსტად ისე, როგორც პრევიუშია)
       if (showLogo && logoUrl && isLogoValid) {
         addLog("⏳ Loading channel logo...");
         const logoImg = new Image();
@@ -281,27 +262,20 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           logoImg.src = logoUrl;
         });
 
-        // ზომების გამოთვლა (პრევიუს CSS-ის შესაბამისად: top 3%, right 3%, width 12%)
-        const logoSize = Math.min(width * 0.12, 130); // მაქს ~130px 1080p სიგანეზე
-        const padding = width * 0.03; // ~3% დაშორება კიდეებიდან
+        const logoSize = Math.min(width * 0.12, 130);
+        const padding = width * 0.03;
         const logoX = width - logoSize - padding;
         const logoY = padding;
 
         ctx.save();
-        // წრიული ფორმის შექმნა
         ctx.beginPath();
         ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-
-        // ლოგოს სურათის დახატვა
         ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-
-        // თხელი თეთრი ჩარჩო (CSS border-2 border-white/40-ის ანალოგი)
         ctx.lineWidth = Math.max(2, width * 0.004);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.stroke();
-
         ctx.restore();
         addLog("✅ Channel logo added to canvas.");
       }
@@ -310,20 +284,16 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
-        
         ctx.shadowColor = 'rgba(0,0,0,0.5)';
         ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 1;
         ctx.shadowOffsetY = 1;
-
         ctx.strokeStyle = 'rgba(255,255,255,0.6)';
         ctx.lineWidth = fontSize * 0.06;
         ctx.lineJoin = 'round';
         ctx.strokeText(text, x, y);
-
         ctx.fillStyle = '#2D2D2D';
         ctx.fillText(text, x, y);
-
         ctx.shadowColor = 'transparent';
         ctx.shadowBlur = 0;
         ctx.shadowOffsetX = 0;
@@ -331,10 +301,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       };
 
       addLog("⏳ [4/6] Rendering typography elements...");
-
-      if (text1) {
-        drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
-      }
+      if (text1) drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
 
       if (text2) {
         const words = text2.split(' ');
@@ -359,15 +326,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             ctx.lineWidth = text2FontSize * 3 * 0.06;
             ctx.lineJoin = 'round';
             ctx.strokeText(line, width / 2, currentY);
-            
             ctx.fillStyle = '#2D2D2D';
             ctx.fillText(line, width / 2, currentY);
-            
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
-
             line = words[n] + ' ';
             currentY += lineHeight;
           } else {
@@ -404,7 +368,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       }
 
       addLog("⏳ [5/6] Encoding to high-quality JPEG...");
-      
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95);
       });
@@ -416,22 +379,20 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
       const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
-        .upload(uploadPath, blob, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        });
+        .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
 
-      if (uploadError) {
-        throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
-      }
-      addLog("✅ Successfully uploaded to Supabase!");
-
+      if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
+      
       const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
       
+      // ✅ ვინახავთ ლინკს სტეიტში, რათა Publish ღილაკმა გამოიყენოს ის!
+      setUploadedImageUrl(urlData.publicUrl);
+      
+      addLog("✅ Successfully uploaded to Supabase!");
       addLog("🎉 FINAL RESULT: Image is ready and live!");
       addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
       
-      alert(`✅ Successfully uploaded!\n\nFile name: ${fileName}\nLink: ${urlData.publicUrl}`);
+      alert(`✅ Successfully uploaded!\n\nFile name: ${fileName}\nLink: ${urlData.publicUrl}\n\nNow you can click "Confirm & Publish"!`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -442,32 +403,55 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  // ✅ განახლებული Publish ფუნქცია, რომელიც იყენებს uploadedImageUrl-ს
   const handlePublish = async () => {
-    if (!imageUrl || !text2 || !selectedZodiac || !selectedFormat) return;
+    if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
+      addLog("❌ Please upload the image to Supabase first by clicking 'Ready (Upload to Supabase)'!");
+      return;
+    }
+    
     setIsPublishing(true);
-    addLog(`🚀 Starting final composition and publishing...`);
+    addLog(`🚀 Starting final composition and publishing to Instagram...`);
+    
     try {
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          zodiacName: selectedZodiac.name, format: selectedFormat, text1, text2,
-          text1FontSize, text2FontSize, showDate, showWeekRange, showLogo, showHashtags,
+          zodiacName: selectedZodiac.name,
+          format: selectedFormat,
+          text1: text1,
+          text2: text2,
           generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
-          logoUrl: isLogoValid ? logoUrl : undefined
+          imageUrl: uploadedImageUrl // ✅ ვუგზავნით Supabase-ის ლინკს API-ს
         })
       });
+      
       const data = await response.json();
+      
       if (data.success) {
-        addLog(`🎉 Successfully published! ID: ${data.postId}`);
-        alert(`Successfully published!\nInstagram URL: ${data.instagramUrl}`);
+        addLog(`🎉 Successfully published to Instagram! Post ID: ${data.postId}`);
+        alert(`Successfully published to Instagram!\nPost ID: ${data.postId}`);
+        
+        // ფორმის გასუფთავება
         setStep("input");
-        setInputValue(""); setSelectedZodiac(null); setSelectedFormat(null);
-        setText1(""); setText2(""); setText1FontSize(24); setText2FontSize(20);
-        setShowDate(true); setShowWeekRange(false); setShowLogo(true); setShowHashtags(true);
-        setLogoUrl(DEFAULT_LOGO_URL); setIsLogoValid(true);
+        setInputValue("");
+        setSelectedZodiac(null);
+        setSelectedFormat(null);
+        setText1("");
+        setText2("");
+        setUploadedImageUrl(null); // ლინკის გასუფთავება
+        setText1FontSize(24);
+        setText2FontSize(20);
+        setShowDate(true);
+        setShowWeekRange(false);
+        setShowLogo(true);
+        setShowHashtags(true);
+        setLogoUrl(DEFAULT_LOGO_URL);
+        setIsLogoValid(true);
       } else {
         addLog(`❌ Error: ${data.error}`);
+        if (data.details) console.error("Publish details:", data.details);
       }
     } catch (error) {
       addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
@@ -507,20 +491,9 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-6" 
             onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} 
           />
-          
           <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-            <button 
-              onClick={handleZodiacSubmit}
-              className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95"
-            >
-              Continue ➔
-            </button>
-            <button 
-              onClick={handleAiPost}
-              className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-            >
-              🤖 AI POST
-            </button>
+            <button onClick={handleZodiacSubmit} className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95">Continue ➔</button>
+            <button onClick={handleAiPost} className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2">🤖 AI POST</button>
           </div>
         </div>
       )}
@@ -551,14 +524,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
               <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              <div 
-                ref={previewRef}
-                className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" 
-                style={{ 
-                  aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5',
-                  width: selectedFormat === 'story' ? '300px' : '400px'
-                }}
-              >
+              <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px' }}>
                 <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
                 {showLogo && logoUrl && isLogoValid && (
@@ -595,26 +561,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 1 - Max 2 lines</div>
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleGenerateText1}
-                      disabled={isGeneratingText1}
-                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      {isGeneratingText1 ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          AI...
-                        </>
-                      ) : (
-                        "GENERATE"
-                      )}
+                    <button onClick={handleGenerateText1} disabled={isGeneratingText1} className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                      {isGeneratingText1 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
                     </button>
-                    <button 
-                      onClick={() => setText1("")} 
-                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
-                    >
-                      Clear
-                    </button>
+                    <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
                     <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
                     <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
@@ -629,26 +579,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleGenerateText2}
-                      disabled={isGeneratingText2}
-                      className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      {isGeneratingText2 ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          AI...
-                        </>
-                      ) : (
-                        "GENERATE"
-                      )}
+                    <button onClick={handleGenerateText2} disabled={isGeneratingText2} className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
+                      {isGeneratingText2 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
                     </button>
-                    <button 
-                      onClick={() => setText2("")} 
-                      className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors"
-                    >
-                      Clear
-                    </button>
+                    <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
                     <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
                     <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
                     <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
@@ -687,32 +621,17 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
               </div>
               
-              <button 
-                onClick={handleReadyAndUpload} 
-                disabled={isPublishing || !text2} 
-                className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3"
-              >
-                {isPublishing ? (
-                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating & Uploading...</>
-                ) : (
-                  <>✅ Ready (Upload to Supabase)</>
-                )}
+              <button onClick={handleReadyAndUpload} disabled={isPublishing || !text2} className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3">
+                {isPublishing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating & Uploading...</> : <>✅ Ready (Upload to Supabase)</>}
               </button>
 
               {logs.length > 0 && (
                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-2xl">
                   <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
                     <span className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                      System Execution Log
+                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> System Execution Log
                     </span>
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(logs.join('\n'));
-                        alert("Logs copied to clipboard!");
-                      }}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 border border-slate-700 hover:border-slate-600"
-                    >
+                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied to clipboard!"); }} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 border border-slate-700 hover:border-slate-600">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                       Copy Logs
                     </button>
@@ -733,16 +652,8 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </div>
               )}
 
-              <button 
-                onClick={handlePublish} 
-                disabled={isPublishing || !text2} 
-                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20"
-              >
-                {isPublishing ? (
-                  <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing & Publishing...</>
-                ) : (
-                  <>🚀 Confirm & Publish</>
-                )}
+              <button onClick={handlePublish} disabled={isPublishing || !text2} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20">
+                {isPublishing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing & Publishing...</> : <>🚀 Confirm & Publish</>}
               </button>
             </div>
           </div>
