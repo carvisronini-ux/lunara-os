@@ -33,7 +33,8 @@ const ZODIAC_SIGNS = [
   { name: 'PISCES', search: 'PISCES PISCES თევზები' },
 ];
 
-const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.jpg';
+// ✅ განახლებულია: ლოგოს სწორი .png ლინკი
+const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const baseTags = [`#${zodiacName}`, "#Horoscope", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
@@ -182,56 +183,69 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  // ✅ მაქსიმალურად დეტალური ლოგირებით აღჭურვილი ფუნქცია
   const handleReadyAndUpload = async () => {
     if (!previewRef.current || !selectedZodiac) {
-      pushEvent("error", "❌ Preview not ready");
+      pushEvent("error", "❌ Preview not ready or Zodiac not selected.");
       return;
     }
     
     setIsPublishing(true);
-    pushEvent("system", "📸 Generating final image from preview...");
+    pushEvent("system", "📸 [1/4] Starting capture of visual preview...");
 
     try {
+      // 1. DOM-ის გადაღება
+      pushEvent("system", "⏳ [2/4] Rendering canvas from DOM (this might take a second)...");
       const canvas = await html2canvas(previewRef.current, {
-        scale: 3,
-        useCORS: true,
+        scale: 3, // მაღალი ხარისხი (~1200px სიგანე)
+        useCORS: true, // აუცილებელია Supabase-ის სურათებისთვის
+        allowTaint: true,
         backgroundColor: '#0f172a',
         logging: false,
       });
+      pushEvent("system", `✅ Canvas captured successfully. Dimensions: ${canvas.width}x${canvas.height}`);
 
-      pushEvent("system", "🔄 Converting to JPEG and uploading...");
-
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
+      // 2. Blob-ად კონვერტაცია
+      pushEvent("system", "⏳ [3/4] Converting canvas to high-quality JPEG...");
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to create blob from canvas"));
+        }, 'image/jpeg', 0.95); // 95% ხარისხი
       });
+      pushEvent("system", `✅ Image converted. Size: ${(blob.size / 1024).toFixed(2)} KB`);
 
+      // 3. Supabase-ზე ატვირთვა
       const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
+      pushEvent("system", `⏳ [4/4] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
-      // ✅ გამოსწორებულია: წაშლილია unused 'data' ცვლადი, დარჩა მხოლოდ 'error'
-      const { error } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, {
           contentType: 'image/jpeg',
           upsert: false,
         });
 
-      if (error) {
-        throw new Error(`Upload failed: ${error.message}`);
+      if (uploadError) {
+        throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
       }
+      pushEvent("success", `✅ Successfully uploaded to Supabase!`);
 
+      // 4. საჯარო ლინკის მიღება
       const { data: urlData } = supabase.storage
         .from('lunara-assets')
         .getPublicUrl(uploadPath);
 
-      pushEvent("success", `✅ Successfully uploaded to Supabase posts folder!`);
-      pushEvent("system", `🔗 URL: ${urlData.publicUrl}`);
+      pushEvent("success", `🎉 FINAL RESULT: Image is ready and live!`);
+      pushEvent("system", `🔗 Direct Link: ${urlData.publicUrl}`);
       
-      alert(`ფოტო წარმატებით აიტვირთა Supabase-ში!\n\n${urlData.publicUrl}`);
+      alert(`✅ წარმატებით აიტვირთა!\n\nფაილის სახელი: ${fileName}\nლინკი: ${urlData.publicUrl}`);
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      pushEvent("error", `❌ Failed: ${errorMsg}`);
+      pushEvent("error", `❌ CRITICAL FAILURE during upload: ${errorMsg}`);
+      console.error("Upload Error Details:", error); // დეველოპერის კონსოლისთვის
     } finally {
       setIsPublishing(false);
     }
@@ -532,7 +546,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="text-xs font-bold text-slate-400 mb-2">Logo URL</div>
                     <div className="flex gap-2">
-                      <input type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.jpg" className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
+                      <input type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className="flex-1 bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/20 transition-all" />
                       {!isLogoValid && <div className="flex items-center text-red-400 text-xs font-bold px-2 whitespace-nowrap">⚠️ Invalid URL</div>}
                     </div>
                   </div>
