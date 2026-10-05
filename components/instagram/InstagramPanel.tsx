@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 
@@ -262,7 +263,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         });
 
         const logoSize = Math.min(width * 0.12, 130);
-        const padding = width * 0.02; // ✅ 2% (უფრო ახლოს კიდესთან)
+        const padding = width * 0.02;
         const logoX = width - logoSize - padding;
         const logoY = padding;
 
@@ -279,13 +280,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         addLog("✅ Channel logo added to canvas.");
       }
 
-      // ✅ სუფთა ტექსტი - მხოლოდ შავი ფერი, ჩრდილების და კონტურების გარეშე
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
         ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
-        
-        // მხოლოდ სუფთა შავი ტექსტი, ყოველგვარი ეფექტის გარეშე
         ctx.fillStyle = '#000000';
         ctx.fillText(text, x, y);
       };
@@ -308,17 +306,14 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           const testLine = line + words[n] + ' ';
           const metrics = ctx.measureText(testLine);
           if (metrics.width > maxWidth && n > 0) {
-            // მხოლოდ სუფთა შავი ტექსტი
             ctx.fillStyle = '#000000';
             ctx.fillText(line, width / 2, currentY);
-            
             line = words[n] + ' ';
             currentY += lineHeight;
           } else {
             line = testLine;
           }
         }
-        // ბოლო ხაზი
         ctx.fillStyle = '#000000';
         ctx.fillText(line, width / 2, currentY);
       }
@@ -440,10 +435,51 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </button>
       </div>
 
-      <div className="mb-4"><h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3></div>
+      <div className="mb-4">
+        <h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3>
+      </div>
 
       {step === "input" && (
-        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500 relative overflow-hidden">
+          
+          {/* ✅ InstaBoss Passport Card - ჩაშენებული Step 1 ბანერში */}
+          <div className="absolute top-4 right-4">
+            <Link href="/instaboss" className="group relative w-56 h-28 rounded-lg overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/30 cursor-pointer block"
+              style={{
+                background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%)',
+                border: '2px solid rgba(139, 92, 246, 0.5)',
+              }}
+            >
+              <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-yellow-500/20 border border-yellow-500/50 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-yellow-400">IB</span>
+              </div>
+              
+              <div className="absolute top-3 left-3">
+                <div className="text-[8px] text-purple-300 font-bold tracking-wider mb-0.5">AUTONOMOUS AGENT</div>
+                <div className="text-base font-black text-white tracking-wide">INSTABOSS</div>
+                <div className="text-[7px] text-purple-300">ID: AGT-2026-001</div>
+              </div>
+              
+              <div className="absolute bottom-3 left-3 right-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center border border-white/30">
+                    <span className="text-lg">🤖</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[7px] text-purple-300 font-bold">STATUS</div>
+                    <div className="text-[9px] font-bold text-green-400 flex items-center gap-0.5">
+                      <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse"></span>
+                      ACTIVE
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-purple-400/10 to-pink-400/10 pointer-events-none"></div>
+            </Link>
+          </div>
+
           <h3 className="text-xl font-black text-white mb-4">Step 1: Choose a Zodiac Sign</h3>
           <input 
             type="text" 
@@ -500,13 +536,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
                     {text1 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
-                        {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
                         <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
                       </div>
                     )}
                     {text2 && (
                       <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
-                        {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
                         <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
                       </div>
                     )}
@@ -514,7 +548,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 )}
                 {(showDate || showWeekRange) && (
                   <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
-                    {/* ✅ წაშლილია textShadow და WebkitTextStroke */}
                     <div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
                   </div>
                 )}
