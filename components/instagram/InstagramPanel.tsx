@@ -10,10 +10,10 @@ type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 
 export interface InstagramPanelProps {
-  pushEvent?: (type: EventLogType, message: string) => void; // ✅ გახდა optional
+  pushEvent?: (type: EventLogType, message: string) => void;
 }
 
-export default function InstagramPanel({ pushEvent = () => {} }: InstagramPanelProps) { // ✅ დეფოლტ მნიშვნელობა
+export default function InstagramPanel({ pushEvent = () => {} }: InstagramPanelProps) {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
@@ -367,6 +367,9 @@ export default function InstagramPanel({ pushEvent = () => {} }: InstagramPanelP
                       {isGeneratingText1 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
                     </button>
                     <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
+                    <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
+                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
+                    <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20" />
@@ -380,6 +383,9 @@ export default function InstagramPanel({ pushEvent = () => {} }: InstagramPanelP
                       {isGeneratingText2 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
                     </button>
                     <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
+                    <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
+                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
+                    <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
                   </div>
                 </div>
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none" />
