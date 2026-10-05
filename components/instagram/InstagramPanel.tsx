@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 
@@ -51,6 +52,7 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
 };
 
 export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
+  const router = useRouter();
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
@@ -162,7 +164,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       setText2(cleanedText);
       addLog(`✨ Successfully generated Text 2: "${cleanedText}"`);
     } catch (error) {
-      addLog(`❌ Failed to generate Text 2: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(` Failed to generate Text 2: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsGeneratingText2(false);
     }
@@ -170,7 +172,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handleReadyAndUpload = async () => {
     if (!selectedZodiac || !imageUrl) {
-      addLog("❌ Preview not ready or Zodiac not selected.");
+      addLog(" Preview not ready or Zodiac not selected.");
       return;
     }
     
@@ -190,7 +192,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Failed to get canvas context");
 
-      addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
+      addLog(` [2/6] Canvas created: ${width}x${height}px`);
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(0, 0, width, height);
 
@@ -327,7 +329,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
 
   const handlePublish = async () => {
     if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
-      addLog("❌ Please upload the image to Supabase first by clicking 'Ready (Upload to Supabase)'!");
+      addLog(" Please upload the image to Supabase first by clicking 'Ready (Upload to Supabase)'!");
       return;
     }
     
@@ -374,7 +376,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         if (data.details) console.error("Publish details:", data.details);
       }
     } catch (error) {
-      addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(` Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsPublishing(false);
     }
@@ -383,12 +385,136 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   return (
     <div className="max-w-5xl mx-auto pb-12">
       <div className="mb-8">
-        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram Manual Creator</h2>
-        <p className="text-base text-slate-400">Create, preview, and publish horoscope posts step-by-step.</p>
+        <div className="flex items-center justify-between mb-6">
+          <button 
+            onClick={() => router.push('/')}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-bold"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Dashboard
+          </button>
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            <span>Active:</span>
+            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold">
+              @lunaraosapp
+            </span>
+          </div>
+        </div>
+        
+        <h2 className="text-2xl font-black tracking-wide mb-2">📸 Instagram Command Center</h2>
+        <p className="text-base text-slate-400">Manage all your Instagram accounts</p>
       </div>
 
-      <div className="mb-4">
-        <h3 className="text-xl font-black text-slate-300 mb-4 border-b border-white/10 pb-2">⚙️ Manual Mode</h3>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-black text-slate-300">Your Profiles</h3>
+          <button className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-all">
+            + Add Profile
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/50 backdrop-blur-xl p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xl">
+                  🌙
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-white">@lunaraosapp</div>
+                  <div className="text-xs text-slate-400">12 posts</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732a2.5 2.5 0 013.536 0z" />
+                  </svg>
+                </button>
+                <button className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <button className="p-2 rounded-lg bg-slate-800 text-slate-300">📱</button>
+                <button className="p-2 rounded-lg bg-slate-800 text-slate-300">🎠</button>
+                <button className="p-2 rounded-lg bg-slate-800 text-slate-300">⚡</button>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-xs font-bold">
+                Active
+              </span>
+            </div>
+          </div>
+          
+          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/30 p-8 flex flex-col items-center justify-center text-slate-500 hover:border-slate-600 hover:bg-slate-900/50 transition-all cursor-pointer">
+            <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="text-sm font-bold">Add New Profile</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-xl font-black text-slate-300 mb-4">Content Formats for @lunaraosapp</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-pink-500/30 bg-gradient-to-br from-pink-900/30 to-purple-900/30 backdrop-blur-xl p-5 relative">
+            <div className="absolute top-4 right-4">
+              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-emerald-500">
+                <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+              </button>
+            </div>
+            <div className="text-3xl mb-3">📱</div>
+            <h4 className="text-lg font-bold text-white mb-1">Post</h4>
+            <p className="text-sm text-slate-400 mb-2">1080×1350 Portrait</p>
+            <div className="flex items-center gap-2 text-xs text-emerald-400 font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              SELECTED
+            </div>
+          </div>
+          
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-xl p-5 relative">
+            <div className="absolute top-4 right-4">
+              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-emerald-500">
+                <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+              </button>
+            </div>
+            <div className="text-3xl mb-3">🎠</div>
+            <h4 className="text-lg font-bold text-white mb-1">Carousel</h4>
+            <p className="text-sm text-slate-400">1080×1080 Square</p>
+          </div>
+          
+          <div className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-xl p-5 relative">
+            <div className="absolute top-4 right-4">
+              <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-emerald-500">
+                <span className="translate-x-6 inline-block h-4 w-4 transform rounded-full bg-white transition-transform" />
+              </button>
+            </div>
+            <div className="text-3xl mb-3">⚡</div>
+            <h4 className="text-lg font-bold text-white mb-1">Story</h4>
+            <p className="text-sm text-slate-400">1080×1920 Vertical</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 pt-6">
+        <div className="flex gap-4">
+          <button className="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition-all flex items-center gap-2">
+            🤖 Manual Mode
+          </button>
+          <button className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-all flex items-center gap-2">
+            🤖 InstaBoss
+          </button>
+          <button className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold transition-all flex items-center gap-2">
+            📊 Analytics
+          </button>
+        </div>
       </div>
 
       {step === "input" && (
@@ -413,7 +539,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
+            {[{ id: 'post', title: ' Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
               <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
                 <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
                 <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
@@ -507,19 +633,19 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               <div className="border-t border-white/10 pt-4 space-y-3">
                 <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
                   <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📆</span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg"></span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
                   <button onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showWeekRange ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showWeekRange ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">🖼️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
+                  <div className="flex items-center gap-3"><span className="text-lg">️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
                   <button onClick={() => setShowLogo(!showLogo)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showLogo ? 'bg-emerald-600' : 'bg-slate-700'}`}>
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showLogo ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
