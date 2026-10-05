@@ -55,7 +55,6 @@ export default function HomePage() {
   const [clock, setClock] = useState<string | null>(null);
   
   const [systemStatus] = useState<"healthy" | "degraded" | "partial_outage">("healthy");
-  const [simulationMode] = useState(true);
   
   const [emergencyState, setEmergencyState] = useState<EmergencyState>({
     allAgentsPaused: false,
