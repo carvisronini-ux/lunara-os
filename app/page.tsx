@@ -1,4 +1,3 @@
-// /home/carvisronini-ux/lunara-os/app/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +26,124 @@ import {
 } from "@/lib/office-data";
 import { formatTime, getStatusColor, getStatusLabel, mapEngineTypeToUI, generateMessageFromEvent } from "@/lib/dashboard-utils";
 import { StatBox, EmergencyButton, EmergencyStatusItem, AnalyticsModal } from "@/components/dashboard/ui-components";
+
+/* =====================================================================
+   DESIGN LAYER (presentation only — no business logic below this block)
+   ===================================================================== */
+
+type PanelId =
+  | "overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge"
+  | "intelligence" | "content-family" | "distribution" | "credentials" | "e2e-test" | "telegram";
+
+const STYLES = `
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+.os-root{
+  --ink:#0b0d1c; --ink-2:#12152b; --ink-3:#1a1e3a;
+  --line:rgba(236,233,247,.09); --line-2:rgba(236,233,247,.17);
+  --moon:#ece9f7; --mute:#9d9bbd; --violet:#9b8cff; --rose:#ff7aa8; --amber:#f6c177; --ok:#5fd6a4;
+  font-family:"Bricolage Grotesque","Noto Sans Georgian",system-ui,sans-serif;
+  background:var(--ink); color:var(--moon);
+}
+.os-root .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.os-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+.os-scroll{scrollbar-width:none}
+.os-scroll::-webkit-scrollbar{display:none}
+.t-ok{color:#5fd6a4;background:rgba(95,214,164,.12);border:1px solid rgba(95,214,164,.28)}
+.t-warn{color:#f6c177;background:rgba(246,193,119,.12);border:1px solid rgba(246,193,119,.28)}
+.t-bad{color:#ff7aa8;background:rgba(255,122,168,.12);border:1px solid rgba(255,122,168,.28)}
+.t-info{color:#b3a8ff;background:rgba(155,140,255,.14);border:1px solid rgba(155,140,255,.3)}
+.t-mute{color:#9d9bbd;background:rgba(157,155,189,.1);border:1px solid rgba(157,155,189,.2)}
+@keyframes os-in{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+.os-in{animation:os-in .22s ease-out}
+@media (prefers-reduced-motion:reduce){
+  .os-in{animation:none}
+  .os-root *{transition:none !important; animation:none !important}
+}
+`;
+
+const NAV_ICONS: Record<string, string> = {
+  overview: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
+  intelligence: "M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3",
+  "content-family": "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z",
+  quality: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z",
+  distribution: "M22 2L11 13M22 2l-7 20-4-9-9-4z",
+  telegram: "M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.4A8 8 0 1121 12z",
+  instagram: "M3 7a2 2 0 012-2h2l2-2h6l2 2h2a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2zM12 17a4 4 0 100-8 4 4 0 000 8z",
+  pipeline: "M4 4h6v6H4zM14 14h6v6h-6zM10 7h4a3 3 0 013 3v4",
+  learning: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18",
+  knowledge: "M4 5a2 2 0 012-2h12v16H6a2 2 0 00-2 2zM4 19V5M8 7h6",
+  credentials: "M6 11h12v9H6zM8 11V8a4 4 0 118 0v3",
+  "e2e-test": "M6 4l14 8-14 8z",
+  emergency: "M12 3l10 18H2zM12 10v5M12 18h.01",
+  approvals: "M12 21a9 9 0 100-18 9 9 0 000 18zM8 12l3 3 5-6",
+};
+
+function NavIcon({ id, size = 18 }: { id: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={NAV_ICONS[id] ?? NAV_ICONS.overview} />
+    </svg>
+  );
+}
+
+const card = "rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]";
+
+const channelMeta = (id: string) =>
+  id === "human_mind" ? { icon: "🧠", label: "Human Mind" }
+  : id === "love" ? { icon: "💕", label: "Love" }
+  : id === "astrology" ? { icon: "♈", label: "Astrology" }
+  : id === "tarot" ? { icon: "🎴", label: "Tarot" }
+  : id === "mystery" ? { icon: "🌙", label: "Mystery" }
+  : { icon: "✨", label: "Lunara" };
+
+const priorityLabel = (p: string) => p === "critical" ? "კრიტიკული" : p === "high" ? "მაღალი" : p === "medium" ? "საშუალო" : "დაბალი";
+const priorityTone = (p: string) => p === "critical" ? "t-bad" : p === "high" ? "t-warn" : p === "medium" ? "t-info" : "t-mute";
+const oppStatusLabel = (s: string) => s === "discovered" ? "აღმოჩენილი" : s === "validated" ? "ვალიდირებული" : s === "approved" ? "დამტკიცებული" : "უარყოფილი";
+const oppStatusTone = (s: string) => s === "discovered" ? "t-info" : s === "validated" ? "t-warn" : s === "approved" ? "t-ok" : "t-bad";
+const agentStatusTone = (s: string) => s === "WORKING" ? "t-warn" : s === "IDLE" ? "t-mute" : s === "COMPLETED" ? "t-ok" : s === "ERROR" ? "t-bad" : "t-info";
+const verdictTone = (v: string) => v === "approved" ? "t-ok" : v === "revise" ? "t-warn" : "t-bad";
+const scoreColor = (v: number) => v >= 85 ? "text-[#5fd6a4]" : v >= 70 ? "text-[#f6c177]" : "text-[#ff7aa8]";
+
+function Chip({ tone, children, className = "" }: { tone: string; children: React.ReactNode; className?: string }) {
+  return <span className={`${tone} inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>{children}</span>;
+}
+
+function Bar({ value, color = "var(--violet)", thin = false }: { value: number; color?: string; thin?: boolean }) {
+  return (
+    <div className={`${thin ? "h-1" : "h-1.5"} overflow-hidden rounded-full bg-white/10`}>
+      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
+    </div>
+  );
+}
+
+function PanelHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold tracking-tight lg:text-2xl">{title}</h2>
+        {subtitle && <p className="mt-1 text-sm text-[var(--mute)]">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+function EmptyState({ title, text }: { title: string; text: string }) {
+  return (
+    <div className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-14 text-center">
+      <p className="font-semibold">{title}</p>
+      <p className="mx-auto mt-2 max-w-md text-sm text-[var(--mute)]">{text}</p>
+    </div>
+  );
+}
+
+const btnBase = "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40";
+const btnGhost = `${btnBase} border border-[var(--line-2)] hover:bg-white/5`;
+const btnPrimary = `${btnBase} bg-[var(--violet)] text-[var(--ink)] hover:opacity-90`;
+
+/* =====================================================================
+   PAGE
+   ===================================================================== */
 
 export default function HomePage() {
   const router = useRouter();
@@ -371,238 +488,295 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
     }
   };
 
+  /* ---------- presentation-only derived data ---------- */
+  const navGroups: { title: string; items: { id: PanelId; label: string; badge?: number }[] }[] = [
+    {
+      title: "ოპერაციები",
+      items: [
+        { id: "overview", label: "მიმოხილვა" },
+        { id: "pipeline", label: "პაიპლაინი" },
+        { id: "approvals", label: "დამტკიცებები" },
+        { id: "emergency", label: "საგანგებო" },
+      ],
+    },
+    {
+      title: "კონტენტი",
+      items: [
+        { id: "intelligence", label: "შესაძლებლობები", badge: opportunities.filter(o => o.status === "discovered").length },
+        { id: "content-family", label: "Content Family", badge: contentFamilies.length },
+        { id: "quality", label: "ხარისხის გადახედვა", badge: qualityReviews.filter(r => r.verdict === "approved").length },
+        { id: "distribution", label: "გავრცელება", badge: distributionPlans.filter(p => p.status === "scheduled").length },
+        { id: "telegram", label: "Telegram" },
+      ],
+    },
+    {
+      title: "სისტემა",
+      items: [
+        { id: "learning", label: "სწავლა" },
+        { id: "knowledge", label: "ცოდნა" },
+        { id: "credentials", label: "API" },
+        { id: "e2e-test", label: "E2E ტესტი" },
+      ],
+    },
+  ];
+
+  const healthItems = [
+    { name: "აგენტების ბუსი", value: 100 },
+    { name: "ამოცანების ძრავა", value: 100 },
+    { name: "მოვლენების ბუსი", value: 98 },
+    { name: "ხარისხის კარიბჭე", value: 100 },
+    { name: "სწავლის ციკლი", value: 95 },
+  ];
+
+  const statusTone = systemStatus === "healthy" ? "t-ok" : systemStatus === "degraded" ? "t-warn" : "t-bad";
+  const statusDot = systemStatus === "healthy" ? "#5fd6a4" : systemStatus === "degraded" ? "#f6c177" : "#ff7aa8";
+  const statusText = systemStatus === "healthy" ? "ონლაინ" : systemStatus === "degraded" ? "გაუარესებული" : "გათიშვა";
+
+  const navButton = (item: { id: PanelId; label: string; badge?: number }, compact = false) => {
+    const selected = activePanel === item.id;
+    return (
+      <button
+        key={item.id}
+        onClick={() => setActivePanel(item.id)}
+        aria-current={selected ? "page" : undefined}
+        className={`flex items-center gap-3 whitespace-nowrap rounded-xl text-sm font-medium transition-colors ${
+          compact ? "px-3 py-2" : "w-full px-3 py-2.5"
+        } ${
+          selected
+            ? "bg-[var(--ink-3)] text-[var(--moon)] shadow-[inset_0_0_0_1px_rgba(155,140,255,.45)]"
+            : "text-[var(--mute)] hover:bg-white/5 hover:text-[var(--moon)]"
+        } ${item.id === "emergency" && !selected ? "hover:text-[#ff7aa8]" : ""}`}
+      >
+        <span className={selected ? "text-[var(--violet)]" : ""}><NavIcon id={item.id} size={compact ? 16 : 18} /></span>
+        <span className="flex-1 text-left">{item.label}</span>
+        {!!item.badge && item.badge > 0 && (
+          <span className="t-info rounded-full px-2 py-0.5 text-xs font-semibold">{item.badge}</span>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <main className="lunara-readable min-h-screen w-full bg-slate-950 text-white overflow-x-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl" />
-      </div>
+    <main className="os-root min-h-screen w-full overflow-x-hidden">
+      <style>{STYLES}</style>
 
-      <nav className="relative z-50 border-b border-white/10 bg-slate-900/80 backdrop-blur-xl">
-        <div className="px-4 lg:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 lg:gap-4">
-              <div className="flex h-12 w-12 lg:h-14 lg:w-14 items-center justify-center rounded-2xl text-2xl lg:text-3xl font-black shadow-2xl" style={{ background: "linear-gradient(135deg, #8b5cf6, #6d28d9)", boxShadow: "0 0 40px rgba(139,92,246,0.5)" }}>◈</div>
-              <div>
-                <h1 className="text-2xl lg:text-4xl font-black tracking-tight">LUNARA OS</h1>
-                <p className="text-xs lg:text-base font-medium text-slate-400 tracking-wide hidden sm:block">ვირტუალური ოფისი — ავტონომიური ციფრული ორგანიზაცია</p>
-              </div>
-            </div>
-
-            <div className="ml-4 flex items-center gap-2 lg:gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 lg:px-5 py-2 lg:py-3 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className={`h-2.5 w-2.5 lg:h-3 lg:w-3 animate-pulse rounded-full ${systemStatus === "healthy" ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.8)]" : systemStatus === "degraded" ? "bg-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.8)]" : "bg-red-400 shadow-[0_0_15px_rgba(248,113,113,0.8)]"}`} />
-                <span className={`text-xs lg:text-base font-bold tracking-wide ${systemStatus === "healthy" ? "text-emerald-400" : systemStatus === "degraded" ? "text-yellow-400" : "text-red-400"}`}>
-                  {systemStatus === "healthy" ? "ონლაინ" : systemStatus === "degraded" ? "გაუარესებული" : "გათიშვა"}
-                </span>
-              </div>
-              <div className="h-6 lg:h-8 w-px bg-white/10 hidden sm:block" />
-              <div className="font-mono text-sm lg:text-xl font-bold">{clock || "--:--:--"}</div>
+      {/* ================= TOP BAR ================= */}
+      <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1680px] items-center justify-between gap-4 px-4 py-3 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+              style={{ background: "radial-gradient(circle at 66% 32%, #1a1e3a 0 20%, transparent 21%), radial-gradient(circle at 56% 40%, #f6c177 0 34%, transparent 35%), #1a1640" }}
+              aria-hidden
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold leading-tight tracking-tight lg:text-xl">LUNARA OS</h1>
+              <p className="hidden truncate text-xs text-[var(--mute)] sm:block">ვირტუალური ოფისი — ავტონომიური ციფრული ორგანიზაცია</p>
             </div>
           </div>
-        </div>
 
-        <div className="px-4 lg:px-6 py-3 border-t border-white/5 bg-slate-900/50">
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setActivePanel("overview")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "overview" ? "bg-purple-500/20 text-purple-400 border border-purple-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🏢 მიმოხილვა</button>
-            <button onClick={() => setActivePanel("intelligence")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "intelligence" ? "bg-blue-500/20 text-blue-400 border border-blue-400/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              🔍 შესაძლებლობები
-              {opportunities.filter(o => o.status === "discovered").length > 0 && (
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs font-black text-white">
-                  {opportunities.filter(o => o.status === "discovered").length}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setActivePanel("content-family")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "content-family" ? "bg-amber-500/20 text-amber-400 border border-amber-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              ✍️ Content Family
-              {contentFamilies.length > 0 && (
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-xs font-black text-white">
-                  {contentFamilies.length}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setActivePanel("quality")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "quality" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              🛡️ ხარისხის გადახედვა
-              {qualityReviews.filter(r => r.verdict === "approved").length > 0 && (
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-cyan-500 text-xs font-black text-white">
-                  {qualityReviews.filter(r => r.verdict === "approved").length}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setActivePanel("distribution")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "distribution" ? "bg-lime-500/20 text-lime-400 border border-lime-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              📡 გავრცელება
-              {distributionPlans.filter(p => p.status === "scheduled").length > 0 && (
-                <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-lime-500 text-xs font-black text-white">
-                  {distributionPlans.filter(p => p.status === "scheduled").length}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setActivePanel("telegram")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "telegram" ? "bg-sky-500/20 text-sky-400 border border-sky-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>
-              📱 Telegram
-            </button>
-            
-            <button 
-              onClick={() => router.push("/dashboard/instagram")} 
-              className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap bg-pink-500/20 text-pink-400 border border-pink-500/40 hover:bg-pink-500/30`}
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              onClick={() => router.push("/dashboard/instagram")}
+              className="hidden items-center gap-2 rounded-full border border-[var(--line-2)] px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-white/5 sm:flex"
             >
-               📸 Instagram
+              <NavIcon id="instagram" size={16} /> Instagram
             </button>
-
-            <button onClick={() => setActivePanel("pipeline")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "pipeline" ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🔄 პაიპლაინი</button>
-            <button onClick={() => setActivePanel("learning")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "learning" ? "bg-teal-500/20 text-teal-400 border border-teal-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🧬 სწავლა</button>
-            <button onClick={() => setActivePanel("knowledge")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "knowledge" ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>📚 ცოდნა</button>
-            <button onClick={() => setActivePanel("credentials")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "credentials" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🔐 API</button>
-            <button onClick={() => setActivePanel("e2e-test")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "e2e-test" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚀 E2E</button>
-            <button onClick={() => setActivePanel("emergency")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "emergency" ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>🚨 საგანგებო</button>
-            <button onClick={() => setActivePanel("approvals")} className={`rounded-xl px-3 lg:px-5 py-2 lg:py-2.5 text-sm lg:text-base font-bold transition-all whitespace-nowrap ${activePanel === "approvals" ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/40" : "bg-white/5 text-slate-400 hover:bg-white/10"}`}>✋ დამტკიცებები</button>
+            <div className={`${statusTone} flex items-center gap-2.5 rounded-full px-3.5 py-1.5`}>
+              <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: statusDot }} />
+              <span className="text-sm font-semibold">{statusText}</span>
+              <span className="mono hidden border-l pl-2.5 text-sm sm:inline" style={{ borderColor: "rgba(255,255,255,.15)" }}>{clock || "--:--:--"}</span>
+            </div>
           </div>
         </div>
-      </nav>
 
-      <div className="relative z-10 flex overflow-hidden">
-        <aside className="w-[280px] lg:w-[340px] border-r border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden lg:block overflow-y-auto">
-          <div className="p-4 lg:p-6">
-            <h2 className="text-xl lg:text-2xl font-black mb-6 tracking-wide">📂 დეპარტამენტები</h2>
-            <div className="space-y-2">
-              <button onClick={() => setSelectedDepartment(null)} className={`w-full rounded-xl border p-3 text-left transition-all ${!selectedDepartment ? "border-white/30 bg-white/10" : "border-white/5 bg-white/5 hover:bg-white/10"}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm lg:text-base font-bold">🏢 ყველა დეპარტამენტი</span>
-                  <span className="text-xs lg:text-sm text-slate-400">{agents.length}</span>
+        {/* mobile / tablet nav */}
+        <nav aria-label="Sections" className="os-scroll flex gap-1 overflow-x-auto border-t border-[var(--line)] px-4 py-2 lg:hidden">
+          {navGroups.flatMap(g => g.items).map(item => navButton(item, true))}
+          <button
+            onClick={() => router.push("/dashboard/instagram")}
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium text-[var(--mute)] hover:bg-white/5 hover:text-[var(--moon)]"
+          >
+            <NavIcon id="instagram" size={16} /> Instagram
+          </button>
+        </nav>
+      </header>
+
+      <div className="mx-auto flex max-w-[1680px]">
+        {/* ================= SIDEBAR ================= */}
+        <aside className="sticky top-[65px] hidden h-[calc(100vh-65px)] w-[250px] shrink-0 overflow-y-auto border-r border-[var(--line)] p-4 lg:block">
+          <nav aria-label="Sections" className="space-y-6">
+            {navGroups.map(group => (
+              <div key={group.title}>
+                <p className="mb-2 px-3 text-xs font-semibold text-[var(--mute)]">{group.title}</p>
+                <div className="space-y-0.5">
+                  {group.items.map(item => navButton(item))}
+                  {group.title === "კონტენტი" && (
+                    <button
+                      onClick={() => router.push("/dashboard/instagram")}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]"
+                    >
+                      <NavIcon id="instagram" />
+                      <span className="flex-1 text-left">Instagram</span>
+                    </button>
+                  )}
                 </div>
-              </button>
-              {departments.map(dept => {
-                const deptAgents = departmentAgents(dept.id);
-                const activeCount = deptAgents.filter(a => a.status === "WORKING").length;
-                return (
-                  <button key={dept.id} onClick={() => setSelectedDepartment(dept.id)} className={`w-full rounded-xl border p-3 text-left transition-all ${selectedDepartment === dept.id ? "border-white/30 bg-white/10" : "border-white/5 bg-white/5 hover:bg-white/10"}`} style={{ borderColor: selectedDepartment === dept.id ? dept.color : undefined }}>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 lg:h-10 lg:w-10 items-center justify-center rounded-lg text-lg lg:text-xl" style={{ background: `${dept.color}30` }}>{dept.icon}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm lg:text-base font-bold truncate">{dept.name}</div>
-                        <div className="text-xs text-slate-400 hidden lg:block">{dept.description}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs lg:text-sm font-bold">{deptAgents.length}</div>
-                        {activeCount > 0 && <div className="text-[10px] lg:text-xs text-emerald-400">{activeCount} აქტიური</div>}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4 lg:p-5">
-              <h3 className="text-base lg:text-lg font-black mb-4">💚 სისტემის ჯანმრთელობა</h3>
-              <div className="space-y-3">
-                {[{ name: "აგენტების ბუსი", value: 100, color: "bg-emerald-500" }, { name: "ამოცანების ძრავა", value: 100, color: "bg-emerald-500" }, { name: "მოვლენების ბუსი", value: 98, color: "bg-blue-500" }, { name: "ხარისხის კარიბჭე", value: 100, color: "bg-emerald-500" }, { name: "სწავლის ციკლი", value: 95, color: "bg-purple-500" }].map(item => (
-                  <div key={item.name}>
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-xs lg:text-sm font-bold text-slate-300">{item.name}</span>
-                      <span className="text-xs lg:text-sm font-mono font-bold text-emerald-400">{item.value}%</span>
-                    </div>
-                    <div className="h-1.5 lg:h-2 overflow-hidden rounded-full bg-slate-700">
-                      <div className={`h-full rounded-full ${item.color}`} style={{ width: `${item.value}%` }} />
-                    </div>
-                  </div>
-                ))}
               </div>
-            </div>
-          </div>
+            ))}
+          </nav>
         </aside>
 
-        <section className="flex-1 p-4 lg:p-8 overflow-y-auto min-h-[calc(100vh-140px)]">
-          
+        {/* ================= MAIN ================= */}
+        <section className="min-w-0 flex-1 p-4 lg:p-8">
+
+          {/* ---------- OVERVIEW ---------- */}
           {activePanel === "overview" && (
-            <div>
-              <div className="mb-6 lg:mb-8">
-                <h2 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6 tracking-wide">🏢 ვირტუალური ოფისის რუკა</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
+            <div className="os-in space-y-10">
+              {/* system health */}
+              <div>
+                <PanelHeader title="სისტემის მდგომარეობა" subtitle="ძირითადი სერვისების ჯანმრთელობა რეალურ დროში" />
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                  {healthItems.map(item => (
+                    <div key={item.name} className={`${card} p-4`}>
+                      <p className="text-sm text-[var(--mute)]">{item.name}</p>
+                      <p className="mono mt-1 text-2xl font-medium">{item.value}%</p>
+                      <div className="mt-3"><Bar value={item.value} color={item.value >= 99 ? "#5fd6a4" : item.value >= 95 ? "var(--violet)" : "#f6c177"} thin /></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* departments */}
+              <div>
+                <PanelHeader title="ვირტუალური ოფისის რუკა" subtitle="დააჭირე დეპარტამენტს დეტალებისთვის" />
+
+                <div className="os-scroll -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0" role="group" aria-label="Filter by department">
+                  <button
+                    onClick={() => setSelectedDepartment(null)}
+                    aria-pressed={!selectedDepartment}
+                    className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      !selectedDepartment ? "border-[var(--moon)] bg-[var(--moon)] text-[var(--ink)]" : "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]"
+                    }`}
+                  >
+                    ყველა · {agents.length}
+                  </button>
+                  {departments.map(dept => {
+                    const on = selectedDepartment === dept.id;
+                    return (
+                      <button
+                        key={dept.id}
+                        onClick={() => setSelectedDepartment(dept.id)}
+                        aria-pressed={on}
+                        className="flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors"
+                        style={{
+                          borderColor: on ? dept.color : "var(--line-2)",
+                          background: on ? `${dept.color}22` : "transparent",
+                          color: on ? "var(--moon)" : "var(--mute)",
+                        }}
+                      >
+                        <span>{dept.icon}</span>{dept.name} · {departmentAgents(dept.id).length}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {departments.map(dept => {
                     const deptAgents = departmentAgents(dept.id);
                     const workingCount = deptAgents.filter(a => a.status === "WORKING").length;
                     const waitingCount = deptAgents.filter(a => a.status.includes("WAITING")).length;
                     const idleCount = deptAgents.filter(a => a.status === "IDLE").length;
+                    const on = selectedDepartment === dept.id;
                     return (
-                      <div key={dept.id} className="rounded-2xl border border-white/10 bg-slate-900/50 backdrop-blur-xl p-4 lg:p-5 transition-all hover:border-white/30 hover:shadow-2xl cursor-pointer" style={{ borderColor: selectedDepartment === dept.id ? dept.color : undefined, boxShadow: selectedDepartment === dept.id ? `0 0 30px ${dept.color}40` : undefined }} onClick={() => setSelectedDepartmentForModal(dept)}>
-                        <div className="flex items-center gap-2 lg:gap-3 mb-3 lg:mb-4">
-                          <div className="flex h-10 w-10 lg:h-12 lg:w-12 items-center justify-center rounded-xl text-xl lg:text-2xl" style={{ background: `${dept.color}30` }}>{dept.icon}</div>
+                      <button
+                        key={dept.id}
+                        onClick={() => setSelectedDepartmentForModal(dept)}
+                        className={`${card} group p-4 text-left transition-colors hover:border-[var(--line-2)]`}
+                        style={{ borderColor: on ? dept.color : undefined }}
+                      >
+                        <div className="mb-4 flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl text-xl" style={{ background: `${dept.color}26` }}>{dept.icon}</div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm lg:text-lg font-black truncate">{dept.name}</div>
-                            <div className="text-[10px] lg:text-xs text-slate-400 truncate hidden lg:block">{dept.description}</div>
+                            <div className="truncate font-semibold">{dept.name}</div>
+                            <div className="truncate text-xs text-[var(--mute)]">{dept.description}</div>
                           </div>
                         </div>
-                        <div className="space-y-1 lg:space-y-2">
-                          <div className="flex items-center justify-between text-xs lg:text-sm"><span className="text-slate-400">მუშაობს</span><span className="font-bold text-yellow-400">{workingCount}</span></div>
-                          <div className="flex items-center justify-between text-xs lg:text-sm"><span className="text-slate-400">მოლოდინში</span><span className="font-bold text-blue-400">{waitingCount}</span></div>
-                          <div className="flex items-center justify-between text-xs lg:text-sm"><span className="text-slate-400">უმოქმედო</span><span className="font-bold text-slate-400">{idleCount}</span></div>
-                        </div>
-                        <div className="mt-3 lg:mt-4 flex -space-x-2">
+                        <dl className="grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-lg bg-white/[0.04] py-2"><dd className="mono text-base text-[#f6c177]">{workingCount}</dd><dt className="text-[11px] text-[var(--mute)]">მუშაობს</dt></div>
+                          <div className="rounded-lg bg-white/[0.04] py-2"><dd className="mono text-base text-[#b3a8ff]">{waitingCount}</dd><dt className="text-[11px] text-[var(--mute)]">მოლოდინში</dt></div>
+                          <div className="rounded-lg bg-white/[0.04] py-2"><dd className="mono text-base text-[var(--mute)]">{idleCount}</dd><dt className="text-[11px] text-[var(--mute)]">უმოქმედო</dt></div>
+                        </dl>
+                        <div className="mt-4 flex -space-x-2">
                           {deptAgents.slice(0, 4).map(agent => (
-                            <div key={agent.id} className="flex h-6 w-6 lg:h-8 lg:w-8 items-center justify-center rounded-full border-2 border-slate-900 text-xs lg:text-sm" style={{ background: `${agent.accent}40` }} title={agent.name}>{agent.icon}</div>
+                            <div key={agent.id} className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--ink-2)] text-xs" style={{ background: `${agent.accent}40` }} title={agent.name}>{agent.icon}</div>
                           ))}
-                          {deptAgents.length > 4 && <div className="flex h-6 w-6 lg:h-8 lg:w-8 items-center justify-center rounded-full border-2 border-slate-900 bg-slate-700 text-[10px] lg:text-xs font-bold">+{deptAgents.length - 4}</div>}
+                          {deptAgents.length > 4 && <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--ink-2)] bg-[var(--ink-3)] text-[11px] font-semibold">+{deptAgents.length - 4}</div>}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="mb-6 lg:mb-8">
-                <h2 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6 tracking-wide">👥 აგენტები <span className="text-sm lg:text-lg font-medium text-slate-400 ml-2 lg:ml-3">({filteredAgents.length} აგენტი{selectedDepartment ? ` დეპარტამენტში ${selectedDept?.name}` : ""})</span></h2>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
+              {/* agents */}
+              <div>
+                <PanelHeader
+                  title="აგენტები"
+                  subtitle={`${filteredAgents.length} აგენტი${selectedDepartment ? ` დეპარტამენტში ${selectedDept?.name}` : ""}`}
+                />
+                <div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
                   {filteredAgents.map(agent => {
                     const agentTasks = tasks.filter(t => t.agentId === agent.id);
                     const activeTask = agentTasks.find(t => (t.status as any) === "CLAIMED" || (t.status as any) === "REVIEW");
                     return (
-                      <div key={agent.id} className="rounded-3xl border border-white/10 bg-slate-900/50 backdrop-blur-xl p-4 lg:p-6 transition-all hover:border-white/30 hover:shadow-2xl cursor-pointer" style={{ borderColor: selectedAgentId === agent.id ? agent.accent : undefined, boxShadow: selectedAgentId === agent.id ? `0 0 40px ${agent.accent}40` : undefined }} onClick={() => setSelectedAgentForDetail(agent)}>
-                        <div className="flex items-start justify-between mb-3 lg:mb-4">
-                          <div className="flex items-center gap-3 lg:gap-4">
-                            <div className="flex h-12 w-12 lg:h-16 lg:w-16 items-center justify-center rounded-2xl text-2xl lg:text-3xl shadow-xl" style={{ background: `${agent.accent}30`, boxShadow: `0 0 30px ${agent.accent}40` }}>{agent.icon}</div>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-lg lg:text-2xl font-black truncate">{agent.name}</h3>
-                              <p className="text-xs lg:text-base text-slate-400 truncate">{agent.role}</p>
-                              <p className="text-[10px] lg:text-xs text-slate-500 mt-1 truncate hidden lg:block">{departments.find(d => d.id === agent.department)?.name}</p>
+                      <article
+                        key={agent.id}
+                        onClick={() => setSelectedAgentForDetail(agent)}
+                        className={`${card} cursor-pointer p-5 transition-colors hover:border-[var(--line-2)]`}
+                        style={{ borderColor: selectedAgentId === agent.id ? agent.accent : undefined }}
+                      >
+                        <div className="mb-4 flex items-start justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl" style={{ background: `${agent.accent}2e` }}>{agent.icon}</div>
+                            <div className="min-w-0">
+                              <h3 className="truncate text-lg font-semibold">{agent.name}</h3>
+                              <p className="truncate text-sm text-[var(--mute)]">{agent.role}</p>
+                              <p className="truncate text-xs text-[#9d9bbd]/70">{departments.find(d => d.id === agent.department)?.name}</p>
                             </div>
                           </div>
-                          <div className={`rounded-xl border px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-bold flex-shrink-0 ${agent.status === "WORKING" ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-400" : agent.status === "IDLE" ? "bg-slate-500/20 border-slate-500/40 text-slate-400" : agent.status === "COMPLETED" ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : agent.status === "ERROR" ? "bg-red-500/20 border-red-500/40 text-red-400" : "bg-blue-500/20 border-blue-500/40 text-blue-400"}`}>
-                            {getStatusLabel(agent.status)}
-                          </div>
+                          <Chip tone={agentStatusTone(agent.status)} className="shrink-0">{getStatusLabel(agent.status)}</Chip>
                         </div>
+
                         {agent.currentTask && (
-                          <div className="mb-3 lg:mb-4 rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                            <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">მიმდინარე აქტივობა</div>
-                            <div className="text-xs lg:text-base font-bold truncate">{agent.currentTask}</div>
+                          <div className="mb-4 rounded-xl bg-white/[0.04] px-3 py-2.5">
+                            <p className="text-xs text-[var(--mute)]">მიმდინარე აქტივობა</p>
+                            <p className="truncate text-sm font-medium">{agent.currentTask}</p>
                           </div>
                         )}
-                        <div className="grid grid-cols-4 gap-2 lg:gap-3 mb-3 lg:mb-4">
+
+                        <div className="mb-4 grid grid-cols-4 gap-2">
                           <StatBox label="დონე" value={agent.level} color={agent.accent} />
                           <StatBox label="გამოცდილება" value={agent.xp} color={agent.accent} />
                           <StatBox label="დასრულებული" value={agent.missionsCompleted} color={agent.accent} />
                           <StatBox label="ავტო" value={`L${agent.autonomyLevel}`} color={agent.accent} />
                         </div>
-                        <div className="mb-3 lg:mb-4">
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="text-xs lg:text-sm font-bold text-slate-400">გამოცდილება</span>
-                            <span className="text-xs lg:text-sm font-mono font-bold">{agent.xp} / {agent.xpToNext}</span>
-                          </div>
-                          <div className="h-2 lg:h-3 overflow-hidden rounded-full bg-slate-700">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(agent.xp / agent.xpToNext) * 100}%`, background: `linear-gradient(90deg, ${agent.accent}, ${agent.accent}80)`, boxShadow: `0 0 15px ${agent.accent}` }} />
-                          </div>
+
+                        <div className="mb-1 flex items-center justify-between text-xs text-[var(--mute)]">
+                          <span>გამოცდილება</span>
+                          <span className="mono">{agent.xp} / {agent.xpToNext}</span>
                         </div>
+                        <Bar value={(agent.xp / agent.xpToNext) * 100} color={agent.accent} />
+
                         {activeTask && (
-                          <div className="rounded-xl border p-2 lg:p-3" style={{ borderColor: `${agent.accent}40`, background: `${agent.accent}10` }}>
-                            <div className="mb-2 flex items-center justify-between">
-                              <span className="text-xs lg:text-sm font-bold">🎯 {activeTask.title}</span>
-                              <span className="text-sm lg:text-lg font-mono font-black">{activeTask.progress}%</span>
+                          <div className="mt-4 rounded-xl border p-3" style={{ borderColor: `${agent.accent}40`, background: `${agent.accent}10` }}>
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <span className="truncate text-sm font-medium">{activeTask.title}</span>
+                              <span className="mono text-sm">{activeTask.progress}%</span>
                             </div>
-                            <div className="h-1.5 lg:h-2 overflow-hidden rounded-full bg-white/10">
-                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${activeTask.progress}%`, background: agent.accent }} />
-                            </div>
+                            <Bar value={activeTask.progress} color={agent.accent} thin />
                           </div>
                         )}
-                      </div>
+                      </article>
                     );
                   })}
                 </div>
@@ -610,172 +784,156 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
           )}
 
+          {/* ---------- INTELLIGENCE ---------- */}
           {activePanel === "intelligence" && (
-            <div>
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <div>
-                  <h2 className="text-xl lg:text-2xl font-black tracking-wide">🔍 ინტელექტის ლენტა</h2>
-                  <p className="text-xs lg:text-base text-slate-400 mt-1">Foundation §4, §11, §24 — Nyx-ის აღმოჩენილი შესაძლებლობები</p>
-                </div>
-                <div className="flex gap-2 lg:gap-3">
-                  <button onClick={copyNyxResults} disabled={opportunities.length === 0 && nyxLogs.length === 0} className={`rounded-xl border px-4 lg:px-6 py-2 lg:py-3 text-sm lg:text-base font-bold transition-all flex items-center gap-2 ${isCopying ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400" : "bg-blue-500/20 border-blue-500/40 text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed"}`}>
-                    {isCopying ? "✅ დაკოპირდა!" : "📋 კოპირება"}
-                  </button>
-                  <button onClick={runNyxAnalysis} className="rounded-xl bg-indigo-500/20 border border-indigo-500/40 px-4 lg:px-6 py-2 lg:py-3 text-sm lg:text-base font-bold text-indigo-400 transition hover:bg-indigo-500/30">🔍 Nyx-ის გაშვება</button>
-                </div>
-              </div>
+            <div className="os-in">
+              <PanelHeader
+                title="შესაძლებლობები"
+                subtitle="Foundation §4, §11, §24 — Nyx-ის აღმოჩენილი შესაძლებლობები"
+                actions={
+                  <>
+                    <button
+                      onClick={copyNyxResults}
+                      disabled={opportunities.length === 0 && nyxLogs.length === 0}
+                      className={isCopying ? `${btnBase} t-ok` : btnGhost}
+                    >
+                      {isCopying ? "დაკოპირდა" : "კოპირება"}
+                    </button>
+                    <button onClick={runNyxAnalysis} className={btnPrimary}>Nyx-ის გაშვება</button>
+                  </>
+                }
+              />
 
               {nyxLogs.length > 0 && (
-                <div className="rounded-2xl border border-slate-700 bg-slate-950 p-3 lg:p-4 mb-6 lg:mb-8 font-mono text-xs lg:text-sm shadow-2xl">
-                  <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2">
-                    <div className="h-2.5 w-2.5 lg:h-3 lg:w-3 rounded-full bg-red-500/50" />
-                    <div className="h-2.5 w-2.5 lg:h-3 lg:w-3 rounded-full bg-yellow-500/50" />
-                    <div className="h-2.5 w-2.5 lg:h-3 lg:w-3 rounded-full bg-emerald-500/50" />
-                    <span className="ml-2 text-[10px] lg:text-xs text-slate-500">nyx-agent-execution.log</span>
+                <div className="mb-8 overflow-hidden rounded-2xl border border-[var(--line)] bg-[#080a16]">
+                  <div className="flex items-center gap-2 border-b border-[var(--line)] px-4 py-2.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#ff7aa8]/60" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#f6c177]/60" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#5fd6a4]/60" />
+                    <span className="mono ml-2 text-xs text-[var(--mute)]">nyx-agent-execution.log</span>
                   </div>
-                  <div className="space-y-1 max-h-48 lg:max-h-64 overflow-y-auto">
+                  <div className="mono max-h-64 space-y-1 overflow-y-auto p-4 text-xs">
                     {nyxLogs.map((log, index) => (
-                      <div key={index} className="text-emerald-400">
-                        <span className="text-slate-500">[{formatTime(Date.now() - (nyxLogs.length - index) * 500)}]</span> {log}
+                      <div key={index} className="text-[#5fd6a4]">
+                        <span className="text-[var(--mute)]">[{formatTime(Date.now() - (nyxLogs.length - index) * 500)}]</span> {log}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6 lg:mb-8">
+              <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatBox label="აღმოჩენილი" value={opportunities.filter(o => o.status === "discovered").length} color="#3b82f6" />
                 <StatBox label="ვალიდირებული" value={opportunities.filter(o => o.status === "validated").length} color="#a855f7" />
                 <StatBox label="დამტკიცებული" value={opportunities.filter(o => o.status === "approved").length} color="#10b981" />
                 <StatBox label="უარყოფილი" value={opportunities.filter(o => o.status === "rejected").length} color="#ef4444" />
               </div>
 
-              <div className="space-y-4 lg:space-y-6">
+              <div className="space-y-4">
                 {opportunities.length === 0 && nyxLogs.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 lg:p-12 text-center">
-                    <div className="text-3xl lg:text-4xl mb-3 lg:mb-4">🔍</div>
-                    <h3 className="text-lg lg:text-xl font-black text-white mb-2">შესაძლებლობები ჯერ არ არის</h3>
-                    <p className="text-sm lg:text-base text-slate-400 mb-6">დააჭირე "Nyx-ის გაშვებას" ტრენდების ანალიზის დასაწყებად.</p>
-                  </div>
+                  <EmptyState title="შესაძლებლობები ჯერ არ არის" text={'დააჭირე „Nyx-ის გაშვებას“ ტრენდების ანალიზის დასაწყებად.'} />
                 ) : opportunities.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 lg:p-12 text-center">
-                    <div className="text-3xl lg:text-4xl mb-3 lg:mb-4">⏳</div>
-                    <h3 className="text-lg lg:text-xl font-black text-white mb-2">ანალიზი მიმდინარეობს...</h3>
-                    <p className="text-sm lg:text-base text-slate-400">შეამოწმე ლოგების ფანჯარა ზემოთ.</p>
-                  </div>
+                  <EmptyState title="ანალიზი მიმდინარეობს…" text="შეამოწმე ლოგების ფანჯარა ზემოთ." />
                 ) : (
                   opportunities.map(opp => (
-                    <div key={opp.opportunity_id} className={`rounded-2xl border bg-slate-900/50 backdrop-blur-xl p-4 lg:p-6 transition-all ${opp.status === "discovered" ? "border-blue-500/30" : opp.status === "validated" ? "border-purple-500/30" : opp.status === "approved" ? "border-emerald-500/30" : "border-red-500/30"}`}>
-                      <div className="flex items-start justify-between mb-3 lg:mb-4">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base lg:text-xl font-black text-white mb-2 truncate">{opp.topic}</h3>
-                          <p className="text-xs lg:text-sm text-slate-300 mb-2 lg:mb-3 line-clamp-2">{opp.core_insight}</p>
+                    <article key={opp.opportunity_id} className={`${card} p-5`}>
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="mb-1.5 text-lg font-semibold">{opp.topic}</h3>
+                          <p className="line-clamp-2 max-w-3xl text-sm text-[var(--mute)]">{opp.core_insight}</p>
                         </div>
-                        <div className="flex flex-col items-end gap-2 ml-3 lg:ml-4 flex-shrink-0">
-                          <div className={`rounded-lg px-2 lg:px-3 py-1 text-[10px] lg:text-xs font-black ${opp.priority === "critical" ? "bg-red-500/20 text-red-400" : opp.priority === "high" ? "bg-orange-500/20 text-orange-400" : opp.priority === "medium" ? "bg-yellow-500/20 text-yellow-400" : "bg-slate-500/20 text-slate-400"}`}>
-                            {opp.priority === "critical" ? "კრიტიკული" : opp.priority === "high" ? "მაღალი" : opp.priority === "medium" ? "საშუალო" : "დაბალი"}
-                          </div>
-                          <div className={`rounded-lg px-2 lg:px-3 py-1 text-[10px] lg:text-xs font-black ${opp.status === "discovered" ? "bg-blue-500/20 text-blue-400" : opp.status === "validated" ? "bg-purple-500/20 text-purple-400" : opp.status === "approved" ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
-                            {opp.status === "discovered" ? "აღმოჩენილი" : opp.status === "validated" ? "ვალიდირებული" : opp.status === "approved" ? "დამტკიცებული" : "უარყოფილი"}
-                          </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <Chip tone={priorityTone(opp.priority)}>{priorityLabel(opp.priority)}</Chip>
+                          <Chip tone={oppStatusTone(opp.status)}>{oppStatusLabel(opp.status)}</Chip>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 lg:gap-3 mb-3 lg:mb-4">
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">სანდოობა</div>
-                          <div className={`text-lg lg:text-2xl font-black ${opp.confidence >= 0.8 ? "text-emerald-400" : opp.confidence >= 0.7 ? "text-yellow-400" : "text-orange-400"}`}>{Math.round(opp.confidence * 100)}%</div>
+
+                      <div className="mb-4 grid grid-cols-3 gap-3">
+                        <div className="rounded-xl bg-white/[0.04] p-3">
+                          <p className="text-xs text-[var(--mute)]">სანდოობა</p>
+                          <p className={`mono text-xl ${opp.confidence >= 0.8 ? "text-[#5fd6a4]" : opp.confidence >= 0.7 ? "text-[#f6c177]" : "text-[#ff7aa8]"}`}>{Math.round(opp.confidence * 100)}%</p>
                         </div>
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">სიჩქარე</div>
-                          <div className="text-lg lg:text-2xl font-black text-blue-400">{Math.round(opp.velocity)}</div>
+                        <div className="rounded-xl bg-white/[0.04] p-3">
+                          <p className="text-xs text-[var(--mute)]">სიჩქარე</p>
+                          <p className="mono text-xl text-[#b3a8ff]">{Math.round(opp.velocity)}</p>
                         </div>
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">ბრენდის შესაბამისობა</div>
-                          <div className={`text-lg lg:text-2xl font-black ${opp.brand_fit >= 0.9 ? "text-emerald-400" : opp.brand_fit >= 0.8 ? "text-yellow-400" : "text-orange-400"}`}>{Math.round(opp.brand_fit * 100)}%</div>
+                        <div className="rounded-xl bg-white/[0.04] p-3">
+                          <p className="text-xs text-[var(--mute)]">ბრენდის შესაბამისობა</p>
+                          <p className={`mono text-xl ${opp.brand_fit >= 0.9 ? "text-[#5fd6a4]" : opp.brand_fit >= 0.8 ? "text-[#f6c177]" : "text-[#ff7aa8]"}`}>{Math.round(opp.brand_fit * 100)}%</p>
                         </div>
                       </div>
+
                       {opp.status === "discovered" && (
-                        <div className="flex gap-2 lg:gap-3">
-                          <button onClick={() => { opportunityRegistry.validateOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `✅ Orion-მა დაადასტურა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-purple-500/40 bg-purple-500/20 py-2 lg:py-3 text-xs lg:text-base font-bold text-purple-400 transition hover:bg-purple-500/30">✅ Orion-ისთვის გადაცემა</button>
-                          <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-2 lg:py-3 text-xs lg:text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ უარყოფა</button>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <button onClick={() => { opportunityRegistry.validateOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `✅ Orion-მა დაადასტურა: ${opp.topic}`); }} className={`${btnPrimary} flex-1`}>Orion-ისთვის გადაცემა</button>
+                          <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className={`${btnBase} t-bad flex-1`}>უარყოფა</button>
                         </div>
                       )}
                       {opp.status === "validated" && (
-                        <div className="flex gap-2 lg:gap-3">
-                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className="flex-1 rounded-xl border border-emerald-500/40 bg-emerald-500/20 py-2 lg:py-3 text-xs lg:text-base font-bold text-emerald-400 transition hover:bg-emerald-500/30">🎯 Sage-სთვის გადაცემა</button>
-                          <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className="flex-1 rounded-xl border border-red-500/40 bg-red-500/20 py-2 lg:py-3 text-xs lg:text-base font-bold text-red-400 transition hover:bg-red-500/30">❌ უარყოფა</button>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <button onClick={() => { opportunityRegistry.approveOpportunity(opp.opportunity_id); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `🎯 Sage-მ დაამტკიცა: ${opp.topic}`); }} className={`${btnPrimary} flex-1`}>Sage-სთვის გადაცემა</button>
+                          <button onClick={() => { opportunityRegistry.rejectOpportunity(opp.opportunity_id, "human_executive"); setOpportunities([...opportunityRegistry.getAllOpportunities()]); pushEvent("approval", `❌ ადამიანმა უარყო: ${opp.topic}`); }} className={`${btnBase} t-bad flex-1`}>უარყოფა</button>
                         </div>
                       )}
                       {opp.status === "approved" && (
-                        <div className="rounded-xl border px-3 lg:px-4 py-2 lg:py-3 text-center text-xs lg:text-base font-black bg-emerald-500/20 border-emerald-500/40 text-emerald-400">✅ დამტკიცებულია — Muse ამუშავებს Content Family-ს</div>
+                        <div className="t-ok rounded-xl px-4 py-2.5 text-center text-sm font-semibold">დამტკიცებულია — Muse ამუშავებს Content Family-ს</div>
                       )}
                       {opp.status === "rejected" && (
-                        <div className="rounded-xl border px-3 lg:px-4 py-2 lg:py-3 text-center text-xs lg:text-base font-black bg-red-500/20 border-red-500/40 text-red-400">❌ უარყოფილია</div>
+                        <div className="t-bad rounded-xl px-4 py-2.5 text-center text-sm font-semibold">უარყოფილია</div>
                       )}
-                    </div>
+                    </article>
                   ))
                 )}
               </div>
             </div>
           )}
 
+          {/* ---------- CONTENT FAMILY ---------- */}
           {activePanel === "content-family" && (
-            <div>
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <div>
-                  <h2 className="text-xl lg:text-2xl font-black tracking-wide">✍️ Content Family</h2>
-                  <p className="text-xs lg:text-base text-slate-400 mt-1">Foundation §10, §24 — Muse-ის მიერ შექმნილი ნატიური ვარიანტები</p>
-                </div>
-              </div>
-              <div className="space-y-4 lg:space-y-6">
+            <div className="os-in">
+              <PanelHeader title="Content Family" subtitle="Foundation §10, §24 — Muse-ის მიერ შექმნილი ნატიური ვარიანტები" />
+              <div className="space-y-5">
                 {contentFamilies.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 lg:p-12 text-center">
-                    <div className="text-3xl lg:text-4xl mb-3 lg:mb-4">✍️</div>
-                    <h3 className="text-lg lg:text-xl font-black text-white mb-2">Content Family ჯერ არ არის</h3>
-                    <p className="text-sm lg:text-base text-slate-400 mb-6">დაამტკიცე Opportunity "შესაძლებლობები" პანელზე, რომ Muse-მ შექმნას Content Family.</p>
-                  </div>
+                  <EmptyState title="Content Family ჯერ არ არის" text={'დაამტკიცე Opportunity „შესაძლებლობები“ პანელზე, რომ Muse-მ შექმნას Content Family.'} />
                 ) : (
                   contentFamilies.map(family => {
                     const familyReviews = qualityReviews.filter(r => r.family_id === family.family_id);
                     return (
-                      <div key={family.family_id} className="rounded-2xl border border-amber-500/30 bg-slate-900/50 backdrop-blur-xl p-4 lg:p-6">
-                        <div className="mb-4 lg:mb-6">
-                          <h3 className="text-base lg:text-xl font-black text-white mb-2">Family ID: {family.family_id}</h3>
-                          <p className="text-xs lg:text-sm text-slate-300 mb-2 lg:mb-3">{family.core_insight}</p>
-                          <div className="text-[10px] lg:text-xs text-slate-500">შექმნილია: {formatTime(family.created_at)} | ავტორი: {family.created_by}</div>
+                      <article key={family.family_id} className={`${card} p-5 lg:p-6`}>
+                        <div className="mb-5">
+                          <h3 className="mono mb-1.5 text-sm text-[var(--mute)]">{family.family_id}</h3>
+                          <p className="max-w-3xl text-base">{family.core_insight}</p>
+                          <p className="mt-2 text-xs text-[var(--mute)]">შექმნილია: {formatTime(family.created_at)} · ავტორი: {family.created_by}</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                           {family.variants.map(variant => {
                             const review = familyReviews.find(r => r.channel_id === variant.channel_id);
+                            const meta = channelMeta(variant.channel_id);
                             return (
-                              <div key={variant.channel_id} className={`rounded-xl border p-3 lg:p-4 ${review?.verdict === "approved" ? "border-emerald-500/30 bg-emerald-500/5" : review?.verdict === "revise" ? "border-yellow-500/30 bg-yellow-500/5" : "border-white/10 bg-white/5"}`}>
-                                <div className="flex items-center justify-between mb-2 lg:mb-3">
+                              <div key={variant.channel_id} className={`rounded-xl border p-4 ${review ? `${verdictTone(review.verdict)}` : "border-[var(--line)] bg-white/[0.03]"}`} style={{ color: "inherit" }}>
+                                <div className="mb-3 flex items-center justify-between">
                                   <div className="flex items-center gap-2">
-                                    <div className="text-xl lg:text-2xl">{variant.channel_id === "human_mind" ? "🧠" : variant.channel_id === "love" ? "💕" : variant.channel_id === "astrology" ? "♈" : variant.channel_id === "tarot" ? "🎴" : variant.channel_id === "mystery" ? "🌙" : "✨"}</div>
-                                    <div className="text-xs lg:text-sm font-bold text-white uppercase">{variant.channel_id.replace('_', ' ')}</div>
+                                    <span className="text-xl">{meta.icon}</span>
+                                    <span className="text-sm font-semibold">{variant.channel_id.replace('_', ' ')}</span>
                                   </div>
-                                  {review && (
-                                    <div className={`rounded-lg px-2 py-1 text-[10px] lg:text-xs font-black ${review.verdict === "approved" ? "bg-emerald-500/20 text-emerald-400" : review.verdict === "revise" ? "bg-yellow-500/20 text-yellow-400" : "bg-red-500/20 text-red-400"}`}>
-                                      {review.scores.total}/100
-                                    </div>
-                                  )}
+                                  {review && <Chip tone={verdictTone(review.verdict)}><span className="mono">{review.scores.total}/100</span></Chip>}
                                 </div>
-                                <h4 className="text-sm lg:text-base font-bold text-white mb-2">{variant.title}</h4>
-                                <p className="text-[10px] lg:text-xs text-slate-400 mb-2 italic line-clamp-2">"{variant.hook}"</p>
-                                <p className="text-[10px] lg:text-xs text-slate-300 mb-2 lg:mb-3 line-clamp-3">{variant.description}</p>
-                                <div className="text-[10px] lg:text-xs text-slate-500 mb-2">ფორმატი: {variant.format}</div>
-                                <div className="text-[10px] lg:text-xs text-emerald-400 font-bold mb-2 lg:mb-3">CTA: {variant.cta}</div>
+                                <h4 className="mb-2 font-semibold text-[var(--moon)]">{variant.title}</h4>
+                                <p className="mb-2 line-clamp-2 text-sm italic text-[var(--mute)]">&quot;{variant.hook}&quot;</p>
+                                <p className="mb-3 line-clamp-3 text-sm text-[#ece9f7]/80">{variant.description}</p>
+                                <p className="mb-1 text-xs text-[var(--mute)]">ფორმატი: {variant.format}</p>
+                                <p className="text-xs font-semibold text-[#5fd6a4]">CTA: {variant.cta}</p>
                                 {review && (
-                                  <div className="border-t border-white/10 pt-2 lg:pt-3 mt-2 lg:mt-3">
-                                    <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">🛡️ Aegis QA:</div>
-                                    <div className="text-[10px] lg:text-xs text-slate-300 line-clamp-2">{review.feedback}</div>
+                                  <div className="mt-3 border-t border-[var(--line)] pt-3">
+                                    <p className="mb-1 text-xs font-semibold text-[var(--mute)]">Aegis QA</p>
+                                    <p className="line-clamp-2 text-xs text-[#ece9f7]/80">{review.feedback}</p>
                                   </div>
                                 )}
                               </div>
                             );
                           })}
                         </div>
-                      </div>
+                      </article>
                     );
                   })
                 )}
@@ -783,194 +941,182 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
           )}
 
+          {/* ---------- QUALITY ---------- */}
           {activePanel === "quality" && (
-            <div>
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <div>
-                  <h2 className="text-xl lg:text-2xl font-black tracking-wide">🛡️ ხარისხის გადახედვა</h2>
-                  <p className="text-xs lg:text-base text-slate-400 mt-1">Foundation §47, §86 — Aegis-ის 11-განზომილებიანი QA შეფასება</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-6 lg:mb-8">
+            <div className="os-in">
+              <PanelHeader title="ხარისხის გადახედვა" subtitle="Foundation §47, §86 — Aegis-ის 11-განზომილებიანი QA შეფასება" />
+              <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
                 <StatBox label="დამტკიცებული" value={qualityReviews.filter(r => r.verdict === "approved").length} color="#10b981" />
                 <StatBox label="საჭიროებს შესწორებას" value={qualityReviews.filter(r => r.verdict === "revise").length} color="#f59e0b" />
                 <StatBox label="უარყოფილი" value={qualityReviews.filter(r => r.verdict === "rejected").length} color="#ef4444" />
               </div>
-              <div className="space-y-4 lg:space-y-6">
+              <div className="space-y-4">
                 {qualityReviews.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 lg:p-12 text-center">
-                    <div className="text-3xl lg:text-4xl mb-3 lg:mb-4">🛡️</div>
-                    <h3 className="text-lg lg:text-xl font-black text-white mb-2">QA შეფასებები ჯერ არ არის</h3>
-                    <p className="text-sm lg:text-base text-slate-400 mb-6">დაამტკიცე Opportunity, რომ Aegis-მ შეაფასოს Content Family.</p>
-                  </div>
+                  <EmptyState title="QA შეფასებები ჯერ არ არის" text="დაამტკიცე Opportunity, რომ Aegis-მ შეაფასოს Content Family." />
                 ) : (
-                  qualityReviews.map(review => (
-                    <div key={review.review_id} className={`rounded-2xl border bg-slate-900/50 backdrop-blur-xl p-4 lg:p-6 ${review.verdict === "approved" ? "border-emerald-500/30" : review.verdict === "revise" ? "border-yellow-500/30" : "border-red-500/30"}`}>
-                      <div className="flex items-start justify-between mb-3 lg:mb-4">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-sm lg:text-lg font-black text-white mb-1 truncate">
-                            {review.channel_id === "human_mind" ? "🧠 Human Mind" : review.channel_id === "love" ? "💕 Love" : review.channel_id === "astrology" ? "♈ Astrology" : review.channel_id === "tarot" ? "🎴 Tarot" : review.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
-                          </h3>
-                          <p className="text-[10px] lg:text-xs text-slate-500">Family: {review.family_id}</p>
-                        </div>
-                        <div className={`rounded-lg px-3 lg:px-4 py-1.5 lg:py-2 text-center flex-shrink-0 ml-3 ${review.verdict === "approved" ? "bg-emerald-500/20 border border-emerald-500/40" : review.verdict === "revise" ? "bg-yellow-500/20 border border-yellow-500/40" : "bg-red-500/20 border border-red-500/40"}`}>
-                          <div className="text-xl lg:text-2xl font-black text-white">{review.scores.total}</div>
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400">/100</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5 lg:gap-2 mb-3 lg:mb-4">
-                        {Object.entries(review.scores).filter(([key]) => key !== 'total').map(([key, value]) => (
-                          <div key={key} className="rounded-lg bg-white/5 border border-white/10 p-1.5 lg:p-2 text-center">
-                            <div className="text-[8px] lg:text-[10px] font-bold text-slate-400 uppercase truncate">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                            <div className={`text-sm lg:text-lg font-black ${value >= 85 ? "text-emerald-400" : value >= 70 ? "text-yellow-400" : "text-red-400"}`}>{value}</div>
+                  qualityReviews.map(review => {
+                    const meta = channelMeta(review.channel_id);
+                    return (
+                      <article key={review.review_id} className={`${card} p-5`}>
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="mb-1 truncate text-lg font-semibold">{meta.icon} {meta.label}</h3>
+                            <p className="mono truncate text-xs text-[var(--mute)]">{review.family_id}</p>
                           </div>
-                        ))}
-                      </div>
-                      <div className="rounded-lg bg-white/5 border border-white/10 p-2 lg:p-3">
-                        <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">💬 Aegis-ის შენიშვნა:</div>
-                        <p className="text-xs lg:text-sm text-slate-300 line-clamp-3">{review.feedback}</p>
-                      </div>
-                    </div>
-                  ))
+                          <div className={`${verdictTone(review.verdict)} shrink-0 rounded-xl px-4 py-2 text-center`}>
+                            <div className="mono text-2xl leading-none">{review.scores.total}</div>
+                            <div className="text-xs opacity-80">/100</div>
+                          </div>
+                        </div>
+                        <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                          {Object.entries(review.scores).filter(([key]) => key !== 'total').map(([key, value]) => (
+                            <div key={key} className="rounded-lg bg-white/[0.04] p-2 text-center">
+                              <div className="truncate text-[11px] text-[var(--mute)]">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
+                              <div className={`mono text-lg ${scoreColor(value as number)}`}>{value as number}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="rounded-xl bg-white/[0.04] p-3">
+                          <p className="mb-1 text-xs font-semibold text-[var(--mute)]">Aegis-ის შენიშვნა</p>
+                          <p className="line-clamp-3 text-sm text-[#ece9f7]/90">{review.feedback}</p>
+                        </div>
+                      </article>
+                    );
+                  })
                 )}
               </div>
             </div>
           )}
 
+          {/* ---------- DISTRIBUTION ---------- */}
           {activePanel === "distribution" && (
-            <div>
-              <div className="flex items-center justify-between mb-4 lg:mb-6">
-                <div>
-                  <h2 className="text-xl lg:text-2xl font-black tracking-wide">📡 გავრცელება</h2>
-                  <p className="text-xs lg:text-base text-slate-400 mt-1">Foundation §48, §116 — Echo-ს მიერ დაგეგმილი და გამოქვეყნებული კონტენტი</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-6 lg:mb-8">
+            <div className="os-in">
+              <PanelHeader title="გავრცელება" subtitle="Foundation §48, §116 — Echo-ს მიერ დაგეგმილი და გამოქვეყნებული კონტენტი" />
+              <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-3">
                 <StatBox label="დაგეგმილი" value={distributionPlans.filter(p => p.status === "scheduled").length} color="#3b82f6" />
                 <StatBox label="გამოქვეყნებული" value={distributionPlans.filter(p => p.status === "published").length} color="#10b981" />
                 <StatBox label="შეცდომა" value={distributionPlans.filter(p => p.status === "failed").length} color="#ef4444" />
               </div>
-              <div className="space-y-4 lg:space-y-6">
+              <div className="space-y-4">
                 {distributionPlans.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-8 lg:p-12 text-center">
-                    <div className="text-3xl lg:text-4xl mb-3 lg:mb-4">📡</div>
-                    <h3 className="text-lg lg:text-xl font-black text-white mb-2">გამოქვეყნებები ჯერ არ არის</h3>
-                    <p className="text-sm lg:text-base text-slate-400 mb-6">დაამტკიცე Opportunity, რომ Echo-მ დაგეგმოს გამოქვეყნება.</p>
-                  </div>
+                  <EmptyState title="გამოქვეყნებები ჯერ არ არის" text="დაამტკიცე Opportunity, რომ Echo-მ დაგეგმოს გამოქვეყნება." />
                 ) : (
-                  distributionPlans.map(plan => (
-                    <div key={plan.plan_id} className={`rounded-2xl border bg-slate-900/50 backdrop-blur-xl p-4 lg:p-6 ${plan.status === "published" ? "border-emerald-500/30" : plan.status === "scheduled" ? "border-blue-500/30" : "border-red-500/30"}`}>
-                      <div className="flex items-start justify-between mb-3 lg:mb-4">
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-sm lg:text-lg font-black text-white mb-1 truncate">
-                            {plan.channel_id === "human_mind" ? "🧠 Human Mind" : plan.channel_id === "love" ? "💕 Love" : plan.channel_id === "astrology" ? "♈ Astrology" : plan.channel_id === "tarot" ? "🎴 Tarot" : plan.channel_id === "mystery" ? "🌙 Mystery" : "✨ Lunara"}
-                          </h3>
-                          <p className="text-[10px] lg:text-xs text-slate-500">Family: {plan.family_id}</p>
+                  distributionPlans.map(plan => {
+                    const meta = channelMeta(plan.channel_id);
+                    return (
+                      <article key={plan.plan_id} className={`${card} p-5`}>
+                        <div className="mb-4 flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="mb-1 truncate text-lg font-semibold">{meta.icon} {meta.label}</h3>
+                            <p className="mono truncate text-xs text-[var(--mute)]">{plan.family_id}</p>
+                          </div>
+                          <Chip tone={plan.status === "published" ? "t-ok" : plan.status === "scheduled" ? "t-info" : "t-bad"}>
+                            {plan.status === "published" ? "გამოქვეყნებული" : plan.status === "scheduled" ? "დაგეგმილი" : "შეცდომა"}
+                          </Chip>
                         </div>
-                        <div className={`rounded-lg px-2 lg:px-3 py-1 text-[10px] lg:text-xs font-black flex-shrink-0 ml-3 ${plan.status === "published" ? "bg-emerald-500/20 text-emerald-400" : plan.status === "scheduled" ? "bg-blue-500/20 text-blue-400" : "bg-red-500/20 text-red-400"}`}>
-                          {plan.status === "published" ? "გამოქვეყნებული" : plan.status === "scheduled" ? "დაგეგმილი" : "შეცდომა"}
+                        <div className="mb-4 grid grid-cols-2 gap-3">
+                          <div className="rounded-xl bg-white/[0.04] p-3">
+                            <p className="text-xs text-[var(--mute)]">პლატფორმა</p>
+                            <p className="truncate font-semibold">{plan.platform}</p>
+                          </div>
+                          <div className="rounded-xl bg-white/[0.04] p-3">
+                            <p className="text-xs text-[var(--mute)]">დაგეგმილი დრო</p>
+                            <p className="mono truncate">{formatTime(plan.scheduled_time)}</p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-3 lg:mb-4">
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">პლატფორმა</div>
-                          <div className="text-xs lg:text-base font-bold text-white truncate">{plan.platform}</div>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/5 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-slate-400 mb-1">დაგეგმილი დრო</div>
-                          <div className="text-xs lg:text-base font-bold text-white truncate">{formatTime(plan.scheduled_time)}</div>
-                        </div>
-                      </div>
-                      {plan.status === "published" && plan.post_id && (
-                        <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 lg:p-3">
-                          <div className="text-[10px] lg:text-xs font-bold text-emerald-400 mb-1">Post ID:</div>
-                          <p className="text-xs lg:text-sm text-emerald-300 font-mono truncate">{plan.post_id}</p>
-                        </div>
-                      )}
-                      {plan.status === "scheduled" && (
-                        <button
-                          onClick={() => {
-                            echoAgent.publishPost(plan.plan_id);
-                            setDistributionPlans([...echoAgent.getAllPlans()]);
-                            pushEvent("system", `📡 Echo-მ მყისიერად გამოაქვეყნა: ${plan.channel_id}`);
-                          }}
-                          className="w-full rounded-xl border border-blue-500/40 bg-blue-500/20 py-2 lg:py-3 text-xs lg:text-base font-bold text-blue-400 transition hover:bg-blue-500/30 mt-2"
-                        >
-                          ▶️ მყისიერი გამოქვეყნება
-                        </button>
-                      )}
-                    </div>
-                  ))
+                        {plan.status === "published" && plan.post_id && (
+                          <div className="t-ok rounded-xl p-3">
+                            <p className="mb-0.5 text-xs font-semibold">Post ID</p>
+                            <p className="mono truncate text-sm">{plan.post_id}</p>
+                          </div>
+                        )}
+                        {plan.status === "scheduled" && (
+                          <button
+                            onClick={() => {
+                              echoAgent.publishPost(plan.plan_id);
+                              setDistributionPlans([...echoAgent.getAllPlans()]);
+                              pushEvent("system", `📡 Echo-მ მყისიერად გამოაქვეყნა: ${plan.channel_id}`);
+                            }}
+                            className={`${btnPrimary} w-full`}
+                          >
+                            მყისიერი გამოქვეყნება
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })
                 )}
               </div>
             </div>
           )}
 
+          {/* ---------- TELEGRAM ---------- */}
           {activePanel === "telegram" && (
-            <div className="max-w-4xl mx-auto pb-12 flex flex-col items-center justify-center min-h-[60vh]">
-              <div 
+            <div className="os-in mx-auto flex min-h-[60vh] max-w-4xl flex-col items-center justify-center pb-12">
+              <div
                 onClick={() => setIsDocModalOpen(true)}
-                className="group relative w-full max-w-3xl h-64 md:h-80 lg:h-96 rounded-3xl border border-sky-500/30 bg-gradient-to-br from-[#08070D] via-[#171127] to-[#0f0a1a] overflow-hidden cursor-pointer transition-all duration-500 hover:scale-[1.02] hover:border-sky-400/60 hover:shadow-[0_0_80px_rgba(56,189,248,0.2)]"
+                className="group relative h-72 w-full cursor-pointer overflow-hidden rounded-[28px] border border-[var(--line-2)] transition-colors hover:border-[var(--violet)] md:h-80 lg:h-96"
+                style={{ background: "radial-gradient(circle at 78% 24%, #1a1e3a 0 7%, transparent 7.3%), radial-gradient(circle at 74% 26%, #f6c177 0 11%, transparent 11.3%), linear-gradient(160deg, #241c52 0%, #14173a 55%, #0b0d1c 100%)" }}
               >
-                <div className="absolute top-3 lg:top-4 right-3 lg:right-4 flex gap-1.5 lg:gap-2 z-20">
-                  <a 
-                    href="https://t.me/lunaraOS" 
-                    target="_blank" 
+                <div className="absolute right-4 top-4 z-20 flex gap-2">
+                  <a
+                    href="https://t.me/lunaraOS"
+                    target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 lg:gap-2 rounded-full bg-sky-500/20 border border-sky-500/40 px-3 lg:px-4 py-1.5 lg:py-2 text-sky-300 text-[10px] lg:text-sm font-bold backdrop-blur-md hover:bg-sky-500/30 transition-all"
+                    className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-white/10"
                   >
-                    <svg className="w-3 h-3 lg:w-4 lg:h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.623 4.823-4.351c.192-.192-.054-.3-.297-.108l-5.965 3.759-2.568-.802c-.56-.176-.57-.56.117-.828l10.037-3.869c.466-.174.875.108.713.828z"/></svg>
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.623 4.823-4.351c.192-.192-.054-.3-.297-.108l-5.965 3.759-2.568-.802c-.56-.176-.57-.56.117-.828l10.037-3.869c.466-.174.875.108.713.828z"/></svg>
                     <span className="hidden sm:inline">Open Channel</span>
                   </a>
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setIsAnalyticsModalOpen(true); }}
-                    className="flex items-center gap-1.5 lg:gap-2 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 lg:px-4 py-1.5 lg:py-2 text-emerald-300 text-[10px] lg:text-sm font-bold backdrop-blur-md hover:bg-emerald-500/30 transition-all"
+                    className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-white/10"
                   >
-                    📊 <span className="hidden sm:inline">Analytics</span>
+                    <span aria-hidden>📊</span><span className="hidden sm:inline">Analytics</span>
                   </button>
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setIsDocModalOpen(true); }}
-                    className="flex items-center gap-1.5 lg:gap-2 rounded-full bg-white/10 border border-white/20 px-3 lg:px-4 py-1.5 lg:py-2 text-white text-[10px] lg:text-sm font-bold backdrop-blur-md hover:bg-white/20 transition-all"
+                    className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium backdrop-blur-md transition-colors hover:bg-white/10"
                   >
-                    📄 <span className="hidden sm:inline">Docs</span>
+                    <span aria-hidden>📄</span><span className="hidden sm:inline">Docs</span>
                   </button>
                 </div>
 
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-sky-900/20 via-transparent to-transparent" />
-                <div className="absolute top-0 right-0 w-64 lg:w-96 h-64 lg:h-96 bg-purple-600/10 rounded-full blur-3xl group-hover:bg-purple-600/20 transition-all duration-700" />
-                <div className="absolute bottom-0 left-0 w-48 lg:w-64 h-48 lg:h-64 bg-sky-600/10 rounded-full blur-3xl group-hover:bg-sky-600/20 transition-all duration-700" />
-                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-
-                <div className="relative z-10 flex flex-col items-center justify-center h-full text-center p-6 lg:p-8">
-                  <div className="mb-3 lg:mb-4 inline-flex items-center gap-1.5 lg:gap-2 rounded-full bg-sky-500/10 border border-sky-500/30 px-3 lg:px-4 py-1 lg:py-1.5 text-sky-300 text-[10px] lg:text-sm font-bold backdrop-blur-sm group-hover:bg-sky-500/20 transition-colors">
-                    <span className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-sky-400 animate-pulse" />
-                    CLICK TO VIEW DOCUMENTATION
-                  </div>
-                  <h2 className="text-3xl md:text-5xl lg:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-slate-200 to-slate-400 mb-2 lg:mb-3 drop-shadow-2xl">
-                    LUNARA
-                  </h2>
-                  <p className="text-sm lg:text-xl text-slate-400 font-medium tracking-wide max-w-2xl mb-4 lg:mb-6 hidden sm:block">
+                <div className="relative z-10 flex h-full flex-col justify-end p-6 lg:p-10">
+                  <h2 className="text-5xl font-bold tracking-tight md:text-6xl lg:text-7xl">LUNARA</h2>
+                  <p className="mt-2 hidden max-w-xl text-lg text-[#ece9f7]/75 sm:block">
                     Your daily cosmic signal. Discover the hidden geometry of the cosmos.
                   </p>
-                  <div className="flex items-center gap-2 lg:gap-3 rounded-2xl bg-white/5 border border-white/10 px-4 lg:px-6 py-2 lg:py-3 text-white font-bold backdrop-blur-md group-hover:bg-sky-500/20 group-hover:border-sky-500/40 group-hover:text-sky-300 transition-all duration-300">
-                    <span className="text-xs lg:text-base">📄 View Documentation</span>
-                    <svg className="w-4 h-4 lg:w-5 lg:h-5 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                  </div>
+                  <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[var(--moon)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-transform group-hover:translate-x-1">
+                    View documentation
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                  </span>
                 </div>
               </div>
             </div>
           )}
 
+          {/* ---------- PLACEHOLDER PANELS ---------- */}
           {activePanel === "pipeline" && pipelineDef && (
-            <div className="text-center p-8 lg:p-12">
-              <h2 className="text-xl lg:text-2xl font-black mb-4">🔄 აქტიური პაიპლაინი</h2>
-              <p className="text-sm lg:text-base text-slate-400">Pipeline პანელი</p>
+            <div className="os-in">
+              <PanelHeader title="აქტიური პაიპლაინი" />
+              <EmptyState title="Pipeline პანელი" text="პაიპლაინის ვიზუალიზაცია მალე დაემატება." />
             </div>
           )}
-          {activePanel === "learning" && <div className="text-center p-8 lg:p-12 text-sm lg:text-base text-slate-400">Learning პანელი</div>}
-          {activePanel === "knowledge" && <div className="text-center p-8 lg:p-12 text-sm lg:text-base text-slate-400">Knowledge პანელი</div>}
-          
+          {activePanel === "learning" && (
+            <div className="os-in">
+              <PanelHeader title="სწავლა" />
+              <EmptyState title="Learning პანელი" text="სწავლის ციკლის მონაცემები მალე დაემატება." />
+            </div>
+          )}
+          {activePanel === "knowledge" && (
+            <div className="os-in">
+              <PanelHeader title="ცოდნა" />
+              <EmptyState title="Knowledge პანელი" text="ცოდნის ბაზა მალე დაემატება." />
+            </div>
+          )}
+
           {activePanel === "credentials" && (
             <CredentialsPanel />
           )}
@@ -979,19 +1125,19 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             <E2ETestPanel />
           )}
 
+          {/* ---------- EMERGENCY ---------- */}
           {activePanel === "emergency" && (
-            <div>
-              <h2 className="text-xl lg:text-2xl font-black mb-4 lg:mb-6 tracking-wide text-red-400">🚨 საგანგებო კონტროლი</h2>
-              <p className="text-xs lg:text-base text-slate-400 mb-4 lg:mb-6">Foundation §104 — გლობალური საგანგებო კონტროლი ადამიანი აღმასრულებლის გადაფარვისთვის</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 mb-6 lg:mb-8">
+            <div className="os-in">
+              <PanelHeader title="საგანგებო კონტროლი" subtitle="Foundation §104 — გლობალური საგანგებო კონტროლი ადამიანი აღმასრულებლის გადაფარვისთვის" />
+              <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <EmergencyButton label="ყველა აგენტის შეჩერება" description="მყისიერად შეაჩერე ყველა მომუშავე აგენტი" icon="⏸️" active={emergencyState.allAgentsPaused} onActivate={pauseAllAgents} onDeactivate={resumeAllAgents} color="red" />
                 <EmergencyButton label="გამოქვეყნების შეჩერება" description="შეაჩერე ყველა გამოქვეყნების ოპერაცია" icon="📡" active={emergencyState.publishingPaused} onActivate={pausePublishing} onDeactivate={resumePublishing} color="orange" />
                 <EmergencyButton label="ძვირადღირებული ამოცანების შეჩერება" description="შეაჩერე ყველა მაღალი პრიორიტეტის რესურსზე მომთხოვნი ამოცანა" icon="🛑" active={emergencyState.expensiveTasksStopped} onActivate={stopExpensiveTasks} onDeactivate={() => setEmergencyState(prev => ({ ...prev, expensiveTasksStopped: false }))} color="yellow" />
                 <EmergencyButton label="დროებითი წვდომის გაუქმება" description="გააუქმე ყველა აქტიური წვდომის ლიზინგი" icon="🔐" active={emergencyState.accessRevoked} onActivate={revokeAccess} onDeactivate={() => setEmergencyState(prev => ({ ...prev, accessRevoked: false }))} color="purple" />
               </div>
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 lg:p-6">
-                <h3 className="text-base lg:text-xl font-black text-red-400 mb-3 lg:mb-4">⚠️ საგანგებო მდგომარეობა</h3>
-                <div className="space-y-2 lg:space-y-3">
+              <div className="t-bad rounded-2xl p-5">
+                <h3 className="mb-4 text-lg font-semibold">საგანგებო მდგომარეობა</h3>
+                <div className="space-y-2">
                   <EmergencyStatusItem label="ყველა აგენტი შეჩერებულია" active={emergencyState.allAgentsPaused} />
                   <EmergencyStatusItem label="გამოქვეყნება შეჩერებულია" active={emergencyState.publishingPaused} />
                   <EmergencyStatusItem label="ძვირადღირებული ამოცანები შეჩერებულია" active={emergencyState.expensiveTasksStopped} />
@@ -1001,61 +1147,62 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
             </div>
           )}
 
+          {/* ---------- APPROVALS ---------- */}
           {activePanel === "approvals" && (
-            <div className="text-center p-8 lg:p-12">
-              <h2 className="text-xl lg:text-2xl font-black mb-4">✋ დამტკიცებები</h2>
-              <p className="text-sm lg:text-base text-slate-400">ამჟამად დამტკიცების მოლოდინში არაფერია.</p>
+            <div className="os-in">
+              <PanelHeader title="დამტკიცებები" />
+              <EmptyState title="ყველაფერი დამუშავებულია" text="ამჟამად დამტკიცების მოლოდინში არაფერია." />
             </div>
           )}
 
         </section>
 
-        <aside className="w-72 lg:w-96 border-l border-white/10 bg-slate-900/50 backdrop-blur-xl min-h-[calc(100vh-140px)] hidden xl:block overflow-y-auto">
-          <div className="p-4 lg:p-6">
-            <div className="mb-6 lg:mb-8">
-              <div className="mb-3 lg:mb-4 flex items-center justify-between">
-                <h2 className="text-xl lg:text-2xl font-black tracking-wide">📡 მოვლენების ნაკადი</h2>
-                <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 lg:h-3 lg:w-3 animate-pulse rounded-full bg-emerald-400" />
-                  <span className="text-xs lg:text-sm font-bold text-emerald-400">პირდაპირი</span>
-                </div>
-              </div>
-              <div className="space-y-2 max-h-64 lg:max-h-96 overflow-y-auto">
-                {events.map((event) => (
-                  <div key={event.id} className="rounded-xl border border-white/5 bg-white/5 p-2.5 lg:p-3 transition-all hover:bg-white/10">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[10px] lg:text-xs font-black tracking-wider text-slate-400">{event.type.toUpperCase()}</span>
-                      <span className="font-mono text-[10px] lg:text-xs text-slate-500">{event.timestamp}</span>
-                    </div>
-                    <p className="text-xs lg:text-sm leading-relaxed text-slate-300">{event.message}</p>
-                  </div>
-                ))}
-              </div>
+        {/* ================= RIGHT RAIL ================= */}
+        <aside className="sticky top-[65px] hidden h-[calc(100vh-65px)] w-[340px] shrink-0 overflow-y-auto border-l border-[var(--line)] p-5 xl:block">
+          <div className="mb-8">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold">მოვლენების ნაკადი</h2>
+              <span className="flex items-center gap-2 text-xs font-medium text-[#5fd6a4]">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#5fd6a4]" /> პირდაპირი
+              </span>
             </div>
-            <div>
-              <h2 className="text-xl lg:text-2xl font-black mb-3 lg:mb-4 tracking-wide">🔐 რესურსები</h2>
-              <div className="space-y-2 lg:space-y-3">
-                {resources.map(resource => (
-                  <div key={resource.id} className="rounded-xl border border-white/10 bg-white/5 p-3 lg:p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs lg:text-base font-bold truncate">{resource.name}</div>
-                        <div className="text-[10px] lg:text-xs text-slate-400 truncate">{resource.type}</div>
-                      </div>
-                      <div className={`rounded-lg px-2 lg:px-3 py-1 text-[10px] lg:text-xs font-black flex-shrink-0 ml-2 ${resource.status === "healthy" ? "bg-emerald-500/20 text-emerald-400" : resource.status === "degraded" ? "bg-yellow-500/20 text-yellow-400" : "bg-red-500/20 text-red-400"}`}>
-                        {resource.status === "healthy" ? "ჯანმრთელი" : resource.status === "degraded" ? "გაუარესებული" : "მიუწვდომელი"}
-                      </div>
-                    </div>
-                    <div className="mb-1 flex items-center justify-between text-xs lg:text-sm">
-                      <span className="text-slate-400">გამოყენება</span>
-                      <span className="font-mono font-bold">{resource.usage} / {resource.quota}</span>
-                    </div>
-                    <div className="h-1.5 lg:h-2 overflow-hidden rounded-full bg-slate-700">
-                      <div className={`h-full rounded-full ${resource.usage / resource.quota > 0.9 ? "bg-red-500" : resource.usage / resource.quota > 0.7 ? "bg-yellow-500" : "bg-emerald-500"}`} style={{ width: `${(resource.usage / resource.quota) * 100}%` }} />
-                    </div>
+            <ol className="max-h-[46vh] space-y-2 overflow-y-auto pr-1">
+              {events.map((event) => (
+                <li key={event.id} className="rounded-xl border border-[var(--line)] bg-[var(--ink-2)] p-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="t-mute rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize">{event.type}</span>
+                    <span className="mono text-[11px] text-[var(--mute)]">{event.timestamp}</span>
                   </div>
-                ))}
-              </div>
+                  <p className="text-sm leading-relaxed text-[#ece9f7]/90">{event.message}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div>
+            <h2 className="mb-3 text-base font-semibold">რესურსები</h2>
+            <div className="space-y-2.5">
+              {resources.map(resource => {
+                const ratio = resource.usage / resource.quota;
+                return (
+                  <div key={resource.id} className={`${card} p-3.5`}>
+                    <div className="mb-2.5 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold">{resource.name}</div>
+                        <div className="truncate text-xs text-[var(--mute)]">{resource.type}</div>
+                      </div>
+                      <Chip tone={resource.status === "healthy" ? "t-ok" : resource.status === "degraded" ? "t-warn" : "t-bad"} className="shrink-0">
+                        {resource.status === "healthy" ? "ჯანმრთელი" : resource.status === "degraded" ? "გაუარესებული" : "მიუწვდომელი"}
+                      </Chip>
+                    </div>
+                    <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--mute)]">
+                      <span>გამოყენება</span>
+                      <span className="mono">{resource.usage} / {resource.quota}</span>
+                    </div>
+                    <Bar value={ratio * 100} color={ratio > 0.9 ? "#ff7aa8" : ratio > 0.7 ? "#f6c177" : "#5fd6a4"} thin />
+                  </div>
+                );
+              })}
             </div>
           </div>
         </aside>
@@ -1066,27 +1213,32 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
         onClose={() => setIsAnalyticsModalOpen(false)} 
       />
 
+      {/* ================= DOCUMENTATION MODAL ================= */}
       {isDocModalOpen && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md" onClick={() => setIsDocModalOpen(false)}>
-          <div className="relative w-full max-w-6xl max-h-[95vh] bg-slate-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 lg:p-6 border-b border-white/10 bg-slate-900/50">
-              <div>
-                <h2 className="text-lg lg:text-2xl font-black text-white flex items-center gap-2">
-                  📄 LUNARA Telegram Channel — Full Documentation
-                </h2>
-                <p className="text-xs lg:text-sm text-slate-400 hidden sm:block">Edit and manage the channel's strategic document</p>
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setIsDocModalOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="LUNARA Telegram Channel documentation"
+            className="os-in relative flex max-h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] p-4 lg:p-5">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold lg:text-xl">LUNARA Telegram Channel — Full Documentation</h2>
+                <p className="hidden text-sm text-[var(--mute)] sm:block">Edit and manage the channel&apos;s strategic document</p>
               </div>
-              <div className="flex gap-1.5 lg:gap-2">
-                <button 
+              <div className="flex shrink-0 gap-2">
+                <button
                   onClick={() => {
                     navigator.clipboard.writeText(documentationContent);
                     pushEvent("system", "📋 Documentation copied to clipboard");
                   }}
-                  className="px-3 lg:px-4 py-1.5 lg:py-2 rounded-xl bg-white/10 border border-white/20 text-white font-bold hover:bg-white/20 transition-colors text-xs lg:text-sm flex items-center gap-1.5 lg:gap-2"
+                  className={btnGhost}
                 >
-                  📋 <span className="hidden sm:inline">Copy</span>
+                  Copy
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     const blob = new Blob([documentationContent], { type: 'text/markdown' });
                     const url = URL.createObjectURL(blob);
@@ -1096,30 +1248,25 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
                     a.click();
                     pushEvent("system", "📥 Documentation downloaded");
                   }}
-                  className="px-3 lg:px-4 py-1.5 lg:py-2 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold hover:bg-sky-500/30 transition-colors text-xs lg:text-sm flex items-center gap-1.5 lg:gap-2"
+                  className={`${btnGhost} hidden sm:inline-flex`}
                 >
-                  📥 <span className="hidden sm:inline">Download .md</span>
+                  Download .md
                 </button>
-                <button 
-                  onClick={saveDocumentation}
-                  className="px-3 lg:px-4 py-1.5 lg:py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold hover:bg-emerald-500/30 transition-colors text-xs lg:text-sm flex items-center gap-1.5 lg:gap-2"
-                >
-                  💾 <span className="hidden sm:inline">Save</span>
-                </button>
-                <button onClick={() => setIsDocModalOpen(false)} className="p-1.5 lg:p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors">
-                  <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <button onClick={saveDocumentation} className={btnPrimary}>Save</button>
+                <button onClick={() => setIsDocModalOpen(false)} aria-label="Close" className="rounded-xl p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 lg:p-6 custom-scrollbar">
+            <div className="custom-scrollbar flex-1 overflow-y-auto p-4 lg:p-5">
               {isDocLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-sky-400 font-bold animate-pulse text-sm lg:text-base">Loading documentation from file...</div>
+                <div className="flex h-full items-center justify-center py-20">
+                  <div className="animate-pulse text-sm font-medium text-[var(--violet)]">Loading documentation from file…</div>
                 </div>
               ) : (
                 <textarea
-                  className="w-full h-full min-h-[400px] lg:min-h-[600px] bg-slate-950 border border-white/10 rounded-xl p-3 lg:p-6 text-xs lg:text-sm text-slate-300 font-mono focus:outline-none focus:border-sky-500/50 resize-none leading-relaxed"
+                  className="mono h-full min-h-[400px] w-full resize-none rounded-xl border border-[var(--line-2)] bg-[#080a16] p-4 text-sm leading-relaxed text-[#ece9f7]/90 outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)] lg:min-h-[600px] lg:p-6"
                   value={documentationContent}
                   onChange={(e) => setDocumentationContent(e.target.value)}
                   placeholder="Documentation content will appear here..."
@@ -1130,39 +1277,40 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
         </div>
       )}
 
+      {/* ================= FLOATING AGENT CARD ================= */}
       {selectedAgent && (
-        <div className="fixed bottom-4 lg:bottom-6 right-4 lg:right-6 z-[1000] w-[300px] lg:w-[450px] rounded-3xl border border-white/10 bg-slate-900/95 backdrop-blur-2xl shadow-2xl max-h-[80vh] overflow-y-auto">
-          <div className="border-b border-white/10 p-4 lg:p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 lg:gap-4">
-                <div className="flex h-10 w-10 lg:h-14 lg:w-14 items-center justify-center rounded-2xl text-2xl lg:text-3xl" style={{ background: `${selectedAgent.accent}30` }}>{selectedAgent.icon}</div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg lg:text-2xl font-black truncate">{selectedAgent.name}</h3>
-                  <p className="text-xs lg:text-sm text-slate-400 truncate">{selectedAgent.role}</p>
+        <div className="fixed bottom-4 right-4 z-[1000] max-h-[80vh] w-[320px] overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] shadow-2xl lg:bottom-6 lg:right-6 lg:w-[420px]">
+          <div className="border-b border-[var(--line)] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl" style={{ background: `${selectedAgent.accent}30` }}>{selectedAgent.icon}</div>
+                <div className="min-w-0">
+                  <h3 className="truncate text-lg font-semibold">{selectedAgent.name}</h3>
+                  <p className="truncate text-sm text-[var(--mute)]">{selectedAgent.role}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedAgentId(null)} className="flex h-8 w-8 lg:h-10 lg:w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-lg lg:text-xl hover:bg-white/10 flex-shrink-0">×</button>
+              <button onClick={() => setSelectedAgentId(null)} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xl text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">×</button>
             </div>
           </div>
-          <div className="p-4 lg:p-5 space-y-3 lg:space-y-4">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3 lg:p-4">
-              <div className="text-xs font-bold text-slate-400 mb-2">სტატუსი</div>
-              <div className="text-base lg:text-xl font-black" style={{ color: getStatusColor(selectedAgent.status) }}>{getStatusLabel(selectedAgent.status)}</div>
+          <div className="space-y-3 p-4">
+            <div className="rounded-xl bg-white/[0.04] p-3">
+              <p className="mb-1 text-xs text-[var(--mute)]">სტატუსი</p>
+              <p className="text-lg font-semibold" style={{ color: getStatusColor(selectedAgent.status) }}>{getStatusLabel(selectedAgent.status)}</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 lg:gap-3">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-2.5 lg:p-3">
-                <div className="text-xs font-bold text-slate-400">დონე</div>
-                <div className="text-lg lg:text-2xl font-black">{selectedAgent.level}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-white/[0.04] p-3">
+                <p className="text-xs text-[var(--mute)]">დონე</p>
+                <p className="mono text-2xl">{selectedAgent.level}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-2.5 lg:p-3">
-                <div className="text-xs font-bold text-slate-400">ავტონომია</div>
-                <div className="text-lg lg:text-2xl font-black">L{selectedAgent.autonomyLevel}</div>
+              <div className="rounded-xl bg-white/[0.04] p-3">
+                <p className="text-xs text-[var(--mute)]">ავტონომია</p>
+                <p className="mono text-2xl">L{selectedAgent.autonomyLevel}</p>
               </div>
             </div>
             {selectedAgent.currentTask && (
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3 lg:p-4">
-                <div className="text-xs font-bold text-slate-400 mb-2">მიმდინარე აქტივობა</div>
-                <div className="text-sm lg:text-base font-bold">{selectedAgent.currentTask}</div>
+              <div className="rounded-xl bg-white/[0.04] p-3">
+                <p className="mb-1 text-xs text-[var(--mute)]">მიმდინარე აქტივობა</p>
+                <p className="text-sm font-medium">{selectedAgent.currentTask}</p>
               </div>
             )}
           </div>
@@ -1193,17 +1341,9 @@ Generated by Lunara OS Intelligence Layer (§4, §11, §24)`;
           from { opacity: 0; transform: translateY(-20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .lunara-readable .text-xs { font-size: 0.75rem !important; line-height: 1.25 !important; }
-        .lunara-readable .text-sm { font-size: 0.875rem !important; line-height: 1.4 !important; }
-        .lunara-readable .text-base { font-size: 1rem !important; line-height: 1.5 !important; }
-        .lunara-readable [class*="text-[10px]"] { font-size: 0.625rem !important; line-height: 1.2 !important; }
-        .lunara-readable p { line-height: 1.5; }
-        .lunara-readable h2 { line-height: 1.2; }
-        .lunara-readable h3 { line-height: 1.25; }
-        .lunara-readable button { line-height: 1.3; }
         ::-webkit-scrollbar { width: 6px !important; height: 6px !important; }
-        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05) !important; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15) !important; border-radius: 4px !important; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.03) !important; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14) !important; border-radius: 4px !important; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25) !important; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px !important; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02) !important; }
