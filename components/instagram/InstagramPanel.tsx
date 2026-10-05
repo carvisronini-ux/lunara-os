@@ -437,10 +437,27 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
             placeholder="e.g., ARIES or LEO (or click AI POST)" 
             className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-6" 
             onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} 
+            disabled={isAutoPosting}
           />
           <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-            <button onClick={handleZodiacSubmit} className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95">Continue ➔</button>
-            <button onClick={handleAiPost} className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2">🤖 AI POST</button>
+            <button 
+              onClick={handleZodiacSubmit} 
+              disabled={isAutoPosting}
+              className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold transition-all hover:scale-105 active:scale-95"
+            >
+              Continue ➔
+            </button>
+            <button 
+              onClick={handleAiPost} 
+              disabled={isAutoPosting}
+              className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+            >
+              {isAutoPosting ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Auto-Posting...</>
+              ) : (
+                <>🤖 AI POST</>
+              )}
+            </button>
           </div>
         </div>
       )}
