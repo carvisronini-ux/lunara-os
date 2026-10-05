@@ -257,11 +257,6 @@ export default function HomePage() {
   const selectedAgent = agents.find(a => a.id === selectedAgentId) ?? null;
   const selectedDept = departments.find(d => d.id === selectedDepartment);
   
-  const activeAgents = agents.filter(a => a.status === "WORKING" || a.status === "STARTING").length;
-  const completedTasks = tasks.filter(t => t.status === "COMPLETED").length;
-  const runningTasks = tasks.filter(t => (t.status as any) === "CLAIMED" || (t.status as any) === "RETRYING").length;
-  const totalXP = agents.reduce((sum, a) => sum + a.xp, 0);
-
   const filteredAgents = selectedDepartment ? agents.filter(a => a.department === selectedDepartment) : agents;
   const departmentAgents = (deptId: string) => agents.filter(a => a.department === deptId);
 
