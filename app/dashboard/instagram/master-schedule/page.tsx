@@ -20,6 +20,11 @@ const STYLES = `
   background:var(--ink); color:var(--moon);
 }
 .ig-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+@keyframes ig-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 140, 255, 0.3); }
+  50% { box-shadow: 0 0 20px 2px rgba(155, 140, 255, 0.15); }
+}
+.ig-today-glow { animation: ig-pulse-glow 3s ease-in-out infinite; }
 `;
 
 const Icons = {
@@ -31,6 +36,9 @@ const Icons = {
   reel: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>,
   edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>,
   trash: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>,
+  clock: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  check: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  calendar: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
 };
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -49,13 +57,45 @@ const TYPE_ICONS: Record<string, any> = {
   reel: Icons.reel,
 };
 
+// სტატუსის ბეიჯის ფერები
+const STATUS_STYLES = {
+  pending: {
+    bg: "bg-[var(--amber)]/10",
+    border: "border-[var(--amber)]/30",
+    text: "text-[var(--amber)]",
+    label: "Pending",
+    icon: Icons.clock,
+  },
+  done: {
+    bg: "bg-[var(--ok)]/10",
+    border: "border-[var(--ok)]/30",
+    text: "text-[var(--ok)]",
+    label: "Done",
+    icon: Icons.check,
+  },
+  upcoming: {
+    bg: "bg-[var(--ink-3)]",
+    border: "border-[var(--line-2)]",
+    text: "text-[var(--mute)]",
+    label: "Upcoming",
+    icon: Icons.calendar,
+  },
+  past: {
+    bg: "bg-[var(--ink-3)]/50",
+    border: "border-[var(--line)]",
+    text: "text-[var(--mute)]/60",
+    label: "Past",
+    icon: Icons.check,
+  },
+};
+
 export default function MasterSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editingRule, setEditingRule] = useState<any | null>(null); // ახალი: რედაქტირებისთვის
+  const [editingRule, setEditingRule] = useState<any | null>(null);
+  const [now, setNow] = useState(new Date());
 
-  // ფორმის მდგომარეობა
   const [formData, setFormData] = useState({
     day_of_week: 0,
     time: "09:00",
@@ -67,6 +107,9 @@ export default function MasterSchedulePage() {
 
   useEffect(() => {
     fetchSchedule();
+    // ყოველ წუთს განვაახლოთ დროს, რომ სტატუსები ავტომატურად შეიცვალოს
+    const interval = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchSchedule = async () => {
@@ -81,7 +124,21 @@ export default function MasterSchedulePage() {
     setLoading(false);
   };
 
-  // 1. ჩართვა/გამორთვა
+  // JS-ის დღის ინდექსი (0=კვირა, 1=ორშაბათი...) → ჩვენი (0=ორშაბათი, 6=კვირა)
+  const jsDay = now.getDay();
+  const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
+  const currentTimeStr = now.toTimeString().slice(0, 5); // "19:53"
+
+  // სტატუსის დადგენა თითოეული წესისთვის
+  const getRuleStatus = (rule: any) => {
+    if (!rule.is_active) return 'past';
+    if (rule.day_of_week < currentDayIndex) return 'past';
+    if (rule.day_of_week > currentDayIndex) return 'upcoming';
+    // იგივე დღე
+    if (rule.time <= currentTimeStr) return 'done';
+    return 'pending';
+  };
+
   const toggleRule = async (id: string, currentStatus: boolean) => {
     const { error } = await supabase
       .from("content_schedule")
@@ -95,7 +152,6 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // 2. წაშლა
   const deleteRule = async (id: string) => {
     if (!confirm("Are you sure you want to delete this rule?")) return;
     const { error } = await supabase.from("content_schedule").delete().eq("id", id);
@@ -104,7 +160,6 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // 3. მოდლის გახსნა (დამატება ან რედაქტირება)
   const openModal = (rule: any = null) => {
     if (rule) {
       setEditingRule(rule);
@@ -130,18 +185,13 @@ export default function MasterSchedulePage() {
     setShowModal(true);
   };
 
-  // 4. შენახვა (Update ან Insert)
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (editingRule) {
-      // UPDATE არსებული ჩანაწერის
       const { error } = await supabase
         .from("content_schedule")
-        .update({
-          ...formData,
-          zodiac_sign: formData.zodiac_sign || null,
-        })
+        .update({ ...formData, zodiac_sign: formData.zodiac_sign || null })
         .eq("id", editingRule.id);
 
       if (!error) {
@@ -156,7 +206,6 @@ export default function MasterSchedulePage() {
         setShowModal(false);
       }
     } else {
-      // INSERT ახალი ჩანაწერის
       const { data, error } = await supabase
         .from("content_schedule")
         .insert([{ ...formData, zodiac_sign: formData.zodiac_sign || null, is_active: true }])
@@ -175,6 +224,10 @@ export default function MasterSchedulePage() {
   };
 
   const activeRulesCount = schedule.filter((r) => r.is_active).length;
+
+  // ფორმატირებული დრო UI-სთვის
+  const formattedNow = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const formattedDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
     <div className="ig-root min-h-screen">
@@ -202,14 +255,26 @@ export default function MasterSchedulePage() {
           <div className="flex justify-center py-20 text-[var(--mute)]">Loading schedule...</div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+            {/* ✅ განახლებული ბანერები - კომპაქტური */}
+            <div className="flex flex-wrap gap-4">
+              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
                 <p className="text-xs font-medium text-[var(--mute)]">Active Rules</p>
-                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{activeRulesCount} <span className="text-sm font-normal text-[var(--mute)]">/ {schedule.length}</span></p>
+                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">
+                  {activeRulesCount} <span className="text-sm font-normal text-[var(--mute)]">/ {schedule.length}</span>
+                </p>
               </div>
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-                <p className="text-xs font-medium text-[var(--mute)]">Total Weekly Output</p>
-                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{schedule.length} <span className="text-sm font-normal text-[var(--mute)]">Items</span></p>
+              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+                <p className="text-xs font-medium text-[var(--mute)]">Weekly Output</p>
+                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">
+                  {schedule.length} <span className="text-sm font-normal text-[var(--mute)]">Items</span>
+                </p>
+              </div>
+              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--violet)]/30 bg-[var(--violet)]/5 p-4">
+                <p className="text-xs font-medium text-[var(--violet)]">Current Time</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--moon)]">
+                  {formattedDate}
+                </p>
+                <p className="text-lg font-bold text-[var(--violet)] font-mono">{formattedNow}</p>
               </div>
             </div>
 
@@ -218,20 +283,58 @@ export default function MasterSchedulePage() {
                 const dayRules = schedule.filter((r) => r.day_of_week === index);
                 if (dayRules.length === 0) return null;
 
+                const isToday = index === currentDayIndex;
+
                 return (
-                  <div key={day} className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] overflow-hidden">
-                    <div className="border-b border-[var(--line)] bg-[var(--ink-3)]/50 px-4 py-3">
-                      <h3 className="text-sm font-semibold text-[var(--violet)]">{day}</h3>
+                  <div 
+                    key={day} 
+                    className={`rounded-2xl border overflow-hidden transition-all ${
+                      isToday 
+                        ? "border-[var(--violet)]/50 bg-[var(--violet)]/5 ig-today-glow" 
+                        : "border-[var(--line)] bg-[var(--ink-2)]"
+                    }`}
+                  >
+                    <div className={`border-b px-4 py-3 flex items-center justify-between ${
+                      isToday 
+                        ? "border-[var(--violet)]/30 bg-[var(--violet)]/10" 
+                        : "border-[var(--line)] bg-[var(--ink-3)]/50"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <h3 className={`text-sm font-semibold ${isToday ? "text-[var(--violet)]" : "text-[var(--violet)]"}`}>
+                          {day}
+                        </h3>
+                        {isToday && (
+                          <span className="rounded-full bg-[var(--violet)] px-2 py-0.5 text-[10px] font-bold text-[var(--ink)]">
+                            TODAY
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-[var(--mute)]">
+                        {dayRules.length} {dayRules.length === 1 ? 'rule' : 'rules'}
+                      </span>
                     </div>
                     <div className="divide-y divide-[var(--line)]">
                       {dayRules.map((rule) => {
                         const TypeIcon = TYPE_ICONS[rule.content_type];
                         const colorClass = TYPE_COLORS[rule.content_type];
+                        const status = getRuleStatus(rule);
+                        const statusStyle = STATUS_STYLES[status as keyof typeof STATUS_STYLES];
+                        const StatusIcon = statusStyle.icon;
+
                         return (
-                          <div key={rule.id} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-white/[0.02]">
-                            <div className="w-16 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">{rule.time}</div>
+                          <div 
+                            key={rule.id} 
+                            className={`flex items-center gap-4 px-4 py-3 transition-colors ${
+                              status === 'pending' ? 'bg-[var(--amber)]/[0.03]' : 'hover:bg-white/[0.02]'
+                            }`}
+                          >
+                            <div className="w-16 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">
+                              {rule.time}
+                            </div>
                             <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${colorClass}`}>{TypeIcon}</div>
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${colorClass}`}>
+                                {TypeIcon}
+                              </div>
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-[var(--moon)]">
                                   {rule.content_type.charAt(0).toUpperCase() + rule.content_type.slice(1)}
@@ -240,14 +343,24 @@ export default function MasterSchedulePage() {
                                 <p className="truncate text-xs text-[var(--mute)]">{rule.content_theme}</p>
                               </div>
                             </div>
-                            <div className="hidden shrink-0 sm:block">
-                              <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)] border border-[var(--line-2)]">{rule.goal}</span>
+                            
+                            {/* ✅ სტატუსის ბეიჯი */}
+                            <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}>
+                              {StatusIcon}
+                              <span className="text-[10px] font-semibold uppercase tracking-wider">
+                                {statusStyle.label}
+                              </span>
                             </div>
+
                             <div className="flex items-center gap-1">
-                              <button onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>
+                              <button 
+                                onClick={() => toggleRule(rule.id, rule.is_active)} 
+                                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                                  rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"
+                                }`}
+                              >
                                 <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
                               </button>
-                              {/* ✅ ახალი: რედაქტირების ღილაკი */}
                               <button onClick={() => openModal(rule)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
                                 {Icons.edit}
                               </button>
@@ -263,11 +376,16 @@ export default function MasterSchedulePage() {
                 );
               })}
             </div>
+
+            <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
+              <p className="text-sm text-[var(--violet)]">
+                🧠 <span className="font-semibold">AI Auto-Optimization:</span> Currently in Baseline Mode. After 4 weeks of data collection, the system will suggest time/theme adjustments based on actual Reach & Saves.
+              </p>
+            </div>
           </>
         )}
       </main>
 
-      {/* ✅ განახლებული Modal: მუშაობს როგორც Add, ისე Edit რეჟიმში */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowModal(false)}>
           <div className="w-full max-w-md rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
