@@ -1,38 +1,37 @@
+// /home/carvisronini-ux/lunara-os/scripts/test-instagram.ts
 import { InstagramAdapter } from '../services/distribution/instagram-adapter';
 
-async function testInstagramPost() {
+async function main() {
   console.log('🧪 Starting Instagram test post...');
   
-  const adapter = new InstagramAdapter();
+  // ✅ FIX: გადავცემთ .env ცვლადებს InstagramAdapter-ს
+  const adapter = new InstagramAdapter(
+    process.env.INSTAGRAM_USER_ID || '',
+    process.env.INSTAGRAM_ACCESS_TOKEN || ''
+  );
   
   // უსაფრთხო, პროფესიონალური სურათი Unsplash-იდან
   // ეს არის მისტიკური/კოსმოსური თემატიკის სურათი
-  const testImageUrl = 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=80';
-  
-  // მარტივი, პროფესიონალური caption
-  const testCaption = `🌙 Welcome to LUNARA
+  const imageUrl = 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1080&h=1350&fit=crop';
+  const caption = '🌌 The universe is whispering your name today. Listen closely. ✨\n\n#LUNARA #CosmicEnergy #Astrology #DailyHoroscope #Universe';
 
-Your daily cosmic signal awaits.
+  console.log('📤 Sending request to Instagram API...');
+  console.log('Image URL:', imageUrl);
+  console.log('Caption length:', caption.length);
 
-#LUNARA #Tarot #Astrology`;
-
-  console.log('📸 Image URL:', testImageUrl);
-  console.log('📝 Caption:', testCaption);
-  console.log('---');
-
-  const result = await adapter.publishPost(testImageUrl, testCaption);
-
-  if (result.success) {
-    console.log('✅ SUCCESS! Post published to Instagram');
-    console.log('🆔 Post ID:', result.postId);
-    console.log('🔗 View at: https://www.instagram.com/p/' + result.postId);
-  } else {
-    console.error('❌ FAILED:', result.error);
-    console.log('\n🔍 Troubleshooting tips:');
-    console.log('1. Check if Access Token is still valid (expires in 1 hour in Dev mode)');
-    console.log('2. Verify Instagram account is Business type');
-    console.log('3. Check Meta Developer App permissions');
+  try {
+    const result = await adapter.publishPost(imageUrl, caption);
+    
+    if (result.success) {
+      console.log('🎉 SUCCESS! Post published successfully.');
+      console.log('Post ID:', result.postId);
+      console.log('URL:', `https://www.instagram.com/p/${result.postId}`);
+    } else {
+      console.error('❌ FAILED! Error:', result.error);
+    }
+  } catch (error) {
+    console.error('💥 CRITICAL ERROR:', error);
   }
 }
 
-testInstagramPost();
+main();
