@@ -284,7 +284,8 @@ export default function InstagramPage() {
     setDeletingProfile(null);
   };
 
-  const toggleFormat = (format: ContentType) => {
+  // ✅ FIX: გამოვიყენეთ async/await, რათა თავიდან ავიცილოთ TypeScript-ის implicit any შეცდომა
+  const toggleFormat = async (format: ContentType) => {
     if (!activeProfile) return;
     const isOn = activeProfile.enabledFormats.includes(format);
     if (isOn && activeProfile.enabledFormats.length === 1) {
@@ -301,13 +302,12 @@ export default function InstagramPage() {
     setProfiles((prev) => prev.map((p) => (p.id === activeProfile.id ? { ...p, enabledFormats: next } : p)));
     
     // Update Supabase (optional, but good for consistency)
-    supabase
+    const { error } = await supabase
       .from("instagram_accounts")
       .update({ enabled_formats: next })
-      .eq("username", activeProfile.username)
-      .then(({ error }) => {
-        if (error) console.error("Failed to update formats in Supabase:", error);
-      });
+      .eq("username", activeProfile.username);
+      
+    if (error) console.error("Failed to update formats in Supabase:", error);
   };
 
   return (
