@@ -1,3 +1,4 @@
+// /home/carvisronini-ux/lunara-os/app/dashboard/instagram/page.tsx
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -448,7 +449,13 @@ export default function InstagramPage() {
                             Publishing to {activeProfile.username}
                           </span>
                         </div>
-                        <InstagramPanel pushEvent={pushEvent} />
+                        
+                        {/* ✅ აქ დაემატა profileUsername პროპი */}
+                        <InstagramPanel 
+                          profileUsername={activeProfile.username} 
+                          pushEvent={pushEvent} 
+                        />
+                        
                       </>
                     ) : (
                       <p className="py-10 text-center text-sm text-[var(--mute)]">

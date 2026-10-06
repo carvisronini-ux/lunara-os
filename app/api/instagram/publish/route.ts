@@ -1,37 +1,47 @@
-// /home/carvisronini-ux/lunara-os/app/api/instagram/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { InstagramAgent } from '@/agents/content/instagram-agent';
+import { createClient } from '@supabase/supabase-js';
+import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
+
+// ვიყენებთ SERVICE_ROLE_KEY-ს, რათა API-მ შეძლოს RLS-ის გვერდის ავლით მონაცემების წაკითხვა
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
+  process.env.SUPABASE_OS_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { imageUrl, caption, profileUsername } = body;
     
-    // ვიღებთ მონაცემებს, რომლებსაც Frontend გვიგზავნის
-    const { 
-      imageUrl, 
-      caption, 
-      text1, 
-      text2, 
-      generatedHashtags 
-    } = body;
-    
-    // თუ caption პირდაპირ არ არის მოწოდებული, ავაწყოთ ის text1, text2 და generatedHashtags-ისგან
-    const finalCaption = caption || `${text1}\n\n${text2}\n\n${generatedHashtags || ''}`.trim();
-    
-    if (!imageUrl || !finalCaption) {
+    if (!imageUrl || !caption || !profileUsername) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Missing imageUrl or caption (text1/text2)' 
+        error: 'Missing imageUrl, caption, or profileUsername' 
       }, { status: 400 });
     }
 
-    console.log('[Instagram Publish API] Starting publish process...');
-    console.log('[Instagram Publish API] Image URL:', imageUrl);
+    console.log(`[Instagram Publish API] Fetching credentials for: ${profileUsername}`);
+
+    // 1. წამოვიღოთ კრედენშიალები Supabase-დან უსაფრთხოდ
+    const { data: profile, error } = await supabase
+      .from('instagram_accounts')
+      .select('instagram_user_id, instagram_access_token')
+      .eq('username', profileUsername)
+      .single();
+
+    if (error || !profile || !profile.instagram_user_id || !profile.instagram_access_token) {
+      console.error('[Instagram Publish API] Credentials not found in database for:', profileUsername);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Instagram credentials are not configured for this profile in the database.' 
+      }, { status: 400 });
+    }
+
+    console.log('[Instagram Publish API] Credentials found securely. Starting publish process...');
     
-    const agent = new InstagramAgent();
-    
-    // ვიყენებთ publishExisting-ს, რადგან ფოტო უკვე ატვირთულია Supabase-ში და გვაქვს მისი საჯარო URL
-    const result = await agent.publishExisting(imageUrl, finalCaption);
+    // 2. გადავცეთ დინამიურად InstagramAdapter-ს (შეცვლილი კონსტრუქტორით)
+    const agent = new InstagramAdapter(profile.instagram_user_id, profile.instagram_access_token);
+    const result = await agent.publishExisting(imageUrl, caption);
     
     if (result.success) {
       console.log('[Instagram Publish API] Successfully published! Post ID:', result.postId);

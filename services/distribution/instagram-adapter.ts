@@ -11,12 +11,13 @@ export class InstagramAdapter {
   private igUserId: string;
   private accessToken: string;
 
-  constructor() {
-    this.igUserId = process.env.INSTAGRAM_USER_ID || '';
-    this.accessToken = process.env.INSTAGRAM_ACCESS_TOKEN || '';
+  // ✅ ახლა ვიღებთ მონაცემებს არგუმენტებად, და არა process.env-დან
+  constructor(userId: string, token: string) {
+    this.igUserId = userId;
+    this.accessToken = token;
 
     if (!this.igUserId || !this.accessToken) {
-      console.error('❌ Instagram credentials are missing in environment variables');
+      console.error('❌ InstagramAdapter: Credentials provided are empty!');
     }
   }
 
@@ -34,6 +35,8 @@ export class InstagramAdapter {
       }
 
       console.log(`📸 Starting Instagram publish for image: ${imageUrl}`);
+      console.log(`📸 Using User ID: ${this.igUserId}`);
+      console.log(`📸 Token length: ${this.accessToken.length} characters`);
 
       // ნაბიჯი 1: მედიის კონტეინერის შექმნა
       const containerResponse = await fetch(
@@ -125,6 +128,23 @@ export class InstagramAdapter {
         platform: 'instagram',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  }
+
+  // დანარჩენი მეთოდები (publishExisting, autoCreateAndPublish და ა.შ.) 
+  // უცვლელი რჩება, როგორც გქონდათ, რადგან ისინი იყენებენ ზემოთ განსაზღვრულ publishPost-ს.
+  async publishExisting(imageUrl: string, caption: string) {
+    try {
+      const publishResult = await this.publishPost(imageUrl, caption);
+      if (publishResult.success) {
+        return { success: true, postId: publishResult.postId, instagramUrl: `https://www.instagram.com/p/${publishResult.postId}` };
+      } else {
+        throw new Error(`Publish failed: ${publishResult.error}`);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ [InstagramAdapter] Publish error:', errorMsg);
+      return { success: false, error: errorMsg };
     }
   }
 }

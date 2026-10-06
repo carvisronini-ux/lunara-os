@@ -9,8 +9,10 @@ type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error
 type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 
+// ✅ 1. დავამატეთ profileUsername ინტერფეისში
 interface InstagramPanelProps {
   pushEvent: (type: EventLogType, message: string) => void;
+  profileUsername: string;
 }
 
 const supabase = createClient(
@@ -147,7 +149,8 @@ function Section({ title, children, actions }: { title: string; children: React.
    COMPONENT
    ===================================================================== */
 
-export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
+// ✅ 2. დავამატეთ profileUsername დესტრუქტურიზაციაში
+export default function InstagramPanel({ pushEvent, profileUsername }: InstagramPanelProps) {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
@@ -434,7 +437,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  // 🔥 ULTRA-DETAILED LOGGING FOR PUBLISHING
+  // 🔥 3. განახლებული handlePublish, რომელიც აგზავნის profileUsername-ს
   const handlePublish = async () => {
     if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
       addLog("❌ PRE-FLIGHT CHECK FAILED: Missing imageUrl, text2, zodiac, or format.");
@@ -451,10 +454,12 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         text1: text1,
         text2: text2,
         generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
-        imageUrl: uploadedImageUrl
+        imageUrl: uploadedImageUrl,
+        profileUsername: profileUsername // ✅ ეს დაემატა
       };
 
       addLog(`📤 [PUBLISH] Sending payload to /api/instagram/publish:`);
+      addLog(`   → profileUsername: ${payload.profileUsername}`);
       addLog(`   → imageUrl: ${payload.imageUrl.substring(0, 60)}...`);
       addLog(`   → caption length: ${payload.text1.length + payload.text2.length + (payload.generatedHashtags?.length || 0)} chars`);
 
