@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
 import InstagramPanel from "@/components/instagram/InstagramPanel";
 
 type ContentType = "post" | "carousel" | "story";
@@ -15,12 +16,25 @@ interface Profile {
   status: "active" | "paused";
   postCount: number;
   enabledFormats: ContentType[];
+  
+  // ახალი API და ავტორიზაციის ველები
+  pageName?: string;
+  pageLink?: string;
+  igUsername?: string;
+  igPassword?: string;
+  instagramPageId?: string;
+  instagramUserId?: string;
+  instagramAccessToken?: string;
 }
 
-const DEFAULT_AVATAR =
-  "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png";
-
+const DEFAULT_AVATAR = "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png";
 const STORAGE_KEY = "instagram-profiles";
+
+// Supabase კლიენტის ინიციალიზაცია
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY!
+);
 
 const DEFAULT_PROFILES: Profile[] = [
   {
@@ -60,6 +74,9 @@ const STYLES = `
 .ig-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
 .ig-scroll{scrollbar-width:none}
 .ig-scroll::-webkit-scrollbar{display:none}
+.custom-scrollbar::-webkit-scrollbar { width: 4px !important; }
+.custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02) !important; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1) !important; border-radius: 3px !important; }
 @keyframes ig-pop{from{opacity:0; transform:translateY(8px) scale(.98)} to{opacity:1; transform:none}}
 @keyframes ig-toast{from{opacity:0; transform:translate(-50%,12px)} to{opacity:1; transform:translate(-50%,0)}}
 .ig-pop{animation:ig-pop .18s ease-out}
@@ -167,27 +184,93 @@ export default function InstagramPage() {
     setActiveFormat(profile.enabledFormats[0] ?? "post");
   };
 
-  const addProfile = (username: string, avatar: string) => {
+  const addProfile = async (data: Partial<Profile> & { username: string }) => {
+    const newProfileData = {
+      username: data.username,
+      avatar_url: data.avatar || DEFAULT_AVATAR,
+      page_name: data.pageName,
+      page_link: data.pageLink,
+      ig_username: data.igUsername,
+      ig_password: data.igPassword,
+      instagram_page_id: data.instagramPageId,
+      instagram_user_id: data.instagramUserId,
+      instagram_access_token: data.instagramAccessToken,
+      status: "paused",
+    };
+
+    const { error } = await supabase.from("instagram_accounts").insert(newProfileData);
+    
+    if (error) {
+      console.error("Failed to save to Supabase:", error);
+      pushEvent("error", "Failed to save account to database");
+      return;
+    }
+
     const newProfile: Profile = {
       id: `profile-${Date.now()}`,
-      username,
-      avatar: avatar || DEFAULT_AVATAR,
+      username: data.username,
+      avatar: data.avatar || DEFAULT_AVATAR,
       status: "paused",
       postCount: 0,
       enabledFormats: ["post", "carousel", "story"],
+      pageName: data.pageName,
+      pageLink: data.pageLink,
+      igUsername: data.igUsername,
+      igPassword: data.igPassword,
+      instagramPageId: data.instagramPageId,
+      instagramUserId: data.instagramUserId,
+      instagramAccessToken: data.instagramAccessToken,
     };
+    
     setProfiles((prev) => [...prev, newProfile]);
     setShowAddProfile(false);
-    pushEvent("profile", `${username} added`);
+    pushEvent("profile", `${data.username} added`);
   };
 
-  const updateProfile = (id: string, updates: Partial<Profile>) => {
-    setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  const updateProfile = async (id: string, data: Partial<Profile>) => {
+    const updateData = {
+      username: data.username,
+      avatar_url: data.avatar,
+      page_name: data.pageName,
+      page_link: data.pageLink,
+      ig_username: data.igUsername,
+      ig_password: data.igPassword,
+      instagram_page_id: data.instagramPageId,
+      instagram_user_id: data.instagramUserId,
+      instagram_access_token: data.instagramAccessToken,
+    };
+
+    const { error } = await supabase
+      .from("instagram_accounts")
+      .update(updateData)
+      .eq("username", data.username);
+
+    if (error) {
+      console.error("Failed to update in Supabase:", error);
+      pushEvent("error", "Failed to update account in database");
+      return;
+    }
+
+    setProfiles((prev) => prev.map((p) => (p.id === id ? { ...p, ...data } : p)));
+    setEditingProfile(null);
+    pushEvent("profile", "Account updated");
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deletingProfile) return;
     const id = deletingProfile.id;
+    
+    const { error } = await supabase
+      .from("instagram_accounts")
+      .delete()
+      .eq("username", deletingProfile.username);
+
+    if (error) {
+      console.error("Failed to delete from Supabase:", error);
+      pushEvent("error", "Failed to delete account from database");
+      return;
+    }
+
     const remaining = profiles.filter((p) => p.id !== id);
     if (activeProfileId === id && remaining.length > 0) {
       const next = remaining[0];
@@ -213,7 +296,18 @@ export default function InstagramPage() {
       : (["post", "carousel", "story"] as ContentType[]).filter(
           (f) => f === format || activeProfile.enabledFormats.includes(f)
         );
-    updateProfile(activeProfile.id, { enabledFormats: next });
+    
+    // Update local state
+    setProfiles((prev) => prev.map((p) => (p.id === activeProfile.id ? { ...p, enabledFormats: next } : p)));
+    
+    // Update Supabase (optional, but good for consistency)
+    supabase
+      .from("instagram_accounts")
+      .update({ enabled_formats: next })
+      .eq("username", activeProfile.username)
+      .then(({ error }) => {
+        if (error) console.error("Failed to update formats in Supabase:", error);
+      });
   };
 
   return (
@@ -361,7 +455,6 @@ export default function InstagramPage() {
                             : "cursor-not-allowed border-[var(--line)] bg-transparent opacity-45"
                         }`}
                       >
-                        {/* aspect-ratio glyph */}
                         <span className="flex h-12 w-12 shrink-0 items-center justify-center">
                           <span
                             className={`block max-h-12 max-w-12 border-2 ${
@@ -450,7 +543,6 @@ export default function InstagramPage() {
                           </span>
                         </div>
                         
-                        {/* ✅ აქ დაემატა profileUsername პროპი */}
                         <InstagramPanel 
                           profileUsername={activeProfile.username} 
                           pushEvent={pushEvent} 
@@ -464,7 +556,6 @@ export default function InstagramPage() {
                     )}
                   </div>
 
-                  {/* live format preview */}
                   <aside className="hidden lg:block">
                     <div className="sticky top-24">
                       <FormatPreview profile={activeProfile} format={currentFormat} />
@@ -513,11 +604,7 @@ export default function InstagramPage() {
           mode="edit"
           profile={editingProfile}
           existing={profiles}
-          onSave={(username, avatar) => {
-            updateProfile(editingProfile.id, { username, avatar: avatar || DEFAULT_AVATAR });
-            setEditingProfile(null);
-            pushEvent("profile", "Account updated");
-          }}
+          onSave={(data) => updateProfile(editingProfile.id, data)}
           onClose={() => setEditingProfile(null)}
         />
       )}
@@ -547,7 +634,7 @@ export default function InstagramPage() {
   );
 }
 
-/* ---------- format preview (the memorable element) ---------- */
+/* ---------- format preview ---------- */
 function FormatPreview({ profile, format }: { profile: Profile; format: ContentType | null }) {
   const cfg = format ? FORMAT_CONFIG[format] : null;
   return (
@@ -656,11 +743,19 @@ function ProfileModal({
   mode: "add" | "edit";
   profile?: Profile;
   existing: Profile[];
-  onSave: (username: string, avatar: string) => void;
+  onSave: (data: Partial<Profile> & { username: string }) => void;
   onClose: () => void;
 }) {
   const [username, setUsername] = useState(profile?.username ?? "");
   const [avatar, setAvatar] = useState(profile?.avatar && profile.avatar !== DEFAULT_AVATAR ? profile.avatar : "");
+  const [pageName, setPageName] = useState(profile?.pageName ?? "");
+  const [pageLink, setPageLink] = useState(profile?.pageLink ?? "");
+  const [igUsername, setIgUsername] = useState(profile?.igUsername ?? "");
+  const [igPassword, setIgPassword] = useState(profile?.igPassword ?? "");
+  const [instagramPageId, setInstagramPageId] = useState(profile?.instagramPageId ?? "");
+  const [instagramUserId, setInstagramUserId] = useState(profile?.instagramUserId ?? "");
+  const [instagramAccessToken, setInstagramAccessToken] = useState(profile?.instagramAccessToken ?? "");
+  
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -673,7 +768,19 @@ function ProfileModal({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (canSave) onSave(normalized, avatar.trim());
+    if (canSave) {
+      onSave({
+        username: normalized,
+        avatar: avatar.trim() || DEFAULT_AVATAR,
+        pageName: pageName.trim(),
+        pageLink: pageLink.trim(),
+        igUsername: igUsername.trim(),
+        igPassword: igPassword.trim(),
+        instagramPageId: instagramPageId.trim(),
+        instagramUserId: instagramUserId.trim(),
+        instagramAccessToken: instagramAccessToken.trim(),
+      });
+    }
   };
 
   const inputClass =
@@ -681,7 +788,7 @@ function ProfileModal({
 
   return (
     <ModalShell title={mode === "add" ? "Add account" : "Edit account"} onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
         <div className="flex items-center gap-4">
           <img
             src={avatar.trim() || DEFAULT_AVATAR}
@@ -693,11 +800,11 @@ function ProfileModal({
         </div>
 
         <div>
-          <label htmlFor="ig-username" className="mb-1.5 block text-sm font-medium">
-            Username
+          <label htmlFor="ig-username-display" className="mb-1.5 block text-sm font-medium">
+            Display Username <span className="text-[var(--rose)]">*</span>
           </label>
           <input
-            id="ig-username"
+            id="ig-username-display"
             ref={inputRef}
             type="text"
             value={username}
@@ -723,7 +830,70 @@ function ProfileModal({
           />
         </div>
 
-        <div className="flex gap-2 pt-2">
+        <div className="border-t border-[var(--line-2)] pt-4 mt-4">
+          <h4 className="text-sm font-semibold text-[var(--violet)] mb-3">Instagram API & Auth Details</h4>
+          
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="page-name" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                Instagram Page Name
+              </label>
+              <input id="page-name" type="text" value={pageName} onChange={(e) => setPageName(e.target.value)} placeholder="My Awesome Page" className={inputClass} />
+            </div>
+
+            <div>
+              <label htmlFor="page-link" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                Instagram Page Link
+              </label>
+              <input id="page-link" type="url" value={pageLink} onChange={(e) => setPageLink(e.target.value)} placeholder="https://instagram.com/..." className={inputClass} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="ig-username-auth" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                  IG Username
+                </label>
+                <input id="ig-username-auth" type="text" value={igUsername} onChange={(e) => setIgUsername(e.target.value)} placeholder="username" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="ig-password" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                  IG Password
+                </label>
+                <input id="ig-password" type="password" value={igPassword} onChange={(e) => setIgPassword(e.target.value)} placeholder="••••••••" className={inputClass} />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="ig-page-id" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                INSTAGRAM_PAGE_ID
+              </label>
+              <input id="ig-page-id" type="text" value={instagramPageId} onChange={(e) => setInstagramPageId(e.target.value)} placeholder="1234567890" className={inputClass} />
+            </div>
+
+            <div>
+              <label htmlFor="ig-user-id" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                INSTAGRAM_USER_ID
+              </label>
+              <input id="ig-user-id" type="text" value={instagramUserId} onChange={(e) => setInstagramUserId(e.target.value)} placeholder="17841440619446676" className={inputClass} />
+            </div>
+
+            <div>
+              <label htmlFor="ig-access-token" className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
+                INSTAGRAM_ACCESS_TOKEN
+              </label>
+              <textarea 
+                id="ig-access-token" 
+                value={instagramAccessToken} 
+                onChange={(e) => setInstagramAccessToken(e.target.value)} 
+                placeholder="EAAXCfSgZAEJQ..." 
+                rows={3}
+                className={`${inputClass} resize-none`} 
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2 sticky bottom-0 bg-[var(--ink-2)] pb-2">
           <button
             type="button"
             onClick={onClose}
