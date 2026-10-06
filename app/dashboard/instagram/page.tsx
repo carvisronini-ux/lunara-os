@@ -6,7 +6,6 @@ import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import InstagramPanel from "@/components/instagram/InstagramPanel";
 
-// ✅ 1. დამატებულია "reel"
 type ContentType = "post" | "carousel" | "story" | "reel";
 type TabId = "manual" | "instaboss" | "analytics";
 
@@ -35,7 +34,6 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY!
 );
 
-// ✅ 2. მხოლოდ "post" არის ჩართული დეფოლტად
 const DEFAULT_PROFILES: Profile[] = [
   {
     id: "lunara-main",
@@ -47,7 +45,6 @@ const DEFAULT_PROFILES: Profile[] = [
   },
 ];
 
-// ✅ 3. დამატებულია Reel-ის კონფიგურაცია
 const FORMAT_CONFIG: Record<
   ContentType,
   { label: string; size: string; ratio: string; ratioCss: string; hint: string }
@@ -205,7 +202,6 @@ export default function InstagramPage() {
       return;
     }
 
-    // ✅ 4. ახალ პროფილსაც მხოლოდ "post" აქვს ჩართული
     const newProfile: Profile = {
       id: `profile-${Date.now()}`,
       username: data.username,
@@ -284,7 +280,6 @@ export default function InstagramPage() {
     setDeletingProfile(null);
   };
 
-  // ✅ 5. სხვა ფორმატების ჩართვა დაბლოკილია "Coming soon" შეტყობინებით
   const toggleFormat = async (format: ContentType) => {
     if (!activeProfile) return;
     const isOn = activeProfile.enabledFormats.includes(format);
@@ -337,13 +332,29 @@ export default function InstagramPage() {
             </div>
           </div>
 
-          {activeProfile && (
-            <div className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink-2)] py-1 pl-1 pr-3">
-              <img src={activeProfile.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-              <span className="text-sm font-medium">{activeProfile.username}</span>
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" aria-label="Active" />
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {/* ✅ Master Schedule ღილაკი Header-ში */}
+            <Link
+              href="/dashboard/instagram/master-schedule"
+              className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink-2)] px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] transition-colors hover:border-[var(--line-2)] hover:bg-[var(--ink-3)]"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span className="hidden sm:inline">Master Schedule</span>
+            </Link>
+
+            {activeProfile && (
+              <div className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink-2)] py-1 pl-1 pr-3">
+                <img src={activeProfile.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+                <span className="text-sm font-medium">{activeProfile.username}</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" aria-label="Active" />
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -438,7 +449,6 @@ export default function InstagramPage() {
                 <p className="hidden text-xs text-[var(--mute)] sm:block">Use the switch to enable or hide a format</p>
               </div>
 
-              {/* ✅ აქ ავტომატურად გამოჩნდება 4 ბარათი, მაგრამ მხოლოდ Post იქნება ჩართული */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {(Object.keys(FORMAT_CONFIG) as ContentType[]).map((key) => {
                   const cfg = FORMAT_CONFIG[key];
