@@ -17,7 +17,6 @@ interface Profile {
   postCount: number;
   enabledFormats: ContentType[];
   
-  // ახალი API და ავტორიზაციის ველები
   pageName?: string;
   pageLink?: string;
   igUsername?: string;
@@ -30,7 +29,6 @@ interface Profile {
 const DEFAULT_AVATAR = "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png";
 const STORAGE_KEY = "instagram-profiles";
 
-// Supabase კლიენტის ინიციალიზაცია
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY!
@@ -128,7 +126,6 @@ export default function InstagramPage() {
   const [deletingProfile, setDeletingProfile] = useState<Profile | null>(null);
   const [toast, setToast] = useState<{ id: number; type: string; message: string } | null>(null);
 
-  /* load once */
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -147,7 +144,6 @@ export default function InstagramPage() {
     setHydrated(true);
   }, []);
 
-  /* save only after load, so defaults never overwrite stored data */
   useEffect(() => {
     if (!hydrated) return;
     try {
@@ -157,7 +153,6 @@ export default function InstagramPage() {
     }
   }, [profiles, hydrated]);
 
-  /* toast auto-dismiss */
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3500);
@@ -284,7 +279,6 @@ export default function InstagramPage() {
     setDeletingProfile(null);
   };
 
-  // ✅ FIX: გამოვიყენეთ async/await, რათა თავიდან ავიცილოთ TypeScript-ის implicit any შეცდომა
   const toggleFormat = async (format: ContentType) => {
     if (!activeProfile) return;
     const isOn = activeProfile.enabledFormats.includes(format);
@@ -298,10 +292,8 @@ export default function InstagramPage() {
           (f) => f === format || activeProfile.enabledFormats.includes(f)
         );
     
-    // Update local state
     setProfiles((prev) => prev.map((p) => (p.id === activeProfile.id ? { ...p, enabledFormats: next } : p)));
     
-    // Update Supabase (optional, but good for consistency)
     const { error } = await supabase
       .from("instagram_accounts")
       .update({ enabled_formats: next })
@@ -314,7 +306,6 @@ export default function InstagramPage() {
     <div className="ig-root min-h-screen">
       <style>{STYLES}</style>
 
-      {/* ---------- header ---------- */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
@@ -344,7 +335,6 @@ export default function InstagramPage() {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-6 lg:px-8 lg:py-8">
-        {/* ---------- accounts ---------- */}
         <section aria-labelledby="accounts-title">
           <div className="mb-3 flex items-center justify-between">
             <h2 id="accounts-title" className="text-sm font-semibold text-[var(--mute)]">
@@ -427,7 +417,6 @@ export default function InstagramPage() {
 
         {activeProfile && (
           <>
-            {/* ---------- formats ---------- */}
             <section aria-labelledby="formats-title">
               <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 id="formats-title" className="text-sm font-semibold text-[var(--mute)]">
@@ -496,7 +485,6 @@ export default function InstagramPage() {
               </div>
             </section>
 
-            {/* ---------- workspace ---------- */}
             <section aria-label="Workspace">
               <div role="tablist" aria-label="Workspace" className="mb-4 inline-flex rounded-full border border-[var(--line)] bg-[var(--ink-2)] p-1">
                 {TABS.map((tab) => {
@@ -527,7 +515,7 @@ export default function InstagramPage() {
               </div>
 
               {activeTab === "manual" && (
-                <div role="tabpanel" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+                <div role="tabpanel" className="gap-6">
                   <div className="min-w-0 rounded-3xl border border-[var(--line)] bg-[var(--ink-2)] p-4 lg:p-6">
                     {currentFormat ? (
                       <>
@@ -556,11 +544,7 @@ export default function InstagramPage() {
                     )}
                   </div>
 
-                  <aside className="hidden lg:block">
-                    <div className="sticky top-24">
-                      <FormatPreview profile={activeProfile} format={currentFormat} />
-                    </div>
-                  </aside>
+                  {/* ✅ Preview ბანერი ამოღებულია */}
                 </div>
               )}
 
@@ -583,7 +567,6 @@ export default function InstagramPage() {
         )}
       </main>
 
-      {/* ---------- toast ---------- */}
       {toast && (
         <div
           key={toast.id}
@@ -595,7 +578,6 @@ export default function InstagramPage() {
         </div>
       )}
 
-      {/* ---------- modals ---------- */}
       {showAddProfile && (
         <ProfileModal mode="add" existing={profiles} onSave={addProfile} onClose={() => setShowAddProfile(false)} />
       )}
@@ -634,47 +616,6 @@ export default function InstagramPage() {
   );
 }
 
-/* ---------- format preview ---------- */
-function FormatPreview({ profile, format }: { profile: Profile; format: ContentType | null }) {
-  const cfg = format ? FORMAT_CONFIG[format] : null;
-  return (
-    <div className="rounded-3xl border border-[var(--line)] bg-[var(--ink-2)] p-5">
-      <p className="mb-4 text-sm font-semibold text-[var(--mute)]">Preview</p>
-      <div className="flex justify-center">
-        <div
-          className="relative w-full max-w-[200px] overflow-hidden rounded-[22px] border border-[var(--line-2)] transition-all duration-300"
-          style={{
-            aspectRatio: cfg?.ratioCss ?? "4 / 5",
-            background:
-              "radial-gradient(circle at 66% 30%, #1a1640 0 9%, transparent 9.5%), radial-gradient(circle at 60% 30%, #f6c177 0 13%, transparent 13.5%), linear-gradient(165deg, #2a2160 0%, #1a1640 55%, #0e1030 100%)",
-          }}
-        >
-          <div className="absolute inset-x-0 top-0 flex items-center gap-2 p-3">
-            <img src={profile.avatar} alt="" className="h-6 w-6 rounded-full object-cover ring-1 ring-white/30" />
-            <span className="truncate text-[11px] font-semibold">{profile.username}</span>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 space-y-1.5 p-3">
-            <div className="h-1.5 w-3/4 rounded-full bg-white/70" />
-            <div className="h-1.5 w-1/2 rounded-full bg-white/35" />
-          </div>
-        </div>
-      </div>
-      {cfg && (
-        <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <dt className="text-xs text-[var(--mute)]">Size</dt>
-            <dd className="font-medium">{cfg.size}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-[var(--mute)]">Ratio</dt>
-            <dd className="font-medium">{cfg.ratio}</dd>
-          </div>
-        </dl>
-      )}
-    </div>
-  );
-}
-
 function ComingSoon({ title, text, role }: { title: string; text: string; role?: string }) {
   return (
     <div role={role} className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-16 text-center">
@@ -687,7 +628,6 @@ function ComingSoon({ title, text, role }: { title: string; text: string; role?:
   );
 }
 
-/* ---------- modals ---------- */
 function ModalShell({
   title,
   onClose,
