@@ -1,4 +1,3 @@
-// /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
 import { useState, useRef } from "react";
@@ -49,6 +48,127 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const uniqueExtractedTags = Array.from(new Set(extractedTags)).slice(0, 4);
   return [...baseTags, ...uniqueExtractedTags].join(" ");
 };
+
+/* =====================================================================
+   DESIGN LAYER (presentation only)
+   ===================================================================== */
+
+const THEME = {
+  "--p-ink": "#0b0d1c",
+  "--p-ink-2": "#12152b",
+  "--p-ink-3": "#1a1e3a",
+  "--p-line": "rgba(236,233,247,.1)",
+  "--p-line-2": "rgba(236,233,247,.18)",
+  "--p-moon": "#ece9f7",
+  "--p-mute": "#9d9bbd",
+  "--p-violet": "#9b8cff",
+  "--p-ok": "#5fd6a4",
+} as React.CSSProperties;
+
+const FORMAT_OPTIONS: { id: PostFormat; label: string; size: string; ratio: string; ratioCss: string }[] = [
+  { id: "post", label: "Post", size: "1080 × 1350", ratio: "4:5", ratioCss: "4 / 5" },
+  { id: "story", label: "Story", size: "1080 × 1920", ratio: "9:16", ratioCss: "9 / 16" },
+  { id: "carousel", label: "Carousel", size: "1080 × 1080", ratio: "1:1", ratioCss: "1 / 1" },
+];
+
+const STEPS: { id: WizardStep; label: string }[] = [
+  { id: "input", label: "Zodiac" },
+  { id: "format", label: "Format" },
+  { id: "preview", label: "Compose" },
+];
+
+const fieldClass =
+  "w-full rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-3 text-sm text-[var(--p-moon)] outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--p-violet)]";
+const btnPrimary =
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-violet)] px-5 py-3 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
+const btnOk =
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-ok)] px-5 py-3.5 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
+const btnGhost =
+  "inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] px-5 py-3 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40";
+const btnSmall =
+  "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+
+function Spinner({ dark = false }: { dark?: boolean }) {
+  return (
+    <span
+      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${
+        dark ? "border-[#0b0d1c]/30 border-t-[#0b0d1c]" : "border-white/30 border-t-white"
+      }`}
+      aria-hidden
+    />
+  );
+}
+
+function Stepper({ current }: { current: WizardStep }) {
+  const currentIndex = STEPS.findIndex(s => s.id === current);
+  return (
+    <ol className="mb-6 flex items-center gap-2" aria-label="Progress">
+      {STEPS.map((s, i) => {
+        const done = i < currentIndex;
+        const active = i === currentIndex;
+        return (
+          <li key={s.id} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                active
+                  ? "bg-[var(--p-violet)] text-[var(--p-ink)]"
+                  : done
+                  ? "bg-[var(--p-ok)] text-[var(--p-ink)]"
+                  : "border border-[var(--p-line-2)] text-[var(--p-mute)]"
+              }`}
+            >
+              {done ? "✓" : i + 1}
+            </span>
+            <span className={`text-sm font-medium ${active ? "text-[var(--p-moon)]" : "text-[var(--p-mute)]"}`}>{s.label}</span>
+            {i < STEPS.length - 1 && <span className="mx-1 h-px w-6 bg-[var(--p-line-2)] sm:w-10" />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onClick}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        on ? "bg-[var(--p-ok)]" : "bg-[var(--p-ink-3)] ring-1 ring-inset ring-[var(--p-line-2)]"
+      }`}
+    >
+      <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${on ? "left-6" : "left-1"}`} />
+    </button>
+  );
+}
+
+function SizeControl({ value, onMinus, onPlus }: { value: number; onMinus: () => void; onPlus: () => void }) {
+  return (
+    <div className="flex items-center rounded-lg border border-[var(--p-line-2)]">
+      <button onClick={onMinus} aria-label="Decrease font size" className="h-8 w-8 rounded-l-lg text-[var(--p-moon)] transition-colors hover:bg-white/5">−</button>
+      <span className="w-12 text-center font-mono text-xs text-[var(--p-ok)]">{value}px</span>
+      <button onClick={onPlus} aria-label="Increase font size" className="h-8 w-8 rounded-r-lg text-[var(--p-moon)] transition-colors hover:bg-white/5">+</button>
+    </div>
+  );
+}
+
+function Section({ title, children, actions }: { title: string; children: React.ReactNode; actions?: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* =====================================================================
+   COMPONENT
+   ===================================================================== */
 
 export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   const [step, setStep] = useState<WizardStep>("input");
@@ -378,172 +498,209 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  const activeFormatOption = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div style={THEME} className="text-[var(--p-moon)]">
+      <Stepper current={step} />
+
+      {/* ================= STEP 1 ================= */}
       {step === "input" && (
-        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h3 className="text-xl font-black text-white mb-4">Step 1: Choose a Zodiac Sign</h3>
-          <input 
-            type="text" 
-            value={inputValue} 
-            onChange={(e) => setInputValue(e.target.value)} 
-            placeholder="e.g., ARIES or LEO (or click AI POST)" 
-            className="w-full max-w-md mx-auto block bg-slate-950 border border-white/10 rounded-xl p-4 text-center text-lg text-white font-mono focus:outline-none focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all mb-6" 
-            onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} 
+        <div className="mx-auto max-w-md py-4 text-center">
+          <h3 className="text-xl font-semibold tracking-tight">Choose a zodiac sign</h3>
+          <p className="mt-1.5 text-sm text-[var(--p-mute)]">Type a sign, or let AI pick one at random.</p>
+
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="e.g., ARIES or LEO"
+            aria-label="Zodiac sign"
+            className={`${fieldClass} mt-6 py-4 text-center font-mono text-lg`}
+            onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()}
           />
-          <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-            <button onClick={handleZodiacSubmit} className="flex-1 px-8 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold transition-all hover:scale-105 active:scale-95">Continue ➔</button>
-            <button onClick={handleAiPost} className="flex-1 px-8 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2">🤖 AI POST</button>
+
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+            <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue</button>
+            <button onClick={handleAiPost} className={`${btnGhost} flex-1`}>AI POST</button>
           </div>
         </div>
       )}
 
+      {/* ================= STEP 2 ================= */}
       {step === "format" && selectedZodiac && (
-        <div className="rounded-2xl border border-pink-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h3 className="text-xl font-black text-white mb-6 text-center">Step 2: What post format do you want for {selectedZodiac.name}?</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[{ id: 'post', title: '📱 Post', desc: '1080x1350 (Portrait)' }, { id: 'story', title: '⚡ Story', desc: '1080x1920 (Vertical)' }, { id: 'carousel', title: '🖼️ Carousel', desc: '1080x1080 (Square)' }].map((fmt) => (
-              <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id as PostFormat)} className="p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-pink-500/50 transition-all text-left group hover:scale-[1.02]">
-                <div className="text-3xl mb-3">{fmt.title.split(' ')[0]}</div>
-                <div className="text-lg font-bold text-white group-hover:text-pink-400 transition-colors">{fmt.title.split(' ').slice(1).join(' ')}</div>
-                <div className="text-sm text-slate-400 mt-2">{fmt.desc}</div>
+        <div>
+          <div className="mb-6 text-center">
+            <h3 className="text-xl font-semibold tracking-tight">Pick a format for {selectedZodiac.name}</h3>
+            <p className="mt-1.5 text-sm text-[var(--p-mute)]">The canvas size is set automatically.</p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {FORMAT_OPTIONS.map((fmt) => (
+              <button
+                key={fmt.id}
+                onClick={() => handleFormatSelect(fmt.id)}
+                className="group flex items-center gap-4 rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4 text-left transition-colors hover:border-[var(--p-violet)] sm:flex-col sm:items-start sm:gap-5 sm:p-5"
+              >
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center sm:h-20 sm:w-full sm:justify-start">
+                  <span
+                    className="block border-2 border-[var(--p-mute)] transition-colors group-hover:border-[var(--p-violet)]"
+                    style={{ aspectRatio: fmt.ratioCss, height: fmt.id === "carousel" ? "75%" : "100%", borderRadius: 8 }}
+                  />
+                </span>
+                <span>
+                  <span className="block text-base font-semibold">{fmt.label}</span>
+                  <span className="mt-0.5 block text-xs text-[var(--p-mute)]">{fmt.size} · {fmt.ratio}</span>
+                </span>
               </button>
             ))}
           </div>
-          <button onClick={() => setStep("input")} className="mt-6 text-slate-400 hover:text-white text-sm flex items-center gap-1 transition-colors">← Go Back</button>
+
+          <button onClick={() => setStep("input")} className="mt-5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Go back</button>
         </div>
       )}
 
+      {/* ================= STEP 3 ================= */}
       {step === "preview" && selectedZodiac && imageUrl && (
-        <div className="rounded-2xl border border-emerald-500/30 bg-slate-900/50 backdrop-blur-xl p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-black text-emerald-400">Step 3: Visual Preview & Text</h3>
-            <button onClick={() => setStep("format")} className="text-sm text-slate-400 hover:text-white transition-colors">← Change Format</button>
+        <div>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>
+              {activeFormatOption && (
+                <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>
+              )}
+            </div>
+            <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col items-center">
-              <div className="text-xs font-bold text-slate-400 mb-3 w-full text-left">Visual Preview (Live)</div>
-              <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px' }}>
-                <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
-                {showLogo && logoUrl && isLogoValid && (
-                  <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
-                    <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
-                      <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" onError={() => setIsLogoValid(false)} />
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]">
+            {/* ---------- preview ---------- */}
+            <div className="xl:sticky xl:top-24 xl:self-start">
+              <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
+                <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]">
+                  <span className="font-semibold">Live preview</span>
+                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span>
+                </div>
+                <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
+                  <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
+                  {showLogo && logoUrl && isLogoValid && (
+                    <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
+                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
+                        <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" onError={() => setIsLogoValid(false)} />
+                      </div>
                     </div>
-                  </div>
-                )}
-                {(text1 || text2) && (
-                  <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                    {text1 && (
-                      <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
-                        <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
-                      </div>
-                    )}
-                    {text2 && (
-                      <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
-                        <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {(showDate || showWeekRange) && (
-                  <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
-                    <div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
-                  </div>
-                )}
+                  )}
+                  {(text1 || text2) && (
+                    <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
+                      {text1 && (
+                        <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
+                          <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
+                        </div>
+                      )}
+                      {text2 && (
+                        <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
+                          <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {(showDate || showWeekRange) && (
+                    <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
+                      <div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-slate-950 p-4 flex flex-col gap-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-slate-400">Text 1 - Max 2 lines</div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleGenerateText1} disabled={isGeneratingText1} className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
-                      {isGeneratingText1 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
+            {/* ---------- editor ---------- */}
+            <div className="flex min-w-0 flex-col gap-4">
+              <Section
+                title="Text 1 · hook (max 2 lines)"
+                actions={
+                  <>
+                    <button onClick={handleGenerateText1} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                      {isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}
                     </button>
-                    <button onClick={() => setText1("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
-                    <button onClick={() => setText1FontSize(Math.max(12, text1FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
-                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text1FontSize}px</span>
-                    <button onClick={() => setText1FontSize(Math.min(60, text1FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
+                    <button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
+                    <SizeControl value={text1FontSize} onMinus={() => setText1FontSize(Math.max(12, text1FontSize - 2))} onPlus={() => setText1FontSize(Math.min(60, text1FontSize + 2))} />
+                  </>
+                }
+              >
+                <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none`} />
+              </Section>
+
+              <Section
+                title="Text 2 · forecast (max 5 lines)"
+                actions={
+                  <>
+                    <button onClick={handleGenerateText2} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                      {isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}
+                    </button>
+                    <button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
+                    <SizeControl value={text2FontSize} onMinus={() => setText2FontSize(Math.max(12, text2FontSize - 2))} onPlus={() => setText2FontSize(Math.min(60, text2FontSize + 2))} />
+                  </>
+                }
+              >
+                <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none`} />
+              </Section>
+
+              <Section title="Design elements">
+                <div className="divide-y divide-[var(--p-line)]">
+                  <div className="flex items-center justify-between py-2.5 first:pt-0">
+                    <span className="text-sm">Today&apos;s date</span>
+                    <Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} />
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <span className="text-sm">One-week forecast</span>
+                    <Toggle on={showWeekRange} label="One-week forecast" onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} />
+                  </div>
+                  <div className="flex items-center justify-between py-2.5 last:pb-0">
+                    <span className="text-sm">Channel logo</span>
+                    <Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} />
                   </div>
                 </div>
-                <div className="relative">
-                  <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className="w-full bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none h-20" />
-                </div>
-              </div>
 
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-slate-400">Text 2 - Max 5 lines</div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleGenerateText2} disabled={isGeneratingText2} className="px-3 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors">
-                      {isGeneratingText2 ? <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> AI...</> : "GENERATE"}
-                    </button>
-                    <button onClick={() => setText2("")} className="px-3 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center justify-center transition-colors">Clear</button>
-                    <button onClick={() => setText2FontSize(Math.max(12, text2FontSize - 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">−</button>
-                    <span className="text-sm font-bold text-emerald-400 w-12 text-center">{text2FontSize}px</span>
-                    <button onClick={() => setText2FontSize(Math.min(60, text2FontSize + 2))} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold">+</button>
-                  </div>
-                </div>
-                <div className="relative h-full">
-                  <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className="w-full h-full min-h-[200px] bg-slate-900 border border-white/10 rounded-lg p-3 text-sm text-white font-sans focus:outline-none focus:border-emerald-500/50 resize-none" />
-                </div>
-              </div>
-
-              <div className="border-t border-white/10 pt-4 space-y-3">
-                <div className="text-xs font-bold text-slate-400 mb-2">Design Elements</div>
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📅</span><div><div className="text-sm font-bold text-white">Today's Date</div></div></div>
-                  <button onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showDate ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showDate ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">📆</span><div><div className="text-sm font-bold text-white">One Week Forecast</div></div></div>
-                  <button onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showWeekRange ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showWeekRange ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between bg-slate-900 rounded-lg p-3 border border-white/5">
-                  <div className="flex items-center gap-3"><span className="text-lg">🖼️</span><div><div className="text-sm font-bold text-white">Channel Logo</div></div></div>
-                  <button onClick={() => setShowLogo(!showLogo)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${showLogo ? 'bg-emerald-600' : 'bg-slate-700'}`}>
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${showLogo ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                </div>
                 {showLogo && (
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                    <div className="text-xs font-bold text-slate-400 mb-2">Logo URL</div>
-                    <input type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-white font-mono focus:outline-none focus:border-emerald-500/50" />
+                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
+                    <label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label>
+                    <input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />
+                    {!isLogoValid && <p className="mt-1.5 text-xs text-[#ff7aa8]">This image failed to load. Check the URL.</p>}
                   </div>
                 )}
-              </div>
-              
-              <button onClick={handleReadyAndUpload} disabled={isPublishing || !text2} className="rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-blue-900/20 mb-3">
-                {isPublishing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Generating & Uploading...</> : <>✅ Ready (Upload to Supabase)</>}
-              </button>
+              </Section>
 
+              {/* ---------- actions ---------- */}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button onClick={handleReadyAndUpload} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>
+                  {isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}
+                </button>
+                <button onClick={handlePublish} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>
+                  {isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}
+                </button>
+              </div>
+
+              {/* ---------- log ---------- */}
               {logs.length > 0 && (
-                <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 animate-in fade-in slide-in-from-top-2 duration-300 shadow-2xl">
-                  <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-                    <span className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider">
-                      <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> System Execution Log
+                <div className="overflow-hidden rounded-2xl border border-[var(--p-line)] bg-[#080a16]">
+                  <div className="flex items-center justify-between border-b border-[var(--p-line)] px-4 py-2.5">
+                    <span className="flex items-center gap-2 text-xs font-semibold text-[var(--p-mute)]">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--p-ok)]" /> System execution log
                     </span>
-                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied to clipboard!"); }} className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 border border-slate-700 hover:border-slate-600">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                      Copy Logs
+                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied to clipboard!"); }} className="flex items-center gap-1.5 rounded-lg border border-[var(--p-line-2)] px-2.5 py-1 text-xs text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]">
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                      Copy logs
                     </button>
                   </div>
-                  <div className="h-56 overflow-y-auto font-mono text-[11px] space-y-1.5 bg-black/80 p-3 rounded-lg border border-slate-800 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent shadow-inner">
+                  <div className="h-56 space-y-1.5 overflow-y-auto p-4 font-mono text-[11px]">
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
                       const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
                       return (
-                        <div key={i} className={`break-words flex gap-2 ${isError ? 'text-red-400' : isSuccess ? 'text-emerald-300 font-bold' : isWarning ? 'text-yellow-300' : 'text-green-400'}`}>
-                          <span className="text-slate-500 shrink-0">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
+                        <div key={i} className={`flex gap-2 break-words ${isError ? 'text-[#ff7aa8]' : isSuccess ? 'font-bold text-[#5fd6a4]' : isWarning ? 'text-[#f6c177]' : 'text-[#ece9f7]/80'}`}>
+                          <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
                           <span>{log.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/, '')}</span>
                         </div>
                       );
@@ -551,10 +708,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   </div>
                 </div>
               )}
-
-              <button onClick={handlePublish} disabled={isPublishing || !text2} className="rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed py-4 text-base font-black text-white transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] shadow-lg shadow-emerald-900/20">
-                {isPublishing ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Processing & Publishing...</> : <>🚀 Confirm & Publish</>}
-              </button>
             </div>
           </div>
         </div>
