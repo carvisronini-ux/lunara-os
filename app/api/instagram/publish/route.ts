@@ -1,3 +1,4 @@
+// /home/carvisronini-ux/lunara-os/app/api/instagram/publish/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
@@ -11,12 +12,17 @@ const supabase = createClient(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { imageUrl, caption, profileUsername } = body;
+    
+    // ✅ წამოვიღოთ ყველა საჭირო ველი ფრონტენდიდან
+    const { imageUrl, text1, text2, generatedHashtags, profileUsername } = body;
+    
+    // ✅ ავაწყოთ caption თუ პირდაპირ არ არის მოწოდებული
+    const caption = `${text1}\n\n${text2}\n\n${generatedHashtags || ''}`.trim();
     
     if (!imageUrl || !caption || !profileUsername) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Missing imageUrl, caption, or profileUsername' 
+        error: 'Missing imageUrl, caption (text1/text2), or profileUsername' 
       }, { status: 400 });
     }
 
@@ -39,9 +45,9 @@ export async function POST(request: NextRequest) {
 
     console.log('[Instagram Publish API] Credentials found securely. Starting publish process...');
     
-    // 2. გადავცეთ დინამიურად InstagramAdapter-ს (შეცვლილი კონსტრუქტორით)
+    // 2. გადავცეთ დინამიურად InstagramAdapter-ს
     const agent = new InstagramAdapter(profile.instagram_user_id, profile.instagram_access_token);
-    const result = await agent.publishExisting(imageUrl, caption);
+    const result = await agent.publishPost(imageUrl, caption);
     
     if (result.success) {
       console.log('[Instagram Publish API] Successfully published! Post ID:', result.postId);
