@@ -1,3 +1,4 @@
+// /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
 import { useState, useRef } from "react";
@@ -50,7 +51,7 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
 };
 
 /* =====================================================================
-   DESIGN LAYER (presentation only)
+   DESIGN LAYER
    ===================================================================== */
 
 const THEME = {
@@ -63,6 +64,8 @@ const THEME = {
   "--p-mute": "#9d9bbd",
   "--p-violet": "#9b8cff",
   "--p-ok": "#5fd6a4",
+  "--p-bad": "#ff7aa8",
+  "--p-warn": "#f6c177",
 } as React.CSSProperties;
 
 const FORMAT_OPTIONS: { id: PostFormat; label: string; size: string; ratio: string; ratioCss: string }[] = [
@@ -77,25 +80,15 @@ const STEPS: { id: WizardStep; label: string }[] = [
   { id: "preview", label: "Compose" },
 ];
 
-const fieldClass =
-  "w-full rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-3 text-sm text-[var(--p-moon)] outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--p-violet)]";
-const btnPrimary =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-violet)] px-5 py-3 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
-const btnOk =
-  "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-ok)] px-5 py-3.5 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
-const btnGhost =
-  "inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] px-5 py-3 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40";
-const btnSmall =
-  "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const fieldClass = "w-full rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-3 text-sm text-[var(--p-moon)] outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--p-violet)]";
+const btnPrimary = "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-violet)] px-5 py-3 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
+const btnOk = "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--p-ok)] px-5 py-3.5 text-sm font-semibold text-[var(--p-ink)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40";
+const btnGhost = "inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] px-5 py-3 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-40";
+const btnSmall = "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 function Spinner({ dark = false }: { dark?: boolean }) {
   return (
-    <span
-      className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${
-        dark ? "border-[#0b0d1c]/30 border-t-[#0b0d1c]" : "border-white/30 border-t-white"
-      }`}
-      aria-hidden
-    />
+    <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${dark ? "border-[#0b0d1c]/30 border-t-[#0b0d1c]" : "border-white/30 border-t-white"}`} aria-hidden />
   );
 }
 
@@ -108,15 +101,7 @@ function Stepper({ current }: { current: WizardStep }) {
         const active = i === currentIndex;
         return (
           <li key={s.id} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
-            <span
-              className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                active
-                  ? "bg-[var(--p-violet)] text-[var(--p-ink)]"
-                  : done
-                  ? "bg-[var(--p-ok)] text-[var(--p-ink)]"
-                  : "border border-[var(--p-line-2)] text-[var(--p-mute)]"
-              }`}
-            >
+            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-[var(--p-violet)] text-[var(--p-ink)]" : done ? "bg-[var(--p-ok)] text-[var(--p-ink)]" : "border border-[var(--p-line-2)] text-[var(--p-mute)]"}`}>
               {done ? "✓" : i + 1}
             </span>
             <span className={`text-sm font-medium ${active ? "text-[var(--p-moon)]" : "text-[var(--p-mute)]"}`}>{s.label}</span>
@@ -130,15 +115,7 @@ function Stepper({ current }: { current: WizardStep }) {
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <button
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={onClick}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-        on ? "bg-[var(--p-ok)]" : "bg-[var(--p-ink-3)] ring-1 ring-inset ring-[var(--p-line-2)]"
-      }`}
-    >
+    <button role="switch" aria-checked={on} aria-label={label} onClick={onClick} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-[var(--p-ok)]" : "bg-[var(--p-ink-3)] ring-1 ring-inset ring-[var(--p-line-2)]"}`}>
       <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${on ? "left-6" : "left-1"}`} />
     </button>
   );
@@ -226,13 +203,36 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
-  const handleAiPost = () => {
-    const randomIndex = Math.floor(Math.random() * ZODIAC_SIGNS.length);
-    const randomZodiac = ZODIAC_SIGNS[randomIndex];
-    setSelectedZodiac(randomZodiac);
-    setInputValue("");
-    addLog(`🤖 AI randomly selected: ${randomZodiac.name}`);
-    setStep("format");
+  const handleAiPost = async () => {
+    setIsPublishing(true);
+    addLog("🤖 AI Auto-Prepare initiated...");
+    try {
+      const randomZodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
+      setSelectedZodiac(randomZodiac);
+      addLog(`✅ Selected: ${randomZodiac.name}`);
+
+      addLog("⏳ Generating viral hook...");
+      const t1 = await generateViralText1(randomZodiac.name);
+      setText1(t1);
+      addLog(`✅ Text 1 generated.`);
+
+      addLog("⏳ Generating forecast...");
+      let t2 = await generateHoroscopeText2(randomZodiac.name, t1);
+      if (t1 && t2.toLowerCase().trim().startsWith(t1.toLowerCase().trim())) {
+        t2 = t2.slice(t1.length).trim().replace(/^[:\-\s]+/, '').trim();
+      }
+      setText2(t2);
+      addLog(`✅ Text 2 generated.`);
+
+      setSelectedFormat("post");
+      addLog("✅ Format set to Post. Jumping to Compose step...");
+      setStep("preview");
+      
+    } catch (error) {
+      addLog(`❌ AI Auto-Prepare failed: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleFormatSelect = (format: PostFormat) => {
@@ -242,10 +242,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   };
 
   const handleGenerateText1 = async () => {
-    if (!selectedZodiac) {
-      addLog("❌ Please select a zodiac sign first!");
-      return;
-    }
+    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return; }
     setIsGeneratingText1(true);
     addLog(`⏳ AI is generating an emotional, viral hook for ${selectedZodiac.name}...`);
     try {
@@ -260,10 +257,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   };
 
   const handleGenerateText2 = async () => {
-    if (!selectedZodiac) {
-      addLog("❌ Please select a zodiac sign first!");
-      return;
-    }
+    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return; }
     setIsGeneratingText2(true);
     addLog(`⏳ AI is generating a meaningful forecast for ${selectedZodiac.name} based on Text 1...`);
     try {
@@ -287,10 +281,7 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
   };
 
   const handleReadyAndUpload = async () => {
-    if (!selectedZodiac || !imageUrl) {
-      addLog("❌ Preview not ready or Zodiac not selected.");
-      return;
-    }
+    if (!selectedZodiac || !imageUrl) { addLog("❌ Preview not ready or Zodiac not selected."); return; }
     
     setIsPublishing(true);
     setLogs([]);
@@ -443,33 +434,53 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     }
   };
 
+  // 🔥 ULTRA-DETAILED LOGGING FOR PUBLISHING
   const handlePublish = async () => {
     if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
-      addLog("❌ Please upload the image to Supabase first by clicking 'Ready (Upload to Supabase)'!");
+      addLog("❌ PRE-FLIGHT CHECK FAILED: Missing imageUrl, text2, zodiac, or format.");
       return;
     }
     
     setIsPublishing(true);
-    addLog(`🚀 Starting final composition and publishing to Instagram...`);
+    addLog("🚀 [PUBLISH] Starting final composition and publishing to Instagram...");
     
     try {
+      const payload = {
+        zodiacName: selectedZodiac.name,
+        format: selectedFormat,
+        text1: text1,
+        text2: text2,
+        generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
+        imageUrl: uploadedImageUrl
+      };
+
+      addLog(`📤 [PUBLISH] Sending payload to /api/instagram/publish:`);
+      addLog(`   → imageUrl: ${payload.imageUrl.substring(0, 60)}...`);
+      addLog(`   → caption length: ${payload.text1.length + payload.text2.length + (payload.generatedHashtags?.length || 0)} chars`);
+
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zodiacName: selectedZodiac.name,
-          format: selectedFormat,
-          text1: text1,
-          text2: text2,
-          generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
-          imageUrl: uploadedImageUrl
-        })
+        body: JSON.stringify(payload)
       });
       
-      const data = await response.json();
+      addLog(`📥 [PUBLISH] API Response Status: ${response.status} ${response.statusText}`);
+      
+      const responseText = await response.text();
+      addLog(`📜 [PUBLISH] Raw API Response Body: ${responseText}`);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        addLog(`⚠️ [PUBLISH] Failed to parse API response as JSON.`);
+        throw new Error(`Invalid JSON response from API: ${responseText}`);
+      }
+      
+      addLog(`🧠 [PUBLISH] Parsed API Response: ${JSON.stringify(data)}`);
       
       if (data.success) {
-        addLog(`🎉 Successfully published to Instagram! Post ID: ${data.postId}`);
+        addLog(`🎉 [PUBLISH] Successfully published to Instagram! Post ID: ${data.postId}`);
         alert(`Successfully published to Instagram!\nPost ID: ${data.postId}`);
         
         setStep("input");
@@ -488,11 +499,15 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         setLogoUrl(DEFAULT_LOGO_URL);
         setIsLogoValid(true);
       } else {
-        addLog(`❌ Error: ${data.error}`);
-        if (data.details) console.error("Publish details:", data.details);
+        addLog(`❌ [PUBLISH] API reported failure: ${data.error}`);
+        if (data.details) {
+            addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
+        }
       }
     } catch (error) {
-      addLog(`❌ Critical error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`💥 [PUBLISH] Critical error caught in frontend: ${errorMsg}`);
+      console.error("[InstagramPanel] Publish Critical Error:", error);
     } finally {
       setIsPublishing(false);
     }
@@ -504,11 +519,10 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
     <div style={THEME} className="text-[var(--p-moon)]">
       <Stepper current={step} />
 
-      {/* ================= STEP 1 ================= */}
       {step === "input" && (
         <div className="mx-auto max-w-md py-4 text-center">
           <h3 className="text-xl font-semibold tracking-tight">Choose a zodiac sign</h3>
-          <p className="mt-1.5 text-sm text-[var(--p-mute)]">Type a sign, or let AI pick one at random.</p>
+          <p className="mt-1.5 text-sm text-[var(--p-mute)]">Type a sign, or let AI prepare everything automatically.</p>
 
           <input
             type="text"
@@ -521,13 +535,14 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           />
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue</button>
-            <button onClick={handleAiPost} className={`${btnGhost} flex-1`}>AI POST</button>
+            <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue Manually</button>
+            <button onClick={handleAiPost} disabled={isPublishing} className={`${btnGhost} flex-1`}>
+              {isPublishing ? <><Spinner /> Preparing...</> : "🤖 AI Auto-Prepare"}
+            </button>
           </div>
         </div>
       )}
 
-      {/* ================= STEP 2 ================= */}
       {step === "format" && selectedZodiac && (
         <div>
           <div className="mb-6 text-center">
@@ -560,7 +575,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
         </div>
       )}
 
-      {/* ================= STEP 3 ================= */}
       {step === "preview" && selectedZodiac && imageUrl && (
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -574,7 +588,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
           </div>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]">
-            {/* ---------- preview ---------- */}
             <div className="xl:sticky xl:top-24 xl:self-start">
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
                 <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]">
@@ -614,7 +627,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
               </div>
             </div>
 
-            {/* ---------- editor ---------- */}
             <div className="flex min-w-0 flex-col gap-4">
               <Section
                 title="Text 1 · hook (max 2 lines)"
@@ -666,12 +678,11 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label>
                     <input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />
-                    {!isLogoValid && <p className="mt-1.5 text-xs text-[#ff7aa8]">This image failed to load. Check the URL.</p>}
+                    {!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}
                   </div>
                 )}
               </Section>
 
-              {/* ---------- actions ---------- */}
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button onClick={handleReadyAndUpload} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>
                   {isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}
@@ -681,7 +692,6 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                 </button>
               </div>
 
-              {/* ---------- log ---------- */}
               {logs.length > 0 && (
                 <div className="overflow-hidden rounded-2xl border border-[var(--p-line)] bg-[#080a16]">
                   <div className="flex items-center justify-between border-b border-[var(--p-line)] px-4 py-2.5">
@@ -693,13 +703,21 @@ export default function InstagramPanel({ pushEvent }: InstagramPanelProps) {
                       Copy logs
                     </button>
                   </div>
-                  <div className="h-56 space-y-1.5 overflow-y-auto p-4 font-mono text-[11px]">
+                  <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[11px]">
                     {logs.map((log, i) => {
-                      const isError = log.includes('❌') || log.includes('FAILURE');
-                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT');
-                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding');
+                      const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
+                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
+                      const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding') || log.includes('⚠️');
+                      const isDebug = log.includes('📤') || log.includes('📥') || log.includes('📜') || log.includes('🧠');
+                      
                       return (
-                        <div key={i} className={`flex gap-2 break-words ${isError ? 'text-[#ff7aa8]' : isSuccess ? 'font-bold text-[#5fd6a4]' : isWarning ? 'text-[#f6c177]' : 'text-[#ece9f7]/80'}`}>
+                        <div key={i} className={`flex gap-2 break-words leading-tight ${
+                          isError ? 'text-[var(--p-bad)]' : 
+                          isSuccess ? 'font-bold text-[var(--p-ok)]' : 
+                          isWarning ? 'text-[var(--p-warn)]' : 
+                          isDebug ? 'text-[var(--p-violet)]' : 
+                          'text-[var(--p-moon)]/80'
+                        }`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
                           <span>{log.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/, '')}</span>
                         </div>
