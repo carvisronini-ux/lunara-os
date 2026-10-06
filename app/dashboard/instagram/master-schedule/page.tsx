@@ -52,10 +52,11 @@ const TYPE_ICONS: Record<string, any> = {
 export default function MasterSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<any | null>(null); // ახალი: რედაქტირებისთვის
 
-  // ფორმის მდგომარეობა ახალი წესისთვის
-  const [newRule, setNewRule] = useState({
+  // ფორმის მდგომარეობა
+  const [formData, setFormData] = useState({
     day_of_week: 0,
     time: "09:00",
     content_type: "post",
@@ -64,7 +65,6 @@ export default function MasterSchedulePage() {
     goal: "Engagement",
   });
 
-  // 1. მონაცემების წამოღება ბაზიდან
   useEffect(() => {
     fetchSchedule();
   }, []);
@@ -81,7 +81,7 @@ export default function MasterSchedulePage() {
     setLoading(false);
   };
 
-  // 2. წესის ჩართვა/გამორთვა
+  // 1. ჩართვა/გამორთვა
   const toggleRule = async (id: string, currentStatus: boolean) => {
     const { error } = await supabase
       .from("content_schedule")
@@ -95,7 +95,7 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // 3. წესის წაშლა
+  // 2. წაშლა
   const deleteRule = async (id: string) => {
     if (!confirm("Are you sure you want to delete this rule?")) return;
     const { error } = await supabase.from("content_schedule").delete().eq("id", id);
@@ -104,21 +104,73 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // 4. ახალი წესის დამატება
-  const handleAddRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { data, error } = await supabase
-      .from("content_schedule")
-      .insert([{ ...newRule, zodiac_sign: newRule.zodiac_sign || null, is_active: true }])
-      .select();
+  // 3. მოდლის გახსნა (დამატება ან რედაქტირება)
+  const openModal = (rule: any = null) => {
+    if (rule) {
+      setEditingRule(rule);
+      setFormData({
+        day_of_week: rule.day_of_week,
+        time: rule.time,
+        content_type: rule.content_type,
+        zodiac_sign: rule.zodiac_sign || "",
+        content_theme: rule.content_theme,
+        goal: rule.goal,
+      });
+    } else {
+      setEditingRule(null);
+      setFormData({
+        day_of_week: 0,
+        time: "09:00",
+        content_type: "post",
+        zodiac_sign: "",
+        content_theme: "",
+        goal: "Engagement",
+      });
+    }
+    setShowModal(true);
+  };
 
-    if (!error && data) {
-      setSchedule((prev) => [...prev, data[0]].sort((a, b) => {
-        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-        return a.time.localeCompare(b.time);
-      }));
-      setShowAddModal(false);
-      setNewRule({ day_of_week: 0, time: "09:00", content_type: "post", zodiac_sign: "", content_theme: "", goal: "Engagement" });
+  // 4. შენახვა (Update ან Insert)
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (editingRule) {
+      // UPDATE არსებული ჩანაწერის
+      const { error } = await supabase
+        .from("content_schedule")
+        .update({
+          ...formData,
+          zodiac_sign: formData.zodiac_sign || null,
+        })
+        .eq("id", editingRule.id);
+
+      if (!error) {
+        setSchedule((prev) =>
+          prev.map((rule) =>
+            rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null } : rule
+          ).sort((a, b) => {
+            if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+            return a.time.localeCompare(b.time);
+          })
+        );
+        setShowModal(false);
+      }
+    } else {
+      // INSERT ახალი ჩანაწერის
+      const { data, error } = await supabase
+        .from("content_schedule")
+        .insert([{ ...formData, zodiac_sign: formData.zodiac_sign || null, is_active: true }])
+        .select();
+
+      if (!error && data) {
+        setSchedule((prev) =>
+          [...prev, data[0]].sort((a, b) => {
+            if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+            return a.time.localeCompare(b.time);
+          })
+        );
+        setShowModal(false);
+      }
     }
   };
 
@@ -139,7 +191,7 @@ export default function MasterSchedulePage() {
               <p className="hidden text-xs text-[var(--mute)] sm:block">Manage and edit your automated posting rules</p>
             </div>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+          <button onClick={() => openModal()} className="flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
             {Icons.plus} Add Rule
           </button>
         </div>
@@ -191,11 +243,17 @@ export default function MasterSchedulePage() {
                             <div className="hidden shrink-0 sm:block">
                               <span className="rounded-full bg-[var(--ink)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)] border border-[var(--line-2)]">{rule.goal}</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               <button onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>
                                 <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
                               </button>
-                              <button onClick={() => deleteRule(rule.id)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[var(--rose)]/10 hover:text-[var(--rose)]">{Icons.trash}</button>
+                              {/* ✅ ახალი: რედაქტირების ღილაკი */}
+                              <button onClick={() => openModal(rule)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                                {Icons.edit}
+                              </button>
+                              <button onClick={() => deleteRule(rule.id)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[var(--rose)]/10 hover:text-[var(--rose)]">
+                                {Icons.trash}
+                              </button>
                             </div>
                           </div>
                         );
@@ -209,29 +267,29 @@ export default function MasterSchedulePage() {
         )}
       </main>
 
-      {/* Add Rule Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowAddModal(false)}>
+      {/* ✅ განახლებული Modal: მუშაობს როგორც Add, ისე Edit რეჟიმში */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowModal(false)}>
           <div className="w-full max-w-md rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-semibold">Add New Schedule Rule</h3>
-            <form onSubmit={handleAddRule} className="space-y-4">
+            <h3 className="mb-4 text-lg font-semibold">{editingRule ? "Edit Schedule Rule" : "Add New Schedule Rule"}</h3>
+            <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Day</label>
-                  <select value={newRule.day_of_week} onChange={(e) => setNewRule({...newRule, day_of_week: parseInt(e.target.value)})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <select value={formData.day_of_week} onChange={(e) => setFormData({...formData, day_of_week: parseInt(e.target.value)})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
                     {DAYS_OF_WEEK.map((day, i) => <option key={i} value={i}>{day}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Time</label>
-                  <input type="time" value={newRule.time} onChange={(e) => setNewRule({...newRule, time: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
+                  <input type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Type</label>
-                  <select value={newRule.content_type} onChange={(e) => setNewRule({...newRule, content_type: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <select value={formData.content_type} onChange={(e) => setFormData({...formData, content_type: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
                     <option value="post">Post</option>
                     <option value="story">Story</option>
                     <option value="carousel">Carousel</option>
@@ -240,7 +298,7 @@ export default function MasterSchedulePage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Zodiac (Optional)</label>
-                  <select value={newRule.zodiac_sign} onChange={(e) => setNewRule({...newRule, zodiac_sign: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <select value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
                     <option value="">None / All</option>
                     <option value="ARIES">Aries</option>
                     <option value="TAURUS">Taurus</option>
@@ -261,12 +319,12 @@ export default function MasterSchedulePage() {
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Content Theme</label>
-                <input type="text" value={newRule.content_theme} onChange={(e) => setNewRule({...newRule, content_theme: e.target.value})} placeholder="e.g., Daily Habit, Red Flags" className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
+                <input type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., Daily Habit, Red Flags" className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
               </div>
 
               <div>
                 <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Primary Goal</label>
-                <select value={newRule.goal} onChange={(e) => setNewRule({...newRule, goal: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                <select value={formData.goal} onChange={(e) => setFormData({...formData, goal: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
                   <option value="Engagement">Engagement</option>
                   <option value="Discovery">Discovery</option>
                   <option value="Saves">Saves / Shares</option>
@@ -278,8 +336,10 @@ export default function MasterSchedulePage() {
               </div>
 
               <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 rounded-xl border border-[var(--line-2)] py-2.5 text-sm font-semibold transition-colors hover:bg-white/5">Cancel</button>
-                <button type="submit" className="flex-1 rounded-xl bg-[var(--violet)] py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">Save Rule</button>
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-[var(--line-2)] py-2.5 text-sm font-semibold transition-colors hover:bg-white/5">Cancel</button>
+                <button type="submit" className="flex-1 rounded-xl bg-[var(--violet)] py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+                  {editingRule ? "Update Rule" : "Save Rule"}
+                </button>
               </div>
             </form>
           </div>
