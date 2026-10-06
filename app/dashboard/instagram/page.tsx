@@ -6,7 +6,8 @@ import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import InstagramPanel from "@/components/instagram/InstagramPanel";
 
-type ContentType = "post" | "carousel" | "story";
+// ✅ 1. დამატებულია "reel"
+type ContentType = "post" | "carousel" | "story" | "reel";
 type TabId = "manual" | "instaboss" | "analytics";
 
 interface Profile {
@@ -34,6 +35,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY!
 );
 
+// ✅ 2. მხოლოდ "post" არის ჩართული დეფოლტად
 const DEFAULT_PROFILES: Profile[] = [
   {
     id: "lunara-main",
@@ -41,10 +43,11 @@ const DEFAULT_PROFILES: Profile[] = [
     avatar: DEFAULT_AVATAR,
     status: "active",
     postCount: 12,
-    enabledFormats: ["post", "carousel", "story"],
+    enabledFormats: ["post"],
   },
 ];
 
+// ✅ 3. დამატებულია Reel-ის კონფიგურაცია
 const FORMAT_CONFIG: Record<
   ContentType,
   { label: string; size: string; ratio: string; ratioCss: string; hint: string }
@@ -52,6 +55,7 @@ const FORMAT_CONFIG: Record<
   post: { label: "Post", size: "1080 × 1350", ratio: "4:5", ratioCss: "4 / 5", hint: "Portrait feed post" },
   carousel: { label: "Carousel", size: "1080 × 1080", ratio: "1:1", ratioCss: "1 / 1", hint: "Swipeable square slides" },
   story: { label: "Story", size: "1080 × 1920", ratio: "9:16", ratioCss: "9 / 16", hint: "Full-screen vertical" },
+  reel: { label: "Reel", size: "1080 × 1920", ratio: "9:16", ratioCss: "9 / 16", hint: "Vertical video discovery" },
 };
 
 const TABS: { id: TabId; label: string; soon?: boolean }[] = [
@@ -201,13 +205,14 @@ export default function InstagramPage() {
       return;
     }
 
+    // ✅ 4. ახალ პროფილსაც მხოლოდ "post" აქვს ჩართული
     const newProfile: Profile = {
       id: `profile-${Date.now()}`,
       username: data.username,
       avatar: data.avatar || DEFAULT_AVATAR,
       status: "paused",
       postCount: 0,
-      enabledFormats: ["post", "carousel", "story"],
+      enabledFormats: ["post"],
       pageName: data.pageName,
       pageLink: data.pageLink,
       igUsername: data.igUsername,
@@ -279,16 +284,24 @@ export default function InstagramPage() {
     setDeletingProfile(null);
   };
 
+  // ✅ 5. სხვა ფორმატების ჩართვა დაბლოკილია "Coming soon" შეტყობინებით
   const toggleFormat = async (format: ContentType) => {
     if (!activeProfile) return;
     const isOn = activeProfile.enabledFormats.includes(format);
+    
+    if (!isOn && format !== "post") {
+      pushEvent("info", `${FORMAT_CONFIG[format].label} coming soon`);
+      return;
+    }
+
     if (isOn && activeProfile.enabledFormats.length === 1) {
       pushEvent("info", "Keep at least one format enabled");
       return;
     }
+    
     const next = isOn
       ? activeProfile.enabledFormats.filter((f) => f !== format)
-      : (["post", "carousel", "story"] as ContentType[]).filter(
+      : (["post", "carousel", "story", "reel"] as ContentType[]).filter(
           (f) => f === format || activeProfile.enabledFormats.includes(f)
         );
     
@@ -425,7 +438,8 @@ export default function InstagramPage() {
                 <p className="hidden text-xs text-[var(--mute)] sm:block">Use the switch to enable or hide a format</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {/* ✅ აქ ავტომატურად გამოჩნდება 4 ბარათი, მაგრამ მხოლოდ Post იქნება ჩართული */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {(Object.keys(FORMAT_CONFIG) as ContentType[]).map((key) => {
                   const cfg = FORMAT_CONFIG[key];
                   const isEnabled = activeProfile.enabledFormats.includes(key);
@@ -451,7 +465,7 @@ export default function InstagramPage() {
                             }`}
                             style={{
                               aspectRatio: cfg.ratioCss,
-                              height: key === "post" || key === "story" ? "100%" : "75%",
+                              height: key === "post" || key === "story" || key === "reel" ? "100%" : "75%",
                               borderRadius: 6,
                             }}
                           />
@@ -543,8 +557,6 @@ export default function InstagramPage() {
                       </p>
                     )}
                   </div>
-
-                  {/* ✅ Preview ბანერი ამოღებულია */}
                 </div>
               )}
 
