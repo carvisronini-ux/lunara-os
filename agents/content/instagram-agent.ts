@@ -25,7 +25,11 @@ export class InstagramAgent {
   private instagramAdapter: InstagramAdapter;
 
   constructor() {
-    this.instagramAdapter = new InstagramAdapter();
+    // ✅ FIX: გადავცემთ .env ცვლადებს InstagramAdapter-ს
+    this.instagramAdapter = new InstagramAdapter(
+      process.env.INSTAGRAM_USER_ID || '',
+      process.env.INSTAGRAM_ACCESS_TOKEN || ''
+    );
   }
 
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
@@ -120,7 +124,6 @@ export class InstagramAgent {
       ? now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
       : `${now.getDate()}-${new Date(now.setDate(now.getDate() + 7)).getDate()} ${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
 
-    // ✅ ვიყენებთ sharp-ის SVG ტექსტის რენდერს (არ საჭიროებს შრიფტის ფაილებს!)
     console.log('[addTextAndLogoToImage] Creating SVG text overlay...');
     
     const escapedText1 = this.escapeXml(aiContent.text1);
