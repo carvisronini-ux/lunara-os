@@ -135,7 +135,7 @@ export default function AgentsPage() {
       const matchingRule = rules?.find((r: any) => r.time <= currentTime);
 
       if (!matchingRule) {
-        addAgentLog("ამ წუთას დაგეგმილი პოსტი არ არის.");
+        addAgentLog("ამ წუთას დაგეგმილი პოსტი არ არის (ან დრო ჯერ არ მოსულა).");
         setIsChecking(false);
         return;
       }
@@ -278,6 +278,25 @@ export default function AgentsPage() {
                       <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
                     </div>
                   </div>
+                  
+                  {/* ✅ აქ დავამატეთ "Run Now" ღილაკი მხოლოდ PostAgent-ისთვის */}
+                  {agent.id === 'post-agent' && (
+                    <div className="mt-6 flex flex-wrap gap-2">
+                      <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
+                        View Logs
+                      </button>
+                      <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
+                        Configure Rules
+                      </button>
+                      <button 
+                        onClick={() => checkAndRunPostAgent()}
+                        disabled={isChecking}
+                        className="flex-1 rounded-xl bg-[var(--violet)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
+                      >
+                        {isChecking ? 'Running...' : 'Run Now'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -306,7 +325,6 @@ export default function AgentsPage() {
               <h4 className="text-sm font-semibold mb-3">Agent Engine (Hidden)</h4>
               <p className="text-xs text-[var(--mute)] mb-3">ეს კომპონენტი ასრულებს რეალურ სამუშაოს ფონზე.</p>
               <div className="opacity-30 pointer-events-none scale-75 origin-top-left">
-                {/* ✅ აქ გამოვიყენეთ 'type' ცვლადი, რათა TypeScript-ის შეცდომა აღმოიფხვრას */}
                 <InstagramPanel 
                   ref={panelRef} 
                   profileUsername="@lunaraosapp" 
