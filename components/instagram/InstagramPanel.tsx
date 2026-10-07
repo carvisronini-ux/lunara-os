@@ -51,22 +51,11 @@ const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   return [...baseTags, ...uniqueExtractedTags].join(" ");
 };
 
-/* =====================================================================
-   DESIGN LAYER
-   ===================================================================== */
-
 const THEME = {
-  "--p-ink": "#0b0d1c",
-  "--p-ink-2": "#12152b",
-  "--p-ink-3": "#1a1e3a",
-  "--p-line": "rgba(236,233,247,.1)",
-  "--p-line-2": "rgba(236,233,247,.18)",
-  "--p-moon": "#ece9f7",
-  "--p-mute": "#9d9bbd",
-  "--p-violet": "#9b8cff",
-  "--p-ok": "#5fd6a4",
-  "--p-bad": "#ff7aa8",
-  "--p-warn": "#f6c177",
+  "--p-ink": "#0b0d1c", "--p-ink-2": "#12152b", "--p-ink-3": "#1a1e3a",
+  "--p-line": "rgba(236,233,247,.1)", "--p-line-2": "rgba(236,233,247,.18)",
+  "--p-moon": "#ece9f7", "--p-mute": "#9d9bbd", "--p-violet": "#9b8cff",
+  "--p-ok": "#5fd6a4", "--p-bad": "#ff7aa8", "--p-warn": "#f6c177",
 } as React.CSSProperties;
 
 const FORMAT_OPTIONS: { id: PostFormat; label: string; size: string; ratio: string; ratioCss: string }[] = [
@@ -76,9 +65,7 @@ const FORMAT_OPTIONS: { id: PostFormat; label: string; size: string; ratio: stri
 ];
 
 const STEPS: { id: WizardStep; label: string }[] = [
-  { id: "input", label: "Zodiac" },
-  { id: "format", label: "Format" },
-  { id: "preview", label: "Compose" },
+  { id: "input", label: "Zodiac" }, { id: "format", label: "Format" }, { id: "preview", label: "Compose" },
 ];
 
 const fieldClass = "w-full rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-3 text-sm text-[var(--p-moon)] outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--p-violet)]";
@@ -88,9 +75,7 @@ const btnGhost = "inline-flex items-center justify-center gap-2 rounded-xl borde
 const btnSmall = "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 function Spinner({ dark = false }: { dark?: boolean }) {
-  return (
-    <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${dark ? "border-[#0b0d1c]/30 border-t-[#0b0d1c]" : "border-white/30 border-t-white"}`} aria-hidden />
-  );
+  return <span className={`inline-block h-4 w-4 animate-spin rounded-full border-2 ${dark ? "border-[#0b0d1c]/30 border-t-[#0b0d1c]" : "border-white/30 border-t-white"}`} aria-hidden />;
 }
 
 function Stepper({ current }: { current: WizardStep }) {
@@ -98,8 +83,7 @@ function Stepper({ current }: { current: WizardStep }) {
   return (
     <ol className="mb-6 flex items-center gap-2" aria-label="Progress">
       {STEPS.map((s, i) => {
-        const done = i < currentIndex;
-        const active = i === currentIndex;
+        const done = i < currentIndex; const active = i === currentIndex;
         return (
           <li key={s.id} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
             <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-[var(--p-violet)] text-[var(--p-ink)]" : done ? "bg-[var(--p-ok)] text-[var(--p-ink)]" : "border border-[var(--p-line-2)] text-[var(--p-mute)]"}`}>
@@ -144,10 +128,6 @@ function Section({ title, children, actions }: { title: string; children: React.
   );
 }
 
-/* =====================================================================
-   COMPONENT
-   ===================================================================== */
-
 const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profileUsername }, ref) => {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
@@ -186,41 +166,26 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const getCurrentDate = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const getWeekRange = () => {
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(startDate.getDate() + 7);
+    const startDate = new Date(); const endDate = new Date(); endDate.setDate(startDate.getDate() + 7);
     return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   };
 
   const handleZodiacSubmit = () => {
     const upperInput = inputValue.trim().toUpperCase();
     const found = ZODIAC_SIGNS.find(z => z.search.toUpperCase().includes(upperInput));
-    if (found) {
-      setSelectedZodiac(found);
-      addLog(`✅ Zodiac selected: ${found.name}`);
-      setStep("format");
-      return found;
-    } else {
-      addLog(`❌ Zodiac not found.`);
-      return null;
-    }
+    if (found) { setSelectedZodiac(found); addLog(`✅ Zodiac selected: ${found.name}`); setStep("format"); return found; }
+    else { addLog(`❌ Zodiac not found.`); return null; }
   };
 
-  const handleFormatSelect = (format: PostFormat) => {
-    setSelectedFormat(format);
-    addLog(`✅ Format selected: ${format}`);
-    setStep("preview");
-  };
+  const handleFormatSelect = (format: PostFormat) => { setSelectedFormat(format); addLog(`✅ Format selected: ${format}`); setStep("preview"); };
 
   const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0]) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText1(true);
-    addLog(`⏳ AI is generating an emotional, viral hook for ${targetZodiac.name}...`);
     try {
       const generatedText = await generateViralText1(targetZodiac.name);
       setText1(generatedText);
-      addLog(`✨ Successfully generated Text 1: "${generatedText}"`);
       setIsGeneratingText1(false);
       return generatedText;
     } catch (error) {
@@ -235,7 +200,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText2(true);
-    addLog(`⏳ AI is generating a meaningful forecast for ${targetZodiac.name} based on Text 1...`);
     try {
       const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1);
       let cleanedText = generatedText;
@@ -244,11 +208,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         const cleanedLower = cleanedText.toLowerCase().trim();
         if (cleanedLower.startsWith(text1Lower)) {
           cleanedText = cleanedText.slice(targetText1.length).trim().replace(/^[:\-\s]+/, '').trim();
-          addLog(`🧹 Auto-cleaned: removed repeated hook from Text 2`);
         }
       }
       setText2(cleanedText);
-      addLog(`✨ Successfully generated Text 2: "${cleanedText}"`);
       setIsGeneratingText2(false);
       return cleanedText;
     } catch (error) {
@@ -266,8 +228,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     if (!targetZodiac || !targetImageUrl || !targetFormat) { addLog("❌ Preview not ready or Zodiac/Format not selected."); return null; }
     
     setIsPublishing(true);
-    addLog("📸 [1/6] Initializing Native Canvas Engine...");
-
     try {
       let width = 1080, height = 1350;
       if (targetFormat === 'story') { width = 1080; height = 1920; }
@@ -278,13 +238,10 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Failed to get canvas context");
 
-      addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
       ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, width, height);
 
-      addLog("⏳ [3/6] Loading high-res zodiac image...");
       const zodiacImg = new Image(); zodiacImg.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => { zodiacImg.onload = resolve; zodiacImg.onerror = reject; zodiacImg.src = targetImageUrl; });
-      
       const scale = Math.max(width / zodiacImg.width, height / zodiacImg.height);
       ctx.drawImage(zodiacImg, (width / 2) - (zodiacImg.width / 2) * scale, (height / 2) - (zodiacImg.height / 2) * scale, zodiacImg.width * scale, zodiacImg.height * scale);
       
@@ -293,14 +250,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
 
       if (showLogo && logoUrl && isLogoValid) {
-        addLog("⏳ Loading channel logo...");
         const logoImg = new Image(); logoImg.crossOrigin = 'anonymous';
         await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject; logoImg.src = logoUrl; });
         const logoSize = Math.min(width * 0.12, 130); const padding = width * 0.02;
         ctx.save(); ctx.beginPath(); ctx.arc(width - logoSize - padding + logoSize / 2, padding + logoSize / 2, logoSize / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
         ctx.drawImage(logoImg, width - logoSize - padding, padding, logoSize, logoSize);
         ctx.lineWidth = Math.max(2, width * 0.004); ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.stroke(); ctx.restore();
-        addLog("✅ Channel logo added to canvas.");
       }
 
       const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean) => {
@@ -308,7 +263,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         ctx.fillText(text, x, y);
       };
 
-      addLog("⏳ [4/6] Rendering typography elements...");
       if (text1) drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
 
       if (text2) {
@@ -329,13 +283,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         ctx.fillText(showWeekRange ? getWeekRange() : getCurrentDate(), width / 2, height * 0.94);
       }
 
-      addLog("⏳ [5/6] Encoding to high-quality JPEG...");
       const blob = await new Promise<Blob>((resolve) => { canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95); });
-      addLog(`✅ Image encoded. Size: ${(blob.size / 1024).toFixed(2)} KB`);
-
       const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
-      addLog(`⏳ [6/6] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
       const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
       if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
@@ -343,13 +293,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
       setUploadedImageUrl(urlData.publicUrl);
       
-      addLog("✅ Successfully uploaded to Supabase!");
-      addLog("🎉 FINAL RESULT: Image is ready and live!");
       return urlData.publicUrl;
 
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ CRITICAL FAILURE: ${errorMsg}`);
       console.error("Upload Error Details:", error);
       return null;
     } finally {
@@ -357,30 +303,36 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handlePublish = async () => {
-    if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
+  // ✅ განახლებული handlePublish: იღებს override პარამეტრებს State-ის დაყოვნების თავიდან ასაცილებლად
+  const handlePublish = async (
+    overrideZodiac?: typeof ZODIAC_SIGNS[0], 
+    overrideFormat?: PostFormat, 
+    overrideText1?: string, 
+    overrideText2?: string, 
+    overrideImageUrl?: string
+  ) => {
+    const targetZodiac = overrideZodiac || selectedZodiac;
+    const targetFormat = overrideFormat || selectedFormat;
+    const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
+    const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
+    const targetImageUrl = overrideImageUrl || uploadedImageUrl;
+
+    if (!targetImageUrl || !targetText2 || !targetZodiac || !targetFormat) {
       addLog("❌ PRE-FLIGHT CHECK FAILED: Missing imageUrl, text2, zodiac, or format.");
       return false;
     }
     
     setIsPublishing(true);
-    addLog("🚀 [PUBLISH] Starting final composition and publishing to Instagram...");
-    
     try {
       const payload = {
-        zodiacName: selectedZodiac.name,
-        format: selectedFormat,
-        text1: text1,
-        text2: text2,
-        generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
-        imageUrl: uploadedImageUrl,
+        zodiacName: targetZodiac.name,
+        format: targetFormat,
+        text1: targetText1,
+        text2: targetText2,
+        generatedHashtags: showHashtags ? generateDynamicHashtags(targetText2, targetZodiac.name) : undefined,
+        imageUrl: targetImageUrl,
         profileUsername: profileUsername
       };
-
-      addLog(`📤 [PUBLISH] Sending payload to /api/instagram/publish:`);
-      addLog(`   → profileUsername: ${payload.profileUsername}`);
-      addLog(`   → imageUrl: ${payload.imageUrl.substring(0, 60)}...`);
-      addLog(`   → caption length: ${payload.text1.length + payload.text2.length + (payload.generatedHashtags?.length || 0)} chars`);
 
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
@@ -388,29 +340,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         body: JSON.stringify(payload)
       });
       
-      addLog(`📥 [PUBLISH] API Response Status: ${response.status} ${response.statusText}`);
-      
       const responseText = await response.text();
-      addLog(`📜 [PUBLISH] Raw API Response Body: ${responseText}`);
-
       let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        addLog(`⚠️ [PUBLISH] Failed to parse API response as JSON.`);
-        throw new Error(`Invalid JSON response from API: ${responseText}`);
-      }
-      
-      addLog(`🧠 [PUBLISH] Parsed API Response: ${JSON.stringify(data)}`);
+      try { data = JSON.parse(responseText); } catch (e) { throw new Error(`Invalid JSON: ${responseText}`); }
       
       if (data.success) {
-        addLog(`🎉 [PUBLISH] Successfully published to Instagram! Post ID: ${data.postId}`);
-        
         await supabase.from('published_content').insert([{
-          content_type: selectedFormat,
-          zodiac_sign: selectedZodiac.name,
-          caption: `${text1}\n\n${text2}`,
-          image_url: uploadedImageUrl,
+          content_type: targetFormat,
+          zodiac_sign: targetZodiac.name,
+          caption: `${targetText1}\n\n${targetText2}`,
+          image_url: targetImageUrl,
           instagram_post_id: data.postId,
           status: 'published',
           agent_used: 'client_agent'
@@ -423,28 +362,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         setText1("");
         setText2("");
         setUploadedImageUrl(null);
-        setText1FontSize(24);
-        setText2FontSize(20);
-        setShowDate(true);
-        setShowWeekRange(false);
-        setShowLogo(true);
-        setShowHashtags(true);
-        setLogoUrl(DEFAULT_LOGO_URL);
-        setIsLogoValid(true);
         
         setIsPublishing(false);
         return true;
       } else {
-        addLog(`❌ [PUBLISH] API reported failure: ${data.error}`);
-        if (data.details) {
-            addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
-        }
         setIsPublishing(false);
         return false;
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`💥 [PUBLISH] Critical error caught in frontend: ${errorMsg}`);
       console.error("[InstagramPanel] Publish Critical Error:", error);
       setIsPublishing(false);
       return false;
@@ -460,37 +385,28 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setInputValue(zodiacName);
       setSelectedZodiac(zodiac);
       setStep("format");
-      addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 1/5)...");
       await new Promise(r => setTimeout(r, 2000));
 
       setSelectedFormat("post");
       setStep("preview");
-      addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 2/5)...");
       await new Promise(r => setTimeout(r, 2000));
 
-      addLog("⏳ აგენტი გენერირებს Text 1-ს...");
       const t1 = await handleGenerateText1(zodiac);
       if (!t1) return false;
       await new Promise(r => setTimeout(r, 2000));
       
-      addLog("⏳ აგენტი გენერირებს Text 2-ს...");
       const t2 = await handleGenerateText2(zodiac, t1);
       if (!t2) return false;
       await new Promise(r => setTimeout(r, 2000));
 
-      addLog("⏳ აგენტი ქმნის სურათს და ტვირთავს Supabase-ში...");
       const imgUrl = await handleReadyAndUpload(zodiac, "post");
-      if (!imgUrl) { 
-        addLog("❌ ატვირთვა ვერ მოხერხდა აგენტის ციკლის დროს"); 
-        return false; 
-      }
+      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა"); return false; }
       await new Promise(r => setTimeout(r, 2000));
 
-      addLog("⏳ ველოდები 7 წამს Instagram API-ს სტაბილურობისთვის...");
-      await new Promise(r => setTimeout(r, 7000));
+      await new Promise(r => setTimeout(r, 7000)); // 7 წამიანი დაყოვნება Instagram API-სთვის
       
-      addLog("🚀 აგენტი აქვეყნებს Instagram-ზე...");
-      const success = await handlePublish();
+      // ✅ გადავცემთ ყველა მონაცემს პირდაპირ, რათა State-ის დაყოვნება გამოირიცხოს
+      const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
         return true;
@@ -506,89 +422,43 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   return (
     <div style={THEME} className="text-[var(--p-moon)]">
       <Stepper current={step} />
-
       {step === "input" && (
         <div className="mx-auto max-w-md py-4 text-center">
           <h3 className="text-xl font-semibold tracking-tight">Choose a zodiac sign</h3>
           <p className="mt-1.5 text-sm text-[var(--p-mute)]">Type a sign, or let AI prepare everything automatically.</p>
-
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="e.g., ARIES or LEO"
-            aria-label="Zodiac sign"
-            className={`${fieldClass} mt-6 py-4 text-center font-mono text-lg`}
-            onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()}
-          />
-
+          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="e.g., ARIES or LEO" aria-label="Zodiac sign" className={`${fieldClass} mt-6 py-4 text-center font-mono text-lg`} onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} />
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue Manually</button>
-            <button 
-              onClick={() => { 
-                const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; 
-                setInputValue(random.name); 
-                handleZodiacSubmit(); 
-              }} 
-              className={`${btnGhost} flex-1`}
-            >
-              🤖 AI Auto-Prepare
-            </button>
+            <button onClick={() => { const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; setInputValue(random.name); handleZodiacSubmit(); }} className={`${btnGhost} flex-1`}>🤖 AI Auto-Prepare</button>
           </div>
         </div>
       )}
-
       {step === "format" && selectedZodiac && (
         <div>
-          <div className="mb-6 text-center">
-            <h3 className="text-xl font-semibold tracking-tight">Pick a format for {selectedZodiac.name}</h3>
-            <p className="mt-1.5 text-sm text-[var(--p-mute)]">The canvas size is set automatically.</p>
-          </div>
-
+          <div className="mb-6 text-center"><h3 className="text-xl font-semibold tracking-tight">Pick a format for {selectedZodiac.name}</h3></div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {FORMAT_OPTIONS.map((fmt) => (
-              <button
-                key={fmt.id}
-                onClick={() => handleFormatSelect(fmt.id)}
-                className="group flex items-center gap-4 rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4 text-left transition-colors hover:border-[var(--p-violet)] sm:flex-col sm:items-start sm:gap-5 sm:p-5"
-              >
+              <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id)} className="group flex items-center gap-4 rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4 text-left transition-colors hover:border-[var(--p-violet)] sm:flex-col sm:items-start sm:gap-5 sm:p-5">
                 <span className="flex h-16 w-16 shrink-0 items-center justify-center sm:h-20 sm:w-full sm:justify-start">
-                  <span
-                    className="block border-2 border-[var(--p-mute)] transition-colors group-hover:border-[var(--p-violet)]"
-                    style={{ aspectRatio: fmt.ratioCss, height: fmt.id === "carousel" ? "75%" : "100%", borderRadius: 8 }}
-                  />
+                  <span className="block border-2 border-[var(--p-mute)] transition-colors group-hover:border-[var(--p-violet)]" style={{ aspectRatio: fmt.ratioCss, height: fmt.id === "carousel" ? "75%" : "100%", borderRadius: 8 }} />
                 </span>
-                <span>
-                  <span className="block text-base font-semibold">{fmt.label}</span>
-                  <span className="mt-0.5 block text-xs text-[var(--p-mute)]">{fmt.size} · {fmt.ratio}</span>
-                </span>
+                <span><span className="block text-base font-semibold">{fmt.label}</span><span className="mt-0.5 block text-xs text-[var(--p-mute)]">{fmt.size} · {fmt.ratio}</span></span>
               </button>
             ))}
           </div>
-
           <button onClick={() => setStep("input")} className="mt-5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Go back</button>
         </div>
       )}
-
       {step === "preview" && selectedZodiac && imageUrl && (
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>
-              {activeFormatOption && (
-                <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>
-              )}
-            </div>
+            <div><h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>{activeFormatOption && <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>}</div>
             <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
           </div>
-
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]">
             <div className="xl:sticky xl:top-24 xl:self-start">
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
-                <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]">
-                  <span className="font-semibold">Live preview</span>
-                  <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span>
-                </div>
+                <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]"><span className="font-semibold">Live preview</span><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span></div>
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
@@ -601,101 +471,39 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   )}
                   {(text1 || text2) && (
                     <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                      {text1 && (
-                        <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
-                          <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div>
-                        </div>
-                      )}
-                      {text2 && (
-                        <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
-                          <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div>
-                        </div>
-                      )}
+                      {text1 && <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}><div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div></div>}
+                      {text2 && <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}><div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div></div>}
                     </div>
                   )}
-                  {(showDate || showWeekRange) && (
-                    <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}>
-                      <div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div>
-                    </div>
-                  )}
+                  {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
                 </div>
               </div>
             </div>
-
             <div className="flex min-w-0 flex-col gap-4">
-              <Section
-                title="Text 1 · hook (max 2 lines)"
-                actions={
-                  <>
-                    <button onClick={() => handleGenerateText1()} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
-                      {isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}
-                    </button>
-                    <button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
-                    <SizeControl value={text1FontSize} onMinus={() => setText1FontSize(Math.max(12, text1FontSize - 2))} onPlus={() => setText1FontSize(Math.min(60, text1FontSize + 2))} />
-                  </>
-                }
-              >
+              <Section title="Text 1 · hook (max 2 lines)" actions={<><button onClick={() => handleGenerateText1()} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text1FontSize} onMinus={() => setText1FontSize(Math.max(12, text1FontSize - 2))} onPlus={() => setText1FontSize(Math.min(60, text1FontSize + 2))} /></>}>
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none`} />
               </Section>
-
-              <Section
-                title="Text 2 · forecast (max 5 lines)"
-                actions={
-                  <>
-                    <button onClick={() => handleGenerateText2()} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
-                      {isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}
-                    </button>
-                    <button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
-                    <SizeControl value={text2FontSize} onMinus={() => setText2FontSize(Math.max(12, text2FontSize - 2))} onPlus={() => setText2FontSize(Math.min(60, text2FontSize + 2))} />
-                  </>
-                }
-              >
+              <Section title="Text 2 · forecast (max 5 lines)" actions={<><button onClick={() => handleGenerateText2()} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text2FontSize} onMinus={() => setText2FontSize(Math.max(12, text2FontSize - 2))} onPlus={() => setText2FontSize(Math.min(60, text2FontSize + 2))} /></>}>
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none`} />
               </Section>
-
               <Section title="Design elements">
                 <div className="divide-y divide-[var(--p-line)]">
-                  <div className="flex items-center justify-between py-2.5 first:pt-0">
-                    <span className="text-sm">Today&apos;s date</span>
-                    <Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} />
-                  </div>
-                  <div className="flex items-center justify-between py-2.5">
-                    <span className="text-sm">One-week forecast</span>
-                    <Toggle on={showWeekRange} label="One-week forecast" onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} />
-                  </div>
-                  <div className="flex items-center justify-between py-2.5 last:pb-0">
-                    <span className="text-sm">Channel logo</span>
-                    <Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} />
-                  </div>
+                  <div className="flex items-center justify-between py-2.5 first:pt-0"><span className="text-sm">Today&apos;s date</span><Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} /></div>
+                  <div className="flex items-center justify-between py-2.5"><span className="text-sm">One-week forecast</span><Toggle on={showWeekRange} label="One-week forecast" onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} /></div>
+                  <div className="flex items-center justify-between py-2.5 last:pb-0"><span className="text-sm">Channel logo</span><Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} /></div>
                 </div>
-
-                {showLogo && (
-                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label>
-                    <input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />
-                    {!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}
-                  </div>
-                )}
+                {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
               </Section>
-
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button onClick={() => handleReadyAndUpload()} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>
-                  {isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}
-                </button>
-                <button onClick={handlePublish} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>
-                  {isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}
-                </button>
+                <button onClick={() => handleReadyAndUpload()} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}</button>
+                <button onClick={() => handlePublish()} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>{isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}</button>
               </div>
-
               {logs.length > 0 && (
                 <div className="overflow-hidden rounded-2xl border border-[var(--p-line)] bg-[#080a16]">
                   <div className="flex items-center justify-between border-b border-[var(--p-line)] px-4 py-2.5">
-                    <span className="flex items-center gap-2 text-xs font-semibold text-[var(--p-mute)]">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--p-ok)]" /> System execution log
-                    </span>
-                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied to clipboard!"); }} className="flex items-center gap-1.5 rounded-lg border border-[var(--p-line-2)] px-2.5 py-1 text-xs text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]">
-                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                      Copy logs
+                    <span className="flex items-center gap-2 text-xs font-semibold text-[var(--p-mute)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--p-ok)]" /> System execution log</span>
+                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied!"); }} className="flex items-center gap-1.5 rounded-lg border border-[var(--p-line-2)] px-2.5 py-1 text-xs text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]">
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy logs
                     </button>
                   </div>
                   <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[11px]">
@@ -704,15 +512,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⏳') || log.includes('Uploading') || log.includes('Loading') || log.includes('Rendering') || log.includes('Encoding') || log.includes('⚠️');
                       const isDebug = log.includes('📤') || log.includes('📥') || log.includes('📜') || log.includes('🧠');
-                      
                       return (
-                        <div key={i} className={`flex gap-2 break-words leading-tight ${
-                          isError ? 'text-[var(--p-bad)]' : 
-                          isSuccess ? 'font-bold text-[var(--p-ok)]' : 
-                          isWarning ? 'text-[var(--p-warn)]' : 
-                          isDebug ? 'text-[var(--p-violet)]' : 
-                          'text-[var(--p-moon)]/80'
-                        }`}>
+                        <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
                           <span>{log.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/, '')}</span>
                         </div>
