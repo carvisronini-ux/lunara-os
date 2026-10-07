@@ -148,7 +148,6 @@ function Section({ title, children, actions }: { title: string; children: React.
    COMPONENT
    ===================================================================== */
 
-// ✅ 1. დავამატეთ forwardRef
 const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profileUsername }, ref) => {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
@@ -245,12 +244,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     setStep("preview");
   };
 
-  const handleGenerateText1 = async () => {
-    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
+  // ✅ განახლებული: იღებს overrideZodiac-ს უსაფრთხოებისთვის
+  const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0]) => {
+    const targetZodiac = overrideZodiac || selectedZodiac;
+    if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText1(true);
-    addLog(`⏳ AI is generating an emotional, viral hook for ${selectedZodiac.name}...`);
+    addLog(`⏳ AI is generating an emotional, viral hook for ${targetZodiac.name}...`);
     try {
-      const generatedText = await generateViralText1(selectedZodiac.name);
+      const generatedText = await generateViralText1(targetZodiac.name);
       setText1(generatedText);
       addLog(`✨ Successfully generated Text 1: "${generatedText}"`);
       setIsGeneratingText1(false);
@@ -262,18 +263,21 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handleGenerateText2 = async () => {
-    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
+  // ✅ განახლებული: იღებს overrideZodiac და overrideText1-ს უსაფრთხოებისთვის
+  const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string) => {
+    const targetZodiac = overrideZodiac || selectedZodiac;
+    const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
+    if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText2(true);
-    addLog(`⏳ AI is generating a meaningful forecast for ${selectedZodiac.name} based on Text 1...`);
+    addLog(`⏳ AI is generating a meaningful forecast for ${targetZodiac.name} based on Text 1...`);
     try {
-      const generatedText = await generateHoroscopeText2(selectedZodiac.name, text1);
+      const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1);
       let cleanedText = generatedText;
-      if (text1 && text1.trim().length > 0) {
-        const text1Lower = text1.toLowerCase().trim();
+      if (targetText1 && targetText1.trim().length > 0) {
+        const text1Lower = targetText1.toLowerCase().trim();
         const cleanedLower = cleanedText.toLowerCase().trim();
         if (cleanedLower.startsWith(text1Lower)) {
-          cleanedText = cleanedText.slice(text1.length).trim().replace(/^[:\-\s]+/, '').trim();
+          cleanedText = cleanedText.slice(targetText1.length).trim().replace(/^[:\-\s]+/, '').trim();
           addLog(`🧹 Auto-cleaned: removed repeated hook from Text 2`);
         }
       }
@@ -288,83 +292,54 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handleReadyAndUpload = async () => {
-    if (!selectedZodiac || !imageUrl) { addLog("❌ Preview not ready or Zodiac not selected."); return null; }
+  // ✅ განახლებული: იღებს overrideZodiac და overrideFormat-ს უსაფრთხოებისთვის
+  const handleReadyAndUpload = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideFormat?: PostFormat) => {
+    const targetZodiac = overrideZodiac || selectedZodiac;
+    const targetFormat = overrideFormat || selectedFormat;
+    const targetImageUrl = targetZodiac ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.name.toLowerCase()}.png` : imageUrl;
+
+    if (!targetZodiac || !targetImageUrl || !targetFormat) { addLog("❌ Preview not ready or Zodiac/Format not selected."); return null; }
     
     setIsPublishing(true);
-    setLogs([]);
     addLog("📸 [1/6] Initializing Native Canvas Engine...");
 
     try {
-      let width = 1080;
-      let height = 1350;
-      if (selectedFormat === 'story') { width = 1080; height = 1920; }
-      else if (selectedFormat === 'carousel') { width = 1080; height = 1080; }
+      let width = 1080, height = 1350;
+      if (targetFormat === 'story') { width = 1080; height = 1920; }
+      else if (targetFormat === 'carousel') { width = 1080; height = 1080; }
 
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Failed to get canvas context");
 
       addLog(`⏳ [2/6] Canvas created: ${width}x${height}px`);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, width, height);
 
       addLog("⏳ [3/6] Loading high-res zodiac image...");
-      const zodiacImg = new Image();
-      zodiacImg.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        zodiacImg.onload = resolve;
-        zodiacImg.onerror = reject;
-        zodiacImg.src = imageUrl;
-      });
+      const zodiacImg = new Image(); zodiacImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => { zodiacImg.onload = resolve; zodiacImg.onerror = reject; zodiacImg.src = targetImageUrl; });
       
       const scale = Math.max(width / zodiacImg.width, height / zodiacImg.height);
-      const x = (width / 2) - (zodiacImg.width / 2) * scale;
-      const y = (height / 2) - (zodiacImg.height / 2) * scale;
-      ctx.drawImage(zodiacImg, x, y, zodiacImg.width * scale, zodiacImg.height * scale);
+      ctx.drawImage(zodiacImg, (width / 2) - (zodiacImg.width / 2) * scale, (height / 2) - (zodiacImg.height / 2) * scale, zodiacImg.width * scale, zodiacImg.height * scale);
       
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, 'rgba(0,0,0,0)');
-      gradient.addColorStop(0.6, 'rgba(0,0,0,0)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, width, height);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)'); gradient.addColorStop(0.6, 'rgba(0,0,0,0)'); gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+      ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
 
       if (showLogo && logoUrl && isLogoValid) {
         addLog("⏳ Loading channel logo...");
-        const logoImg = new Image();
-        logoImg.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve;
-          logoImg.onerror = reject;
-          logoImg.src = logoUrl;
-        });
-
-        const logoSize = Math.min(width * 0.12, 130);
-        const padding = width * 0.02;
-        const logoX = width - logoSize - padding;
-        const logoY = padding;
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-        ctx.closePath();
-        ctx.clip();
-        ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-        ctx.lineWidth = Math.max(2, width * 0.004);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-        ctx.stroke();
-        ctx.restore();
+        const logoImg = new Image(); logoImg.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject; logoImg.src = logoUrl; });
+        const logoSize = Math.min(width * 0.12, 130); const padding = width * 0.02;
+        ctx.save(); ctx.beginPath(); ctx.arc(width - logoSize - padding + logoSize / 2, padding + logoSize / 2, logoSize / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+        ctx.drawImage(logoImg, width - logoSize - padding, padding, logoSize, logoSize);
+        ctx.lineWidth = Math.max(2, width * 0.004); ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.stroke(); ctx.restore();
         addLog("✅ Channel logo added to canvas.");
       }
 
-      const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean, align: CanvasTextAlign = 'center') => {
-        ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`;
-        ctx.textAlign = align;
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#000000';
+      const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean) => {
+        ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000';
         ctx.fillText(text, x, y);
       };
 
@@ -372,65 +347,39 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (text1) drawStyledText(text1, width / 2, height * 0.40, text1FontSize * 3, true);
 
       if (text2) {
-        const words = text2.split(' ');
-        let line = '';
-        let currentY = height * 0.66;
-        const lineHeight = text2FontSize * 3 * 1.4;
-        const maxWidth = width * 0.85;
-
+        const words = text2.split(' '); let line = ''; let currentY = height * 0.66;
+        const lineHeight = text2FontSize * 3 * 1.4; const maxWidth = width * 0.85;
         ctx.font = `normal ${text2FontSize * 3}px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
         for (let n = 0; n < words.length; n++) {
           const testLine = line + words[n] + ' ';
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && n > 0) {
-            ctx.fillStyle = '#000000';
-            ctx.fillText(line, width / 2, currentY);
-            line = words[n] + ' ';
-            currentY += lineHeight;
-          } else {
-            line = testLine;
-          }
+          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+            ctx.fillText(line, width / 2, currentY); line = words[n] + ' '; currentY += lineHeight;
+          } else { line = testLine; }
         }
-        ctx.fillStyle = '#000000';
         ctx.fillText(line, width / 2, currentY);
       }
 
       if (showDate || showWeekRange) {
-        const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
-        ctx.font = `italic 36px serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#000000';
-        ctx.fillText(dateText, width / 2, height * 0.94);
+        ctx.font = `italic 36px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000';
+        ctx.fillText(showWeekRange ? getWeekRange() : getCurrentDate(), width / 2, height * 0.94);
       }
 
       addLog("⏳ [5/6] Encoding to high-quality JPEG...");
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95);
-      });
+      const blob = await new Promise<Blob>((resolve) => { canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95); });
       addLog(`✅ Image encoded. Size: ${(blob.size / 1024).toFixed(2)} KB`);
 
-      const fileName = `post-${selectedZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
+      const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
       addLog(`⏳ [6/6] Uploading to Supabase (lunara-assets/posts/${fileName})...`);
 
-      const { error: uploadError } = await supabase.storage
-        .from('lunara-assets')
-        .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
-
+      const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
       if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
       
       const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
-      
       setUploadedImageUrl(urlData.publicUrl);
       
       addLog("✅ Successfully uploaded to Supabase!");
       addLog("🎉 FINAL RESULT: Image is ready and live!");
-      addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
-      
       return urlData.publicUrl;
 
     } catch (error) {
@@ -492,7 +441,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (data.success) {
         addLog(`🎉 [PUBLISH] Successfully published to Instagram! Post ID: ${data.postId}`);
         
-        // ✅ შენახვა published_content ცხრილში
         await supabase.from('published_content').insert([{
           content_type: selectedFormat,
           zodiac_sign: selectedZodiac.name,
@@ -503,7 +451,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
           agent_used: 'client_agent'
         }]);
 
-        // რესეტი მხოლოდ მაშინ, თუ არაა აგენტის რეჟიმი (აგენტი თვითონ მართავს რესეტს)
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
@@ -539,42 +486,45 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ 2. useImperativeHandle: ეს არის "რობოტული საჭე", რომელსაც AgentsPage გამოიყენებს
+  // ✅ განახლებული useImperativeHandle: დამატებულია 2-3 წამიანი პაუზები ჭედვის თავიდან ასაცილებლად
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
       addLog(`🤖 აგენტი იწყებს მუშაობას: ${zodiacName}`);
-      
+      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
+      if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
+
       // ნაბიჯი 1: ზოდიაქოს ჩაწერა და არჩევა
       setInputValue(zodiacName);
-      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
-      if (zodiac) {
-        setSelectedZodiac(zodiac);
-        setStep("format");
-      }
-      await new Promise(r => setTimeout(r, 1000));
+      setSelectedZodiac(zodiac);
+      setStep("format");
+      addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 1/5)...");
+      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
 
       // ნაბიჯი 2: ფორმატის არჩევა
       setSelectedFormat("post");
       setStep("preview");
-      await new Promise(r => setTimeout(r, 1000));
+      addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 2/5)...");
+      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
 
       // ნაბიჯი 3: ტექსტის გენერაცია
       addLog("⏳ აგენტი გენერირებს Text 1-ს...");
-      await handleGenerateText1();
-      await new Promise(r => setTimeout(r, 1500));
+      const t1 = await handleGenerateText1(zodiac); // გადავცემთ ზოდიაქოს პირდაპირ
+      if (!t1) return false;
+      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
       
       addLog("⏳ აგენტი გენერირებს Text 2-ს...");
-      await handleGenerateText2();
-      await new Promise(r => setTimeout(r, 1500));
+      const t2 = await handleGenerateText2(zodiac, t1); // გადავცემთ ზოდიაქოს და Text1-ს
+      if (!t2) return false;
+      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
 
       // ნაბიჯი 4: ატვირთვა
       addLog("⏳ აგენტი ქმნის სურათს და ტვირთავს Supabase-ში...");
-      const imgUrl = await handleReadyAndUpload();
-      if (!imgUrl) {
-        addLog("❌ ატვირთვა ვერ მოხერხდა აგენტის ციკლის დროს");
-        return false;
+      const imgUrl = await handleReadyAndUpload(zodiac, "post"); // გადავცემთ ზოდიაქოს და ფორმატს
+      if (!imgUrl) { 
+        addLog("❌ ატვირთვა ვერ მოხერხდა აგენტის ციკლის დროს"); 
+        return false; 
       }
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
 
       // ნაბიჯი 5: 7 წამიანი დაყოვნება და გამოქვეყნება
       addLog("⏳ ველოდები 7 წამს Instagram API-ს სტაბილურობისთვის...");
@@ -615,8 +565,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue Manually</button>
-            <button onClick={handleAiPost} disabled={isPublishing} className={`${btnGhost} flex-1`}>
-              {isPublishing ? <><Spinner /> Preparing...</> : "🤖 AI Auto-Prepare"}
+            <button onClick={() => { const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; setInputValue(random.name); handleZodiacSubmit(); }} className={`${btnGhost} flex-1`}>
+              🤖 AI Auto-Prepare
             </button>
           </div>
         </div>
@@ -711,7 +661,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 title="Text 1 · hook (max 2 lines)"
                 actions={
                   <>
-                    <button onClick={handleGenerateText1} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                    <button onClick={() => handleGenerateText1()} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
                       {isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}
                     </button>
                     <button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
@@ -726,7 +676,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 title="Text 2 · forecast (max 5 lines)"
                 actions={
                   <>
-                    <button onClick={handleGenerateText2} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                    <button onClick={() => handleGenerateText2()} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
                       {isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}
                     </button>
                     <button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
@@ -763,7 +713,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               </Section>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button onClick={handleReadyAndUpload} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>
+                <button onClick={() => handleReadyAndUpload()} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>
                   {isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}
                 </button>
                 <button onClick={handlePublish} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>
