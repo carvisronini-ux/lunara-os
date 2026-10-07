@@ -1,4 +1,3 @@
-// /home/carvisronini-ux/lunara-os/app/dashboard/instagram/master-schedule/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -11,20 +10,32 @@ const supabase = createClient(
 );
 
 const STYLES = `
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 .ig-root{
   --ink:#0b0d1c; --ink-2:#12152b; --ink-3:#1a1e3a;
   --line:rgba(236,233,247,.1); --line-2:rgba(236,233,247,.18);
   --moon:#ece9f7; --mute:#9d9bbd; --violet:#9b8cff; --rose:#ff7aa8; --amber:#f6c177; --ok:#5fd6a4;
   font-family:"Bricolage Grotesque","Noto Sans Georgian",system-ui,sans-serif;
   background:var(--ink); color:var(--moon);
+  color-scheme:dark;
 }
+.ig-root .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
 .ig-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+.ig-scroll{scrollbar-width:none}
+.ig-scroll::-webkit-scrollbar{display:none}
 @keyframes ig-pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 140, 255, 0.3); }
-  50% { box-shadow: 0 0 20px 2px rgba(155, 140, 255, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 140, 255, 0.28); }
+  50% { box-shadow: 0 0 22px 2px rgba(155, 140, 255, 0.14); }
 }
 .ig-today-glow { animation: ig-pulse-glow 3s ease-in-out infinite; }
+@keyframes ig-pop{from{opacity:0; transform:translateY(6px) scale(.98)} to{opacity:1; transform:none}}
+.ig-pop{animation:ig-pop .16s ease-out}
+@keyframes ig-shimmer{0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5}}
+.ig-skeleton{animation:ig-shimmer 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){
+  .ig-today-glow,.ig-pop,.ig-skeleton{animation:none}
+  .ig-root *{transition:none !important}
+}
 `;
 
 const Icons = {
@@ -42,32 +53,34 @@ const Icons = {
   pause: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
   skip: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>,
   x: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>,
+  chevron: <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+  refresh: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/></svg>,
 };
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 // ✅ ზოდიაქოების სია inline editing-ისთვის
 const ZODIAC_OPTIONS = [
-  { value: null, label: '🎲 Random', color: 'text-[var(--violet)]' },
-  { value: 'ARIES', label: '♈ Aries', color: 'text-[var(--rose)]' },
-  { value: 'TAURUS', label: '♉ Taurus', color: 'text-[var(--ok)]' },
-  { value: 'GEMINI', label: '♊ Gemini', color: 'text-[var(--amber)]' },
-  { value: 'CANCER', label: '♋ Cancer', color: 'text-[var(--moon)]' },
-  { value: 'LEO', label: '♌ Leo', color: 'text-[var(--amber)]' },
-  { value: 'VIRGO', label: '♍ Virgo', color: 'text-[var(--ok)]' },
-  { value: 'LIBRA', label: '♎ Libra', color: 'text-[var(--violet)]' },
-  { value: 'SCORPIO', label: '♏ Scorpio', color: 'text-[var(--rose)]' },
-  { value: 'SAGITTARIUS', label: '♐ Sagittarius', color: 'text-[var(--violet)]' },
-  { value: 'CAPRICORN', label: '♑ Capricorn', color: 'text-[var(--mute)]' },
-  { value: 'AQUARIUS', label: '♒ Aquarius', color: 'text-[var(--violet)]' },
-  { value: 'PISCES', label: '♓ Pisces', color: 'text-[var(--violet)]' },
+  { value: null, label: '🎲 Random', color: 'text-[#b3a8ff]' },
+  { value: 'ARIES', label: '♈ Aries', color: 'text-[#ff7aa8]' },
+  { value: 'TAURUS', label: '♉ Taurus', color: 'text-[#5fd6a4]' },
+  { value: 'GEMINI', label: '♊ Gemini', color: 'text-[#f6c177]' },
+  { value: 'CANCER', label: '♋ Cancer', color: 'text-[#ece9f7]' },
+  { value: 'LEO', label: '♌ Leo', color: 'text-[#f6c177]' },
+  { value: 'VIRGO', label: '♍ Virgo', color: 'text-[#5fd6a4]' },
+  { value: 'LIBRA', label: '♎ Libra', color: 'text-[#b3a8ff]' },
+  { value: 'SCORPIO', label: '♏ Scorpio', color: 'text-[#ff7aa8]' },
+  { value: 'SAGITTARIUS', label: '♐ Sagittarius', color: 'text-[#b3a8ff]' },
+  { value: 'CAPRICORN', label: '♑ Capricorn', color: 'text-[#9d9bbd]' },
+  { value: 'AQUARIUS', label: '♒ Aquarius', color: 'text-[#b3a8ff]' },
+  { value: 'PISCES', label: '♓ Pisces', color: 'text-[#b3a8ff]' },
 ];
 
 const TYPE_COLORS: Record<string, string> = {
-  post: "text-[var(--violet)] bg-[var(--violet)]/10 border-[var(--violet)]/20",
-  story: "text-[var(--amber)] bg-[var(--amber)]/10 border-[var(--amber)]/20",
-  carousel: "text-[var(--ok)] bg-[var(--ok)]/10 border-[var(--ok)]/20",
-  reel: "text-[var(--rose)] bg-[var(--rose)]/10 border-[var(--rose)]/20",
+  post: "text-[#b3a8ff] bg-[#9b8cff]/10 border-[#9b8cff]/25",
+  story: "text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/25",
+  carousel: "text-[#5fd6a4] bg-[#5fd6a4]/10 border-[#5fd6a4]/25",
+  reel: "text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/25",
 };
 
 const TYPE_ICONS: Record<string, any> = {
@@ -78,26 +91,35 @@ const TYPE_ICONS: Record<string, any> = {
 };
 
 const STATUS_STYLES: Record<string, any> = {
-  pending: { bg: "bg-[var(--amber)]/10", border: "border-[var(--amber)]/30", text: "text-[var(--amber)]", label: "Pending", icon: Icons.clock },
-  done: { bg: "bg-[var(--ok)]/10", border: "border-[var(--ok)]/30", text: "text-[var(--ok)]", label: "Done", icon: Icons.check },
-  upcoming: { bg: "bg-[var(--ink-3)]", border: "border-[var(--line-2)]", text: "text-[var(--mute)]", label: "Upcoming", icon: Icons.calendar },
-  past: { bg: "bg-[var(--ink-3)]/50", border: "border-[var(--line)]", text: "text-[var(--mute)]/60", label: "Past", icon: Icons.check },
-  pause: { bg: "bg-[var(--rose)]/10", border: "border-[var(--rose)]/30", text: "text-[var(--rose)]", label: "Pause", icon: Icons.pause },
-  skip: { bg: "bg-[var(--mute)]/10", border: "border-[var(--mute)]/30", text: "text-[var(--mute)]", label: "Skip", icon: Icons.skip },
+  pending: { bg: "bg-[#f6c177]/10", border: "border-[#f6c177]/30", text: "text-[#f6c177]", label: "Pending", icon: Icons.clock },
+  done: { bg: "bg-[#5fd6a4]/10", border: "border-[#5fd6a4]/30", text: "text-[#5fd6a4]", label: "Done", icon: Icons.check },
+  upcoming: { bg: "bg-[#1a1e3a]", border: "border-[#ece9f7]/15", text: "text-[#9d9bbd]", label: "Upcoming", icon: Icons.calendar },
+  past: { bg: "bg-[#1a1e3a]/50", border: "border-[#ece9f7]/10", text: "text-[#9d9bbd]/70", label: "Past", icon: Icons.check },
+  pause: { bg: "bg-[#ff7aa8]/10", border: "border-[#ff7aa8]/30", text: "text-[#ff7aa8]", label: "Pause", icon: Icons.pause },
+  skip: { bg: "bg-[#9d9bbd]/10", border: "border-[#9d9bbd]/30", text: "text-[#9d9bbd]", label: "Skip", icon: Icons.skip },
+};
+
+const STATUS_DOT: Record<string, string> = {
+  pending: "#f6c177",
+  done: "#5fd6a4",
+  upcoming: "#9d9bbd",
+  past: "#4b4f78",
+  pause: "#ff7aa8",
+  skip: "#9d9bbd",
 };
 
 const PUBLISH_STATUS_STYLES: Record<string, any> = {
   published: {
-    bg: "bg-[var(--ok)]/10",
-    border: "border-[var(--ok)]/30",
-    text: "text-[var(--ok)]",
+    bg: "bg-[#5fd6a4]/10",
+    border: "border-[#5fd6a4]/30",
+    text: "text-[#5fd6a4]",
     label: "დაიპოსტა",
     icon: Icons.check,
   },
   failed: {
-    bg: "bg-[var(--rose)]/10",
-    border: "border-[var(--rose)]/30",
-    text: "text-[var(--rose)]",
+    bg: "bg-[#ff7aa8]/10",
+    border: "border-[#ff7aa8]/30",
+    text: "text-[#ff7aa8]",
     label: "არდაიპოსტა",
     icon: Icons.x,
   },
@@ -109,6 +131,10 @@ const formatTime = (time: string): string => {
   if (time.length >= 8) return time.substring(0, 8);
   return time;
 };
+
+const inputClass =
+  "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
+const labelClass = "mb-1.5 block text-xs font-medium text-[var(--mute)]";
 
 export default function MasterSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
@@ -302,27 +328,28 @@ export default function MasterSchedulePage() {
 
   // ✅ ზოდიაქოს ნიშნის ფორმატირება
   const getZodiacDisplay = (zodiacSign: string | null) => {
-    if (!zodiacSign) return { label: '🎲 Random', color: 'text-[var(--violet)]' };
+    if (!zodiacSign) return { label: '🎲 Random', color: 'text-[#b3a8ff]' };
     const option = ZODIAC_OPTIONS.find(z => z.value === zodiacSign);
-    return option || { label: zodiacSign, color: 'text-[var(--mute)]' };
+    return option || { label: zodiacSign, color: 'text-[#9d9bbd]' };
   };
 
   return (
     <div className="ig-root min-h-screen">
-      <style>{STYLES}</style>
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
+      {/* ================= HEADER ================= */}
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3.5 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
             <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
               {Icons.back} <span className="hidden sm:inline">Back</span>
             </Link>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">Master Schedule</h1>
-              <p className="hidden text-xs text-[var(--mute)] sm:block">Manage and edit your automated posting rules</p>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold tracking-tight">Master Schedule</h1>
+              <p className="hidden truncate text-xs text-[var(--mute)] sm:block">Manage and edit your automated posting rules</p>
             </div>
           </div>
-          <button onClick={() => openModal()} className="flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+          <button onClick={() => openModal()} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
             {Icons.plus} Add Rule
           </button>
         </div>
@@ -330,55 +357,69 @@ export default function MasterSchedulePage() {
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
         {loading ? (
-          <div className="flex justify-center py-20 text-[var(--mute)]">Loading schedule...</div>
+          <div className="space-y-4" aria-busy="true" aria-label="Loading schedule">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[0, 1, 2].map(i => <div key={i} className="ig-skeleton h-24 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" />)}
+            </div>
+            {[0, 1].map(i => <div key={i} className="ig-skeleton h-44 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" />)}
+          </div>
         ) : (
           <>
-            <div className="flex flex-wrap gap-4">
-              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-                <p className="text-xs font-medium text-[var(--mute)]">Active Rules</p>
-                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{activeRulesCount} <span className="text-sm font-normal text-[var(--mute)]">/ {schedule.length}</span></p>
+            {/* ================= STATS ================= */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+                <p className="text-xs font-medium text-[var(--mute)]">Active rules</p>
+                <p className="mono mt-1.5 text-3xl font-medium leading-none">{activeRulesCount}<span className="ml-1.5 text-sm text-[var(--mute)]">/ {schedule.length}</span></p>
+                <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-[var(--ok)] transition-all duration-500" style={{ width: `${schedule.length ? (activeRulesCount / schedule.length) * 100 : 0}%` }} />
+                </div>
               </div>
-              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-                <p className="text-xs font-medium text-[var(--mute)]">Weekly Output</p>
-                <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{schedule.length} <span className="text-sm font-normal text-[var(--mute)]">Items</span></p>
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+                <p className="text-xs font-medium text-[var(--mute)]">Weekly output</p>
+                <p className="mono mt-1.5 text-3xl font-medium leading-none">{schedule.length}<span className="ml-1.5 text-sm text-[var(--mute)]">items</span></p>
+                <p className="mt-3 text-xs text-[var(--mute)]">Across {DAYS_OF_WEEK.filter((_, i) => schedule.some(r => r.day_of_week === i)).length} days</p>
               </div>
-              <div className="min-w-[200px] flex-1 max-w-xs rounded-2xl border border-[var(--violet)]/30 bg-[var(--violet)]/5 p-4">
-                <p className="text-xs font-medium text-[var(--violet)]">Current Time</p>
-                <p className="mt-1 text-sm font-semibold text-[var(--moon)]">{formattedDate}</p>
-                <p className="text-lg font-bold text-[var(--violet)] font-mono">{formattedNow}</p>
+              <div className="rounded-2xl border border-[#9b8cff]/35 bg-[#9b8cff]/[0.07] p-4">
+                <p className="text-xs font-medium text-[#b3a8ff]">Current time</p>
+                <p className="mono mt-1.5 text-3xl font-medium leading-none text-[#b3a8ff]">{formattedNow}</p>
+                <p className="mt-3 text-xs text-[var(--moon)]/80">{formattedDate}</p>
               </div>
             </div>
 
+            {/* ================= PUBLISHED TODAY ================= */}
             {publishedToday.length > 0 && (
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] overflow-hidden">
-                <div className="border-b border-[var(--line)] bg-[var(--ink-3)]/50 px-4 py-3 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-[var(--violet)]">
-                    📊 Published Today ({publishedToday.length})
+              <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" aria-label="Published today">
+                <div className="flex items-center justify-between rounded-t-2xl border-b border-[var(--line)] bg-[#1a1e3a]/50 px-4 py-3">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold">
+                    <span className="h-2 w-2 rounded-full bg-[var(--ok)]" />
+                    Published today
+                    <span className="mono rounded-full bg-white/10 px-2 py-0.5 text-xs text-[var(--mute)]">{publishedToday.length}</span>
                   </h3>
-                  <button onClick={() => fetchPublishedToday()} className="text-xs text-[var(--mute)] hover:text-[var(--moon)] transition-colors">
-                    ↻ Refresh
+                  <button onClick={() => fetchPublishedToday()} className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                    {Icons.refresh} Refresh
                   </button>
                 </div>
                 <div className="divide-y divide-[var(--line)]">
                   {publishedToday.map(p => {
                     const publishStyle = PUBLISH_STATUS_STYLES[p.status];
                     return (
-                      <div key={p.id} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-white/[0.02]">
+                      <div key={p.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]">
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${publishStyle.bg} ${publishStyle.border} ${publishStyle.text}`}>
                           {publishStyle.icon}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-[var(--moon)]">
-                            {p.content_type} {p.zodiac_sign && `· ${p.zodiac_sign}`}
+                          <p className="truncate text-sm font-medium capitalize">
+                            {p.content_type} {p.zodiac_sign && <span className="font-normal text-[var(--mute)]">· {p.zodiac_sign}</span>}
                           </p>
                           <p className="truncate text-xs text-[var(--mute)]">{p.caption?.substring(0, 60) || 'No caption'}</p>
                         </div>
-                        <span className="text-xs text-[var(--mute)] font-mono">
+                        <span className="mono shrink-0 text-xs text-[var(--mute)]">
                           {new Date(p.published_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <button 
                           onClick={() => deletePublished(p.id)} 
-                          className="rounded-lg p-1.5 text-[var(--mute)] hover:bg-[var(--rose)]/10 hover:text-[var(--rose)] transition-colors"
+                          aria-label="წაშლა"
+                          className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]"
                           title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას"
                         >
                           {Icons.trash}
@@ -387,9 +428,49 @@ export default function MasterSchedulePage() {
                     );
                   })}
                 </div>
+              </section>
+            )}
+
+            {/* ================= DAY JUMP BAR ================= */}
+            {schedule.length > 0 && (
+              <nav aria-label="Jump to day" className="ig-scroll -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+                {DAYS_OF_WEEK.map((day, index) => {
+                  const count = schedule.filter((r) => r.day_of_week === index).length;
+                  const isToday = index === currentDayIndex;
+                  const has = count > 0;
+                  return (
+                    <a
+                      key={day}
+                      href={has ? `#day-${index}` : undefined}
+                      aria-disabled={!has}
+                      className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                        isToday
+                          ? "border-[#9b8cff]/60 bg-[#9b8cff]/15 text-[var(--moon)]"
+                          : has
+                          ? "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]"
+                          : "pointer-events-none border-[var(--line)] text-[#9d9bbd]/40"
+                      }`}
+                    >
+                      {day.slice(0, 3)}
+                      <span className="mono text-xs opacity-80">{count}</span>
+                    </a>
+                  );
+                })}
+              </nav>
+            )}
+
+            {/* ================= EMPTY STATE ================= */}
+            {schedule.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-16 text-center">
+                <p className="font-semibold">No schedule rules yet</p>
+                <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--mute)]">Create your first rule to start automated posting.</p>
+                <button onClick={() => openModal()} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+                  {Icons.plus} Add Rule
+                </button>
               </div>
             )}
 
+            {/* ================= WEEK ================= */}
             <div className="space-y-4">
               {DAYS_OF_WEEK.map((day, index) => {
                 const dayRules = schedule.filter((r) => r.day_of_week === index);
@@ -397,14 +478,19 @@ export default function MasterSchedulePage() {
                 const isToday = index === currentDayIndex;
 
                 return (
-                  <div key={day} className={`rounded-2xl border overflow-hidden transition-all ${isToday ? "border-[var(--violet)]/50 bg-[var(--violet)]/5 ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}>
-                    <div className={`border-b px-4 py-3 flex items-center justify-between ${isToday ? "border-[var(--violet)]/30 bg-[var(--violet)]/10" : "border-[var(--line)] bg-[var(--ink-3)]/50"}`}>
-                      <div className="flex items-center gap-2">
-                        <h3 className={`text-sm font-semibold ${isToday ? "text-[var(--violet)]" : "text-[var(--violet)]"}`}>{day}</h3>
-                        {isToday && <span className="rounded-full bg-[var(--violet)] px-2 py-0.5 text-[10px] font-bold text-[var(--ink)]">TODAY</span>}
+                  <section
+                    key={day}
+                    id={`day-${index}`}
+                    className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}
+                  >
+                    <div className={`flex items-center justify-between rounded-t-2xl border-b px-4 py-3 ${isToday ? "border-[#9b8cff]/30 bg-[#9b8cff]/10" : "border-[var(--line)] bg-[#1a1e3a]/50"}`}>
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-sm font-semibold">{day}</h3>
+                        {isToday && <span className="rounded-full bg-[var(--violet)] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[var(--ink)]">TODAY</span>}
                       </div>
                       <span className="text-xs text-[var(--mute)]">{dayRules.length} {dayRules.length === 1 ? 'rule' : 'rules'}</span>
                     </div>
+
                     <div className="divide-y divide-[var(--line)]">
                       {dayRules.map((rule) => {
                         const TypeIcon = TYPE_ICONS[rule.content_type];
@@ -416,150 +502,174 @@ export default function MasterSchedulePage() {
                         const zodiacDisplay = getZodiacDisplay(rule.zodiac_sign);
 
                         return (
-                          <div key={rule.id} className={`flex items-center gap-4 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[var(--amber)]/[0.03]' : 'hover:bg-white/[0.02]'}`}>
-                            <div className="w-20 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">
-                              {formatTime(rule.time)}
+                          <div key={rule.id} className={`flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[#f6c177]/[0.04]' : 'hover:bg-white/[0.02]'}`}>
+                            {/* time + status dot */}
+                            <div className="flex w-[88px] shrink-0 items-center gap-2.5">
+                              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_DOT[status] ?? "#9d9bbd" }} aria-hidden />
+                              <span className="mono text-sm font-medium">{formatTime(rule.time)}</span>
                             </div>
-                            <div className="flex min-w-0 flex-1 items-center gap-3">
-                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${colorClass}`}>{TypeIcon}</div>
+
+                            {/* type + title */}
+                            <div className={`flex min-w-[170px] flex-1 items-center gap-3 ${!rule.is_active ? 'opacity-55' : ''}`}>
+                              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>{TypeIcon}</div>
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-[var(--moon)]">
+                                <p className="truncate text-sm font-medium">
                                   {rule.content_type.charAt(0).toUpperCase() + rule.content_type.slice(1)}
-                                  {rule.zodiac_sign && <span className="ml-2 text-[var(--violet)]">· {rule.zodiac_sign}</span>}
+                                  {rule.zodiac_sign && <span className="ml-2 font-normal text-[#b3a8ff]">· {rule.zodiac_sign}</span>}
                                 </p>
                                 <p className="truncate text-xs text-[var(--mute)]">{rule.content_theme}</p>
                               </div>
                             </div>
-                            
-                            {/* ✅ ახალი: ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
-                            {rule.content_type === 'post' && (
-                              // ✅ დამატებულია z-50, რომ stacking context-ში ზემოთ იყოს
-                              <div className="relative hidden sm:block z-50" ref={zodiacDropdownRef}>
-                                <button 
-                                  onClick={() => setActiveZodiacDropdown(activeZodiacDropdown === rule.id ? null : rule.id)}
-                                  disabled={savingZodiac === rule.id}
-                                  className={`flex items-center gap-1.5 rounded-full border border-[var(--violet)]/30 bg-[var(--violet)]/5 px-2.5 py-1 transition-colors hover:bg-[var(--violet)]/15 ${zodiacDisplay.color} ${savingZodiac === rule.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                                  title="დააჭირე ზოდიაქოს შესაცვლელად"
-                                >
-                                  {savingZodiac === rule.id ? (
-                                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                  ) : (
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider">
-                                      {zodiacDisplay.label}
-                                    </span>
+
+                            {/* controls */}
+                            <div className="ml-auto flex flex-wrap items-center gap-2">
+                              {/* ✅ ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
+                              {rule.content_type === 'post' && (
+                                <div className={`relative ${activeZodiacDropdown === rule.id ? 'z-[70]' : 'z-10'}`} ref={zodiacDropdownRef}>
+                                  <button 
+                                    onClick={() => setActiveZodiacDropdown(activeZodiacDropdown === rule.id ? null : rule.id)}
+                                    disabled={savingZodiac === rule.id}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={activeZodiacDropdown === rule.id}
+                                    className={`flex items-center gap-1.5 rounded-full border border-[#9b8cff]/30 bg-[#9b8cff]/[0.06] px-2.5 py-1 transition-colors hover:bg-[#9b8cff]/15 ${zodiacDisplay.color} ${savingZodiac === rule.id ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
+                                    title="დააჭირე ზოდიაქოს შესაცვლელად"
+                                  >
+                                    {savingZodiac === rule.id ? (
+                                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                    ) : (
+                                      <span className="text-[11px] font-semibold uppercase tracking-wider">
+                                        {zodiacDisplay.label}
+                                      </span>
+                                    )}
+                                    {Icons.chevron}
+                                  </button>
+
+                                  {activeZodiacDropdown === rule.id && (
+                                    <div role="listbox" className="ig-pop absolute right-0 top-full z-[100] mt-2 max-h-[60vh] w-52 overflow-y-auto rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-2xl">
+                                      {ZODIAC_OPTIONS.map((option) => (
+                                        <button
+                                          key={option.value || 'random'}
+                                          role="option"
+                                          aria-selected={rule.zodiac_sign === option.value}
+                                          onClick={() => updateZodiacSign(rule.id, option.value)}
+                                          className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
+                                            rule.zodiac_sign === option.value ? 'bg-[#9b8cff]/20 text-[#b3a8ff]' : option.color
+                                          }`}
+                                        >
+                                          <span className="flex-1">{option.label}</span>
+                                          {rule.zodiac_sign === option.value && (
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                          )}
+                                        </button>
+                                      ))}
+                                    </div>
                                   )}
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                </div>
+                              )}
+
+                              {/* განრიგის სტატუსი */}
+                              <div className={`status-dropdown relative ${activeDropdown === rule.id ? 'z-[70]' : 'z-10'}`}>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdown(activeDropdown === rule.id ? null : rule.id);
+                                  }}
+                                  aria-haspopup="menu"
+                                  aria-expanded={activeDropdown === rule.id}
+                                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-opacity hover:opacity-80 ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}
+                                >
+                                  {StatusIcon}
+                                  <span className="text-[11px] font-semibold uppercase tracking-wider">{statusStyle.label}</span>
+                                  {Icons.chevron}
                                 </button>
 
-                                {/* ✅ განახლებული: dropdown ქვემოდან იხსნება, მაქს. 70vh სიმაღლით და z-[100]-ით რომ ყველა ელემენტზე ზემოთ იყოს */}
-                                {activeZodiacDropdown === rule.id && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-[100] max-h-[70vh] overflow-y-auto">
-                                    {ZODIAC_OPTIONS.map((option) => (
+                                {activeDropdown === rule.id && (
+                                  <div role="menu" className="ig-pop absolute right-0 top-full z-[100] mt-2 w-40 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-2xl">
+                                    {Object.entries(STATUS_STYLES).map(([key, style]) => (
                                       <button
-                                        key={option.value || 'random'}
-                                        onClick={() => updateZodiacSign(rule.id, option.value)}
+                                        key={key}
+                                        role="menuitem"
+                                        onClick={() => updateRuleStatus(rule.id, key)}
                                         className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
-                                          rule.zodiac_sign === option.value ? 'bg-[var(--violet)]/20 text-[var(--violet)]' : option.color
+                                          status === key ? 'bg-white/5 text-[#b3a8ff]' : 'text-[var(--moon)]'
                                         }`}
                                       >
-                                        <span className="flex-1">{option.label}</span>
-                                        {rule.zodiac_sign === option.value && (
-                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                        )}
+                                        {style.icon}
+                                        {style.label}
                                       </button>
                                     ))}
                                   </div>
                                 )}
                               </div>
-                            )}
 
-                            {/* განრიგის სტატუსი */}
-                            <div className="relative hidden sm:block status-dropdown">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveDropdown(activeDropdown === rule.id ? null : rule.id);
-                                }}
-                                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-colors hover:opacity-80 ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}
-                              >
-                                {StatusIcon}
-                                <span className="text-[10px] font-semibold uppercase tracking-wider">{statusStyle.label}</span>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                              </button>
-
-                              {activeDropdown === rule.id && (
-                                <div className="absolute right-0 top-full mt-2 w-36 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-50">
-                                  {Object.entries(STATUS_STYLES).map(([key, style]) => (
-                                    <button
-                                      key={key}
-                                      onClick={() => updateRuleStatus(rule.id, key)}
-                                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
-                                        status === key ? 'text-[var(--violet)] bg-white/5' : 'text-[var(--moon)]'
-                                      }`}
-                                    >
-                                      {style.icon}
-                                      {style.label}
-                                    </button>
-                                  ))}
+                              {publishStatus && (
+                                <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${PUBLISH_STATUS_STYLES[publishStatus].bg} ${PUBLISH_STATUS_STYLES[publishStatus].border} ${PUBLISH_STATUS_STYLES[publishStatus].text}`}>
+                                  {PUBLISH_STATUS_STYLES[publishStatus].icon}
+                                  <span className="text-[11px] font-semibold tracking-wide">
+                                    {PUBLISH_STATUS_STYLES[publishStatus].label}
+                                  </span>
                                 </div>
                               )}
-                            </div>
 
-                            {publishStatus && (
-                              <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${PUBLISH_STATUS_STYLES[publishStatus].bg} ${PUBLISH_STATUS_STYLES[publishStatus].border} ${PUBLISH_STATUS_STYLES[publishStatus].text}`}>
-                                {PUBLISH_STATUS_STYLES[publishStatus].icon}
-                                <span className="text-[10px] font-semibold uppercase tracking-wider">
-                                  {PUBLISH_STATUS_STYLES[publishStatus].label}
-                                </span>
+                              <div className="flex items-center gap-1 border-l border-[var(--line)] pl-2">
+                                <button
+                                  role="switch"
+                                  aria-checked={rule.is_active}
+                                  aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
+                                  onClick={() => toggleRule(rule.id, rule.is_active)}
+                                  className={`relative mr-1 h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}
+                                >
+                                  <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
+                                </button>
+                                <button onClick={() => openModal(rule)} aria-label="Edit rule" className="rounded-lg p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.edit}</button>
+                                <button onClick={() => deleteRule(rule.id)} aria-label="Delete rule" className="rounded-lg p-2 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]">{Icons.trash}</button>
                               </div>
-                            )}
-
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>
-                                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
-                              </button>
-                              <button onClick={() => openModal(rule)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.edit}</button>
-                              <button onClick={() => deleteRule(rule.id)} className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[var(--rose)]/10 hover:text-[var(--rose)]">{Icons.trash}</button>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
+                  </section>
                 );
               })}
             </div>
 
-            <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
-              <p className="text-sm text-[var(--violet)]">
-                🧠 <span className="font-semibold">AI Auto-Optimization:</span> Currently in Baseline Mode. After 4 weeks of data collection, the system will suggest time/theme adjustments based on actual Reach & Saves.
+            {/* ================= FOOTER NOTE ================= */}
+            <div className="flex items-start gap-3 rounded-2xl border border-[#9b8cff]/20 bg-[#9b8cff]/[0.05] p-4">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#9b8cff]/15 text-xs" aria-hidden>🧠</span>
+              <p className="text-sm leading-relaxed text-[var(--moon)]/85">
+                <span className="font-semibold text-[#b3a8ff]">AI Auto-Optimization:</span> Currently in Baseline Mode. After 4 weeks of data collection, the system will suggest time/theme adjustments based on actual Reach &amp; Saves.
               </p>
             </div>
           </>
         )}
       </main>
 
+      {/* ================= MODAL ================= */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowModal(false)}>
-          <div className="w-full max-w-md rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-4 text-lg font-semibold">{editingRule ? "Edit Schedule Rule" : "Add New Schedule Rule"}</h3>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowModal(false)}>
+          <div role="dialog" aria-modal="true" aria-label={editingRule ? "Edit schedule rule" : "Add schedule rule"} className="ig-pop max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">{editingRule ? "Edit Schedule Rule" : "Add New Schedule Rule"}</h3>
+              <button type="button" onClick={() => setShowModal(false)} aria-label="Close" className="rounded-full p-1.5 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.x}</button>
+            </div>
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Day</label>
-                  <select value={formData.day_of_week} onChange={(e) => setFormData({...formData, day_of_week: parseInt(e.target.value)})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <label htmlFor="rule-day" className={labelClass}>Day</label>
+                  <select id="rule-day" value={formData.day_of_week} onChange={(e) => setFormData({...formData, day_of_week: parseInt(e.target.value)})} className={inputClass}>
                     {DAYS_OF_WEEK.map((day, i) => <option key={i} value={i}>{day}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Time</label>
-                  <input type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
+                  <label htmlFor="rule-time" className={labelClass}>Time</label>
+                  <input id="rule-time" type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className={inputClass} required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Type</label>
-                  <select value={formData.content_type} onChange={(e) => setFormData({...formData, content_type: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <label htmlFor="rule-type" className={labelClass}>Type</label>
+                  <select id="rule-type" value={formData.content_type} onChange={(e) => setFormData({...formData, content_type: e.target.value})} className={inputClass}>
                     <option value="post">Post</option>
                     <option value="story">Story</option>
                     <option value="carousel">Carousel</option>
@@ -567,8 +677,8 @@ export default function MasterSchedulePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Zodiac (Optional)</label>
-                  <select value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                  <label htmlFor="rule-zodiac" className={labelClass}>Zodiac (optional)</label>
+                  <select id="rule-zodiac" value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className={inputClass}>
                     <option value="">🎲 Random</option>
                     <option value="ARIES">♈ Aries</option>
                     <option value="TAURUS">♉ Taurus</option>
@@ -586,12 +696,12 @@ export default function MasterSchedulePage() {
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Content Theme</label>
-                <input type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., Daily Habit, Red Flags" className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]" required />
+                <label htmlFor="rule-theme" className={labelClass}>Content theme</label>
+                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., Daily Habit, Red Flags" className={inputClass} required />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Primary Goal</label>
-                <select value={formData.goal} onChange={(e) => setFormData({...formData, goal: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
+                <label htmlFor="rule-goal" className={labelClass}>Primary goal</label>
+                <select id="rule-goal" value={formData.goal} onChange={(e) => setFormData({...formData, goal: e.target.value})} className={inputClass}>
                   <option value="Engagement">Engagement</option>
                   <option value="Discovery">Discovery</option>
                   <option value="Saves">Saves / Shares</option>
