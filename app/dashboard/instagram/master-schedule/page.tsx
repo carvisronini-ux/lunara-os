@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/app/dashboard/instagram/master-schedule/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -39,7 +39,6 @@ const Icons = {
   clock: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   check: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
   calendar: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  // ✅ ახალი იკონები
   pause: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
   skip: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>,
 };
@@ -60,7 +59,6 @@ const TYPE_ICONS: Record<string, any> = {
   reel: Icons.reel,
 };
 
-// ✅ განახლებული სტატუსები (Pause და Skip-ის დამატებით)
 const STATUS_STYLES: Record<string, any> = {
   pending: { bg: "bg-[var(--amber)]/10", border: "border-[var(--amber)]/30", text: "text-[var(--amber)]", label: "Pending", icon: Icons.clock },
   done: { bg: "bg-[var(--ok)]/10", border: "border-[var(--ok)]/30", text: "text-[var(--ok)]", label: "Done", icon: Icons.check },
@@ -93,7 +91,6 @@ export default function MasterSchedulePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Dropdown-ის დახურვა გარე დაჭერისას
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (activeDropdown && !(event.target as HTMLElement).closest('.status-dropdown')) {
@@ -120,7 +117,6 @@ export default function MasterSchedulePage() {
   const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
-  // ✅ სტატუსის ლოგიკა: თუ ხელით არის მითითებული, ვაბრუნებთ მას, თუ არა - ავტომატურს
   const getRuleStatus = (rule: any) => {
     if (rule.status && ['done', 'pending', 'past', 'upcoming', 'pause', 'skip'].includes(rule.status)) {
       return rule.status;
@@ -139,7 +135,6 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ახალი ფუნქცია: სტატუსის განახლება ბაზაში
   const updateRuleStatus = async (id: string, newStatus: string) => {
     const { error } = await supabase.from("content_schedule").update({ status: newStatus }).eq("id", id);
     if (!error) {
@@ -272,7 +267,6 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
                             
-                            {/* ✅ სტატუსის ბეიჯი (Dropdown მენიუთი) */}
                             <div className="relative hidden sm:block status-dropdown">
                               <button 
                                 onClick={(e) => {
