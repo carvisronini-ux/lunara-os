@@ -59,7 +59,6 @@ const Icons = {
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// ✅ ზოდიაქოების სია inline editing-ისთვის
 const ZODIAC_OPTIONS = [
   { value: null, label: '🎲 Random', color: 'text-[#b3a8ff]' },
   { value: 'ARIES', label: '♈ Aries', color: 'text-[#ff7aa8]' },
@@ -109,20 +108,8 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 const PUBLISH_STATUS_STYLES: Record<string, any> = {
-  published: {
-    bg: "bg-[#5fd6a4]/10",
-    border: "border-[#5fd6a4]/30",
-    text: "text-[#5fd6a4]",
-    label: "დაიპოსტა",
-    icon: Icons.check,
-  },
-  failed: {
-    bg: "bg-[#ff7aa8]/10",
-    border: "border-[#ff7aa8]/30",
-    text: "text-[#ff7aa8]",
-    label: "არდაიპოსტა",
-    icon: Icons.x,
-  },
+  published: { bg: "bg-[#5fd6a4]/10", border: "border-[#5fd6a4]/30", text: "text-[#5fd6a4]", label: "დაიპოსტა", icon: Icons.check },
+  failed: { bg: "bg-[#ff7aa8]/10", border: "border-[#ff7aa8]/30", text: "text-[#ff7aa8]", label: "არდაიპოსტა", icon: Icons.x },
 };
 
 const formatTime = (time: string): string => {
@@ -132,8 +119,7 @@ const formatTime = (time: string): string => {
   return time;
 };
 
-const inputClass =
-  "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
+const inputClass = "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
 const labelClass = "mb-1.5 block text-xs font-medium text-[var(--mute)]";
 
 export default function MasterSchedulePage() {
@@ -145,7 +131,6 @@ export default function MasterSchedulePage() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [publishedToday, setPublishedToday] = useState<any[]>([]);
   
-  // ✅ ახალი: ზოდიაქოს inline dropdown-ისთვის
   const [activeZodiacDropdown, setActiveZodiacDropdown] = useState<string | null>(null);
   const [savingZodiac, setSavingZodiac] = useState<string | null>(null);
   const zodiacDropdownRef = useRef<HTMLDivElement>(null);
@@ -174,7 +159,6 @@ export default function MasterSchedulePage() {
       if (activeDropdown && !(event.target as HTMLElement).closest('.status-dropdown')) {
         setActiveDropdown(null);
       }
-      // ✅ ზოდიაქოს dropdown-ის დახურვა გარე დაჭერისას
       if (activeZodiacDropdown && zodiacDropdownRef.current && !zodiacDropdownRef.current.contains(event.target as Node)) {
         setActiveZodiacDropdown(null);
       }
@@ -185,41 +169,25 @@ export default function MasterSchedulePage() {
 
   const fetchSchedule = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("content_schedule")
-      .select("*")
-      .order("day_of_week", { ascending: true })
-      .order("time", { ascending: true });
-    
+    const { data, error } = await supabase.from("content_schedule").select("*").order("day_of_week", { ascending: true }).order("time", { ascending: true });
     if (!error && data) setSchedule(data);
     setLoading(false);
   };
 
   const fetchPublishedToday = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('published_content')
-      .select('*')
-      .gte('published_at', `${today}T00:00:00`)
-      .lt('published_at', `${today}T23:59:59`)
-      .order('published_at', { ascending: false });
-    
+    const { data, error } = await supabase.from('published_content').select('*').gte('published_at', `${today}T00:00:00`).lt('published_at', `${today}T23:59:59`).order('published_at', { ascending: false });
     if (!error && data) setPublishedToday(data);
   };
 
   const deletePublished = async (id: string) => {
     if (!confirm("წაშლა საშუალებას მისცემს აგენტს ხელახლა დაპოსტოს. დარწმუნებული ხარ?")) return;
     const { error } = await supabase.from('published_content').delete().eq('id', id);
-    if (!error) {
-      setPublishedToday(prev => prev.filter(p => p.id !== id));
-    }
+    if (!error) setPublishedToday(prev => prev.filter(p => p.id !== id));
   };
 
   const getPublishedStatus = (rule: any) => {
-    const matching = publishedToday.find(p => 
-      p.content_type === rule.content_type && 
-      (!rule.zodiac_sign || p.zodiac_sign === rule.zodiac_sign)
-    );
+    const matching = publishedToday.find(p => p.content_type === rule.content_type && (!rule.zodiac_sign || p.zodiac_sign === rule.zodiac_sign));
     if (!matching) return null;
     return matching.status;
   };
@@ -229,13 +197,10 @@ export default function MasterSchedulePage() {
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
   const getRuleStatus = (rule: any) => {
-    if (rule.status && ['pause', 'skip'].includes(rule.status)) {
-      return rule.status;
-    }
+    if (rule.status && ['pause', 'skip'].includes(rule.status)) return rule.status;
     if (!rule.is_active) return 'past';
     if (rule.day_of_week < currentDayIndex) return 'past';
     if (rule.day_of_week > currentDayIndex) return 'upcoming';
-    
     const ruleTime = formatTime(rule.time);
     const ruleTimeHHMM = ruleTime.substring(0, 5);
     if (ruleTimeHHMM <= currentTimeStr) return 'done';
@@ -244,9 +209,7 @@ export default function MasterSchedulePage() {
 
   const toggleRule = async (id: string, currentStatus: boolean) => {
     const { error } = await supabase.from("content_schedule").update({ is_active: !currentStatus }).eq("id", id);
-    if (!error) {
-      setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, is_active: !currentStatus } : rule)));
-    }
+    if (!error) setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, is_active: !currentStatus } : rule)));
   };
 
   const updateRuleStatus = async (id: string, newStatus: string) => {
@@ -258,19 +221,25 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ახალი: ოდიაქოს inline განახლება ბაზაში
+  // ✅ განახლებული: დამატებულია .select() და console.error დიაგნოსტიკისთვის
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
     setSavingZodiac(ruleId);
-    const { error } = await supabase
+    
+    const { data, error } = await supabase
       .from("content_schedule")
       .update({ zodiac_sign: newZodiac })
-      .eq("id", ruleId);
+      .eq("id", ruleId)
+      .select(); // ვამოწმებთ, განახლდა თუ არა რეალურად
     
-    if (!error) {
+    if (error) {
+      console.error("შეცდომა ზოდიაქოს განახლებისას:", error);
+      alert(`შეცდომა ბაზაში შენახვისას: ${error.message}\n\nშეამოწმე, რომ 'zodiac_sign' სვეტი არსებობს ცხრილში.`);
+    } else {
       setSchedule((prev) => prev.map((rule) => 
         rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac } : rule
       ));
     }
+    
     setSavingZodiac(null);
     setActiveZodiacDropdown(null);
   };
@@ -326,7 +295,6 @@ export default function MasterSchedulePage() {
   const formattedNow = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const formattedDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  // ✅ ზოდიაქოს ნიშნის ფორმატირება
   const getZodiacDisplay = (zodiacSign: string | null) => {
     if (!zodiacSign) return { label: '🎲 Random', color: 'text-[#b3a8ff]' };
     const option = ZODIAC_OPTIONS.find(z => z.value === zodiacSign);
@@ -337,7 +305,6 @@ export default function MasterSchedulePage() {
     <div className="ig-root min-h-screen">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      {/* ================= HEADER ================= */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3.5 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
@@ -365,7 +332,6 @@ export default function MasterSchedulePage() {
           </div>
         ) : (
           <>
-            {/* ================= STATS ================= */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
                 <p className="text-xs font-medium text-[var(--mute)]">Active rules</p>
@@ -386,7 +352,6 @@ export default function MasterSchedulePage() {
               </div>
             </div>
 
-            {/* ================= PUBLISHED TODAY ================= */}
             {publishedToday.length > 0 && (
               <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" aria-label="Published today">
                 <div className="flex items-center justify-between rounded-t-2xl border-b border-[var(--line)] bg-[#1a1e3a]/50 px-4 py-3">
@@ -416,12 +381,7 @@ export default function MasterSchedulePage() {
                         <span className="mono shrink-0 text-xs text-[var(--mute)]">
                           {new Date(p.published_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <button 
-                          onClick={() => deletePublished(p.id)} 
-                          aria-label="წაშლა"
-                          className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]"
-                          title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას"
-                        >
+                        <button onClick={() => deletePublished(p.id)} aria-label="წაშლა" className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]" title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას">
                           {Icons.trash}
                         </button>
                       </div>
@@ -431,7 +391,6 @@ export default function MasterSchedulePage() {
               </section>
             )}
 
-            {/* ================= DAY JUMP BAR ================= */}
             {schedule.length > 0 && (
               <nav aria-label="Jump to day" className="ig-scroll -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
                 {DAYS_OF_WEEK.map((day, index) => {
@@ -439,18 +398,7 @@ export default function MasterSchedulePage() {
                   const isToday = index === currentDayIndex;
                   const has = count > 0;
                   return (
-                    <a
-                      key={day}
-                      href={has ? `#day-${index}` : undefined}
-                      aria-disabled={!has}
-                      className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                        isToday
-                          ? "border-[#9b8cff]/60 bg-[#9b8cff]/15 text-[var(--moon)]"
-                          : has
-                          ? "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]"
-                          : "pointer-events-none border-[var(--line)] text-[#9d9bbd]/40"
-                      }`}
-                    >
+                    <a key={day} href={has ? `#day-${index}` : undefined} aria-disabled={!has} className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${isToday ? "border-[#9b8cff]/60 bg-[#9b8cff]/15 text-[var(--moon)]" : has ? "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]" : "pointer-events-none border-[var(--line)] text-[#9d9bbd]/40"}`}>
                       {day.slice(0, 3)}
                       <span className="mono text-xs opacity-80">{count}</span>
                     </a>
@@ -459,7 +407,6 @@ export default function MasterSchedulePage() {
               </nav>
             )}
 
-            {/* ================= EMPTY STATE ================= */}
             {schedule.length === 0 && (
               <div className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-16 text-center">
                 <p className="font-semibold">No schedule rules yet</p>
@@ -470,7 +417,6 @@ export default function MasterSchedulePage() {
               </div>
             )}
 
-            {/* ================= WEEK ================= */}
             <div className="space-y-4">
               {DAYS_OF_WEEK.map((day, index) => {
                 const dayRules = schedule.filter((r) => r.day_of_week === index);
@@ -478,11 +424,7 @@ export default function MasterSchedulePage() {
                 const isToday = index === currentDayIndex;
 
                 return (
-                  <section
-                    key={day}
-                    id={`day-${index}`}
-                    className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}
-                  >
+                  <section key={day} id={`day-${index}`} className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}>
                     <div className={`flex items-center justify-between rounded-t-2xl border-b px-4 py-3 ${isToday ? "border-[#9b8cff]/30 bg-[#9b8cff]/10" : "border-[var(--line)] bg-[#1a1e3a]/50"}`}>
                       <div className="flex items-center gap-2.5">
                         <h3 className="text-sm font-semibold">{day}</h3>
@@ -503,13 +445,11 @@ export default function MasterSchedulePage() {
 
                         return (
                           <div key={rule.id} className={`flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[#f6c177]/[0.04]' : 'hover:bg-white/[0.02]'}`}>
-                            {/* time + status dot */}
                             <div className="flex w-[88px] shrink-0 items-center gap-2.5">
                               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_DOT[status] ?? "#9d9bbd" }} aria-hidden />
                               <span className="mono text-sm font-medium">{formatTime(rule.time)}</span>
                             </div>
 
-                            {/* type + title */}
                             <div className={`flex min-w-[170px] flex-1 items-center gap-3 ${!rule.is_active ? 'opacity-55' : ''}`}>
                               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>{TypeIcon}</div>
                               <div className="min-w-0">
@@ -521,9 +461,7 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
 
-                            {/* controls */}
                             <div className="ml-auto flex flex-wrap items-center gap-2">
-                              {/* ✅ ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
                               {rule.content_type === 'post' && (
                                 <div className={`relative ${activeZodiacDropdown === rule.id ? 'z-[70]' : 'z-10'}`} ref={zodiacDropdownRef}>
                                   <button 
@@ -567,13 +505,9 @@ export default function MasterSchedulePage() {
                                 </div>
                               )}
 
-                              {/* განრიგის სტატუსი */}
                               <div className={`status-dropdown relative ${activeDropdown === rule.id ? 'z-[70]' : 'z-10'}`}>
                                 <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveDropdown(activeDropdown === rule.id ? null : rule.id);
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === rule.id ? null : rule.id); }}
                                   aria-haspopup="menu"
                                   aria-expanded={activeDropdown === rule.id}
                                   className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-opacity hover:opacity-80 ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}
@@ -590,9 +524,7 @@ export default function MasterSchedulePage() {
                                         key={key}
                                         role="menuitem"
                                         onClick={() => updateRuleStatus(rule.id, key)}
-                                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
-                                          status === key ? 'bg-white/5 text-[#b3a8ff]' : 'text-[var(--moon)]'
-                                        }`}
+                                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${status === key ? 'bg-white/5 text-[#b3a8ff]' : 'text-[var(--moon)]'}`}
                                       >
                                         {style.icon}
                                         {style.label}
@@ -612,13 +544,7 @@ export default function MasterSchedulePage() {
                               )}
 
                               <div className="flex items-center gap-1 border-l border-[var(--line)] pl-2">
-                                <button
-                                  role="switch"
-                                  aria-checked={rule.is_active}
-                                  aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
-                                  onClick={() => toggleRule(rule.id, rule.is_active)}
-                                  className={`relative mr-1 h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}
-                                >
+                                <button role="switch" aria-checked={rule.is_active} aria-label={rule.is_active ? "Disable rule" : "Enable rule"} onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative mr-1 h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>
                                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
                                 </button>
                                 <button onClick={() => openModal(rule)} aria-label="Edit rule" className="rounded-lg p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.edit}</button>
@@ -634,7 +560,6 @@ export default function MasterSchedulePage() {
               })}
             </div>
 
-            {/* ================= FOOTER NOTE ================= */}
             <div className="flex items-start gap-3 rounded-2xl border border-[#9b8cff]/20 bg-[#9b8cff]/[0.05] p-4">
               <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#9b8cff]/15 text-xs" aria-hidden>🧠</span>
               <p className="text-sm leading-relaxed text-[var(--moon)]/85">
@@ -645,7 +570,6 @@ export default function MasterSchedulePage() {
         )}
       </main>
 
-      {/* ================= MODAL ================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowModal(false)}>
           <div role="dialog" aria-modal="true" aria-label={editingRule ? "Edit schedule rule" : "Add schedule rule"} className="ig-pop max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
