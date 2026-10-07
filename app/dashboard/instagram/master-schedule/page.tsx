@@ -221,15 +221,15 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ განახლებული: დამატებულია .select() და console.error დიაგნოსტიკისთვის
+  // ✅ განახლებული: ამოღებულია გამოუყენებელი 'data' ცვლადი
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
     setSavingZodiac(ruleId);
     
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("content_schedule")
       .update({ zodiac_sign: newZodiac })
       .eq("id", ruleId)
-      .select(); // ვამოწმებთ, განახლდა თუ არა რეალურად
+      .select();
     
     if (error) {
       console.error("შეცდომა ზოდიაქოს განახლებისას:", error);
