@@ -100,9 +100,10 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  
+  // ✅ კონფიგურაციის მოდალის სტეიტები
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('post');
-  
   const [masterPrompt, setMasterPrompt] = useState('');
   const [thinkingStyle, setThinkingStyle] = useState('');
   const [skills, setSkills] = useState('');
@@ -126,7 +127,7 @@ export default function AgentsPage() {
     setAgentLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
   };
 
-  // ✅ აგენტის კონფიგურაციის ჩატვირთვა
+  // ✅ აგენტის კონფიგურაციის ჩატვირთვა ბაზიდან
   const loadAgentConfig = async (agentType: string) => {
     const { data, error } = await supabase
       .from('agent_config')
@@ -146,14 +147,14 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ Configure ილაკზე დაჭერა
+  // ✅ კონფიგურაციის მოდალის გახსნა
   const openConfigModal = (agentType: string) => {
     setConfigAgentType(agentType);
     loadAgentConfig(agentType);
     setShowConfigModal(true);
   };
 
-  // ✅ კონფიგურაციის შენახვა
+  // ✅ კონფიგურაციის შენახვა ბაზაში
   const saveAgentConfig = async () => {
     setIsSavingConfig(true);
     
@@ -170,13 +171,14 @@ export default function AgentsPage() {
     if (error) {
       addAgentLog(`❌ შეცდომა კონფიგურაციის შენახვისას: ${error.message}`);
     } else {
-      addAgentLog(`✅ ${configAgentType} აგენტის კონფიგურაცია შენახულია!`);
+      addAgentLog(`✅ ${configAgentType.toUpperCase()} აგენტის კონფიგურაცია წარმატებით შეინახა!`);
       setShowConfigModal(false);
     }
 
     setIsSavingConfig(false);
   };
 
+  // ✅ ჭკვიანი ზოდიაქოს არჩევა
   const chooseSmartZodiac = (ruleZodiac: string | null): string => {
     if (ruleZodiac && ruleZodiac !== 'ALL' && ALL_ZODIAC_SIGNS.includes(ruleZodiac)) {
       return ruleZodiac;
@@ -223,7 +225,7 @@ export default function AgentsPage() {
         return;
       }
 
-      addAgentLog(` ნაპოვნია წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
+      addAgentLog(`📋 ნაპოვნია წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
       addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
 
       const today = now.toISOString().split('T')[0];
@@ -231,7 +233,7 @@ export default function AgentsPage() {
         .from('published_content')
         .select('id')
         .eq('content_type', 'post')
-        .eq('status', 'published')
+        .eq('status', 'published') 
         .gte('published_at', `${today}T00:00:00`)
         .limit(1);
 
@@ -247,6 +249,7 @@ export default function AgentsPage() {
         return;
       }
 
+      // ✅ ჭკვიანი არჩევანი
       const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
       addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
@@ -257,7 +260,7 @@ export default function AgentsPage() {
           addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
         } else {
-          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
+          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით (შეიძლება ხელახლა სცადოს).");
         }
       } else {
         addAgentLog("⚠️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
@@ -371,7 +374,7 @@ export default function AgentsPage() {
                     <div className="mt-6 flex flex-wrap gap-2">
                       <button 
                         onClick={() => openConfigModal('post')}
-                        className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/30 bg-[var(--violet)]/10 px-4 py-2.5 text-sm font-medium text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20"
+                        className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/30 bg-[var(--violet)]/10 px-4 py-2.5 text-sm font-medium text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
                       >
                         {Icons.brain}
                         Configure Agent
@@ -425,7 +428,7 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
@@ -451,7 +454,7 @@ export default function AgentsPage() {
               </button>
             </div>
 
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[var(--violet)]">
                   🧠 Master Prompt
@@ -474,7 +477,7 @@ export default function AgentsPage() {
                 <textarea
                   value={thinkingStyle}
                   onChange={(e) => setThinkingStyle(e.target.value)}
-                  placeholder="როგორ ფიქრობს აგენტი... (მაგ: ემოციურად, მაგრამ ოგიკურად...)"
+                  placeholder="როგორ ფიქრობს აგენტი... (მაგ: ემოციურად, მაგრამ ლოგიკურად...)"
                   className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
