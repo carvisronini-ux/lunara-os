@@ -450,8 +450,9 @@ export default function MasterSchedulePage() {
                                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                 </button>
 
+                                {/* ✅ განახლებული: dropdown იხსნება ზემოდან (bottom-full mb-2) */}
                                 {activeZodiacDropdown === rule.id && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-50 max-h-80 overflow-y-auto">
+                                  <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-50 max-h-80 overflow-y-auto">
                                     {ZODIAC_OPTIONS.map((option) => (
                                       <button
                                         key={option.value || 'random'}
