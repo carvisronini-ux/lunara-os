@@ -206,45 +206,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handleAiPost = async () => {
-    setIsPublishing(true);
-    addLog("🤖 AI Auto-Prepare initiated...");
-    try {
-      const randomZodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
-      setSelectedZodiac(randomZodiac);
-      addLog(`✅ Selected: ${randomZodiac.name}`);
-
-      addLog("⏳ Generating viral hook...");
-      const t1 = await generateViralText1(randomZodiac.name);
-      setText1(t1);
-      addLog(`✅ Text 1 generated.`);
-
-      addLog("⏳ Generating forecast...");
-      let t2 = await generateHoroscopeText2(randomZodiac.name, t1);
-      if (t1 && t2.toLowerCase().trim().startsWith(t1.toLowerCase().trim())) {
-        t2 = t2.slice(t1.length).trim().replace(/^[:\-\s]+/, '').trim();
-      }
-      setText2(t2);
-      addLog(`✅ Text 2 generated.`);
-
-      setSelectedFormat("post");
-      addLog("✅ Format set to Post. Jumping to Compose step...");
-      setStep("preview");
-      
-    } catch (error) {
-      addLog(`❌ AI Auto-Prepare failed: ${error instanceof Error ? error.message : 'Unknown'}`);
-    } finally {
-      setIsPublishing(false);
-    }
-  };
-
   const handleFormatSelect = (format: PostFormat) => {
     setSelectedFormat(format);
     addLog(`✅ Format selected: ${format}`);
     setStep("preview");
   };
 
-  // ✅ განახლებული: იღებს overrideZodiac-ს უსაფრთხოებისთვის
   const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0]) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
@@ -263,7 +230,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იღებს overrideZodiac და overrideText1-ს უსაფრთხოებისთვის
   const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
@@ -292,7 +258,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იღებს overrideZodiac და overrideFormat-ს უსაფრთხოებისთვის
   const handleReadyAndUpload = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideFormat?: PostFormat) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
@@ -486,47 +451,41 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული useImperativeHandle: დამატებულია 2-3 წამიანი პაუზები ჭედვის თავიდან ასაცილებლად
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
       addLog(`🤖 აგენტი იწყებს მუშაობას: ${zodiacName}`);
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
       if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
 
-      // ნაბიჯი 1: ზოდიაქოს ჩაწერა და არჩევა
       setInputValue(zodiacName);
       setSelectedZodiac(zodiac);
       setStep("format");
       addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 1/5)...");
-      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
+      await new Promise(r => setTimeout(r, 2000));
 
-      // ნაბიჯი 2: ფორმატის არჩევა
       setSelectedFormat("post");
       setStep("preview");
       addLog("⏳ ველოდები UI-ის განახლებას (ნაბიჯი 2/5)...");
-      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
+      await new Promise(r => setTimeout(r, 2000));
 
-      // ნაბიჯი 3: ტექსტის გენერაცია
       addLog("⏳ აგენტი გენერირებს Text 1-ს...");
-      const t1 = await handleGenerateText1(zodiac); // გადავცემთ ზოდიაქოს პირდაპირ
+      const t1 = await handleGenerateText1(zodiac);
       if (!t1) return false;
-      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
+      await new Promise(r => setTimeout(r, 2000));
       
       addLog("⏳ აგენტი გენერირებს Text 2-ს...");
-      const t2 = await handleGenerateText2(zodiac, t1); // გადავცემთ ზოდიაქოს და Text1-ს
+      const t2 = await handleGenerateText2(zodiac, t1);
       if (!t2) return false;
-      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
+      await new Promise(r => setTimeout(r, 2000));
 
-      // ნაბიჯი 4: ატვირთვა
       addLog("⏳ აგენტი ქმნის სურათს და ტვირთავს Supabase-ში...");
-      const imgUrl = await handleReadyAndUpload(zodiac, "post"); // გადავცემთ ზოდიაქოს და ფორმატს
+      const imgUrl = await handleReadyAndUpload(zodiac, "post");
       if (!imgUrl) { 
         addLog("❌ ატვირთვა ვერ მოხერხდა აგენტის ციკლის დროს"); 
         return false; 
       }
-      await new Promise(r => setTimeout(r, 2000)); // 2 წამიანი პაუზა
+      await new Promise(r => setTimeout(r, 2000));
 
-      // ნაბიჯი 5: 7 წამიანი დაყოვნება და გამოქვეყნება
       addLog("⏳ ველოდები 7 წამს Instagram API-ს სტაბილურობისთვის...");
       await new Promise(r => setTimeout(r, 7000));
       
@@ -565,7 +524,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
             <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue Manually</button>
-            <button onClick={() => { const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; setInputValue(random.name); handleZodiacSubmit(); }} className={`${btnGhost} flex-1`}>
+            <button 
+              onClick={() => { 
+                const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; 
+                setInputValue(random.name); 
+                handleZodiacSubmit(); 
+              }} 
+              className={`${btnGhost} flex-1`}
+            >
               🤖 AI Auto-Prepare
             </button>
           </div>
