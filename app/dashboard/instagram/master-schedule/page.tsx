@@ -60,9 +60,9 @@ const Icons = {
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const ZODIAC_OPTIONS = [
-  { value: null, label: '🎲 Random', color: 'text-[#b3a8ff]' },
+  { value: null, label: ' Random', color: 'text-[#b3a8ff]' },
   { value: 'ARIES', label: '♈ Aries', color: 'text-[#ff7aa8]' },
-  { value: 'TAURUS', label: '♉ Taurus', color: 'text-[#5fd6a4]' },
+  { value: 'TAURUS', label: ' Taurus', color: 'text-[#5fd6a4]' },
   { value: 'GEMINI', label: '♊ Gemini', color: 'text-[#f6c177]' },
   { value: 'CANCER', label: '♋ Cancer', color: 'text-[#ece9f7]' },
   { value: 'LEO', label: '♌ Leo', color: 'text-[#f6c177]' },
@@ -221,8 +221,11 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ განახლებული: ამოღებულია გამოუყენებელი 'data' ცვლადი
+  // ✅ განახლებული: დამატებულია console.log debugging-ისთვის
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
+    console.log('🔵 updateZodiacSign called:', { ruleId, newZodiac });
+    console.log('🔵 Current schedule:', schedule);
+    
     setSavingZodiac(ruleId);
     
     const { error } = await supabase
@@ -231,13 +234,21 @@ export default function MasterSchedulePage() {
       .eq("id", ruleId)
       .select();
     
+    console.log('🔵 Supabase response:', { error });
+    
     if (error) {
-      console.error("შეცდომა ზოდიაქოს განახლებისას:", error);
+      console.error("❌ შეცდომა ზოდიაქოს განახლებისას:", error);
       alert(`შეცდომა ბაზაში შენახვისას: ${error.message}\n\nშეამოწმე, რომ 'zodiac_sign' სვეტი არსებობს ცხრილში.`);
     } else {
-      setSchedule((prev) => prev.map((rule) => 
-        rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac } : rule
-      ));
+      console.log('✅ Updating schedule state...');
+      setSchedule((prev) => {
+        console.log(' Previous schedule:', prev);
+        const updated = prev.map((rule) => 
+          rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac } : rule
+        );
+        console.log('🔵 Updated schedule:', updated);
+        return updated;
+      });
     }
     
     setSavingZodiac(null);
@@ -470,7 +481,7 @@ export default function MasterSchedulePage() {
                                     aria-haspopup="listbox"
                                     aria-expanded={activeZodiacDropdown === rule.id}
                                     className={`flex items-center gap-1.5 rounded-full border border-[#9b8cff]/30 bg-[#9b8cff]/[0.06] px-2.5 py-1 transition-colors hover:bg-[#9b8cff]/15 ${zodiacDisplay.color} ${savingZodiac === rule.id ? 'cursor-wait opacity-50' : 'cursor-pointer'}`}
-                                    title="დააჭირე ზოდიაქოს შესაცვლელად"
+                                    title="დააჭირე ოდიაქოს შესაცვლელად"
                                   >
                                     {savingZodiac === rule.id ? (
                                       <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -483,13 +494,24 @@ export default function MasterSchedulePage() {
                                   </button>
 
                                   {activeZodiacDropdown === rule.id && (
-                                    <div role="listbox" className="ig-pop absolute right-0 top-full z-[100] mt-2 max-h-[60vh] w-52 overflow-y-auto rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-2xl">
+                                    // ✅ დამატებულია onMouseDown={(e) => e.stopPropagation()} - ეს არის მთავარი გამოსავალი!
+                                    <div 
+                                      role="listbox" 
+                                      className="ig-pop absolute right-0 top-full z-[100] mt-2 max-h-[60vh] w-52 overflow-y-auto rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-2xl"
+                                      onMouseDown={(e) => {
+                                        console.log('🟢 Dropdown mousedown - stopping propagation');
+                                        e.stopPropagation();
+                                      }}
+                                    >
                                       {ZODIAC_OPTIONS.map((option) => (
                                         <button
                                           key={option.value || 'random'}
                                           role="option"
                                           aria-selected={rule.zodiac_sign === option.value}
-                                          onClick={() => updateZodiacSign(rule.id, option.value)}
+                                          onClick={() => {
+                                            console.log('🟢 Option clicked:', option.value);
+                                            updateZodiacSign(rule.id, option.value);
+                                          }}
                                           className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
                                             rule.zodiac_sign === option.value ? 'bg-[#9b8cff]/20 text-[#b3a8ff]' : option.color
                                           }`}
@@ -605,13 +627,13 @@ export default function MasterSchedulePage() {
                   <select id="rule-zodiac" value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className={inputClass}>
                     <option value="">🎲 Random</option>
                     <option value="ARIES">♈ Aries</option>
-                    <option value="TAURUS">♉ Taurus</option>
+                    <option value="TAURUS"> Taurus</option>
                     <option value="GEMINI">♊ Gemini</option>
                     <option value="CANCER">♋ Cancer</option>
-                    <option value="LEO">♌ Leo</option>
+                    <option value="LEO"> Leo</option>
                     <option value="VIRGO">♍ Virgo</option>
                     <option value="LIBRA">♎ Libra</option>
-                    <option value="SCORPIO">♏ Scorpio</option>
+                    <option value="SCORPIO"> Scorpio</option>
                     <option value="SAGITTARIUS">♐ Sagittarius</option>
                     <option value="CAPRICORN">♑ Capricorn</option>
                     <option value="AQUARIUS">♒ Aquarius</option>
