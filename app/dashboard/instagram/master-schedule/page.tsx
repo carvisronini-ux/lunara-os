@@ -60,6 +60,21 @@ const TYPE_ICONS: Record<string, any> = {
   reel: Icons.reel,
 };
 
+// ✅ ახალი: დროის ფორმატირების helper ფუნქცია
+const formatTime = (time: string): string => {
+  if (!time) return '';
+  // თუ არის მიკროწამები (მაგ. "13:30:50.171035"), ვიღებთ მხოლოდ HH:MM:SS
+  if (time.includes('.')) {
+    return time.split('.')[0];
+  }
+  // თუ არის HH:MM:SS, ვაბრუნებთ როგორც არის
+  if (time.length >= 8) {
+    return time.substring(0, 8);
+  }
+  // თუ არის HH:MM, ვაბრუნებთ როგორც არის
+  return time;
+};
+
 // განრიგის სტატუსები (ავტომატური + Override)
 const STATUS_STYLES: Record<string, any> = {
   pending: { bg: "bg-[var(--amber)]/10", border: "border-[var(--amber)]/30", text: "text-[var(--amber)]", label: "Pending", icon: Icons.clock },
@@ -95,7 +110,7 @@ export default function MasterSchedulePage() {
   const [editingRule, setEditingRule] = useState<any | null>(null);
   const [now, setNow] = useState(new Date());
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [publishedToday, setPublishedToday] = useState<any[]>([]); // ✅ ახალი
+  const [publishedToday, setPublishedToday] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     day_of_week: 0,
@@ -111,7 +126,7 @@ export default function MasterSchedulePage() {
     fetchPublishedToday();
     const interval = setInterval(() => {
       setNow(new Date());
-      fetchPublishedToday(); // ✅ ყოველ წუთს განვაახლოთ
+      fetchPublishedToday();
     }, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -138,7 +153,6 @@ export default function MasterSchedulePage() {
     setLoading(false);
   };
 
-  // ✅ ახალი: დღევანდელი დაპოსტილი ჩანაწერების წამოღება
   const fetchPublishedToday = async () => {
     const today = new Date().toISOString().split('T')[0];
     const { data, error } = await supabase
@@ -151,7 +165,6 @@ export default function MasterSchedulePage() {
     if (!error && data) setPublishedToday(data);
   };
 
-  // ✅ ახალი: ჩანაწერის წაშლა
   const deletePublished = async (id: string) => {
     if (!confirm("წაშლა საშუალებას მისცემს აგენტს ხელახლა დაპოსტოს. დარწმუნებული ხარ?")) return;
     const { error } = await supabase.from('published_content').delete().eq('id', id);
@@ -160,7 +173,6 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ახალი: დაპოსტვის სტატუსის მიღება
   const getPublishedStatus = (rule: any) => {
     const matching = publishedToday.find(p => 
       p.content_type === rule.content_type && 
@@ -174,6 +186,7 @@ export default function MasterSchedulePage() {
   const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
+  // ✅ განახლებული: იყენებს formatTime-ს შედარებისთვის
   const getRuleStatus = (rule: any) => {
     if (rule.status && ['pause', 'skip'].includes(rule.status)) {
       return rule.status;
@@ -181,7 +194,11 @@ export default function MasterSchedulePage() {
     if (!rule.is_active) return 'past';
     if (rule.day_of_week < currentDayIndex) return 'past';
     if (rule.day_of_week > currentDayIndex) return 'upcoming';
-    if (rule.time <= currentTimeStr) return 'done';
+    
+    // ✅ გასუფთავებული დროის შედარება
+    const ruleTime = formatTime(rule.time);
+    const ruleTimeHHMM = ruleTime.substring(0, 5);
+    if (ruleTimeHHMM <= currentTimeStr) return 'done';
     return 'pending';
   };
 
@@ -225,18 +242,25 @@ export default function MasterSchedulePage() {
     setShowModal(true);
   };
 
+  // ✅ განახლებული: იყენებს formatTime-ს სორტირებისთვის
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRule) {
       const { error } = await supabase.from("content_schedule").update({ ...formData, zodiac_sign: formData.zodiac_sign || null }).eq("id", editingRule.id);
       if (!error) {
-        setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null } : rule).sort((a, b) => a.day_of_week !== b.day_of_week ? a.day_of_week - b.day_of_week : a.time.localeCompare(b.time)));
+        setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null } : rule).sort((a, b) => {
+          if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+          return formatTime(a.time).localeCompare(formatTime(b.time));
+        }));
         setShowModal(false);
       }
     } else {
       const { data, error } = await supabase.from("content_schedule").insert([{ ...formData, zodiac_sign: formData.zodiac_sign || null, is_active: true }]).select();
       if (!error && data) {
-        setSchedule((prev) => [...prev, data[0]].sort((a, b) => a.day_of_week !== b.day_of_week ? a.day_of_week - b.day_of_week : a.time.localeCompare(b.time)));
+        setSchedule((prev) => [...prev, data[0]].sort((a, b) => {
+          if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+          return formatTime(a.time).localeCompare(formatTime(b.time));
+        }));
         setShowModal(false);
       }
     }
@@ -288,7 +312,6 @@ export default function MasterSchedulePage() {
               </div>
             </div>
 
-            {/* ✅ ახალი: Published Today სექცია */}
             {publishedToday.length > 0 && (
               <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] overflow-hidden">
                 <div className="border-b border-[var(--line)] bg-[var(--ink-3)]/50 px-4 py-3 flex items-center justify-between">
@@ -352,11 +375,14 @@ export default function MasterSchedulePage() {
                         const status = getRuleStatus(rule);
                         const statusStyle = STATUS_STYLES[status as keyof typeof STATUS_STYLES];
                         const StatusIcon = statusStyle.icon;
-                        const publishStatus = getPublishedStatus(rule); // ✅ ახალი
+                        const publishStatus = getPublishedStatus(rule);
 
                         return (
                           <div key={rule.id} className={`flex items-center gap-4 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[var(--amber)]/[0.03]' : 'hover:bg-white/[0.02]'}`}>
-                            <div className="w-16 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">{rule.time}</div>
+                            {/* ✅ განახლებული: დროის ფორმატირება */}
+                            <div className="w-20 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">
+                              {formatTime(rule.time)}
+                            </div>
                             <div className="flex min-w-0 flex-1 items-center gap-3">
                               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${colorClass}`}>{TypeIcon}</div>
                               <div className="min-w-0">
@@ -368,7 +394,6 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
                             
-                            {/* განრიგის სტატუსი */}
                             <div className="relative hidden sm:block status-dropdown">
                               <button 
                                 onClick={(e) => {
@@ -400,7 +425,6 @@ export default function MasterSchedulePage() {
                               )}
                             </div>
 
-                            {/* ✅ ახალი: დაპოსტვის სტატუსი */}
                             {publishStatus && (
                               <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${PUBLISH_STATUS_STYLES[publishStatus].bg} ${PUBLISH_STATUS_STYLES[publishStatus].border} ${PUBLISH_STATUS_STYLES[publishStatus].text}`}>
                                 {PUBLISH_STATUS_STYLES[publishStatus].icon}
