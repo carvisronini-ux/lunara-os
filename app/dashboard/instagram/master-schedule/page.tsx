@@ -59,7 +59,6 @@ const Icons = {
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-// ✅ ზოდიაქოების სია inline editing-ისთვის
 const ZODIAC_OPTIONS = [
   { value: null, label: '🎲 Random', color: 'text-[#b3a8ff]' },
   { value: 'ARIES', label: '♈ Aries', color: 'text-[#ff7aa8]' },
@@ -145,7 +144,6 @@ export default function MasterSchedulePage() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [publishedToday, setPublishedToday] = useState<any[]>([]);
   
-  // ✅ ახალი: ზოდიაქოს inline dropdown-ისთვის
   const [activeZodiacDropdown, setActiveZodiacDropdown] = useState<string | null>(null);
   const [savingZodiac, setSavingZodiac] = useState<string | null>(null);
 
@@ -173,7 +171,6 @@ export default function MasterSchedulePage() {
       if (activeDropdown && !(event.target as HTMLElement).closest('.status-dropdown')) {
         setActiveDropdown(null);
       }
-      // ✅ ზოდიაქოს dropdown-ის დახურვა გარე დაჭერისას
       if (activeZodiacDropdown && !(event.target as HTMLElement).closest(`[data-zodiac-dropdown="${activeZodiacDropdown}"]`)) {
         setActiveZodiacDropdown(null);
       }
@@ -257,13 +254,26 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ზოდიაქოს inline განახლება ბაზაში
+  // ✅ ჭკვიანი განახლება: ცვლის ზოდიაქოს და ავტომატურად ანაცვლებს ძველ ნიშანს ახლით თემის ტექსტში
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
     setSavingZodiac(ruleId);
 
+    const currentRule = schedule.find(r => r.id === ruleId);
+    let newTheme = currentRule?.content_theme || "";
+
+    // თუ გვაქვს ძველი ნიშანი და ვირჩევთ ახალს, ვცვლით ძველს ახლით თემის ტექსტში
+    if (currentRule?.zodiac_sign && newZodiac) {
+      // 'gi' flag უზრუნველყოფს, რომ შეიცვალოს დამოუკიდებლად რეგისტრისგან (მაგ. "aries" ან "ARIES")
+      const regex = new RegExp(currentRule.zodiac_sign, 'gi');
+      newTheme = newTheme.replace(regex, newZodiac);
+    }
+
     const { data, error } = await supabase
       .from("content_schedule")
-      .update({ zodiac_sign: newZodiac })
+      .update({ 
+        zodiac_sign: newZodiac,
+        content_theme: newTheme // ✅ ვინახავთ განახლებულ თემასაც
+      })
       .eq("id", ruleId)
       .select();
 
@@ -271,12 +281,11 @@ export default function MasterSchedulePage() {
       console.error("❌ შეცდომა ზოდიაქოს განახლებისას:", error);
       alert(`შეცდომა ბაზაში შენახვისას: ${error.message}`);
     } else if (!data || data.length === 0) {
-      // ბაზამ არცერთი ჩანაწერი არ განაახლა (მაგ. RLS policy ბლოკავს UPDATE-ს)
-      console.error("❌ განახლდა 0 ჩანაწერი. შეამოწმე Supabase RLS policy content_schedule ცხრილზე.");
-      alert("ბაზაში ცვლილება არ შეინახა (0 ჩანაწერი განახლდა). სავარაუდოდ Supabase RLS policy ბლოკავს UPDATE-ს content_schedule ცხრილზე.");
+      console.error("❌ განახლდა 0 ჩანაწერი. შეამოწმე Supabase RLS policy.");
+      alert("ბაზაში ცვლილება არ შეინახა (0 ჩანაწერი განახლდა).");
     } else {
       setSchedule((prev) => prev.map((rule) =>
-        rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac } : rule
+        rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac, content_theme: newTheme } : rule
       ));
     }
 
@@ -335,7 +344,6 @@ export default function MasterSchedulePage() {
   const formattedNow = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const formattedDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  // ✅ ზოდიაქოს ნიშნის ფორმატირება
   const getZodiacDisplay = (zodiacSign: string | null) => {
     if (!zodiacSign) return { label: '🎲 Random', color: 'text-[#b3a8ff]' };
     const option = ZODIAC_OPTIONS.find(z => z.value === zodiacSign);
@@ -346,7 +354,6 @@ export default function MasterSchedulePage() {
     <div className="ig-root min-h-screen">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      {/* ================= HEADER ================= */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3.5 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
@@ -374,7 +381,6 @@ export default function MasterSchedulePage() {
           </div>
         ) : (
           <>
-            {/* ================= STATS ================= */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
                 <p className="text-xs font-medium text-[var(--mute)]">Active rules</p>
@@ -395,7 +401,6 @@ export default function MasterSchedulePage() {
               </div>
             </div>
 
-            {/* ================= PUBLISHED TODAY ================= */}
             {publishedToday.length > 0 && (
               <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" aria-label="Published today">
                 <div className="flex items-center justify-between rounded-t-2xl border-b border-[var(--line)] bg-[#1a1e3a]/50 px-4 py-3">
@@ -440,7 +445,6 @@ export default function MasterSchedulePage() {
               </section>
             )}
 
-            {/* ================= DAY JUMP BAR ================= */}
             {schedule.length > 0 && (
               <nav aria-label="Jump to day" className="ig-scroll -mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:px-0">
                 {DAYS_OF_WEEK.map((day, index) => {
@@ -468,7 +472,6 @@ export default function MasterSchedulePage() {
               </nav>
             )}
 
-            {/* ================= EMPTY STATE ================= */}
             {schedule.length === 0 && (
               <div className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-16 text-center">
                 <p className="font-semibold">No schedule rules yet</p>
@@ -479,7 +482,6 @@ export default function MasterSchedulePage() {
               </div>
             )}
 
-            {/* ================= WEEK ================= */}
             <div className="space-y-4">
               {DAYS_OF_WEEK.map((day, index) => {
                 const dayRules = schedule.filter((r) => r.day_of_week === index);
@@ -512,13 +514,11 @@ export default function MasterSchedulePage() {
 
                         return (
                           <div key={rule.id} className={`flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[#f6c177]/[0.04]' : 'hover:bg-white/[0.02]'}`}>
-                            {/* time + status dot */}
                             <div className="flex w-[88px] shrink-0 items-center gap-2.5">
                               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: STATUS_DOT[status] ?? "#9d9bbd" }} aria-hidden />
                               <span className="mono text-sm font-medium">{formatTime(rule.time)}</span>
                             </div>
 
-                            {/* type + title */}
                             <div className={`flex min-w-[170px] flex-1 items-center gap-3 ${!rule.is_active ? 'opacity-55' : ''}`}>
                               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>{TypeIcon}</div>
                               <div className="min-w-0">
@@ -530,9 +530,7 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
 
-                            {/* controls */}
                             <div className="ml-auto flex flex-wrap items-center gap-2">
-                              {/* ✅ ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
                               {rule.content_type === 'post' && (
                                 <div className={`relative ${activeZodiacDropdown === rule.id ? 'z-[70]' : 'z-10'}`} data-zodiac-dropdown={rule.id}>
                                   <button 
@@ -576,7 +574,6 @@ export default function MasterSchedulePage() {
                                 </div>
                               )}
 
-                              {/* განრიგის სტატუსი */}
                               <div className={`status-dropdown relative ${activeDropdown === rule.id ? 'z-[70]' : 'z-10'}`}>
                                 <button 
                                   onClick={(e) => {
@@ -643,7 +640,6 @@ export default function MasterSchedulePage() {
               })}
             </div>
 
-            {/* ================= FOOTER NOTE ================= */}
             <div className="flex items-start gap-3 rounded-2xl border border-[#9b8cff]/20 bg-[#9b8cff]/[0.05] p-4">
               <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#9b8cff]/15 text-xs" aria-hidden>🧠</span>
               <p className="text-sm leading-relaxed text-[var(--moon)]/85">
@@ -654,7 +650,6 @@ export default function MasterSchedulePage() {
         )}
       </main>
 
-      {/* ================= MODAL ================= */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowModal(false)}>
           <div role="dialog" aria-modal="true" aria-label={editingRule ? "Edit schedule rule" : "Add schedule rule"} className="ig-pop max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -706,7 +701,7 @@ export default function MasterSchedulePage() {
               </div>
               <div>
                 <label htmlFor="rule-theme" className={labelClass}>Content theme</label>
-                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., Daily Habit, Red Flags" className={inputClass} required />
+                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., კვირის დაწყება: ARIES ენერგია" className={inputClass} required />
               </div>
               <div>
                 <label htmlFor="rule-goal" className={labelClass}>Primary goal</label>
