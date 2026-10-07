@@ -131,8 +131,7 @@ const formatTime = (time: string): string => {
   return time;
 };
 
-const inputClass =
-  "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
+const inputClass = "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
 const labelClass = "mb-1.5 block text-xs font-medium text-[var(--mute)]";
 
 export default function MasterSchedulePage() {
@@ -263,7 +262,7 @@ export default function MasterSchedulePage() {
 
     // თუ გვაქვს ძველი ნიშანი და ვირჩევთ ახალს, ვცვლით ძველს ახლით თემის ტექსტში
     if (currentRule?.zodiac_sign && newZodiac) {
-      // 'gi' flag უზრუნველყოფს, რომ შეიცვალოს დამოუკიდებლად რეგისტრისგან (მაგ. "aries" ან "ARIES")
+      // 'gi' flag უზრუნველყოფს, რომ შეიცვალოს დამოუკიდებლად რეგისტრისგან (მაგ. "scorpio" ან "SCORPIO")
       const regex = new RegExp(currentRule.zodiac_sign, 'gi');
       newTheme = newTheme.replace(regex, newZodiac);
     }
@@ -701,7 +700,7 @@ export default function MasterSchedulePage() {
               </div>
               <div>
                 <label htmlFor="rule-theme" className={labelClass}>Content theme</label>
-                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="e.g., კვირის დაწყება: ARIES ენერგია" className={inputClass} required />
+                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="მაგ: კვირის დაწყება: ARIES ენერგია" className={inputClass} required />
               </div>
               <div>
                 <label htmlFor="rule-goal" className={labelClass}>Primary goal</label>
