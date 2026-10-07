@@ -35,6 +35,12 @@ const Icons = {
       <circle cx="12" cy="12" r="3"/>
     </svg>
   ),
+  brain: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/>
+      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/>
+    </svg>
+  ),
   post: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
@@ -85,10 +91,22 @@ const TYPE_COLORS: Record<string, string> = {
   reel: 'text-[var(--rose)] bg-[var(--rose)]/10 border-[var(--rose)]/20',
 };
 
+const ALL_ZODIAC_SIGNS = [
+  'ARIES', 'TAURUS', 'GEMINI', 'CANCER', 'LEO', 'VIRGO',
+  'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
+];
+
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configAgentType, setConfigAgentType] = useState<string>('post');
+  
+  const [masterPrompt, setMasterPrompt] = useState('');
+  const [thinkingStyle, setThinkingStyle] = useState('');
+  const [skills, setSkills] = useState('');
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
   
   const panelRef = useRef<any>(null);
 
@@ -108,10 +126,69 @@ export default function AgentsPage() {
     setAgentLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
   };
 
+  // ✅ აგენტის კონფიგურაციის ჩატვირთვა
+  const loadAgentConfig = async (agentType: string) => {
+    const { data, error } = await supabase
+      .from('agent_config')
+      .select('*')
+      .eq('agent_type', agentType)
+      .single();
+
+    if (error) {
+      console.error('Error loading config:', error);
+      return;
+    }
+
+    if (data) {
+      setMasterPrompt(data.master_prompt || '');
+      setThinkingStyle(data.thinking_style || '');
+      setSkills(data.skills || '');
+    }
+  };
+
+  // ✅ Configure ილაკზე დაჭერა
+  const openConfigModal = (agentType: string) => {
+    setConfigAgentType(agentType);
+    loadAgentConfig(agentType);
+    setShowConfigModal(true);
+  };
+
+  // ✅ კონფიგურაციის შენახვა
+  const saveAgentConfig = async () => {
+    setIsSavingConfig(true);
+    
+    const { error } = await supabase
+      .from('agent_config')
+      .upsert({
+        agent_type: configAgentType,
+        master_prompt: masterPrompt,
+        thinking_style: thinkingStyle,
+        skills: skills,
+        updated_at: new Date().toISOString()
+      });
+
+    if (error) {
+      addAgentLog(`❌ შეცდომა კონფიგურაციის შენახვისას: ${error.message}`);
+    } else {
+      addAgentLog(`✅ ${configAgentType} აგენტის კონფიგურაცია შენახულია!`);
+      setShowConfigModal(false);
+    }
+
+    setIsSavingConfig(false);
+  };
+
+  const chooseSmartZodiac = (ruleZodiac: string | null): string => {
+    if (ruleZodiac && ruleZodiac !== 'ALL' && ALL_ZODIAC_SIGNS.includes(ruleZodiac)) {
+      return ruleZodiac;
+    }
+    const randomIndex = Math.floor(Math.random() * ALL_ZODIAC_SIGNS.length);
+    return ALL_ZODIAC_SIGNS[randomIndex];
+  };
+
   const checkAndRunPostAgent = async () => {
     if (isChecking) return;
     setIsChecking(true);
-    addAgentLog("ვამოწმებ Master Schedule-ს...");
+    addAgentLog("🔍 ვამოწმებ Master Schedule-ს...");
 
     try {
       const now = new Date();
@@ -127,59 +204,67 @@ export default function AgentsPage() {
         .eq('is_active', true);
 
       if (error) {
-        addAgentLog(`შეცდომა ბაზის წაკითხვისას: ${error.message}`);
+        addAgentLog(`❌ შეცდომა ბაზის წაკითხვისას: ${error.message}`);
         setIsChecking(false);
         return;
       }
 
-      const matchingRule = rules?.find((r: any) => r.time <= currentTime);
+      if (!rules || rules.length === 0) {
+        addAgentLog("⚠️ დღეს post ტიპის წესი არ არის.");
+        setIsChecking(false);
+        return;
+      }
+
+      const matchingRule = rules.find((r: any) => r.time <= currentTime);
 
       if (!matchingRule) {
-        addAgentLog("ამ წუთას დაგეგმილი პოსტი არ არის (ან დრო ჯერ არ მოსულა).");
+        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა.`);
         setIsChecking(false);
         return;
       }
 
+      addAgentLog(` ნაპოვნია წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
+      addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
+
       const today = now.toISOString().split('T')[0];
-      
-      // ✅ განახლებული: მხოლოდ 'published' სტატუსის მქონე ჩანაწერებს ამოწმებს
       const { data: published, error: pubError } = await supabase
         .from('published_content')
         .select('id')
         .eq('content_type', 'post')
-        .eq('status', 'published') 
+        .eq('status', 'published')
         .gte('published_at', `${today}T00:00:00`)
         .limit(1);
 
       if (pubError) {
-        addAgentLog(`შეცდომა გამოქვეყნებულის შემოწმებისას: ${pubError.message}`);
+        addAgentLog(`⚠️ შეცდომა შემოწმებისას: ${pubError.message}`);
         setIsChecking(false);
         return;
       }
 
       if (published && published.length > 0) {
-        addAgentLog("დღევანდელი პოსტი უკვე წარმატებით გამოქვეყნებულია. ვტოვებ.");
+        addAgentLog("✅ დღევანდელი პოსტი უკვე წარმატებით გამოქვეყნებულია. ვტოვებ.");
         setIsChecking(false);
         return;
       }
 
-      addAgentLog(`🚀 დრო მოვიდა! ვრთავ PostAgent-ს წესისთვის: ${matchingRule.time}`);
-      
-      const zodiacToPost = "ARIES"; 
-      addAgentLog(`ავირჩიე ზოდიაქო: ${zodiacToPost}`);
+      const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
+      addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
+      addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
         const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
         if (success) {
-          addAgentLog("✅ PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
         } else {
-          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით (შეიძლება ხელახლა სცადოს).");
+          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
+      } else {
+        addAgentLog("⚠️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
       }
 
     } catch (error) {
-      addAgentLog(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addAgentLog(`❌ კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`);
     } finally {
       setIsChecking(false);
     }
@@ -284,11 +369,12 @@ export default function AgentsPage() {
                   
                   {agent.id === 'post-agent' && (
                     <div className="mt-6 flex flex-wrap gap-2">
-                      <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
-                        View Logs
-                      </button>
-                      <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
-                        Configure Rules
+                      <button 
+                        onClick={() => openConfigModal('post')}
+                        className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/30 bg-[var(--violet)]/10 px-4 py-2.5 text-sm font-medium text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20"
+                      >
+                        {Icons.brain}
+                        Configure Agent
                       </button>
                       <button 
                         onClick={() => checkAndRunPostAgent()}
@@ -310,7 +396,7 @@ export default function AgentsPage() {
                 <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
                 PostAgent Live Logs
               </h4>
-              <div className="h-64 overflow-y-auto rounded-xl bg-[var(--ink)] p-3 font-mono text-xs space-y-1 custom-scrollbar">
+              <div className="h-96 overflow-y-auto rounded-xl bg-[var(--ink)] p-3 font-mono text-xs space-y-1 custom-scrollbar">
                 {agentLogs.length === 0 ? (
                   <p className="text-[var(--mute)]">ლოგები გამოჩნდება აქ, როცა აგენტი ამოქმედდება...</p>
                 ) : (
@@ -339,10 +425,97 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> When enabled, agents automatically check the Master Schedule and publish content at the scheduled times. Keep your browser open for client-side execution.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
+
+      {/* ✅ Configure Agent Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowConfigModal(false)}>
+          <div className="w-full max-w-2xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--violet)]/20 text-[var(--violet)]">
+                  {Icons.brain}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Configure {configAgentType.toUpperCase()} Agent</h3>
+                  <p className="text-xs text-[var(--mute)]">მართე აგენტის ქცევა და აზროვნება</p>
+                </div>
+              </div>
+              <button onClick={() => setShowConfigModal(false)} className="rounded-full p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[var(--violet)]">
+                  🧠 Master Prompt
+                </label>
+                <textarea
+                  value={masterPrompt}
+                  onChange={(e) => setMasterPrompt(e.target.value)}
+                  placeholder="მთავარი ინსტრუქცია აგენტისთვის... (მაგ: შენ ხარ პროფესიონალი ასტროლოგი...)"
+                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[120px] resize-none"
+                />
+                <p className="mt-1 text-xs text-[var(--mute)]">
+                  ეს არის აგენტის მთავარი პიროვნება და მიზანი
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[var(--amber)]">
+                   Thinking Style
+                </label>
+                <textarea
+                  value={thinkingStyle}
+                  onChange={(e) => setThinkingStyle(e.target.value)}
+                  placeholder="როგორ ფიქრობს აგენტი... (მაგ: ემოციურად, მაგრამ ოგიკურად...)"
+                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
+                />
+                <p className="mt-1 text-xs text-[var(--mute)]">
+                  აზროვნების სტილი და მიდგომა
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[var(--ok)]">
+                   Skills & Constraints
+                </label>
+                <textarea
+                  value={skills}
+                  onChange={(e) => setSkills(e.target.value)}
+                  placeholder="უნარები და შეზღუდვები... (მაგ: ვირუსული ჰუკების შექმნა, არ იყენებ კლიშეებს...)"
+                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
+                />
+                <p className="mt-1 text-xs text-[var(--mute)]">
+                  რა შეუძლია და რა არ შეუძლია აგენტს
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3 border-t border-[var(--line)] pt-4">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="flex-1 rounded-xl border border-[var(--line-2)] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAgentConfig}
+                disabled={isSavingConfig}
+                className="flex-1 rounded-xl bg-[var(--violet)] py-3 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                {isSavingConfig ? 'Saving...' : 'Save Configuration'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
