@@ -1,9 +1,10 @@
 // /home/carvisronini-ux/lunara-os/app/dashboard/instagram/agents/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import InstagramPanel from "@/components/instagram/InstagramPanel";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
@@ -66,51 +67,15 @@ interface Agent {
   totalPosts: number;
 }
 
-// ⚠️ დროებითი მონაცემები. მომავალში ეს წამოვა Supabase-დან (agent_settings ცხრილიდან)
 const INITIAL_AGENTS: Agent[] = [
-  {
-    id: 'post-agent',
-    name: 'PostAgent',
-    type: 'post',
-    status: 'inactive',
-    nextRun: 'Monday 19:00',
-    lastRun: 'Never',
-    totalPosts: 0,
-  },
-  {
-    id: 'story-agent',
-    name: 'StoryAgent',
-    type: 'story',
-    status: 'inactive',
-    nextRun: 'Tuesday 10:00',
-    lastRun: 'Never',
-    totalPosts: 0,
-  },
-  {
-    id: 'carousel-agent',
-    name: 'CarouselAgent',
-    type: 'carousel',
-    status: 'inactive',
-    nextRun: 'Wednesday 12:00',
-    lastRun: 'Never',
-    totalPosts: 0,
-  },
-  {
-    id: 'reel-agent',
-    name: 'ReelAgent',
-    type: 'reel',
-    status: 'inactive',
-    nextRun: 'Tuesday 19:00',
-    lastRun: 'Never',
-    totalPosts: 0,
-  },
+  { id: 'post-agent', name: 'PostAgent', type: 'post', status: 'inactive', nextRun: 'Monday 19:00', lastRun: 'Never', totalPosts: 0 },
+  { id: 'story-agent', name: 'StoryAgent', type: 'story', status: 'inactive', nextRun: 'Tuesday 10:00', lastRun: 'Never', totalPosts: 0 },
+  { id: 'carousel-agent', name: 'CarouselAgent', type: 'carousel', status: 'inactive', nextRun: 'Wednesday 12:00', lastRun: 'Never', totalPosts: 0 },
+  { id: 'reel-agent', name: 'ReelAgent', type: 'reel', status: 'inactive', nextRun: 'Tuesday 19:00', lastRun: 'Never', totalPosts: 0 },
 ];
 
 const TYPE_ICONS: Record<string, any> = {
-  post: Icons.post,
-  story: Icons.story,
-  carousel: Icons.carousel,
-  reel: Icons.reel,
+  post: Icons.post, story: Icons.story, carousel: Icons.carousel, reel: Icons.reel,
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -122,49 +87,113 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
-  const [loading, setLoading] = useState(true);
+  const [isChecking, setIsChecking] = useState(false);
+  const [agentLogs, setAgentLogs] = useState<string[]>([]);
+  
+  const panelRef = useRef<any>(null);
 
-  // მომავალში აქ დაემატება Supabase-დან მონაცემების წამოღება
   useEffect(() => {
-    // fetchAgents();
-    setLoading(false);
-  }, []);
+    const interval = setInterval(() => {
+      const postAgent = agents.find(a => a.id === 'post-agent');
+      if (postAgent?.status === 'active') {
+        checkAndRunPostAgent();
+      }
+    }, 60000); 
+
+    return () => clearInterval(interval);
+  }, [agents]);
+
+  const addAgentLog = (msg: string) => {
+    const time = new Date().toLocaleTimeString();
+    setAgentLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
+  };
+
+  const checkAndRunPostAgent = async () => {
+    if (isChecking) return;
+    setIsChecking(true);
+    addAgentLog("ვამოწმებ Master Schedule-ს...");
+
+    try {
+      const now = new Date();
+      const jsDay = now.getDay();
+      const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1; 
+      const currentTime = now.toTimeString().slice(0, 5); 
+
+      // ✅ აქ ვიყენებთ supabase-ს, რათა შეცდომა აღმოიფხვრას
+      const { data: rules, error } = await supabase
+        .from('content_schedule')
+        .select('*')
+        .eq('day_of_week', dayOfWeek)
+        .eq('content_type', 'post')
+        .eq('is_active', true);
+
+      if (error) {
+        addAgentLog(`შეცდომა ბაზის წაკითხვისას: ${error.message}`);
+        setIsChecking(false);
+        return;
+      }
+
+      const matchingRule = rules?.find(r => r.time <= currentTime);
+
+      if (!matchingRule) {
+        addAgentLog("ამ წუთას დაგეგმილი პოსტი არ არის.");
+        setIsChecking(false);
+        return;
+      }
+
+      const today = now.toISOString().split('T')[0];
+      const { data: published } = await supabase
+        .from('published_content')
+        .select('id')
+        .eq('content_type', 'post')
+        .gte('published_at', `${today}T00:00:00`)
+        .limit(1);
+
+      if (published && published.length > 0) {
+        addAgentLog("დღევანდელი პოსტი უკვე გამოქვეყნებულია. ვტოვებ.");
+        setIsChecking(false);
+        return;
+      }
+
+      addAgentLog(`🚀 დრო მოვიდა! ვრთავ PostAgent-ს წესისთვის: ${matchingRule.time}`);
+      
+      const zodiacToPost = "ARIES"; 
+      addAgentLog(`ავირჩიე ზოდიაქო: ${zodiacToPost}`);
+      
+      if (panelRef.current) {
+        const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
+        if (success) {
+          addAgentLog("✅ PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
+        } else {
+          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
+        }
+      }
+
+    } catch (error) {
+      addAgentLog(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   const toggleAgent = (id: string) => {
-    setAgents(prev =>
-      prev.map(agent =>
-        agent.id === id
-          ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' }
-          : agent
-      )
-    );
-    // მომავალში აქ დაემატება Supabase update:
-    // supabase.from('agent_settings').update({ is_active: newStatus }).eq('id', id)
+    setAgents(prev => prev.map(agent => 
+      agent.id === id ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' } : agent
+    ));
   };
 
   const activeAgentsCount = agents.filter(a => a.status === 'active').length;
   const totalPostsCount = agents.reduce((sum, a) => sum + a.totalPosts, 0);
 
-  if (loading) {
-    return (
-      <div className="agents-root flex min-h-screen items-center justify-center">
-        <p className="text-[var(--mute)]">Loading Agents...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="agents-root min-h-screen">
       <style>{STYLES}</style>
 
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
-            <Link
-              href="/dashboard/instagram"
-              className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]"
-            >
+            <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
               {Icons.back}
               <span className="hidden sm:inline">Back to Instagram</span>
             </Link>
@@ -181,8 +210,6 @@ export default function AgentsPage() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
-        
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
             <p className="text-xs font-medium text-[var(--mute)]">Total Agents</p>
@@ -198,86 +225,95 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        {/* Agents List */}
-        <div className="space-y-4">
-          {agents.map((agent) => {
-            const TypeIcon = TYPE_ICONS[agent.type];
-            const colorClass = TYPE_COLORS[agent.type];
-
-            return (
-              <div
-                key={agent.id}
-                className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-6 transition-all hover:border-[var(--line-2)]"
-              >
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>
-                      {TypeIcon}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-4">
+            {agents.map((agent) => {
+              const TypeIcon = TYPE_ICONS[agent.type];
+              const colorClass = TYPE_COLORS[agent.type];
+              return (
+                <div key={agent.id} className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-6 transition-all hover:border-[var(--line-2)]">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>
+                        {TypeIcon}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-[var(--moon)]">{agent.name}</h3>
+                        <p className="text-sm capitalize text-[var(--mute)]">{agent.type} Agent</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-[var(--moon)]">{agent.name}</h3>
-                      <p className="text-sm capitalize text-[var(--mute)]">{agent.type} Agent</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-xs text-[var(--mute)]">Status</p>
-                      <p className={`text-sm font-semibold ${agent.status === 'active' ? 'text-[var(--ok)]' : 'text-[var(--mute)]'}`}>
-                        {agent.status === 'active' ? '● Active' : '○ Inactive'}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => toggleAgent(agent.id)}
-                      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                        agent.status === 'active' ? 'bg-[var(--ok)]' : 'bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]'
-                      }`}
-                      aria-label={`Toggle ${agent.name}`}
-                    >
-                      <span
-                        className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${
-                          agent.status === 'active' ? 'left-6' : 'left-1'
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-xs text-[var(--mute)]">Status</p>
+                        <p className={`text-sm font-semibold ${agent.status === 'active' ? 'text-[var(--ok)]' : 'text-[var(--mute)]'}`}>
+                          {agent.status === 'active' ? '● Active' : '○ Inactive'}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => toggleAgent(agent.id)}
+                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                          agent.status === 'active' ? 'bg-[var(--ok)]' : 'bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]'
                         }`}
-                      />
-                    </button>
+                      >
+                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${agent.status === 'active' ? 'left-6' : 'left-1'}`} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                      <p className="text-xs text-[var(--mute)]">Next Run</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.nextRun}</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                      <p className="text-xs text-[var(--mute)]">Last Run</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.lastRun}</p>
+                    </div>
+                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                      <p className="text-xs text-[var(--mute)]">Total Published</p>
+                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="rounded-xl bg-[var(--ink)] p-3">
-                    <p className="text-xs text-[var(--mute)]">Next Run</p>
-                    <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.nextRun}</p>
-                  </div>
-                  <div className="rounded-xl bg-[var(--ink)] p-3">
-                    <p className="text-xs text-[var(--mute)]">Last Run</p>
-                    <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.lastRun}</p>
-                  </div>
-                  <div className="rounded-xl bg-[var(--ink)] p-3">
-                    <p className="text-xs text-[var(--mute)]">Total Published</p>
-                    <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
-                    View Logs
-                  </button>
-                  <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">
-                    Configure Rules
-                  </button>
-                  <button className="flex-1 rounded-xl bg-[var(--violet)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 sm:flex-none">
-                    Run Now
-                  </button>
-                </div>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
+                PostAgent Live Logs
+              </h4>
+              <div className="h-64 overflow-y-auto rounded-xl bg-[var(--ink)] p-3 font-mono text-xs space-y-1 custom-scrollbar">
+                {agentLogs.length === 0 ? (
+                  <p className="text-[var(--mute)]">ლოგები გამოჩნდება აქ, როცა აგენტი ამოქმედდება...</p>
+                ) : (
+                  agentLogs.map((log, i) => (
+                    <div key={i} className="text-[var(--moon)] border-b border-[var(--line)] pb-1 mb-1 last:border-0">
+                      {log}
+                    </div>
+                  ))
+                )}
               </div>
-            );
-          })}
+            </div>
+
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+              <h4 className="text-sm font-semibold mb-3">Agent Engine (Hidden)</h4>
+              <p className="text-xs text-[var(--mute)] mb-3">ეს კომპონენტი ასრულებს რეალურ სამუშაოს ფონზე.</p>
+              <div className="opacity-30 pointer-events-none scale-75 origin-top-left">
+                <InstagramPanel 
+                  ref={panelRef} 
+                  profileUsername="@lunaraosapp" 
+                  pushEvent={(type, msg) => addAgentLog(`[Panel] ${msg}`)} 
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Info Box */}
         <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> When enabled, agents automatically check the Master Schedule and publish content at the scheduled times. Keep your browser open for client-side execution, or configure server-side fallback.
+            💡 <span className="font-semibold">How it works:</span> When enabled, agents automatically check the Master Schedule and publish content at the scheduled times. Keep your browser open for client-side execution.
           </p>
         </div>
       </main>
