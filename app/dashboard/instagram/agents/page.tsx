@@ -119,7 +119,6 @@ export default function AgentsPage() {
       const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1; 
       const currentTime = now.toTimeString().slice(0, 5); 
 
-      // ✅ აქ ვიყენებთ supabase-ს, რათა შეცდომა აღმოიფხვრას
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
@@ -133,7 +132,8 @@ export default function AgentsPage() {
         return;
       }
 
-      const matchingRule = rules?.find(r => r.time <= currentTime);
+      // ✅ აქ დავამატეთ (r: any) TypeScript-ის შეცდომის აღმოსაფხვრელად
+      const matchingRule = rules?.find((r: any) => r.time <= currentTime);
 
       if (!matchingRule) {
         addAgentLog("ამ წუთას დაგეგმილი პოსტი არ არის.");
@@ -142,12 +142,18 @@ export default function AgentsPage() {
       }
 
       const today = now.toISOString().split('T')[0];
-      const { data: published } = await supabase
+      const { data: published, error: pubError } = await supabase
         .from('published_content')
         .select('id')
         .eq('content_type', 'post')
         .gte('published_at', `${today}T00:00:00`)
         .limit(1);
+
+      if (pubError) {
+        addAgentLog(`შეცდომა გამოქვეყნებულის შემოწმებისას: ${pubError.message}`);
+        setIsChecking(false);
+        return;
+      }
 
       if (published && published.length > 0) {
         addAgentLog("დღევანდელი პოსტი უკვე გამოქვეყნებულია. ვტოვებ.");
