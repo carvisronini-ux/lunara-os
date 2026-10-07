@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/app/dashboard/instagram/master-schedule/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -46,6 +46,23 @@ const Icons = {
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
+// ✅ ზოდიაქოების სია inline editing-ისთვის
+const ZODIAC_OPTIONS = [
+  { value: null, label: '🎲 Random', color: 'text-[var(--violet)]' },
+  { value: 'ARIES', label: '♈ Aries', color: 'text-[var(--rose)]' },
+  { value: 'TAURUS', label: '♉ Taurus', color: 'text-[var(--ok)]' },
+  { value: 'GEMINI', label: '♊ Gemini', color: 'text-[var(--amber)]' },
+  { value: 'CANCER', label: '♋ Cancer', color: 'text-[var(--moon)]' },
+  { value: 'LEO', label: '♌ Leo', color: 'text-[var(--amber)]' },
+  { value: 'VIRGO', label: '♍ Virgo', color: 'text-[var(--ok)]' },
+  { value: 'LIBRA', label: '♎ Libra', color: 'text-[var(--violet)]' },
+  { value: 'SCORPIO', label: '♏ Scorpio', color: 'text-[var(--rose)]' },
+  { value: 'SAGITTARIUS', label: '♐ Sagittarius', color: 'text-[var(--violet)]' },
+  { value: 'CAPRICORN', label: '♑ Capricorn', color: 'text-[var(--mute)]' },
+  { value: 'AQUARIUS', label: '♒ Aquarius', color: 'text-[var(--violet)]' },
+  { value: 'PISCES', label: '♓ Pisces', color: 'text-[var(--violet)]' },
+];
+
 const TYPE_COLORS: Record<string, string> = {
   post: "text-[var(--violet)] bg-[var(--violet)]/10 border-[var(--violet)]/20",
   story: "text-[var(--amber)] bg-[var(--amber)]/10 border-[var(--amber)]/20",
@@ -60,22 +77,6 @@ const TYPE_ICONS: Record<string, any> = {
   reel: Icons.reel,
 };
 
-// ✅ ახალი: დროის ფორმატირების helper ფუნქცია
-const formatTime = (time: string): string => {
-  if (!time) return '';
-  // თუ არის მიკროწამები (მაგ. "13:30:50.171035"), ვიღებთ მხოლოდ HH:MM:SS
-  if (time.includes('.')) {
-    return time.split('.')[0];
-  }
-  // თუ არის HH:MM:SS, ვაბრუნებთ როგორც არის
-  if (time.length >= 8) {
-    return time.substring(0, 8);
-  }
-  // თუ არის HH:MM, ვაბრუნებთ როგორც არის
-  return time;
-};
-
-// განრიგის სტატუსები (ავტომატური + Override)
 const STATUS_STYLES: Record<string, any> = {
   pending: { bg: "bg-[var(--amber)]/10", border: "border-[var(--amber)]/30", text: "text-[var(--amber)]", label: "Pending", icon: Icons.clock },
   done: { bg: "bg-[var(--ok)]/10", border: "border-[var(--ok)]/30", text: "text-[var(--ok)]", label: "Done", icon: Icons.check },
@@ -85,7 +86,6 @@ const STATUS_STYLES: Record<string, any> = {
   skip: { bg: "bg-[var(--mute)]/10", border: "border-[var(--mute)]/30", text: "text-[var(--mute)]", label: "Skip", icon: Icons.skip },
 };
 
-// ✅ ახალი: დაპოსტვის სტატუსები
 const PUBLISH_STATUS_STYLES: Record<string, any> = {
   published: {
     bg: "bg-[var(--ok)]/10",
@@ -103,6 +103,13 @@ const PUBLISH_STATUS_STYLES: Record<string, any> = {
   },
 };
 
+const formatTime = (time: string): string => {
+  if (!time) return '';
+  if (time.includes('.')) return time.split('.')[0];
+  if (time.length >= 8) return time.substring(0, 8);
+  return time;
+};
+
 export default function MasterSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,6 +118,11 @@ export default function MasterSchedulePage() {
   const [now, setNow] = useState(new Date());
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [publishedToday, setPublishedToday] = useState<any[]>([]);
+  
+  // ✅ ახალი: ზოდიაქოს inline dropdown-ისთვის
+  const [activeZodiacDropdown, setActiveZodiacDropdown] = useState<string | null>(null);
+  const [savingZodiac, setSavingZodiac] = useState<string | null>(null);
+  const zodiacDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     day_of_week: 0,
@@ -136,10 +148,14 @@ export default function MasterSchedulePage() {
       if (activeDropdown && !(event.target as HTMLElement).closest('.status-dropdown')) {
         setActiveDropdown(null);
       }
+      // ✅ ზოდიაქოს dropdown-ის დახურვა გარე დაჭერისას
+      if (activeZodiacDropdown && zodiacDropdownRef.current && !zodiacDropdownRef.current.contains(event.target as Node)) {
+        setActiveZodiacDropdown(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [activeDropdown]);
+  }, [activeDropdown, activeZodiacDropdown]);
 
   const fetchSchedule = async () => {
     setLoading(true);
@@ -186,7 +202,6 @@ export default function MasterSchedulePage() {
   const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
-  // ✅ განახლებული: იყენებს formatTime-ს შედარებისთვის
   const getRuleStatus = (rule: any) => {
     if (rule.status && ['pause', 'skip'].includes(rule.status)) {
       return rule.status;
@@ -195,7 +210,6 @@ export default function MasterSchedulePage() {
     if (rule.day_of_week < currentDayIndex) return 'past';
     if (rule.day_of_week > currentDayIndex) return 'upcoming';
     
-    // ✅ გასუფთავებული დროის შედარება
     const ruleTime = formatTime(rule.time);
     const ruleTimeHHMM = ruleTime.substring(0, 5);
     if (ruleTimeHHMM <= currentTimeStr) return 'done';
@@ -216,6 +230,23 @@ export default function MasterSchedulePage() {
       setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, status: statusToSave } : rule)));
       setActiveDropdown(null);
     }
+  };
+
+  // ✅ ახალი: ოდიაქოს inline განახლება ბაზაში
+  const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
+    setSavingZodiac(ruleId);
+    const { error } = await supabase
+      .from("content_schedule")
+      .update({ zodiac_sign: newZodiac })
+      .eq("id", ruleId);
+    
+    if (!error) {
+      setSchedule((prev) => prev.map((rule) => 
+        rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac } : rule
+      ));
+    }
+    setSavingZodiac(null);
+    setActiveZodiacDropdown(null);
   };
 
   const deleteRule = async (id: string) => {
@@ -242,7 +273,6 @@ export default function MasterSchedulePage() {
     setShowModal(true);
   };
 
-  // ✅ განახლებული: იყენებს formatTime-ს სორტირებისთვის
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRule) {
@@ -269,6 +299,13 @@ export default function MasterSchedulePage() {
   const activeRulesCount = schedule.filter((r) => r.is_active).length;
   const formattedNow = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const formattedDate = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // ✅ ზოდიაქოს ნიშნის ფორმატირება
+  const getZodiacDisplay = (zodiacSign: string | null) => {
+    if (!zodiacSign) return { label: '🎲 Random', color: 'text-[var(--violet)]' };
+    const option = ZODIAC_OPTIONS.find(z => z.value === zodiacSign);
+    return option || { label: zodiacSign, color: 'text-[var(--mute)]' };
+  };
 
   return (
     <div className="ig-root min-h-screen">
@@ -376,10 +413,10 @@ export default function MasterSchedulePage() {
                         const statusStyle = STATUS_STYLES[status as keyof typeof STATUS_STYLES];
                         const StatusIcon = statusStyle.icon;
                         const publishStatus = getPublishedStatus(rule);
+                        const zodiacDisplay = getZodiacDisplay(rule.zodiac_sign);
 
                         return (
                           <div key={rule.id} className={`flex items-center gap-4 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[var(--amber)]/[0.03]' : 'hover:bg-white/[0.02]'}`}>
-                            {/* ✅ განახლებული: დროის ფორმატირება */}
                             <div className="w-20 shrink-0 font-mono text-sm font-medium text-[var(--moon)]">
                               {formatTime(rule.time)}
                             </div>
@@ -394,6 +431,47 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
                             
+                            {/* ✅ ახალი: ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
+                            {rule.content_type === 'post' && (
+                              <div className="relative hidden sm:block" ref={zodiacDropdownRef}>
+                                <button 
+                                  onClick={() => setActiveZodiacDropdown(activeZodiacDropdown === rule.id ? null : rule.id)}
+                                  disabled={savingZodiac === rule.id}
+                                  className={`flex items-center gap-1.5 rounded-full border border-[var(--violet)]/30 bg-[var(--violet)]/5 px-2.5 py-1 transition-colors hover:bg-[var(--violet)]/15 ${zodiacDisplay.color} ${savingZodiac === rule.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                                  title="დააჭირე ზოდიაქოს შესაცვლელად"
+                                >
+                                  {savingZodiac === rule.id ? (
+                                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  ) : (
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                                      {zodiacDisplay.label}
+                                    </span>
+                                  )}
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+
+                                {activeZodiacDropdown === rule.id && (
+                                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-50 max-h-80 overflow-y-auto">
+                                    {ZODIAC_OPTIONS.map((option) => (
+                                      <button
+                                        key={option.value || 'random'}
+                                        onClick={() => updateZodiacSign(rule.id, option.value)}
+                                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
+                                          rule.zodiac_sign === option.value ? 'bg-[var(--violet)]/20 text-[var(--violet)]' : option.color
+                                        }`}
+                                      >
+                                        <span className="flex-1">{option.label}</span>
+                                        {rule.zodiac_sign === option.value && (
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* განრიგის სტატუსი */}
                             <div className="relative hidden sm:block status-dropdown">
                               <button 
                                 onClick={(e) => {
@@ -489,20 +567,19 @@ export default function MasterSchedulePage() {
                 <div>
                   <label className="mb-1 block text-xs font-medium text-[var(--mute)]">Zodiac (Optional)</label>
                   <select value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3 py-2 text-sm outline-none focus:border-[var(--violet)]">
-                    <option value="">None / All</option>
-                    <option value="ARIES">Aries</option>
-                    <option value="TAURUS">Taurus</option>
-                    <option value="GEMINI">Gemini</option>
-                    <option value="CANCER">Cancer</option>
-                    <option value="LEO">Leo</option>
-                    <option value="VIRGO">Virgo</option>
-                    <option value="LIBRA">Libra</option>
-                    <option value="SCORPIO">Scorpio</option>
-                    <option value="SAGITTARIUS">Sagittarius</option>
-                    <option value="CAPRICORN">Capricorn</option>
-                    <option value="AQUARIUS">Aquarius</option>
-                    <option value="PISCES">Pisces</option>
-                    <option value="ALL">ALL SIGNS</option>
+                    <option value="">🎲 Random</option>
+                    <option value="ARIES">♈ Aries</option>
+                    <option value="TAURUS">♉ Taurus</option>
+                    <option value="GEMINI">♊ Gemini</option>
+                    <option value="CANCER">♋ Cancer</option>
+                    <option value="LEO">♌ Leo</option>
+                    <option value="VIRGO">♍ Virgo</option>
+                    <option value="LIBRA">♎ Libra</option>
+                    <option value="SCORPIO">♏ Scorpio</option>
+                    <option value="SAGITTARIUS">♐ Sagittarius</option>
+                    <option value="CAPRICORN">♑ Capricorn</option>
+                    <option value="AQUARIUS">♒ Aquarius</option>
+                    <option value="PISCES">♓ Pisces</option>
                   </select>
                 </div>
               </div>
