@@ -41,6 +41,7 @@ const Icons = {
   calendar: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
   pause: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
   skip: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>,
+  x: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>,
 };
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -59,6 +60,7 @@ const TYPE_ICONS: Record<string, any> = {
   reel: Icons.reel,
 };
 
+// განრიგის სტატუსები (ავტომატური + Override)
 const STATUS_STYLES: Record<string, any> = {
   pending: { bg: "bg-[var(--amber)]/10", border: "border-[var(--amber)]/30", text: "text-[var(--amber)]", label: "Pending", icon: Icons.clock },
   done: { bg: "bg-[var(--ok)]/10", border: "border-[var(--ok)]/30", text: "text-[var(--ok)]", label: "Done", icon: Icons.check },
@@ -68,6 +70,24 @@ const STATUS_STYLES: Record<string, any> = {
   skip: { bg: "bg-[var(--mute)]/10", border: "border-[var(--mute)]/30", text: "text-[var(--mute)]", label: "Skip", icon: Icons.skip },
 };
 
+// ✅ ახალი: დაპოსტვის სტატუსები
+const PUBLISH_STATUS_STYLES: Record<string, any> = {
+  published: {
+    bg: "bg-[var(--ok)]/10",
+    border: "border-[var(--ok)]/30",
+    text: "text-[var(--ok)]",
+    label: "დაიპოსტა",
+    icon: Icons.check,
+  },
+  failed: {
+    bg: "bg-[var(--rose)]/10",
+    border: "border-[var(--rose)]/30",
+    text: "text-[var(--rose)]",
+    label: "არდაიპოსტა",
+    icon: Icons.x,
+  },
+};
+
 export default function MasterSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +95,7 @@ export default function MasterSchedulePage() {
   const [editingRule, setEditingRule] = useState<any | null>(null);
   const [now, setNow] = useState(new Date());
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [publishedToday, setPublishedToday] = useState<any[]>([]); // ✅ ახალი
 
   const [formData, setFormData] = useState({
     day_of_week: 0,
@@ -87,7 +108,11 @@ export default function MasterSchedulePage() {
 
   useEffect(() => {
     fetchSchedule();
-    const interval = setInterval(() => setNow(new Date()), 60000);
+    fetchPublishedToday();
+    const interval = setInterval(() => {
+      setNow(new Date());
+      fetchPublishedToday(); // ✅ ყოველ წუთს განვაახლოთ
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -113,12 +138,44 @@ export default function MasterSchedulePage() {
     setLoading(false);
   };
 
+  // ✅ ახალი: დღევანდელი დაპოსტილი ჩანაწერების წამოღება
+  const fetchPublishedToday = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('published_content')
+      .select('*')
+      .gte('published_at', `${today}T00:00:00`)
+      .lt('published_at', `${today}T23:59:59`)
+      .order('published_at', { ascending: false });
+    
+    if (!error && data) setPublishedToday(data);
+  };
+
+  // ✅ ახალი: ჩანაწერის წაშლა
+  const deletePublished = async (id: string) => {
+    if (!confirm("წაშლა საშუალებას მისცემს აგენტს ხელახლა დაპოსტოს. დარწმუნებული ხარ?")) return;
+    const { error } = await supabase.from('published_content').delete().eq('id', id);
+    if (!error) {
+      setPublishedToday(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  // ✅ ახალი: დაპოსტვის სტატუსის მიღება
+  const getPublishedStatus = (rule: any) => {
+    const matching = publishedToday.find(p => 
+      p.content_type === rule.content_type && 
+      (!rule.zodiac_sign || p.zodiac_sign === rule.zodiac_sign)
+    );
+    if (!matching) return null;
+    return matching.status;
+  };
+
   const jsDay = now.getDay();
   const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
   const getRuleStatus = (rule: any) => {
-    if (rule.status && ['done', 'pending', 'past', 'upcoming', 'pause', 'skip'].includes(rule.status)) {
+    if (rule.status && ['pause', 'skip'].includes(rule.status)) {
       return rule.status;
     }
     if (!rule.is_active) return 'past';
@@ -136,9 +193,10 @@ export default function MasterSchedulePage() {
   };
 
   const updateRuleStatus = async (id: string, newStatus: string) => {
-    const { error } = await supabase.from("content_schedule").update({ status: newStatus }).eq("id", id);
+    const statusToSave = ['pause', 'skip'].includes(newStatus) ? newStatus : null;
+    const { error } = await supabase.from("content_schedule").update({ status: statusToSave }).eq("id", id);
     if (!error) {
-      setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, status: newStatus } : rule)));
+      setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, status: statusToSave } : rule)));
       setActiveDropdown(null);
     }
   };
@@ -230,6 +288,48 @@ export default function MasterSchedulePage() {
               </div>
             </div>
 
+            {/* ✅ ახალი: Published Today სექცია */}
+            {publishedToday.length > 0 && (
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] overflow-hidden">
+                <div className="border-b border-[var(--line)] bg-[var(--ink-3)]/50 px-4 py-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-[var(--violet)]">
+                    📊 Published Today ({publishedToday.length})
+                  </h3>
+                  <button onClick={() => fetchPublishedToday()} className="text-xs text-[var(--mute)] hover:text-[var(--moon)] transition-colors">
+                    ↻ Refresh
+                  </button>
+                </div>
+                <div className="divide-y divide-[var(--line)]">
+                  {publishedToday.map(p => {
+                    const publishStyle = PUBLISH_STATUS_STYLES[p.status];
+                    return (
+                      <div key={p.id} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-white/[0.02]">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${publishStyle.bg} ${publishStyle.border} ${publishStyle.text}`}>
+                          {publishStyle.icon}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[var(--moon)]">
+                            {p.content_type} {p.zodiac_sign && `· ${p.zodiac_sign}`}
+                          </p>
+                          <p className="truncate text-xs text-[var(--mute)]">{p.caption?.substring(0, 60) || 'No caption'}</p>
+                        </div>
+                        <span className="text-xs text-[var(--mute)] font-mono">
+                          {new Date(p.published_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <button 
+                          onClick={() => deletePublished(p.id)} 
+                          className="rounded-lg p-1.5 text-[var(--mute)] hover:bg-[var(--rose)]/10 hover:text-[var(--rose)] transition-colors"
+                          title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას"
+                        >
+                          {Icons.trash}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               {DAYS_OF_WEEK.map((day, index) => {
                 const dayRules = schedule.filter((r) => r.day_of_week === index);
@@ -252,6 +352,7 @@ export default function MasterSchedulePage() {
                         const status = getRuleStatus(rule);
                         const statusStyle = STATUS_STYLES[status as keyof typeof STATUS_STYLES];
                         const StatusIcon = statusStyle.icon;
+                        const publishStatus = getPublishedStatus(rule); // ✅ ახალი
 
                         return (
                           <div key={rule.id} className={`flex items-center gap-4 px-4 py-3 transition-colors ${status === 'pending' ? 'bg-[var(--amber)]/[0.03]' : 'hover:bg-white/[0.02]'}`}>
@@ -267,6 +368,7 @@ export default function MasterSchedulePage() {
                               </div>
                             </div>
                             
+                            {/* განრიგის სტატუსი */}
                             <div className="relative hidden sm:block status-dropdown">
                               <button 
                                 onClick={(e) => {
@@ -297,6 +399,16 @@ export default function MasterSchedulePage() {
                                 </div>
                               )}
                             </div>
+
+                            {/* ✅ ახალი: დაპოსტვის სტატუსი */}
+                            {publishStatus && (
+                              <div className={`hidden sm:flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${PUBLISH_STATUS_STYLES[publishStatus].bg} ${PUBLISH_STATUS_STYLES[publishStatus].border} ${PUBLISH_STATUS_STYLES[publishStatus].text}`}>
+                                {PUBLISH_STATUS_STYLES[publishStatus].icon}
+                                <span className="text-[10px] font-semibold uppercase tracking-wider">
+                                  {PUBLISH_STATUS_STYLES[publishStatus].label}
+                                </span>
+                              </div>
+                            )}
 
                             <div className="flex items-center gap-1">
                               <button onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>

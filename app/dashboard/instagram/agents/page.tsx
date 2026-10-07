@@ -141,10 +141,13 @@ export default function AgentsPage() {
       }
 
       const today = now.toISOString().split('T')[0];
+      
+      // ✅ განახლებული: მხოლოდ 'published' სტატუსის მქონე ჩანაწერებს ამოწმებს
       const { data: published, error: pubError } = await supabase
         .from('published_content')
         .select('id')
         .eq('content_type', 'post')
+        .eq('status', 'published') 
         .gte('published_at', `${today}T00:00:00`)
         .limit(1);
 
@@ -155,7 +158,7 @@ export default function AgentsPage() {
       }
 
       if (published && published.length > 0) {
-        addAgentLog("დღევანდელი პოსტი უკვე გამოქვეყნებულია. ვტოვებ.");
+        addAgentLog("დღევანდელი პოსტი უკვე წარმატებით გამოქვეყნებულია. ვტოვებ.");
         setIsChecking(false);
         return;
       }
@@ -171,7 +174,7 @@ export default function AgentsPage() {
           addAgentLog("✅ PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
         } else {
-          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
+          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით (შეიძლება ხელახლა სცადოს).");
         }
       }
 
@@ -279,7 +282,6 @@ export default function AgentsPage() {
                     </div>
                   </div>
                   
-                  {/* ✅ აქ დავამატეთ "Run Now" ღილაკი მხოლოდ PostAgent-ისთვის */}
                   {agent.id === 'post-agent' && (
                     <div className="mt-6 flex flex-wrap gap-2">
                       <button className="flex-1 rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-2.5 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)] sm:flex-none">

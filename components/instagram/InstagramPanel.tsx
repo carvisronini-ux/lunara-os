@@ -224,7 +224,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იღებს text1 და text2 პარამეტრებს, რათა Canvas-მა ზუსტად ის დახატოს
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
@@ -235,7 +234,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetFormat = overrideFormat || selectedFormat;
     const targetImageUrl = targetZodiac ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.name.toLowerCase()}.png` : imageUrl;
     
-    // ✅ აქ ვიყენებთ გადაცემულ ტექსტს, ან State-ს (თუ Manual რეჟიმია)
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
 
@@ -403,7 +401,23 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         setIsPublishing(false);
         return true;
       } else {
+        // ✅ ახალი: წარუმატებლობის ჩაწერა ბაზაში, რათა აგენტმა ხელახლა სცადოს
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`);
+        if (data.details) {
+          addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
+        }
+        
+        await supabase.from('published_content').insert([{
+          content_type: targetFormat,
+          zodiac_sign: targetZodiac.name,
+          caption: `${targetText1}\n\n${targetText2}`,
+          image_url: targetImageUrl,
+          instagram_post_id: null,
+          status: 'failed',
+          agent_used: 'client_agent',
+          error_message: data.error || 'Unknown error'
+        }]);
+        
         setIsPublishing(false);
         return false;
       }
@@ -440,7 +454,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია და ატვირთვა...");
-      // ✅ აქ გადავცემთ t1 და t2-ს, რათა Canvas-მა ზუსტად ის დახატოს!
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
       if (!imgUrl) { 
         addLog("❌ ატვირთვა ვერ მოხერხდა"); 
@@ -457,7 +470,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
         return true;
       } else {
-        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა");
+        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა (შეიძლება ხელახლა სცადოს)");
         return false;
       }
     }
