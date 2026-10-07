@@ -7,7 +7,8 @@ import { createClient } from "@supabase/supabase-js";
 import InstagramPanel from "@/components/instagram/InstagramPanel";
 
 type ContentType = "post" | "carousel" | "story" | "reel";
-type TabId = "manual" | "instaboss" | "analytics";
+// ✅ 1. დამატებულია "agents" TabId-ში
+type TabId = "manual" | "agents" | "instaboss" | "analytics";
 
 interface Profile {
   id: string;
@@ -55,8 +56,10 @@ const FORMAT_CONFIG: Record<
   reel: { label: "Reel", size: "1080 × 1920", ratio: "9:16", ratioCss: "9 / 16", hint: "Vertical video discovery" },
 };
 
+// ✅ 2. დამატებულია "Agents" ტაბი
 const TABS: { id: TabId; label: string; soon?: boolean }[] = [
   { id: "manual", label: "Manual" },
+  { id: "agents", label: "Agents" },
   { id: "instaboss", label: "InstaBoss", soon: true },
   { id: "analytics", label: "Analytics", soon: true },
 ];
@@ -333,7 +336,6 @@ export default function InstagramPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ✅ Master Schedule ღილაკი Header-ში */}
             <Link
               href="/dashboard/instagram/master-schedule"
               className="flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--ink-2)] px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] transition-colors hover:border-[var(--line-2)] hover:bg-[var(--ink-3)]"
@@ -566,6 +568,31 @@ export default function InstagramPage() {
                         Enable a format above to start creating.
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ 3. დამატებულია Agents ტაბის კონტენტი (გადამისამართება) */}
+              {activeTab === "agents" && (
+                <div role="tabpanel" className="rounded-3xl border border-[var(--line)] bg-[var(--ink-2)] p-6">
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--violet)]/10 text-[var(--violet)]">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-[var(--moon)]">Agents Control Center</h3>
+                    <p className="mt-2 max-w-md text-sm text-[var(--mute)]">
+                      Manage all automated posting agents (Post, Story, Carousel, Reel) in a dedicated, centralized view.
+                    </p>
+                    <Link
+                      href="/dashboard/instagram/agents"
+                      className="mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--violet)] px-6 py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90"
+                    >
+                      Open Agents Dashboard
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </Link>
                   </div>
                 </div>
               )}

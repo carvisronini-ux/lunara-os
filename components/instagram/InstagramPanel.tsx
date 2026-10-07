@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 
@@ -9,7 +9,6 @@ type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error
 type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 
-// ✅ 1. დავამატეთ profileUsername ინტერფეისში
 interface InstagramPanelProps {
   pushEvent: (type: EventLogType, message: string) => void;
   profileUsername: string;
@@ -149,8 +148,8 @@ function Section({ title, children, actions }: { title: string; children: React.
    COMPONENT
    ===================================================================== */
 
-// ✅ 2. დავამატეთ profileUsername დესტრუქტურიზაციაში
-export default function InstagramPanel({ pushEvent, profileUsername }: InstagramPanelProps) {
+// ✅ 1. დავამატეთ forwardRef
+const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profileUsername }, ref) => {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
   const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
@@ -201,8 +200,10 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
       setSelectedZodiac(found);
       addLog(`✅ Zodiac selected: ${found.name}`);
       setStep("format");
+      return found;
     } else {
       addLog(`❌ Zodiac not found.`);
+      return null;
     }
   };
 
@@ -245,22 +246,24 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
   };
 
   const handleGenerateText1 = async () => {
-    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return; }
+    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText1(true);
     addLog(`⏳ AI is generating an emotional, viral hook for ${selectedZodiac.name}...`);
     try {
       const generatedText = await generateViralText1(selectedZodiac.name);
       setText1(generatedText);
       addLog(`✨ Successfully generated Text 1: "${generatedText}"`);
+      setIsGeneratingText1(false);
+      return generatedText;
     } catch (error) {
       addLog(`❌ Failed to generate Text 1: ${error instanceof Error ? error.message : 'Unknown'}`);
-    } finally {
       setIsGeneratingText1(false);
+      return null;
     }
   };
 
   const handleGenerateText2 = async () => {
-    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return; }
+    if (!selectedZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText2(true);
     addLog(`⏳ AI is generating a meaningful forecast for ${selectedZodiac.name} based on Text 1...`);
     try {
@@ -276,15 +279,17 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
       }
       setText2(cleanedText);
       addLog(`✨ Successfully generated Text 2: "${cleanedText}"`);
+      setIsGeneratingText2(false);
+      return cleanedText;
     } catch (error) {
       addLog(`❌ Failed to generate Text 2: ${error instanceof Error ? error.message : 'Unknown'}`);
-    } finally {
       setIsGeneratingText2(false);
+      return null;
     }
   };
 
   const handleReadyAndUpload = async () => {
-    if (!selectedZodiac || !imageUrl) { addLog("❌ Preview not ready or Zodiac not selected."); return; }
+    if (!selectedZodiac || !imageUrl) { addLog("❌ Preview not ready or Zodiac not selected."); return null; }
     
     setIsPublishing(true);
     setLogs([]);
@@ -426,22 +431,22 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
       addLog("🎉 FINAL RESULT: Image is ready and live!");
       addLog(`🔗 Direct Link: ${urlData.publicUrl}`);
       
-      alert(`✅ Successfully uploaded!\n\nFile name: ${fileName}\nLink: ${urlData.publicUrl}\n\nNow you can click "Confirm & Publish"!`);
+      return urlData.publicUrl;
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       addLog(`❌ CRITICAL FAILURE: ${errorMsg}`);
       console.error("Upload Error Details:", error);
+      return null;
     } finally {
       setIsPublishing(false);
     }
   };
 
-  // 🔥 3. განახლებული handlePublish, რომელიც აგზავნის profileUsername-ს
   const handlePublish = async () => {
     if (!uploadedImageUrl || !text2 || !selectedZodiac || !selectedFormat) {
       addLog("❌ PRE-FLIGHT CHECK FAILED: Missing imageUrl, text2, zodiac, or format.");
-      return;
+      return false;
     }
     
     setIsPublishing(true);
@@ -455,7 +460,7 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
         text2: text2,
         generatedHashtags: showHashtags ? generateDynamicHashtags(text2, selectedZodiac.name) : undefined,
         imageUrl: uploadedImageUrl,
-        profileUsername: profileUsername // ✅ ეს დაემატა
+        profileUsername: profileUsername
       };
 
       addLog(`📤 [PUBLISH] Sending payload to /api/instagram/publish:`);
@@ -486,8 +491,19 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
       
       if (data.success) {
         addLog(`🎉 [PUBLISH] Successfully published to Instagram! Post ID: ${data.postId}`);
-        alert(`Successfully published to Instagram!\nPost ID: ${data.postId}`);
         
+        // ✅ შენახვა published_content ცხრილში
+        await supabase.from('published_content').insert([{
+          content_type: selectedFormat,
+          zodiac_sign: selectedZodiac.name,
+          caption: `${text1}\n\n${text2}`,
+          image_url: uploadedImageUrl,
+          instagram_post_id: data.postId,
+          status: 'published',
+          agent_used: 'client_agent'
+        }]);
+
+        // რესეტი მხოლოდ მაშინ, თუ არაა აგენტის რეჟიმი (აგენტი თვითონ მართავს რესეტს)
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
@@ -503,20 +519,78 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
         setShowHashtags(true);
         setLogoUrl(DEFAULT_LOGO_URL);
         setIsLogoValid(true);
+        
+        setIsPublishing(false);
+        return true;
       } else {
         addLog(`❌ [PUBLISH] API reported failure: ${data.error}`);
         if (data.details) {
             addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
         }
+        setIsPublishing(false);
+        return false;
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       addLog(`💥 [PUBLISH] Critical error caught in frontend: ${errorMsg}`);
       console.error("[InstagramPanel] Publish Critical Error:", error);
-    } finally {
       setIsPublishing(false);
+      return false;
     }
   };
+
+  // ✅ 2. useImperativeHandle: ეს არის "რობოტული საჭე", რომელსაც AgentsPage გამოიყენებს
+  useImperativeHandle(ref, () => ({
+    executeAutoPostSequence: async (zodiacName: string) => {
+      addLog(`🤖 აგენტი იწყებს მუშაობას: ${zodiacName}`);
+      
+      // ნაბიჯი 1: ზოდიაქოს ჩაწერა და არჩევა
+      setInputValue(zodiacName);
+      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
+      if (zodiac) {
+        setSelectedZodiac(zodiac);
+        setStep("format");
+      }
+      await new Promise(r => setTimeout(r, 1000));
+
+      // ნაბიჯი 2: ფორმატის არჩევა
+      setSelectedFormat("post");
+      setStep("preview");
+      await new Promise(r => setTimeout(r, 1000));
+
+      // ნაბიჯი 3: ტექსტის გენერაცია
+      addLog("⏳ აგენტი გენერირებს Text 1-ს...");
+      await handleGenerateText1();
+      await new Promise(r => setTimeout(r, 1500));
+      
+      addLog("⏳ აგენტი გენერირებს Text 2-ს...");
+      await handleGenerateText2();
+      await new Promise(r => setTimeout(r, 1500));
+
+      // ნაბიჯი 4: ატვირთვა
+      addLog("⏳ აგენტი ქმნის სურათს და ტვირთავს Supabase-ში...");
+      const imgUrl = await handleReadyAndUpload();
+      if (!imgUrl) {
+        addLog("❌ ატვირთვა ვერ მოხერხდა აგენტის ციკლის დროს");
+        return false;
+      }
+      await new Promise(r => setTimeout(r, 1500));
+
+      // ნაბიჯი 5: 7 წამიანი დაყოვნება და გამოქვეყნება
+      addLog("⏳ ველოდები 7 წამს Instagram API-ს სტაბილურობისთვის...");
+      await new Promise(r => setTimeout(r, 7000));
+      
+      addLog("🚀 აგენტი აქვეყნებს Instagram-ზე...");
+      const success = await handlePublish();
+      if (success) {
+        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
+        return true;
+      } else {
+        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა");
+        return false;
+      }
+    }
+  }));
 
   const activeFormatOption = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
 
@@ -737,4 +811,7 @@ export default function InstagramPanel({ pushEvent, profileUsername }: Instagram
       )}
     </div>
   );
-}
+});
+
+InstagramPanel.displayName = "InstagramPanel";
+export default InstagramPanel;
