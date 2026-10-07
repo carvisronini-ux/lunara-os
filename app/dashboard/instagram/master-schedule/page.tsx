@@ -302,7 +302,7 @@ export default function MasterSchedulePage() {
 
   // ✅ ზოდიაქოს ნიშნის ფორმატირება
   const getZodiacDisplay = (zodiacSign: string | null) => {
-    if (!zodiacSign) return { label: ' Random', color: 'text-[var(--violet)]' };
+    if (!zodiacSign) return { label: '🎲 Random', color: 'text-[var(--violet)]' };
     const option = ZODIAC_OPTIONS.find(z => z.value === zodiacSign);
     return option || { label: zodiacSign, color: 'text-[var(--mute)]' };
   };
@@ -433,7 +433,8 @@ export default function MasterSchedulePage() {
                             
                             {/* ✅ ახალი: ზოდიაქოს inline dropdown (მხოლოდ post ტიპზე) */}
                             {rule.content_type === 'post' && (
-                              <div className="relative hidden sm:block" ref={zodiacDropdownRef}>
+                              // ✅ დამატებულია z-50, რომ stacking context-ში ზემოთ იყოს
+                              <div className="relative hidden sm:block z-50" ref={zodiacDropdownRef}>
                                 <button 
                                   onClick={() => setActiveZodiacDropdown(activeZodiacDropdown === rule.id ? null : rule.id)}
                                   disabled={savingZodiac === rule.id}
@@ -450,9 +451,9 @@ export default function MasterSchedulePage() {
                                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                 </button>
 
-                                {/* ✅ განახლებული: dropdown ქვემოდან იხსნება, მაქს. 70vh სიმაღლით */}
+                                {/* ✅ განახლებული: dropdown ქვემოდან იხსნება, მაქს. 70vh სიმაღლით და z-[100]-ით რომ ყველა ელემენტზე ზემოთ იყოს */}
                                 {activeZodiacDropdown === rule.id && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-50 max-h-[70vh] overflow-y-auto">
+                                  <div className="absolute right-0 top-full mt-2 w-48 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-xl z-[100] max-h-[70vh] overflow-y-auto">
                                     {ZODIAC_OPTIONS.map((option) => (
                                       <button
                                         key={option.value || 'random'}
@@ -578,7 +579,7 @@ export default function MasterSchedulePage() {
                     <option value="LIBRA">♎ Libra</option>
                     <option value="SCORPIO">♏ Scorpio</option>
                     <option value="SAGITTARIUS">♐ Sagittarius</option>
-                    <option value="CAPRICORN"> Capricorn</option>
+                    <option value="CAPRICORN">♑ Capricorn</option>
                     <option value="AQUARIUS">♒ Aquarius</option>
                     <option value="PISCES">♓ Pisces</option>
                   </select>
