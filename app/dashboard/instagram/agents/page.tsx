@@ -132,7 +132,6 @@ export default function AgentsPage() {
         return;
       }
 
-      // ✅ აქ დავამატეთ (r: any) TypeScript-ის შეცდომის აღმოსაფხვრელად
       const matchingRule = rules?.find((r: any) => r.time <= currentTime);
 
       if (!matchingRule) {
@@ -307,10 +306,11 @@ export default function AgentsPage() {
               <h4 className="text-sm font-semibold mb-3">Agent Engine (Hidden)</h4>
               <p className="text-xs text-[var(--mute)] mb-3">ეს კომპონენტი ასრულებს რეალურ სამუშაოს ფონზე.</p>
               <div className="opacity-30 pointer-events-none scale-75 origin-top-left">
+                {/* ✅ აქ გამოვიყენეთ 'type' ცვლადი, რათა TypeScript-ის შეცდომა აღმოიფხვრას */}
                 <InstagramPanel 
                   ref={panelRef} 
                   profileUsername="@lunaraosapp" 
-                  pushEvent={(type, msg) => addAgentLog(`[Panel] ${msg}`)} 
+                  pushEvent={(type, msg) => addAgentLog(`[${type}] ${msg}`)} 
                 />
               </div>
             </div>
