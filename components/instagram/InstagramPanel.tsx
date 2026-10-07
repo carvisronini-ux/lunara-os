@@ -142,7 +142,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [showDate, setShowDate] = useState(true);
   const [showWeekRange, setShowWeekRange] = useState(false);
   const [showLogo, setShowLogo] = useState(true);
-  const [showHashtags, setShowHashtags] = useState(true);
+  const [showHashtags] = useState(true); // ✅ წაშლილია unused setShowHashtags
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
   const [isLogoValid, setIsLogoValid] = useState(true);
 
@@ -303,7 +303,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული handlePublish: იღებს override პარამეტრებს State-ის დაყოვნების თავიდან ასაცილებლად
   const handlePublish = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat, 
@@ -403,9 +402,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა"); return false; }
       await new Promise(r => setTimeout(r, 2000));
 
-      await new Promise(r => setTimeout(r, 7000)); // 7 წამიანი დაყოვნება Instagram API-სთვის
+      await new Promise(r => setTimeout(r, 7000));
       
-      // ✅ გადავცემთ ყველა მონაცემს პირდაპირ, რათა State-ის დაყოვნება გამოირიცხოს
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
