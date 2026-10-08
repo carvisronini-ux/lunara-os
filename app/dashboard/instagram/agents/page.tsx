@@ -191,23 +191,21 @@ export default function AgentsPage() {
     return ALL_ZODIAC_SIGNS[randomIndex];
   };
 
+  // ✅ განახლებული: იღებს უახლეს post წესს განრიგიდან, მიუხედავად დღისა და საათისა
   const checkAndRunPostAgent = async () => {
     if (isChecking) return;
     setIsChecking(true);
     addAgentLog("🔍 ვამოწმებ Master Schedule-ს...");
 
     try {
-      const now = new Date();
-      const jsDay = now.getDay();
-      const dayOfWeek = jsDay === 0 ? 6 : jsDay - 1; 
-      const currentTime = now.toTimeString().slice(0, 5); 
-
+      // ✅ ვიღებთ ყველა post ტიპის წესს განრიგიდან (მიუხედავად დღისა), დალაგებული დროის მიხედვით
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
-        .eq('day_of_week', dayOfWeek)
         .eq('content_type', 'post')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('day_of_week', { ascending: true })
+        .order('time', { ascending: true });
 
       if (error) {
         addAgentLog(`❌ შეცდომა ბაზის წაკითხვისას: ${error.message}`);
@@ -216,23 +214,20 @@ export default function AgentsPage() {
       }
 
       if (!rules || rules.length === 0) {
-        addAgentLog("⚠️ დღეს post ტიპის წესი არ არის.");
+        addAgentLog("⚠️ post ტიპის წესი საერთოდ არ არის განრიგში.");
         setIsChecking(false);
         return;
       }
 
-      const matchingRule = rules.find((r: any) => r.time <= currentTime);
+      // ✅ ვიღებთ პირველ (უახლეს) წესს განრიგიდან
+      const nextRule = rules[0];
+      const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-      if (!matchingRule) {
-        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა.`);
-        setIsChecking(false);
-        return;
-      }
+      addAgentLog(`📋 ნაპოვნია უახლესი წესი: ${dayNames[nextRule.day_of_week]} ${nextRule.time} - ${nextRule.content_theme}`);
+      addAgentLog(`🎯 მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
 
-      addAgentLog(`📋 ნაპოვნია წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
-      addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
-
-      const today = now.toISOString().split('T')[0];
+      // ✅ ვამოწმებთ, დღეს უკვე გამოქვეყნდა თუ არა ეს პოსტი (დუბლიკატის თავიდან ასაცილებლად)
+      const today = new Date().toISOString().split('T')[0];
       const { data: published, error: pubError } = await supabase
         .from('published_content')
         .select('id')
@@ -254,8 +249,8 @@ export default function AgentsPage() {
       }
 
       // ✅ ჭკვიანი არჩევანი
-      const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
-      addAgentLog(`🌟 არჩეული ოდიაქო: ${zodiacToPost}`);
+      const zodiacToPost = chooseSmartZodiac(nextRule.zodiac_sign);
+      addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
