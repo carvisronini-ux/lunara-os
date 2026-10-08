@@ -129,7 +129,6 @@ export default function AgentsPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   
-  // ✅ ახალი სტეიტები ბანერისთვის
   const [lastPostTime, setLastPostTime] = useState<string>('არ არის');
   const [nextPostTime, setNextPostTime] = useState<string>('—');
   
@@ -142,9 +141,9 @@ export default function AgentsPage() {
   
   const panelRef = useRef<any>(null);
 
-  // ✅ ბოლო პოსტის დროის წამოღება ბაზიდან
   const fetchLastPostTime = async () => {
-    const { data, error } = await supabase
+    // ✅ წაშლილია 'error', რადგან არ გამოიყენება
+    const { data } = await supabase
       .from('published_content')
       .select('published_at')
       .eq('content_type', 'post')
@@ -162,7 +161,6 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ შემდეგი პოსტის დროის გამოთვლა
   const fetchNextPostTime = async () => {
     const now = new Date();
     const jsDay = now.getDay();
@@ -213,7 +211,6 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ ფონური ტაიმერი + localStorage-დან სტატუსების ჩატვირთვა
   useEffect(() => {
     fetchLastPostTime();
     fetchNextPostTime();
@@ -381,7 +378,7 @@ export default function AgentsPage() {
         if (success) {
           addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
-          fetchLastPostTime(); // ✅ წარმატების შემდეგ ვაახლებთ დროებს
+          fetchLastPostTime();
           fetchNextPostTime();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
@@ -528,7 +525,6 @@ export default function AgentsPage() {
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            {/* ✅ ახალი ბანერი ბოლო და შემდეგი პოსტის დროით */}
             <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mute)] mb-3">PostAgent Timeline</h4>
               <div className="grid grid-cols-2 gap-3">
