@@ -89,6 +89,13 @@ const Icons = {
       <polyline points="20 6 9 17 4 12"/>
     </svg>
   ),
+  alert: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
 };
 
 interface Agent {
@@ -99,6 +106,16 @@ interface Agent {
   nextRun: string;
   lastRun: string;
   totalPosts: number;
+}
+
+interface FailedPost {
+  id: string;
+  content_type: string;
+  zodiac_sign: string;
+  caption: string;
+  published_at: string;
+  error_message: string;
+  status: 'failed';
 }
 
 const INITIAL_AGENTS: Agent[] = [
@@ -124,6 +141,9 @@ const ALL_ZODIAC_SIGNS = [
   'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
 ];
 
+// day_of_week: 0=ორშაბათი, 6=კვირა
+const DAY_NAMES = ["ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი", "კვირა"];
+
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(INITIAL_AGENTS);
   const [isChecking, setIsChecking] = useState(false);
@@ -139,81 +159,128 @@ export default function AgentsPage() {
   const [skills, setSkills] = useState('');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   
+  const [failedPosts, setFailedPosts] = useState<FailedPost[]>([]);
+  const [showFailedModal, setShowFailedModal] = useState(false);
+  const [selectedFailedPost, setSelectedFailedPost] = useState<FailedPost | null>(null);
+  
   const panelRef = useRef<any>(null);
+  const nextRuleRef = useRef<any>(null); // ინახავს შემდეგი წესის ინფოს
 
-  const fetchLastPostTime = async () => {
-    // ✅ წაშლილია 'error', რადგან არ გამოიყენება
-    const { data } = await supabase
+  // ✅ იღებს ბოლო წარმატებულ პოსტს და შემდეგ წესს
+  const fetchTimelineData = async () => {
+    // 1. ბოლო წარმატებული პოსტი
+    const { data: lastPostData } = await supabase
       .from('published_content')
-      .select('published_at')
+      .select('published_at, zodiac_sign, caption')
       .eq('content_type', 'post')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(1);
-    
-    if (data && data.length > 0) {
-      const date = new Date(data[0].published_at);
-      setLastPostTime(date.toLocaleString('ka-GE', { 
+
+    const lastPostDate = lastPostData && lastPostData.length > 0 
+      ? new Date(lastPostData[0].published_at) 
+      : null;
+
+    if (lastPostDate) {
+      setLastPostTime(lastPostDate.toLocaleString('ka-GE', { 
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
       }));
     } else {
       setLastPostTime('არ არის');
     }
-  };
 
-  const fetchNextPostTime = async () => {
-    const now = new Date();
-    const jsDay = now.getDay();
-    const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
-    const currentTimeStr = now.toTimeString().slice(0, 5);
-
-    const { data: rules, error } = await supabase
+    // 2. ყველა აქტიური post წესი, დალაგებული
+    const { data: rules } = await supabase
       .from('content_schedule')
-      .select('day_of_week, time')
+      .select('*')
       .eq('content_type', 'post')
       .eq('is_active', true)
       .order('day_of_week', { ascending: true })
       .order('time', { ascending: true });
 
-    if (error || !rules || rules.length === 0) {
+    if (!rules || rules.length === 0) {
       setNextPostTime('—');
+      nextRuleRef.current = null;
       return;
     }
 
-    const nextRule = rules.find((r: any) => {
-      if (r.day_of_week > currentDayIndex) return true;
-      if (r.day_of_week === currentDayIndex && r.time > currentTimeStr) return true;
-      return false;
-    });
+    // 3. ვპოულობთ პირველ წესს, რომლის დროც ბოლო პოსტის შემდეგაა
+    let nextRule: any = null;
+    
+    for (const rule of rules) {
+      const ruleDate = getRuleNextDate(rule.day_of_week, rule.time, lastPostDate);
+      if (ruleDate.getTime() > (lastPostDate?.getTime() || 0)) {
+        nextRule = { ...rule, nextDate: ruleDate };
+        break;
+      }
+    }
+
+    nextRuleRef.current = nextRule;
 
     if (nextRule) {
-      const dayNames = ["კვირა", "ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი"];
-      const targetDate = new Date(now);
-      const daysUntil = (nextRule.day_of_week - currentDayIndex + 7) % 7;
-      targetDate.setDate(now.getDate() + daysUntil);
+      const now = new Date();
+      const diffMs = nextRule.nextDate.getTime() - now.getTime();
       
-      const [hours, minutes] = nextRule.time.split(':').map(Number);
-      targetDate.setHours(hours, minutes, 0, 0);
-
-      const diffMs = targetDate.getTime() - now.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      if (diffHours > 24) {
-        setNextPostTime(`${dayNames[nextRule.day_of_week]} ${nextRule.time}`);
-      } else if (diffHours > 0) {
-        setNextPostTime(`${diffHours}სთ ${diffMinutes}წთ-ში`);
+      if (diffMs <= 0) {
+        setNextPostTime('ახლავე');
       } else {
-        setNextPostTime(`${diffMinutes} წუთში`);
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (diffHours >= 24) {
+          const dayName = DAY_NAMES[nextRule.day_of_week];
+          const [h, m] = nextRule.time.split(':');
+          setNextPostTime(`${dayName} ${h}:${m}`);
+        } else if (diffHours > 0) {
+          setNextPostTime(`${diffHours}სთ ${diffMinutes}წთ-ში`);
+        } else {
+          setNextPostTime(`${diffMinutes} წუთში`);
+        }
       }
     } else {
       setNextPostTime('—');
     }
   };
 
+  // ✅ ითვლის წესის უახლოეს მომავალ თარიღს
+  const getRuleNextDate = (dayOfWeek: number, timeStr: string, afterDate: Date | null): Date => {
+    const now = afterDate || new Date();
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    
+    // ვიპოვით უახლოეს დღეს, რომელიც ემთხვევა dayOfWeek-ს
+    let targetDate = new Date(now);
+    targetDate.setHours(hours, minutes, 0, 0);
+    
+    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0=ორშაბათი, 6=კვირა
+    let daysUntil = (dayOfWeek - currentDayOfWeek + 7) % 7;
+    
+    targetDate.setDate(now.getDate() + daysUntil);
+    
+    // თუ ეს თარიღი წარსულშია (დრო უკვე გასულია), ვამატებთ 7 დღეს
+    if (targetDate.getTime() <= (afterDate?.getTime() || 0)) {
+      targetDate.setDate(targetDate.getDate() + 7);
+    }
+    
+    return targetDate;
+  };
+
+  const fetchFailedPosts = async () => {
+    const { data } = await supabase
+      .from('published_content')
+      .select('*')
+      .eq('content_type', 'post')
+      .eq('status', 'failed')
+      .order('published_at', { ascending: false })
+      .limit(10);
+    
+    if (data) {
+      setFailedPosts(data as FailedPost[]);
+    }
+  };
+
   useEffect(() => {
-    fetchLastPostTime();
-    fetchNextPostTime();
+    fetchTimelineData();
+    fetchFailedPosts();
 
     try {
       const savedStatuses = localStorage.getItem('agent_statuses');
@@ -306,23 +373,33 @@ export default function AgentsPage() {
     return ALL_ZODIAC_SIGNS[randomIndex];
   };
 
+  // ✅ ახალი ლოგიკა: ვამოწმებთ შემდეგ წესს ბოლო პოსტის მიხედვით
   const checkAndRunPostAgent = async (forceRun: boolean = false) => {
     if (isChecking) return;
     setIsChecking(true);
     addAgentLog("🔍 ვამოწმებ Master Schedule-ს...");
 
     try {
-      const now = new Date();
-      const jsDay = now.getDay();
-      const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
-      const currentTimeStr = now.toTimeString().slice(0, 5);
+      // 1. ვიღებთ ბოლო წარმატებულ პოსტს
+      const { data: lastPostData } = await supabase
+        .from('published_content')
+        .select('published_at')
+        .eq('content_type', 'post')
+        .eq('status', 'published')
+        .order('published_at', { ascending: false })
+        .limit(1);
 
+      const lastPostDate = lastPostData && lastPostData.length > 0 
+        ? new Date(lastPostData[0].published_at) 
+        : null;
+
+      // 2. ვიღებთ ყველა წესს
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
         .eq('content_type', 'post')
         .eq('is_active', true)
-        .eq('day_of_week', currentDayIndex)
+        .order('day_of_week', { ascending: true })
         .order('time', { ascending: true });
 
       if (error) {
@@ -332,59 +409,59 @@ export default function AgentsPage() {
       }
 
       if (!rules || rules.length === 0) {
-        addAgentLog(`⚠️ დღეს (${currentDayIndex}-ე დღე) post ტიპის წესი არ არის.`);
+        addAgentLog(`⚠️ post ტიპის წესი საერთოდ არ არის.`);
         setIsChecking(false);
         return;
       }
 
-      const matchingRule = rules.find((r: any) => forceRun || r.time <= currentTimeStr);
+      // 3. ვპოულობთ შემდეგ წესს ბოლო პოსტის შემდეგ
+      let nextRule: any = null;
+      for (const rule of rules) {
+        const ruleDate = getRuleNextDate(rule.day_of_week, rule.time, lastPostDate);
+        if (ruleDate.getTime() > (lastPostDate?.getTime() || 0)) {
+          nextRule = { ...rule, nextDate: ruleDate };
+          break;
+        }
+      }
 
-      if (!matchingRule) {
-        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
+      if (!nextRule) {
+        addAgentLog(`️ შემდეგი წესი ვერ მოიძებნა.`);
         setIsChecking(false);
         return;
       }
 
-      addAgentLog(`📋 ნაპოვნია დროისთვის შესაფერისი წესი: ${matchingRule.time} - ${matchingRule.content_theme || 'AI will generate theme'}`);
-      addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
+      const now = new Date();
+      const dayName = DAY_NAMES[nextRule.day_of_week];
+      addAgentLog(`📋 შემდეგი წესი: ${dayName} ${nextRule.time} - ${nextRule.content_theme || 'AI will generate theme'}`);
+      addAgentLog(` მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
 
-      const today = now.toISOString().split('T')[0];
-      const { data: published, error: pubError } = await supabase
-        .from('published_content')
-        .select('id')
-        .eq('content_type', 'post')
-        .eq('status', 'published') 
-        .gte('published_at', `${today}T00:00:00`)
-        .limit(1);
+      // 4. ვამოწმებთ: არის თუ არა ამ წესის დრო უკვე მოსული?
+      const isTimeReached = nextRule.nextDate.getTime() <= now.getTime();
 
-      if (pubError) {
-        addAgentLog(`⚠️ შეცდომა შემოწმებისას: ${pubError.message}`);
+      if (!isTimeReached && !forceRun) {
+        const diffMs = nextRule.nextDate.getTime() - now.getTime();
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+        addAgentLog(`⏳ დრო ჯერ არ მოსულა. დარჩენილია: ${diffMinutes} წუთი`);
         setIsChecking(false);
         return;
       }
 
-      if (published && published.length > 0) {
-        addAgentLog("✅ დღევანდელი პოსტი უკვე წარმატებით გამოქვეყნებულია. ვტოვებ.");
-        setIsChecking(false);
-        return;
-      }
-
-      const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
+      // 5. ვრთავთ აგენტს
+      const zodiacToPost = chooseSmartZodiac(nextRule.zodiac_sign);
       addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
         const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
         if (success) {
-          addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          addAgentLog(" PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
-          fetchLastPostTime();
-          fetchNextPostTime();
+          fetchTimelineData();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
       } else {
-        addAgentLog("⚠️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
+        addAgentLog("️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
       }
 
     } catch (error) {
@@ -408,6 +485,11 @@ export default function AgentsPage() {
       
       return newAgents;
     });
+  };
+
+  const openFailedPostDetails = (post: FailedPost) => {
+    setSelectedFailedPost(post);
+    setShowFailedModal(true);
   };
 
   const activeAgentsCount = agents.filter(a => a.status === 'active').length;
@@ -545,6 +627,32 @@ export default function AgentsPage() {
               </div>
             </div>
 
+            {failedPosts.length > 0 && (
+              <div className="stat-card rounded-2xl border border-[var(--rose)]/30 p-5">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--rose)] mb-3 flex items-center gap-2">
+                  <span>{Icons.alert}</span>
+                  Failed Posts ({failedPosts.length})
+                </h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                  {failedPosts.map((post) => (
+                    <button
+                      key={post.id}
+                      onClick={() => openFailedPostDetails(post)}
+                      className="w-full text-left rounded-lg border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-2.5 transition-colors hover:bg-[var(--rose)]/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-[var(--moon)]">
+                          {post.zodiac_sign || 'Unknown'} · {new Date(post.published_at).toLocaleString('ka-GE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[10px] text-[var(--rose)]">View Details →</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--mute)] truncate">{post.error_message || 'Unknown error'}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
@@ -579,10 +687,87 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/15 bg-gradient-to-r from-[var(--violet)]/[.07] via-transparent to-[var(--rose)]/[.04] p-5 text-center shadow-[0_14px_35px_rgba(0,0,0,.12)]">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
+
+      {showFailedModal && selectedFailedPost && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowFailedModal(false)}>
+          <div className="w-full max-w-2xl rounded-3xl border border-[var(--rose)]/30 bg-[var(--ink-2)]/98 p-6 shadow-[0_35px_100px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--rose)]/20 text-[var(--rose)]">
+                  {Icons.alert}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Failed Post Details</h3>
+                  <p className="text-xs text-[var(--mute)]">
+                    {new Date(selectedFailedPost.published_at).toLocaleString('ka-GE')}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowFailedModal(false)} className="rounded-full p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--rose)]">
+                  Error Message
+                </label>
+                <div className="rounded-xl border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-4">
+                  <p className="text-sm text-[var(--moon)] whitespace-pre-wrap">
+                    {selectedFailedPost.error_message || 'No error message available'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--mute)]">
+                    Zodiac Sign
+                  </label>
+                  <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-3">
+                    <p className="text-sm text-[var(--moon)]">{selectedFailedPost.zodiac_sign || 'Not specified'}</p>
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--mute)]">
+                    Content Type
+                  </label>
+                  <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-3">
+                    <p className="text-sm text-[var(--moon)] capitalize">{selectedFailedPost.content_type}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--mute)]">
+                  Caption
+                </label>
+                <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-3">
+                  <p className="text-sm text-[var(--moon)] whitespace-pre-wrap">
+                    {selectedFailedPost.caption || 'No caption'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3 border-t border-[var(--line)] pt-4">
+              <button
+                onClick={() => setShowFailedModal(false)}
+                className="flex-1 rounded-xl border border-[var(--line-2)] bg-white/[.025] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showConfigModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowConfigModal(false)}>
