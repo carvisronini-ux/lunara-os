@@ -9,19 +9,17 @@ export interface HoroscopeGenerationResult {
 
 export async function generateHoroscopeContent(
   zodiacName: string,
-  period: 'daily' | 'weekly'
+  period: 'daily' | 'weekly',
+  config?: any
 ): Promise<HoroscopeGenerationResult> {
   
-  // 1. Wait for CredentialVault to load data from DB
   await credentialVault.ready;
 
-  // 2. Request both key and recommended model from smart vault
   const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
 
   console.log('[AI Generator] 🔑 Key found in Vault:', !!vaultApiKey);
   console.log('[AI Generator] 🎯 Recommended model from Vault:', recommendedModel || 'Not specified (Fallback will be used)');
 
-  // 3. Fallback: If not in Vault, try reading from .env
   let finalApiKey: string | null = vaultApiKey;
   if (!finalApiKey) {
     console.log('[AI Generator] ⚠️ Vault not found. Falling back to .env.');
@@ -32,12 +30,10 @@ export async function generateHoroscopeContent(
     throw new Error('GROQ API Key not found. Please check CredentialVault or .env file.');
   }
 
-  // 4. Use Vault's recommended model
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
   const periodText = period === 'daily' ? 'daily' : 'weekly';
 
-  // ✅ Prompt optimized for WARM, EMOTIONAL, and ALIVE tone (No hardcore/robotic text)
-  const systemPrompt = `You are a warm, engaging, and mystical astrologer and Instagram copywriter for LUNARA OS.
+  let systemPrompt = `You are a warm, engaging, and mystical astrologer and Instagram copywriter for LUNARA OS.
 Generate a ${periodText} horoscope post in ENGLISH. The tone must be alive, emotional, uplifting, and deeply personal. NEVER use robotic, hardcore, dry, or generic language.
 
 STRICT VISUAL LAYOUT RULES (DO NOT BREAK):
@@ -52,6 +48,20 @@ Return ONLY valid JSON in this exact format:
   "hashtags": ["#LUNARA", "#${zodiacName}", "#Astrology", "#Horoscope", "#Zodiac"]
 }`;
 
+  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას, თუ ის არსებობს
+  if (config) {
+    systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
+
+--- THINKING STYLE ---
+${config.thinking_style || ''}
+
+--- SKILLS & CONSTRAINTS ---
+${config.skills_constraints || ''}
+
+--- SPECIFIC TASK FOR THIS GENERATION ---
+${systemPrompt}`;
+  }
+
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -63,7 +73,7 @@ Return ONLY valid JSON in this exact format:
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
         response_format: { type: 'json_object' },
-        temperature: 0.8, // Slightly higher for more creative, emotional language
+        temperature: 0.8,
       })
     });
 
@@ -92,8 +102,8 @@ Return ONLY valid JSON in this exact format:
   }
 }
 
-// ✅ New function: Generate ONLY the viral, emotional Text 1 hook
-export async function generateViralText1(zodiacName: string): Promise<string> {
+// ✅ განახლებული: იღებს config-ს და აერთიანებს მას პრომპტთან
+export async function generateViralText1(zodiacName: string, config?: any): Promise<string> {
   await credentialVault.ready;
 
   const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
@@ -109,8 +119,7 @@ export async function generateViralText1(zodiacName: string): Promise<string> {
 
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
 
-  // ✅ Prompt optimized for ALIVE, MYSTICAL, and EMOTIONAL hooks
-  const systemPrompt = `You are a warm, engaging, and mystical Instagram copywriter for LUNARA OS.
+  const basePrompt = `You are a warm, engaging, and mystical Instagram copywriter for LUNARA OS.
 Generate a SHORT, ALIVE, EMOTIONAL, and INTRIGUING hook or question for a horoscope post about ${zodiacName}.
 It should feel personal, cosmic, and seamlessly lead into the zodiac name (which will be displayed right below it visually).
 
@@ -128,6 +137,22 @@ STRICT RULES:
 4. DO NOT include punctuation at the end (no period, no question mark).
 5. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown. Keep it warm and alive, never robotic or hardcore.`;
 
+  let systemPrompt = basePrompt;
+  
+  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას
+  if (config) {
+    systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
+
+--- THINKING STYLE ---
+${config.thinking_style || ''}
+
+--- SKILLS & CONSTRAINTS ---
+${config.skills_constraints || ''}
+
+--- SPECIFIC TASK FOR THIS GENERATION ---
+${basePrompt}`;
+  }
+
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -138,7 +163,7 @@ STRICT RULES:
       body: JSON.stringify({
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
-        temperature: 0.9, // High temperature for maximum creativity and emotion
+        temperature: 0.9,
       })
     });
 
@@ -150,7 +175,6 @@ STRICT RULES:
     const data = await response.json();
     let content = data.choices[0].message.content?.trim();
 
-    // Cleanup: remove any quotes or markdown if the model adds them
     if (content) {
       content = content.replace(/^["']|["']$/g, '').replace(/^`+|`+$/g, '').trim();
     }
@@ -166,8 +190,8 @@ STRICT RULES:
   }
 }
 
-// ✅ New function: Generate Text 2 (meaningful forecast) that answers/flows from Text 1 WITHOUT repeating it
-export async function generateHoroscopeText2(zodiacName: string, text1Hook: string): Promise<string> {
+// ✅ განახლებული: იღებს config-ს და აერთიანებს მას პრომპტთან
+export async function generateHoroscopeText2(zodiacName: string, text1Hook: string, config?: any): Promise<string> {
   await credentialVault.ready;
 
   const { apiKey: vaultApiKey, recommendedModel } = credentialVault.getCredentialDetailsByProvider('groq');
@@ -183,8 +207,7 @@ export async function generateHoroscopeText2(zodiacName: string, text1Hook: stri
 
   const modelToUse = recommendedModel || 'llama-3.3-70b-versatile';
 
-  // ✅ Prompt optimized to create a meaningful, emotional response to Text 1 WITHOUT repeating it
-  const systemPrompt = `You are a warm, engaging, and mystical astrologer for LUNARA OS.
+  const basePrompt = `You are a warm, engaging, and mystical astrologer for LUNARA OS.
 Your task is to write a SHORT, MEANINGFUL, and EMOTIONAL horoscope forecast for ${zodiacName}.
 
 CONTEXT: The post starts with this hook: "${text1Hook || 'the stars'}"
@@ -205,6 +228,22 @@ STRICT RULES:
 4. DO NOT start with the hook. DO NOT include the hook anywhere in your response.
 5. Return ONLY the raw text string. NO JSON, NO quotes, NO markdown, NO hashtags here.`;
 
+  let systemPrompt = basePrompt;
+
+  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას
+  if (config) {
+    systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
+
+--- THINKING STYLE ---
+${config.thinking_style || ''}
+
+--- SKILLS & CONSTRAINTS ---
+${config.skills_constraints || ''}
+
+--- SPECIFIC TASK FOR THIS GENERATION ---
+${basePrompt}`;
+  }
+
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -215,7 +254,7 @@ STRICT RULES:
       body: JSON.stringify({
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
-        temperature: 0.85, // Slightly higher for creativity and emotion
+        temperature: 0.85,
       })
     });
 
@@ -227,7 +266,6 @@ STRICT RULES:
     const data = await response.json();
     let content = data.choices[0].message.content?.trim();
 
-    // Cleanup: remove any quotes or markdown if the model adds them
     if (content) {
       content = content.replace(/^["']|["']$/g, '').replace(/^`+|`+$/g, '').trim();
     }

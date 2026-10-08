@@ -179,13 +179,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const handleFormatSelect = (format: PostFormat) => { setSelectedFormat(format); addLog(`✅ Format selected: ${format}`); setStep("preview"); };
 
-  const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0]) => {
+  // ✅ განახლებული: იღებს config-ს პარამეტრად და გადასცემს AI გენერატორს
+  const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText1(true);
     addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`);
     try {
-      const generatedText = await generateViralText1(targetZodiac.name);
+      const generatedText = await generateViralText1(targetZodiac.name, config);
       setText1(generatedText);
       addLog(`✅ მიიღო Text 1: "${generatedText}" (სიგრძე: ${generatedText.length})`);
       setIsGeneratingText1(false);
@@ -197,14 +198,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string) => {
+  // ✅ განახლებული: იღებს config-ს პარამეტრად და გადასცემს AI გენერატორს
+  const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string, config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
     setIsGeneratingText2(true);
     addLog(`⏳ ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`);
     try {
-      const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1);
+      const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1, config);
       let cleanedText = generatedText;
       if (targetText1 && targetText1.trim().length > 0) {
         const text1Lower = targetText1.toLowerCase().trim();
@@ -401,7 +403,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         setIsPublishing(false);
         return true;
       } else {
-        // ✅ ახალი: წარუმატებლობის ჩაწერა ბაზაში, რათა აგენტმა ხელახლა სცადოს
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`);
         if (data.details) {
           addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
@@ -434,6 +435,20 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
       if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
 
+      // ✅ ახალი: კონფიგურაციის წაკითხვა ბაზიდან გენერაციის დაწყებამდე
+      addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...");
+      const { data: config, error: configError } = await supabase
+        .from('agent_config')
+        .select('master_prompt, thinking_style, skills_constraints')
+        .eq('agent_type', 'post')
+        .single();
+
+      if (configError || !config) {
+        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`);
+      } else {
+        addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!");
+      }
+
       setInputValue(zodiacName);
       setSelectedZodiac(zodiac);
       setStep("format");
@@ -444,12 +459,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...");
-      const t1 = await handleGenerateText1(zodiac);
+      // ✅ გადავცემთ config-ს გენერატორს
+      const t1 = await handleGenerateText1(zodiac, config);
       if (!t1) return false;
       await new Promise(r => setTimeout(r, 1500));
       
       addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...");
-      const t2 = await handleGenerateText2(zodiac, t1);
+      // ✅ გადავცემთ config-ს გენერატორს
+      const t2 = await handleGenerateText2(zodiac, t1, config);
       if (!t2) return false;
       await new Promise(r => setTimeout(r, 1500));
 
