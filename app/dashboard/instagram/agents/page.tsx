@@ -42,7 +42,6 @@ const STYLES = `
 @media(max-width:640px){.agents-root .mobile-tight{padding:16px!important}}
 `;
 
-
 const Icons = {
   back: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

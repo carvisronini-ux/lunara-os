@@ -12,29 +12,42 @@ const supabase = createClient(
 const STYLES = `
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 .ig-root{
-  --ink:#0b0d1c; --ink-2:#12152b; --ink-3:#1a1e3a;
-  --line:rgba(236,233,247,.1); --line-2:rgba(236,233,247,.18);
-  --moon:#ece9f7; --mute:#9d9bbd; --violet:#9b8cff; --rose:#ff7aa8; --amber:#f6c177; --ok:#5fd6a4;
+  --ink:#080914; --ink-2:#101224; --ink-3:#171a31; --ink-4:#1d2140;
+  --line:rgba(236,233,247,.09); --line-2:rgba(236,233,247,.16);
+  --moon:#f4f1fb; --mute:#9897b6; --violet:#9b8cff; --violet-2:#7668f4;
+  --rose:#ff7aa8; --amber:#f6c177; --ok:#5fd6a4;
   font-family:"Bricolage Grotesque","Noto Sans Georgian",system-ui,sans-serif;
-  background:var(--ink); color:var(--moon);
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(155,140,255,.11), transparent 60%),
+    radial-gradient(700px 420px at 92% 8%, rgba(255,122,168,.06), transparent 58%),
+    var(--ink);
+  color:var(--moon);
   color-scheme:dark;
 }
 .ig-root .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
-.ig-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+.ig-root *{box-sizing:border-box}
+.ig-root *:focus-visible{outline:2px solid var(--violet); outline-offset:3px; border-radius:10px}
 .ig-scroll{scrollbar-width:none}
 .ig-scroll::-webkit-scrollbar{display:none}
+.ig-root select option{background:#101224;color:#f4f1fb}
+.ig-root input::selection,.ig-root textarea::selection{background:rgba(155,140,255,.3)}
 @keyframes ig-pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(155, 140, 255, 0.28); }
-  50% { box-shadow: 0 0 22px 2px rgba(155, 140, 255, 0.14); }
+  0%,100% { box-shadow:0 0 0 0 rgba(155,140,255,0); }
+  50% { box-shadow:0 0 30px 2px rgba(155,140,255,.11); }
 }
-.ig-today-glow { animation: ig-pulse-glow 3s ease-in-out infinite; }
-@keyframes ig-pop{from{opacity:0; transform:translateY(6px) scale(.98)} to{opacity:1; transform:none}}
-.ig-pop{animation:ig-pop .16s ease-out}
-@keyframes ig-shimmer{0%{opacity:.5} 50%{opacity:1} 100%{opacity:.5}}
-.ig-skeleton{animation:ig-shimmer 1.4s ease-in-out infinite}
+.ig-today-glow{animation:ig-pulse-glow 4s ease-in-out infinite}
+@keyframes ig-pop{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+.ig-pop{animation:ig-pop .18s cubic-bezier(.22,1,.36,1)}
+@keyframes ig-shimmer{0%,100%{opacity:.45}50%{opacity:.9}}
+.ig-skeleton{animation:ig-shimmer 1.5s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){
   .ig-today-glow,.ig-pop,.ig-skeleton{animation:none}
   .ig-root *{transition:none !important}
+}
+@media (max-width:640px){
+  .ig-root{background:
+    radial-gradient(600px 360px at 10% -8%,rgba(155,140,255,.10),transparent 60%),
+    var(--ink)}
 }
 `;
 
@@ -75,7 +88,6 @@ const ZODIAC_OPTIONS = [
   { value: 'PISCES', label: '♓ Pisces', color: 'text-[#b3a8ff]' },
 ];
 
-// ✅ ყველა ზოდიაქოს სია ტექსტში საძიებლად
 const ALL_ZODIAC_SIGNS = ['ARIES', 'TAURUS', 'GEMINI', 'CANCER', 'LEO', 'VIRGO', 'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'];
 
 const TYPE_COLORS: Record<string, string> = {
@@ -122,7 +134,7 @@ const formatTime = (time: string): string => {
   return time;
 };
 
-const inputClass = "w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-3.5 py-2.5 text-sm outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
+const inputClass = "w-full rounded-xl border border-[var(--line-2)] bg-[#080914] px-3.5 py-2.5 text-sm shadow-inner outline-none transition-colors placeholder:text-[#9d9bbd]/60 focus:border-[var(--violet)]";
 const labelClass = "mb-1.5 block text-xs font-medium text-[var(--mute)]";
 
 export default function MasterSchedulePage() {
@@ -223,21 +235,16 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ჭკვიანი ლოგიკა: ტექსტში ვეძებთ ნებისმიერ ზოდიაქოს და ვცვლით ახალი არჩევანით
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
     setSavingZodiac(ruleId);
     const currentRule = schedule.find(r => r.id === ruleId);
     let newTheme = currentRule?.content_theme || "";
 
     if (newZodiac) {
-      // ვქმნით რეგულარულ გამოსახულებას, რომელიც ეძებს ნებისმიერ ზოდიაქოს მთლიანად როგორც სიტყვას (\b), დამოუკიდებლად რეგისტრისგან (gi)
       const zodiacRegex = new RegExp(`\\b(${ALL_ZODIAC_SIGNS.join('|')})\\b`, 'gi');
-      
-      // თუ ტექსტში ნაპოვნია რაიმე ზოდიაქო, ვცვლით მას ახალით
       if (zodiacRegex.test(newTheme)) {
         newTheme = newTheme.replace(zodiacRegex, newZodiac);
       } else {
-        // უკიდურესი შემთხვევა: თუ ტექსტში საერთოდ არ არის ზოდიაქოს სახელი, პირველ სიტყვას ვცვლით (უსაფრთხოებისთვის)
         const words = newTheme.split(' ');
         if (words.length > 0) {
           words[0] = newZodiac;
@@ -248,10 +255,7 @@ export default function MasterSchedulePage() {
 
     const { data, error } = await supabase
       .from("content_schedule")
-      .update({ 
-        zodiac_sign: newZodiac,
-        content_theme: newTheme 
-      })
+      .update({ zodiac_sign: newZodiac, content_theme: newTheme })
       .eq("id", ruleId)
       .select();
 
@@ -284,7 +288,7 @@ export default function MasterSchedulePage() {
         time: rule.time,
         content_type: rule.content_type,
         zodiac_sign: rule.zodiac_sign || "",
-        content_theme: rule.content_theme,
+        content_theme: rule.content_theme || "",
         goal: rule.goal,
       });
     } else {
@@ -296,17 +300,32 @@ export default function MasterSchedulePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // ✅ თუ ველი ცარიელია ან მხოლოდ ჰარებს შეიცავს, ვინახავთ როგორც null-ს
+    const themeToSave = formData.content_theme.trim() === '' ? null : formData.content_theme;
+
     if (editingRule) {
-      const { error } = await supabase.from("content_schedule").update({ ...formData, zodiac_sign: formData.zodiac_sign || null }).eq("id", editingRule.id);
+      const { error } = await supabase.from("content_schedule").update({ 
+        ...formData, 
+        zodiac_sign: formData.zodiac_sign || null,
+        content_theme: themeToSave
+      }).eq("id", editingRule.id);
+      
       if (!error) {
-        setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null } : rule).sort((a, b) => {
+        setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null, content_theme: themeToSave } : rule).sort((a, b) => {
           if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
           return formatTime(a.time).localeCompare(formatTime(b.time));
         }));
         setShowModal(false);
       }
     } else {
-      const { data, error } = await supabase.from("content_schedule").insert([{ ...formData, zodiac_sign: formData.zodiac_sign || null, is_active: true }]).select();
+      const { data, error } = await supabase.from("content_schedule").insert([{ 
+        ...formData, 
+        zodiac_sign: formData.zodiac_sign || null, 
+        content_theme: themeToSave,
+        is_active: true 
+      }]).select();
+      
       if (!error && data) {
         setSchedule((prev) => [...prev, data[0]].sort((a, b) => {
           if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
@@ -331,8 +350,8 @@ export default function MasterSchedulePage() {
     <div className="ig-root min-h-screen">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3.5 lg:px-8">
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#080914]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
             <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
               {Icons.back} <span className="hidden sm:inline">Back</span>
@@ -342,36 +361,36 @@ export default function MasterSchedulePage() {
               <p className="hidden truncate text-xs text-[var(--mute)] sm:block">Manage and edit your automated posting rules</p>
             </div>
           </div>
-          <button onClick={() => openModal()} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+          <button onClick={() => openModal()} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold shadow-[0_8px_30px_rgba(155,140,255,.18)] text-[var(--ink)] transition-opacity hover:opacity-90">
             {Icons.plus} Add Rule
           </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-7 lg:px-8 lg:py-10">
         {loading ? (
           <div className="space-y-4" aria-busy="true" aria-label="Loading schedule">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {[0, 1, 2].map(i => <div key={i} className="ig-skeleton h-24 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" />)}
+              {[0, 1, 2].map(i => <div key={i} className="ig-skeleton h-24 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]/90 shadow-[0_14px_45px_rgba(0,0,0,.14)]" />)}
             </div>
-            {[0, 1].map(i => <div key={i} className="ig-skeleton h-44 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" />)}
+            {[0, 1].map(i => <div key={i} className="ig-skeleton h-44 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]/90 shadow-[0_14px_45px_rgba(0,0,0,.14)]" />)}
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]/90 p-5 shadow-[0_14px_40px_rgba(0,0,0,.16)]">
                 <p className="text-xs font-medium text-[var(--mute)]">Active rules</p>
                 <p className="mono mt-1.5 text-3xl font-medium leading-none">{activeRulesCount}<span className="ml-1.5 text-sm text-[var(--mute)]">/ {schedule.length}</span></p>
                 <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/10">
                   <div className="h-full rounded-full bg-[var(--ok)] transition-all duration-500" style={{ width: `${schedule.length ? (activeRulesCount / schedule.length) * 100 : 0}%` }} />
                 </div>
               </div>
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+              <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]/90 p-5 shadow-[0_14px_40px_rgba(0,0,0,.16)]">
                 <p className="text-xs font-medium text-[var(--mute)]">Weekly output</p>
                 <p className="mono mt-1.5 text-3xl font-medium leading-none">{schedule.length}<span className="ml-1.5 text-sm text-[var(--mute)]">items</span></p>
                 <p className="mt-3 text-xs text-[var(--mute)]">Across {DAYS_OF_WEEK.filter((_, i) => schedule.some(r => r.day_of_week === i)).length} days</p>
               </div>
-              <div className="rounded-2xl border border-[#9b8cff]/35 bg-[#9b8cff]/[0.07] p-4">
+              <div className="rounded-2xl border border-[#9b8cff]/30 bg-gradient-to-br from-[#9b8cff]/[0.10] to-transparent p-5 shadow-[0_14px_40px_rgba(90,75,180,.10)]">
                 <p className="text-xs font-medium text-[#b3a8ff]">Current time</p>
                 <p className="mono mt-1.5 text-3xl font-medium leading-none text-[#b3a8ff]">{formattedNow}</p>
                 <p className="mt-3 text-xs text-[var(--moon)]/80">{formattedDate}</p>
@@ -379,8 +398,8 @@ export default function MasterSchedulePage() {
             </div>
 
             {publishedToday.length > 0 && (
-              <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]" aria-label="Published today">
-                <div className="flex items-center justify-between rounded-t-2xl border-b border-[var(--line)] bg-[#1a1e3a]/50 px-4 py-3">
+              <section className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)]/90 shadow-[0_14px_45px_rgba(0,0,0,.14)]" aria-label="Published today">
+                <div className="flex items-center justify-between rounded-t-2xl border-b border-[var(--line)] bg-white/[0.025] px-5 py-3.5">
                   <h3 className="flex items-center gap-2 text-sm font-semibold">
                     <span className="h-2 w-2 rounded-full bg-[var(--ok)]" />
                     Published today
@@ -394,7 +413,7 @@ export default function MasterSchedulePage() {
                   {publishedToday.map(p => {
                     const publishStyle = PUBLISH_STATUS_STYLES[p.status];
                     return (
-                      <div key={p.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]">
+                      <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-white/[0.025]">
                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${publishStyle.bg} ${publishStyle.border} ${publishStyle.text}`}>
                           {publishStyle.icon}
                         </div>
@@ -437,7 +456,7 @@ export default function MasterSchedulePage() {
               <div className="rounded-3xl border border-dashed border-[var(--line-2)] px-6 py-16 text-center">
                 <p className="font-semibold">No schedule rules yet</p>
                 <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--mute)]">Create your first rule to start automated posting.</p>
-                <button onClick={() => openModal()} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
+                <button onClick={() => openModal()} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold shadow-[0_8px_30px_rgba(155,140,255,.18)] text-[var(--ink)] transition-opacity hover:opacity-90">
                   {Icons.plus} Add Rule
                 </button>
               </div>
@@ -450,8 +469,8 @@ export default function MasterSchedulePage() {
                 const isToday = index === currentDayIndex;
 
                 return (
-                  <section key={day} id={`day-${index}`} className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}>
-                    <div className={`flex items-center justify-between rounded-t-2xl border-b px-4 py-3 ${isToday ? "border-[#9b8cff]/30 bg-[#9b8cff]/10" : "border-[var(--line)] bg-[#1a1e3a]/50"}`}>
+                  <section key={day} id={`day-${index}`} className={`scroll-mt-24 rounded-2xl border transition-all shadow-[0_14px_45px_rgba(0,0,0,.12)] ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}>
+                    <div className={`flex items-center justify-between rounded-t-2xl border-b px-5 py-3.5 ${isToday ? "border-[#9b8cff]/30 bg-[#9b8cff]/10" : "border-[var(--line)] bg-white/[0.025]"}`}>
                       <div className="flex items-center gap-2.5">
                         <h3 className="text-sm font-semibold">{day}</h3>
                         {isToday && <span className="rounded-full bg-[var(--violet)] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[var(--ink)]">TODAY</span>}
@@ -483,7 +502,10 @@ export default function MasterSchedulePage() {
                                   {rule.content_type.charAt(0).toUpperCase() + rule.content_type.slice(1)}
                                   {rule.zodiac_sign && <span className="ml-2 font-normal text-[#b3a8ff]">· {rule.zodiac_sign}</span>}
                                 </p>
-                                <p className="truncate text-xs text-[var(--mute)]">{rule.content_theme}</p>
+                                {/* ✅ თუ თემა ცარიელია, ვაჩვენებთ შესაბამის შეტყობინებას */}
+                                <p className="truncate text-xs text-[var(--mute)] italic">
+                                  {rule.content_theme || "AI will generate theme"}
+                                </p>
                               </div>
                             </div>
 
@@ -591,7 +613,7 @@ export default function MasterSchedulePage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={() => setShowModal(false)}>
-          <div role="dialog" aria-modal="true" aria-label={editingRule ? "Edit schedule rule" : "Add schedule rule"} className="ig-pop max-h-[92vh] w-full max-w-md overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-label={editingRule ? "Edit schedule rule" : "Add schedule rule"} className="ig-pop max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-7 shadow-[0_30px_100px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-lg font-semibold">{editingRule ? "Edit Schedule Rule" : "Add New Schedule Rule"}</h3>
               <button type="button" onClick={() => setShowModal(false)} aria-label="Close" className="rounded-full p-1.5 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.x}</button>
@@ -640,7 +662,15 @@ export default function MasterSchedulePage() {
               </div>
               <div>
                 <label htmlFor="rule-theme" className={labelClass}>Content theme</label>
-                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="მაგ: SCORPIO & სიყვარული: მითი vs რეალობა" className={inputClass} required />
+                <input 
+                  id="rule-theme" 
+                  type="text" 
+                  value={formData.content_theme} 
+                  onChange={(e) => setFormData({...formData, content_theme: e.target.value})} 
+                  placeholder="დატოვე ცარიელი, რომ AI-მ თავად მოიფიქროს თემა" 
+                  className={inputClass} 
+                  // ✅ წაშლილია required ატრიბუტი
+                />
               </div>
               <div>
                 <label htmlFor="rule-goal" className={labelClass}>Primary goal</label>
