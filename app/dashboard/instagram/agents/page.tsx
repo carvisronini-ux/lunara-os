@@ -79,6 +79,16 @@ const Icons = {
       <path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>
     </svg>
   ),
+  clock: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  check: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
 };
 
 interface Agent {
@@ -119,6 +129,10 @@ export default function AgentsPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   
+  // ✅ ახალი სტეიტები ბანერისთვის
+  const [lastPostTime, setLastPostTime] = useState<string>('არ არის');
+  const [nextPostTime, setNextPostTime] = useState<string>('—');
+  
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('post');
   const [masterPrompt, setMasterPrompt] = useState('');
@@ -128,9 +142,84 @@ export default function AgentsPage() {
   
   const panelRef = useRef<any>(null);
 
+  // ✅ ბოლო პოსტის დროის წამოღება ბაზიდან
+  const fetchLastPostTime = async () => {
+    const { data, error } = await supabase
+      .from('published_content')
+      .select('published_at')
+      .eq('content_type', 'post')
+      .eq('status', 'published')
+      .order('published_at', { ascending: false })
+      .limit(1);
+    
+    if (data && data.length > 0) {
+      const date = new Date(data[0].published_at);
+      setLastPostTime(date.toLocaleString('ka-GE', { 
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+      }));
+    } else {
+      setLastPostTime('არ არის');
+    }
+  };
+
+  // ✅ შემდეგი პოსტის დროის გამოთვლა
+  const fetchNextPostTime = async () => {
+    const now = new Date();
+    const jsDay = now.getDay();
+    const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
+    const currentTimeStr = now.toTimeString().slice(0, 5);
+
+    // ვიღებთ ყველა აქტიურ post წესს, დალაგებულს დროის მიხედვით
+    const { data: rules, error } = await supabase
+      .from('content_schedule')
+      .select('day_of_week, time')
+      .eq('content_type', 'post')
+      .eq('is_active', true)
+      .order('day_of_week', { ascending: true })
+      .order('time', { ascending: true });
+
+    if (error || !rules || rules.length === 0) {
+      setNextPostTime('—');
+      return;
+    }
+
+    // ვეძებთ პირველ წესს, რომლის დროც ჯერ არ მოსულა
+    const nextRule = rules.find((r: any) => {
+      if (r.day_of_week > currentDayIndex) return true;
+      if (r.day_of_week === currentDayIndex && r.time > currentTimeStr) return true;
+      return false;
+    });
+
+    if (nextRule) {
+      const dayNames = ["კვირა", "ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი"];
+      const targetDate = new Date(now);
+      const daysUntil = (nextRule.day_of_week - currentDayIndex + 7) % 7;
+      targetDate.setDate(now.getDate() + daysUntil);
+      
+      const [hours, minutes] = nextRule.time.split(':').map(Number);
+      targetDate.setHours(hours, minutes, 0, 0);
+
+      const diffMs = targetDate.getTime() - now.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (diffHours > 24) {
+        setNextPostTime(`${dayNames[nextRule.day_of_week]} ${nextRule.time}`);
+      } else if (diffHours > 0) {
+        setNextPostTime(`${diffHours}სთ ${diffMinutes}წთ-ში`);
+      } else {
+        setNextPostTime(`${diffMinutes} წუთში`);
+      }
+    } else {
+      setNextPostTime('—');
+    }
+  };
+
   // ✅ ფონური ტაიმერი + localStorage-დან სტატუსების ჩატვირთვა
   useEffect(() => {
-    // 1. ვცდილობთ წავიკითხოთ შენახული სტატუსები
+    fetchLastPostTime();
+    fetchNextPostTime();
+
     try {
       const savedStatuses = localStorage.getItem('agent_statuses');
       if (savedStatuses) {
@@ -144,7 +233,6 @@ export default function AgentsPage() {
       console.error('Failed to load agent statuses', e);
     }
 
-    // 2. ვაყენებთ ტაიმერს
     const interval = setInterval(() => {
       setAgents(currentAgents => {
         const postAgent = currentAgents.find(a => a.id === 'post-agent');
@@ -223,7 +311,6 @@ export default function AgentsPage() {
     return ALL_ZODIAC_SIGNS[randomIndex];
   };
 
-  // ✅ განახლებული ლოგიკა: forceRun პარამეტრით
   const checkAndRunPostAgent = async (forceRun: boolean = false) => {
     if (isChecking) return;
     setIsChecking(true);
@@ -232,16 +319,15 @@ export default function AgentsPage() {
     try {
       const now = new Date();
       const jsDay = now.getDay();
-      const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1; // 0=Monday, 6=Sunday
-      const currentTimeStr = now.toTimeString().slice(0, 5); // "HH:MM" ფორმატში
+      const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
+      const currentTimeStr = now.toTimeString().slice(0, 5);
 
-      // 1. ვიღებთ მხოლოდ დღევანდელი დღის post წესებს
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
         .eq('content_type', 'post')
         .eq('is_active', true)
-        .eq('day_of_week', currentDayIndex) // მკაცრი შემოწმება: მხოლოდ დღევანდელი დღე
+        .eq('day_of_week', currentDayIndex)
         .order('time', { ascending: true });
 
       if (error) {
@@ -256,11 +342,10 @@ export default function AgentsPage() {
         return;
       }
 
-      // 2. ვეძებთ პირველ წესს, რომლის დროც უკვე მოვიდა (ან ვაიძულებთ forceRun-ით)
       const matchingRule = rules.find((r: any) => forceRun || r.time <= currentTimeStr);
 
       if (!matchingRule) {
-        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
+        addAgentLog(` დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
         setIsChecking(false);
         return;
       }
@@ -268,7 +353,6 @@ export default function AgentsPage() {
       addAgentLog(`📋 ნაპოვნია დროისთვის შესაფერისი წესი: ${matchingRule.time} - ${matchingRule.content_theme || 'AI will generate theme'}`);
       addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
 
-      // 3. ვამოწმებთ, დღეს უკვე გამოქვეყნდა თუ არა ეს კონკრეტული პოსტი
       const today = now.toISOString().split('T')[0];
       const { data: published, error: pubError } = await supabase
         .from('published_content')
@@ -290,16 +374,17 @@ export default function AgentsPage() {
         return;
       }
 
-      // 4. ვრთავთ აგენტს
       const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
-      addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
+      addAgentLog(` არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
         const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
         if (success) {
-          addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          addAgentLog(" PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
+          fetchLastPostTime();
+          fetchNextPostTime();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
@@ -314,7 +399,6 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ განახლებული toggleAgent: ინახავს localStorage-ში და აქვს სწორი TypeScript ტიპი
   const toggleAgent = (id: string) => {
     setAgents(prev => {
       const newAgents = prev.map(agent => 
@@ -323,7 +407,6 @@ export default function AgentsPage() {
           : agent
       );
       
-      // ვინახავთ ახალ სტატუსებს localStorage-ში
       const statusesToSave: Record<string, 'active' | 'inactive'> = {};
       newAgents.forEach(a => { statusesToSave[a.id] = a.status; });
       localStorage.setItem('agent_statuses', JSON.stringify(statusesToSave));
@@ -447,6 +530,27 @@ export default function AgentsPage() {
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            {/* ✅ ახალი ბანერი ბოლო და შემდეგი პოსტის დროით */}
+            <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mute)] mb-3">PostAgent Timeline</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[var(--ok)]">{Icons.check}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">ბოლო პოსტი</span>
+                  </div>
+                  <p className="text-sm font-medium text-[var(--moon)]">{lastPostTime}</p>
+                </div>
+                <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[var(--amber)]">{Icons.clock}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">შემდეგი პოსტი</span>
+                  </div>
+                  <p className="text-sm font-medium text-[var(--moon)]">{nextPostTime}</p>
+                </div>
+              </div>
+            </div>
+
             <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
@@ -481,7 +585,7 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/15 bg-gradient-to-r from-[var(--violet)]/[.07] via-transparent to-[var(--rose)]/[.04] p-5 text-center shadow-[0_14px_35px_rgba(0,0,0,.12)]">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
