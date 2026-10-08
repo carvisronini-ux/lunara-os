@@ -147,7 +147,6 @@ const ALL_ZODIAC_SIGNS = [
   'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
 ];
 
-// day_of_week: 0=ორშაბათი, 6=კვირა
 const DAY_NAMES = ["ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი", "კვირა"];
 
 export default function AgentsPage() {
@@ -156,7 +155,6 @@ export default function AgentsPage() {
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   
   const [lastPostTime, setLastPostTime] = useState<string>('არ არის');
-  const [nextPostTime, setNextPostTime] = useState<string>('—');
   const [nextPostInfo, setNextPostInfo] = useState<NextPostInfo | null>(null);
   
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -173,19 +171,17 @@ export default function AgentsPage() {
   const panelRef = useRef<any>(null);
   const nextRuleRef = useRef<any>(null);
 
-  // ✅ ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს
   const getNextOccurrence = (ruleDay: number, ruleTime: string, afterDate: Date): Date => {
     const [hours, minutes] = ruleTime.split(':').map(Number);
     const target = new Date(afterDate);
     target.setHours(hours, minutes, 0, 0);
 
-    const currentDayJs = afterDate.getDay(); // 0=კვირა, 1=ორშაბათი...
-    const currentDayCustom = currentDayJs === 0 ? 6 : currentDayJs - 1; // 0=ორშაბათი, 6=კვირა
+    const currentDayJs = afterDate.getDay();
+    const currentDayCustom = currentDayJs === 0 ? 6 : currentDayJs - 1;
     
     let daysToAdd = (ruleDay - currentDayCustom + 7) % 7;
     target.setDate(afterDate.getDate() + daysToAdd);
 
-    // თუ მიღებული დრო უკვე გასულია (ან ემთხვევა) afterDate-ს, გადავიდეთ მომავალ კვირაზე
     if (target.getTime() <= afterDate.getTime()) {
       target.setDate(target.getDate() + 7);
     }
@@ -193,7 +189,6 @@ export default function AgentsPage() {
     return target;
   };
 
-  // ✅ დარჩენილი დროის ფორმატირება
   const formatTimeRemaining = (diffMs: number): string => {
     if (diffMs <= 0) return 'ახლავე';
     
@@ -210,7 +205,6 @@ export default function AgentsPage() {
   };
 
   const fetchTimelineData = async () => {
-    // 1. ბოლო პოსტის მიღება მხოლოდ თარიღის საჩვენებლად
     const { data: lastPostData } = await supabase
       .from('published_content')
       .select('published_at')
@@ -237,13 +231,11 @@ export default function AgentsPage() {
       .order('time', { ascending: true });
 
     if (!rules || rules.length === 0) {
-      setNextPostTime('—');
       setNextPostInfo(null);
       nextRuleRef.current = null;
       return;
     }
 
-    // ✅ შემდეგი პოსტის საპოვნელად ვიყენებთ მიმდინარე დროს
     const now = new Date();
     let nextRule: any = null;
     let closestTime = Infinity;
@@ -265,14 +257,12 @@ export default function AgentsPage() {
       const diffMs = nextRule.nextDate.getTime() - now.getTime();
       const timeRemaining = formatTimeRemaining(diffMs);
       
-      setNextPostTime(timeRemaining);
       setNextPostInfo({
         rule: nextRule,
         nextDate: nextRule.nextDate,
         timeRemaining
       });
     } else {
-      setNextPostTime('—');
       setNextPostInfo(null);
     }
   };
@@ -295,10 +285,9 @@ export default function AgentsPage() {
     fetchTimelineData();
     fetchFailedPosts();
 
-    // ✅ აივ განახლება ყოველ 1 წუთში
     const liveInterval = setInterval(() => {
       fetchTimelineData();
-    }, 60000); // 60000ms = 1 წუთი
+    }, 60000);
 
     try {
       const savedStatuses = localStorage.getItem('agent_statuses');
@@ -432,7 +421,6 @@ export default function AgentsPage() {
         return;
       }
 
-      // ✅ აგენტის გაშვებისთვის ვიყენებთ lastPostDate-ს, რომ დუბლიკატი არ შეიქმნას
       const referenceDate = lastPostDate || new Date();
       let nextRule: any = null;
       let closestTime = Infinity;
@@ -457,7 +445,7 @@ export default function AgentsPage() {
       const now = new Date();
       const dayName = DAY_NAMES[nextRule.day_of_week];
       addAgentLog(`📋 შემდეგი წესი: ${dayName} ${nextRule.time} - ${nextRule.content_theme || 'AI will generate theme'}`);
-      addAgentLog(` მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
+      addAgentLog(`🎯 მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
 
       const isTimeReached = nextRule.nextDate.getTime() <= now.getTime();
 
@@ -629,11 +617,9 @@ export default function AgentsPage() {
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-            {/* ✅ განახლებული Timeline ბანერი დეტალური ინფორმაციით */}
             <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mute)] mb-3">PostAgent Timeline</h4>
               
-              {/* ბოლო პოსტი */}
               <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5 mb-3">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-[var(--ok)]">{Icons.check}</span>
@@ -642,7 +628,6 @@ export default function AgentsPage() {
                 <p className="text-sm font-medium text-[var(--moon)]">{lastPostTime}</p>
               </div>
 
-              {/* შემდეგი პოსტი - დეტალური ინფო */}
               {nextPostInfo ? (
                 <div className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3.5">
                   <div className="flex items-center justify-between mb-2">
