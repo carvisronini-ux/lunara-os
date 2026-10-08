@@ -14,14 +14,34 @@ const supabase = createClient(
 const STYLES = `
 @import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&display=swap");
 .agents-root{
-  --ink:#0b0d1c; --ink-2:#12152b; --ink-3:#1a1e3a;
-  --line:rgba(236,233,247,.1); --line-2:rgba(236,233,247,.18);
-  --moon:#ece9f7; --mute:#9d9bbd; --violet:#9b8cff; --rose:#ff7aa8; --amber:#f6c177; --ok:#5fd6a4;
+  --ink:#070812; --ink-2:#0d1020; --ink-3:#15192d; --ink-4:#1b2038;
+  --line:rgba(236,233,247,.075); --line-2:rgba(236,233,247,.14); --line-3:rgba(155,140,255,.22);
+  --moon:#f4f1fb; --mute:#8f8da8; --mute-2:#68667e;
+  --violet:#a99cff; --violet-2:#806cf6; --rose:#ff83ad; --amber:#f6c177; --ok:#65dfab;
   font-family:"Bricolage Grotesque","Noto Sans Georgian",system-ui,sans-serif;
-  background:var(--ink); color:var(--moon);
+  background:
+    radial-gradient(900px 420px at 78% -8%, rgba(128,108,246,.12), transparent 62%),
+    radial-gradient(700px 360px at 4% 26%, rgba(255,131,173,.055), transparent 64%),
+    var(--ink);
+  color:var(--moon);
 }
-.agents-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+.agents-root *{box-sizing:border-box}
+.agents-root *:focus-visible{outline:2px solid var(--violet);outline-offset:3px;border-radius:10px}
+.agents-root ::selection{background:rgba(169,156,255,.25);color:#fff}
+.agents-root .custom-scrollbar{scrollbar-width:thin;scrollbar-color:rgba(169,156,255,.28) transparent}
+.agents-root .custom-scrollbar::-webkit-scrollbar{width:6px;height:6px}
+.agents-root .custom-scrollbar::-webkit-scrollbar-track{background:transparent}
+.agents-root .custom-scrollbar::-webkit-scrollbar-thumb{background:rgba(169,156,255,.24);border-radius:999px}
+.agents-root .glass{background:linear-gradient(180deg,rgba(20,24,44,.88),rgba(11,14,29,.88));box-shadow:0 18px 55px rgba(0,0,0,.18)}
+.agents-root .soft-shadow{box-shadow:0 12px 35px rgba(0,0,0,.18)}
+.agents-root .agent-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(19,23,43,.96),rgba(10,13,27,.96));box-shadow:0 18px 45px rgba(0,0,0,.16)}
+.agents-root .agent-card:before{content:"";position:absolute;inset:0 0 auto;height:1px;background:linear-gradient(90deg,transparent,rgba(169,156,255,.34),transparent);opacity:.8}
+.agents-root .stat-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(18,22,41,.94),rgba(10,13,27,.94));box-shadow:0 14px 35px rgba(0,0,0,.14)}
+.agents-root .stat-card:after{content:"";position:absolute;width:120px;height:120px;right:-55px;top:-65px;border-radius:999px;background:rgba(169,156,255,.07);filter:blur(2px)}
+.agents-root textarea{line-height:1.65}
+@media(max-width:640px){.agents-root .mobile-tight{padding:16px!important}}
 `;
+
 
 const Icons = {
   back: (
@@ -292,38 +312,38 @@ export default function AgentsPage() {
     <div className="agents-root min-h-screen">
       <style>{STYLES}</style>
 
-      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
+      <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/80 backdrop-blur-xl shadow-[0_10px_35px_rgba(0,0,0,.16)]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
-            <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-full border border-[var(--line)] px-3 py-1.5 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
+            <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-3.5 py-2 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
               {Icons.back}
               <span className="hidden sm:inline">Back to Instagram</span>
             </Link>
             <div>
-              <h1 className="text-lg font-semibold tracking-tight">Agents Control Center</h1>
-              <p className="hidden text-xs text-[var(--mute)] sm:block">Manage all automated posting agents</p>
+              <h1 className="text-xl font-semibold tracking-tight">Agents Control Center</h1>
+              <p className="hidden text-xs text-[var(--mute)] sm:block mt-0.5">Manage all automated posting agents</p>
             </div>
           </div>
-          <button className="flex items-center gap-1.5 rounded-full border border-[var(--line-2)] bg-[var(--ink-2)] px-4 py-2 text-sm font-medium text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)]">
+          <button className="flex items-center gap-1.5 rounded-xl border border-[var(--line-2)] bg-white/[.035] px-4 py-2.5 text-sm font-medium shadow-[0_8px_24px_rgba(0,0,0,.12)] text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)]">
             {Icons.settings}
             <span className="hidden sm:inline">Global Settings</span>
           </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-            <p className="text-xs font-medium text-[var(--mute)]">Total Agents</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{agents.length}</p>
+      <main className="mx-auto max-w-7xl space-y-7 px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mute)]">Total Agents</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--moon)]">{agents.length}</p>
           </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-            <p className="text-xs font-medium text-[var(--mute)]">Active Agents</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--ok)]">{activeAgentsCount}</p>
+          <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mute)]">Active Agents</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--ok)]">{activeAgentsCount}</p>
           </div>
-          <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
-            <p className="text-xs font-medium text-[var(--mute)]">Total Posts Published</p>
-            <p className="mt-1 text-2xl font-bold text-[var(--moon)]">{totalPostsCount}</p>
+          <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mute)]">Total Posts Published</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--moon)]">{totalPostsCount}</p>
           </div>
         </div>
 
@@ -333,10 +353,10 @@ export default function AgentsPage() {
               const TypeIcon = TYPE_ICONS[agent.type];
               const colorClass = TYPE_COLORS[agent.type];
               return (
-                <div key={agent.id} className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-6 transition-all hover:border-[var(--line-2)]">
+                <div key={agent.id} className="agent-card rounded-2xl border border-[var(--line)] p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--line-2)] hover:shadow-[0_22px_55px_rgba(0,0,0,.2)]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4">
-                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${colorClass}`}>
+                      <div className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border ${colorClass}`}>
                         {TypeIcon}
                       </div>
                       <div>
@@ -353,24 +373,24 @@ export default function AgentsPage() {
                       </div>
                       <button
                         onClick={() => toggleAgent(agent.id)}
-                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                        className={`relative h-7 w-12 shrink-0 rounded-full transition-all duration-300 ${
                           agent.status === 'active' ? 'bg-[var(--ok)]' : 'bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]'
                         }`}
                       >
-                        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${agent.status === 'active' ? 'left-6' : 'left-1'}`} />
+                        <span className={`absolute top-1.5 h-4 w-4 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,.35)] transition-all duration-300 ${agent.status === 'active' ? 'left-6' : 'left-1'}`} />
                       </button>
                     </div>
                   </div>
                   <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
                       <p className="text-xs text-[var(--mute)]">Next Run</p>
                       <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.nextRun}</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
                       <p className="text-xs text-[var(--mute)]">Last Run</p>
                       <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.lastRun}</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--ink)] p-3">
+                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
                       <p className="text-xs text-[var(--mute)]">Total Published</p>
                       <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
                     </div>
@@ -380,7 +400,7 @@ export default function AgentsPage() {
                     <div className="mt-6 flex flex-wrap gap-2">
                       <button 
                         onClick={() => openConfigModal('post')}
-                        className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/30 bg-[var(--violet)]/10 px-4 py-2.5 text-sm font-medium text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
+                        className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/25 bg-[var(--violet)]/[.09] px-4 py-2.5 text-sm font-semibold shadow-[0_8px_25px_rgba(128,108,246,.08)] text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
                       >
                         {Icons.brain}
                         Configure PostAgent
@@ -389,7 +409,7 @@ export default function AgentsPage() {
                         // ✅ true ნიშნავს: აიძულე გაშვება ტესტირების მიზნით, დროის მიუხედავად
                         onClick={() => checkAndRunPostAgent(true)}
                         disabled={isChecking}
-                        className="flex-1 rounded-xl bg-[var(--violet)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
+                        className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] px-5 py-2.5 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.22)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
                       >
                         {isChecking ? 'Running...' : 'Run Now'}
                       </button>
@@ -400,18 +420,18 @@ export default function AgentsPage() {
             })}
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+          <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
                 PostAgent Live Logs
               </h4>
-              <div className="h-96 overflow-y-auto rounded-xl bg-[var(--ink)] p-3 font-mono text-xs space-y-1 custom-scrollbar">
+              <div className="h-96 overflow-y-auto rounded-xl border border-white/[.035] bg-black/20 p-3.5 font-mono text-xs space-y-1 custom-scrollbar">
                 {agentLogs.length === 0 ? (
                   <p className="text-[var(--mute)]">ლოგები გამოჩნდება აქ, როცა აგენტი ამოქმედდება...</p>
                 ) : (
                   agentLogs.map((log, i) => (
-                    <div key={i} className="text-[var(--moon)] border-b border-[var(--line)] pb-1 mb-1 last:border-0">
+                    <div key={i} className="text-[var(--moon)] border-b border-[var(--line)] pb-2 mb-2 last:border-0">
                       {log}
                     </div>
                   ))
@@ -419,7 +439,7 @@ export default function AgentsPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-4">
+            <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-sm font-semibold mb-3">Agent Engine (Hidden)</h4>
               <p className="text-xs text-[var(--mute)] mb-3">ეს კომპონენტი ასრულებს რეალურ სამუშაოს ფონზე.</p>
               <div className="opacity-30 pointer-events-none scale-75 origin-top-left">
@@ -433,7 +453,7 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[var(--violet)]/20 bg-[var(--violet)]/5 p-4 text-center">
+        <div className="rounded-2xl border border-[var(--violet)]/15 bg-gradient-to-r from-[var(--violet)]/[.07] via-transparent to-[var(--rose)]/[.04] p-5 text-center shadow-[0_14px_35px_rgba(0,0,0,.12)]">
           <p className="text-sm text-[var(--violet)]">
             💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
@@ -441,8 +461,8 @@ export default function AgentsPage() {
       </main>
 
       {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowConfigModal(false)}>
-          <div className="w-full max-w-2xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowConfigModal(false)}>
+          <div className="w-full max-w-3xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)]/98 p-5 sm:p-7 shadow-[0_35px_100px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--violet)]/20 text-[var(--violet)]">
@@ -460,16 +480,16 @@ export default function AgentsPage() {
               </button>
             </div>
 
-            <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-5 max-h-[68vh] overflow-y-auto pr-2 custom-scrollbar">
               <div>
-                <label className="mb-2 block text-sm font-semibold text-[var(--violet)]">
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--violet)]">
                   🧠 Master Prompt
                 </label>
                 <textarea
                   value={masterPrompt}
                   onChange={(e) => setMasterPrompt(e.target.value)}
                   placeholder="მთავარი ინსტრუქცია აგენტისთვის..."
-                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[120px] resize-none"
+                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute-2)] focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[150px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
                   ეს არის აგენტის მთავარი პიროვნება და მიზანი
@@ -477,14 +497,14 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-[var(--amber)]">
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--amber)]">
                    Thinking Style
                 </label>
                 <textarea
                   value={thinkingStyle}
                   onChange={(e) => setThinkingStyle(e.target.value)}
                   placeholder="როგორ ფიქრობს აგენტი..."
-                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
+                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute-2)] focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
                   აზროვნების სტილი და მიდგომა
@@ -492,14 +512,14 @@ export default function AgentsPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-[var(--ok)]">
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ok)]">
                    Skills & Constraints
                 </label>
                 <textarea
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
                   placeholder="უნარები და შეზღუდვები..."
-                  className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
+                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute-2)] focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
                   რა შეუძლია და რა არ შეუძლია აგენტს
@@ -510,14 +530,14 @@ export default function AgentsPage() {
             <div className="mt-6 flex gap-3 border-t border-[var(--line)] pt-4">
               <button
                 onClick={() => setShowConfigModal(false)}
-                className="flex-1 rounded-xl border border-[var(--line-2)] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
+                className="flex-1 rounded-xl border border-[var(--line-2)] bg-white/[.025] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
               >
                 Cancel
               </button>
               <button
                 onClick={saveAgentConfig}
                 disabled={isSavingConfig}
-                className="flex-1 rounded-xl bg-[var(--violet)] py-3 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] py-3 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.2)] transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {isSavingConfig ? 'Saving...' : 'Save Configuration'}
               </button>
