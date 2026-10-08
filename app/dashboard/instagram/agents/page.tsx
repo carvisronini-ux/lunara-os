@@ -166,7 +166,7 @@ export default function AgentsPage() {
   const panelRef = useRef<any>(null);
   const nextRuleRef = useRef<any>(null);
 
-  // ✅ ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს მოცემულ თარიღთან შედარებით
+  // ✅ ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს
   const getNextOccurrence = (ruleDay: number, ruleTime: string, afterDate: Date): Date => {
     const [hours, minutes] = ruleTime.split(':').map(Number);
     const target = new Date(afterDate);
@@ -178,7 +178,7 @@ export default function AgentsPage() {
     let daysToAdd = (ruleDay - currentDayCustom + 7) % 7;
     target.setDate(afterDate.getDate() + daysToAdd);
 
-    // თუ მიღებული დრო უკვე გასულია (ან ემთხვევა) afterDate-ს, ნიშნავს რომ ეს ვარიანტი უკვე იყო, გადავიდეთ მომავალ კვირაზე
+    // თუ მიღებული დრო უკვე გასულია (ან ემთხვევა) afterDate-ს, გადავიდეთ მომავალ კვირაზე
     if (target.getTime() <= afterDate.getTime()) {
       target.setDate(target.getDate() + 7);
     }
@@ -187,19 +187,17 @@ export default function AgentsPage() {
   };
 
   const fetchTimelineData = async () => {
+    // 1. ბოლო პოსტის მიღება მხოლოდ თარიღის საჩვენებლად
     const { data: lastPostData } = await supabase
       .from('published_content')
-      .select('published_at, zodiac_sign, caption')
+      .select('published_at')
       .eq('content_type', 'post')
       .eq('status', 'published')
       .order('published_at', { ascending: false })
       .limit(1);
 
-    const lastPostDate = lastPostData && lastPostData.length > 0 
-      ? new Date(lastPostData[0].published_at) 
-      : null;
-
-    if (lastPostDate) {
+    if (lastPostData && lastPostData.length > 0) {
+      const lastPostDate = new Date(lastPostData[0].published_at);
       setLastPostTime(lastPostDate.toLocaleString('ka-GE', { 
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
       }));
@@ -221,15 +219,16 @@ export default function AgentsPage() {
       return;
     }
 
-    const referenceDate = lastPostDate || new Date();
+    // ✅ გასწორებული ლოგიკა: შემდეგი პოსტის საპოვნელად ვიყენებთ მიმდინარე დროს (now)
+    // ეს თავიდან გვაცილებს lastPostDate-ის UTC/ლოკალური დროის შეუსაბამობის ბაგს
+    const now = new Date();
     let nextRule: any = null;
     let closestTime = Infinity;
     
-    // ✅ ვპოულობთ ყველა შესაძლო წესს და ვირჩევთ ყველაზე ახლოს (მინიმალური დროის სხვაობით)
     for (const rule of rules) {
-      const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
-      if (occurrence.getTime() > referenceDate.getTime()) {
-        const timeDiff = occurrence.getTime() - referenceDate.getTime();
+      const occurrence = getNextOccurrence(rule.day_of_week, rule.time, now);
+      if (occurrence.getTime() > now.getTime()) {
+        const timeDiff = occurrence.getTime() - now.getTime();
         if (timeDiff < closestTime) {
           closestTime = timeDiff;
           nextRule = { ...rule, nextDate: occurrence };
@@ -240,7 +239,6 @@ export default function AgentsPage() {
     nextRuleRef.current = nextRule;
 
     if (nextRule) {
-      const now = new Date();
       const diffMs = nextRule.nextDate.getTime() - now.getTime();
       
       if (diffMs <= 0) {
@@ -411,11 +409,11 @@ export default function AgentsPage() {
         return;
       }
 
+      // ✅ აგენტის გაშვებისთვის ვიყენებთ lastPostDate-ს, რომ დუბლიკატი არ შეიქმნას
       const referenceDate = lastPostDate || new Date();
       let nextRule: any = null;
       let closestTime = Infinity;
       
-      // ✅ ვპოულობთ ყველაზე ახლო წესს
       for (const rule of rules) {
         const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
         if (occurrence.getTime() > referenceDate.getTime()) {
