@@ -134,7 +134,7 @@ export default function AgentsPage() {
     try {
       const savedStatuses = localStorage.getItem('agent_statuses');
       if (savedStatuses) {
-        const parsed = JSON.parse(savedStatuses);
+        const parsed = JSON.parse(savedStatuses) as Record<string, 'active' | 'inactive'>;
         setAgents(prev => prev.map(agent => ({
           ...agent,
           status: parsed[agent.id] || agent.status
@@ -146,7 +146,6 @@ export default function AgentsPage() {
 
     // 2. ვაყენებთ ტაიმერს
     const interval = setInterval(() => {
-      // ვიღებთ უახლეს სტატუსს
       setAgents(currentAgents => {
         const postAgent = currentAgents.find(a => a.id === 'post-agent');
         if (postAgent?.status === 'active') {
@@ -157,7 +156,7 @@ export default function AgentsPage() {
     }, 60000); 
 
     return () => clearInterval(interval);
-  }, []); // ⚠️ ყურადღება: დამოკიდებულების მასივი ცარიელია
+  }, []);
 
   const addAgentLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();
@@ -315,15 +314,17 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ განახლებული toggleAgent: ინახავს localStorage-ში
+  // ✅ განახლებული toggleAgent: ინახავს localStorage-ში და აქვს სწორი TypeScript ტიპი
   const toggleAgent = (id: string) => {
     setAgents(prev => {
       const newAgents = prev.map(agent => 
-        agent.id === id ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' } : agent
+        agent.id === id 
+          ? { ...agent, status: (agent.status === 'active' ? 'inactive' : 'active') as 'active' | 'inactive' } 
+          : agent
       );
       
       // ვინახავთ ახალ სტატუსებს localStorage-ში
-      const statusesToSave: Record<string, string> = {};
+      const statusesToSave: Record<string, 'active' | 'inactive'> = {};
       newAgents.forEach(a => { statusesToSave[a.id] = a.status; });
       localStorage.setItem('agent_statuses', JSON.stringify(statusesToSave));
       
