@@ -101,7 +101,6 @@ export default function AgentsPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
   
-  // ✅ კონფიგურაციის მოდალის სტეიტები
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('post');
   const [masterPrompt, setMasterPrompt] = useState('');
@@ -111,11 +110,13 @@ export default function AgentsPage() {
   
   const panelRef = useRef<any>(null);
 
+  // ✅ ფონური ტაიმერი: მუშაობს მხოლოდ მაშინ, თუ სტატუსი არის 'active'
   useEffect(() => {
     const interval = setInterval(() => {
       const postAgent = agents.find(a => a.id === 'post-agent');
       if (postAgent?.status === 'active') {
-        checkAndRunPostAgent();
+        // false ნიშნავს: მკაცრად შეამოწმე დღე და საათი განრიგის მიხედვით
+        checkAndRunPostAgent(false);
       }
     }, 60000); 
 
@@ -127,7 +128,6 @@ export default function AgentsPage() {
     setAgentLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
   };
 
-  // ✅ აგენტის კონფიგურაციის ჩატვირთვა ბაზიდან
   const loadAgentConfig = async (agentType: string) => {
     const { data, error } = await supabase
       .from('agent_config')
@@ -149,14 +149,12 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ კონფიგურაციის მოდალის გახსნა
   const openConfigModal = (agentType: string) => {
     setConfigAgentType(agentType);
     loadAgentConfig(agentType);
     setShowConfigModal(true);
   };
 
-  // ✅ კონფიგურაციის შენახვა ბაზაში (გასწორებულია onConflict-ით)
   const saveAgentConfig = async () => {
     setIsSavingConfig(true);
     addAgentLog(`💾 ${configAgentType.toUpperCase()} კონფიგურაციის შენახვა...`);
@@ -169,7 +167,7 @@ export default function AgentsPage() {
         thinking_style: thinkingStyle,
         skills_constraints: skills, 
         updated_at: new Date().toISOString()
-      }, { onConflict: 'agent_type' }); // ✅ ეს წყვეტს duplicate key შეცდომას!
+      }, { onConflict: 'agent_type' });
 
     if (error) {
       addAgentLog(`❌ შეცდომა კონფიგურაციის შენახვისას: ${error.message}`);
@@ -182,7 +180,6 @@ export default function AgentsPage() {
     setIsSavingConfig(false);
   };
 
-  // ✅ ჭკვიანი ზოდიაქოს არჩევა
   const chooseSmartZodiac = (ruleZodiac: string | null): string => {
     if (ruleZodiac && ruleZodiac !== 'ALL' && ALL_ZODIAC_SIGNS.includes(ruleZodiac)) {
       return ruleZodiac;
@@ -191,20 +188,25 @@ export default function AgentsPage() {
     return ALL_ZODIAC_SIGNS[randomIndex];
   };
 
-  // ✅ განახლებული: იღებს უახლეს post წესს განრიგიდან, მიუხედავად დღისა და საათისა
-  const checkAndRunPostAgent = async () => {
+  // ✅ განახლებული ლოგიკა: forceRun პარამეტრით
+  const checkAndRunPostAgent = async (forceRun: boolean = false) => {
     if (isChecking) return;
     setIsChecking(true);
     addAgentLog("🔍 ვამოწმებ Master Schedule-ს...");
 
     try {
-      // ✅ ვიღებთ ყველა post ტიპის წესს განრიგიდან (მიუხედავად დღისა), დალაგებული დროის მიხედვით
+      const now = new Date();
+      const jsDay = now.getDay();
+      const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1; // 0=Monday, 6=Sunday
+      const currentTimeStr = now.toTimeString().slice(0, 5); // "HH:MM" ფორმატში
+
+      // 1. ვიღებთ მხოლოდ დღევანდელი დღის post წესებს
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
         .eq('content_type', 'post')
         .eq('is_active', true)
-        .order('day_of_week', { ascending: true })
+        .eq('day_of_week', currentDayIndex) // მკაცრი შემოწმება: მხოლოდ დღევანდელი დღე
         .order('time', { ascending: true });
 
       if (error) {
@@ -214,20 +216,25 @@ export default function AgentsPage() {
       }
 
       if (!rules || rules.length === 0) {
-        addAgentLog("⚠️ post ტიპის წესი საერთოდ არ არის განრიგში.");
+        addAgentLog(`⚠️ დღეს (${currentDayIndex}-ე დღე) post ტიპის წესი არ არის.`);
         setIsChecking(false);
         return;
       }
 
-      // ✅ ვიღებთ პირველ (უახლეს) წესს განრიგიდან
-      const nextRule = rules[0];
-      const dayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+      // 2. ვეძებთ პირველ წესს, რომლის დროც უკვე მოვიდა (ან ვაიძულებთ forceRun-ით)
+      const matchingRule = rules.find((r: any) => forceRun || r.time <= currentTimeStr);
 
-      addAgentLog(`📋 ნაპოვნია უახლესი წესი: ${dayNames[nextRule.day_of_week]} ${nextRule.time} - ${nextRule.content_theme}`);
-      addAgentLog(`🎯 მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
+      if (!matchingRule) {
+        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
+        setIsChecking(false);
+        return;
+      }
 
-      // ✅ ვამოწმებთ, დღეს უკვე გამოქვეყნდა თუ არა ეს პოსტი (დუბლიკატის თავიდან ასაცილებლად)
-      const today = new Date().toISOString().split('T')[0];
+      addAgentLog(`📋 ნაპოვნია დროისთვის შესაფერისი წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
+      addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
+
+      // 3. ვამოწმებთ, დღეს უკვე გამოქვეყნდა თუ არა ეს კონკრეტული პოსტი
+      const today = now.toISOString().split('T')[0];
       const { data: published, error: pubError } = await supabase
         .from('published_content')
         .select('id')
@@ -248,8 +255,8 @@ export default function AgentsPage() {
         return;
       }
 
-      // ✅ ჭკვიანი არჩევანი
-      const zodiacToPost = chooseSmartZodiac(nextRule.zodiac_sign);
+      // 4. ვრთავთ აგენტს
+      const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
       addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
@@ -259,7 +266,7 @@ export default function AgentsPage() {
           addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
         } else {
-          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით (შეიძლება ხელახლა სცადოს).");
+          addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
       } else {
         addAgentLog("⚠️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
@@ -379,7 +386,8 @@ export default function AgentsPage() {
                         Configure PostAgent
                       </button>
                       <button 
-                        onClick={() => checkAndRunPostAgent()}
+                        // ✅ true ნიშნავს: აიძულე გაშვება ტესტირების მიზნით, დროის მიუხედავად
+                        onClick={() => checkAndRunPostAgent(true)}
                         disabled={isChecking}
                         className="flex-1 rounded-xl bg-[var(--violet)] px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
                       >
@@ -432,7 +440,6 @@ export default function AgentsPage() {
         </div>
       </main>
 
-      {/* ✅ Configure Agent Modal */}
       {showConfigModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={() => setShowConfigModal(false)}>
           <div className="w-full max-w-2xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
