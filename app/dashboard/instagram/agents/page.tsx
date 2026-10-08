@@ -166,7 +166,7 @@ export default function AgentsPage() {
   const panelRef = useRef<any>(null);
   const nextRuleRef = useRef<any>(null);
 
-  // ✅ გასწორებული ლოგიკა: ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს მოცემულ თარიღთან შედარებით
+  // ✅ ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს მოცემულ თარიღთან შედარებით
   const getNextOccurrence = (ruleDay: number, ruleTime: string, afterDate: Date): Date => {
     const [hours, minutes] = ruleTime.split(':').map(Number);
     const target = new Date(afterDate);
@@ -223,12 +223,17 @@ export default function AgentsPage() {
 
     const referenceDate = lastPostDate || new Date();
     let nextRule: any = null;
+    let closestTime = Infinity;
     
+    // ✅ ვპოულობთ ყველა შესაძლო წესს და ვირჩევთ ყველაზე ახლოს (მინიმალური დროის სხვაობით)
     for (const rule of rules) {
       const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
       if (occurrence.getTime() > referenceDate.getTime()) {
-        nextRule = { ...rule, nextDate: occurrence };
-        break; // ვიპოვეთ ყველაზე ახლო მომავალი წესი
+        const timeDiff = occurrence.getTime() - referenceDate.getTime();
+        if (timeDiff < closestTime) {
+          closestTime = timeDiff;
+          nextRule = { ...rule, nextDate: occurrence };
+        }
       }
     }
 
@@ -408,12 +413,17 @@ export default function AgentsPage() {
 
       const referenceDate = lastPostDate || new Date();
       let nextRule: any = null;
+      let closestTime = Infinity;
       
+      // ✅ ვპოულობთ ყველაზე ახლო წესს
       for (const rule of rules) {
         const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
         if (occurrence.getTime() > referenceDate.getTime()) {
-          nextRule = { ...rule, nextDate: occurrence };
-          break;
+          const timeDiff = occurrence.getTime() - referenceDate.getTime();
+          if (timeDiff < closestTime) {
+            closestTime = timeDiff;
+            nextRule = { ...rule, nextDate: occurrence };
+          }
         }
       }
 
