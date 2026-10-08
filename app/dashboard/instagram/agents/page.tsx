@@ -164,11 +164,29 @@ export default function AgentsPage() {
   const [selectedFailedPost, setSelectedFailedPost] = useState<FailedPost | null>(null);
   
   const panelRef = useRef<any>(null);
-  const nextRuleRef = useRef<any>(null); // ინახავს შემდეგი წესის ინფოს
+  const nextRuleRef = useRef<any>(null);
 
-  // ✅ იღებს ბოლო წარმატებულ პოსტს და შემდეგ წესს
+  // ✅ გასწორებული ლოგიკა: ითვლის წესის ზუსტად შემდეგ გამოჩენის დროს მოცემულ თარიღთან შედარებით
+  const getNextOccurrence = (ruleDay: number, ruleTime: string, afterDate: Date): Date => {
+    const [hours, minutes] = ruleTime.split(':').map(Number);
+    const target = new Date(afterDate);
+    target.setHours(hours, minutes, 0, 0);
+
+    const currentDayJs = afterDate.getDay(); // 0=კვირა, 1=ორშაბათი...
+    const currentDayCustom = currentDayJs === 0 ? 6 : currentDayJs - 1; // 0=ორშაბათი, 6=კვირა
+    
+    let daysToAdd = (ruleDay - currentDayCustom + 7) % 7;
+    target.setDate(afterDate.getDate() + daysToAdd);
+
+    // თუ მიღებული დრო უკვე გასულია (ან ემთხვევა) afterDate-ს, ნიშნავს რომ ეს ვარიანტი უკვე იყო, გადავიდეთ მომავალ კვირაზე
+    if (target.getTime() <= afterDate.getTime()) {
+      target.setDate(target.getDate() + 7);
+    }
+
+    return target;
+  };
+
   const fetchTimelineData = async () => {
-    // 1. ბოლო წარმატებული პოსტი
     const { data: lastPostData } = await supabase
       .from('published_content')
       .select('published_at, zodiac_sign, caption')
@@ -189,7 +207,6 @@ export default function AgentsPage() {
       setLastPostTime('არ არის');
     }
 
-    // 2. ყველა აქტიური post წესი, დალაგებული
     const { data: rules } = await supabase
       .from('content_schedule')
       .select('*')
@@ -204,14 +221,14 @@ export default function AgentsPage() {
       return;
     }
 
-    // 3. ვპოულობთ პირველ წესს, რომლის დროც ბოლო პოსტის შემდეგაა
+    const referenceDate = lastPostDate || new Date();
     let nextRule: any = null;
     
     for (const rule of rules) {
-      const ruleDate = getRuleNextDate(rule.day_of_week, rule.time, lastPostDate);
-      if (ruleDate.getTime() > (lastPostDate?.getTime() || 0)) {
-        nextRule = { ...rule, nextDate: ruleDate };
-        break;
+      const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
+      if (occurrence.getTime() > referenceDate.getTime()) {
+        nextRule = { ...rule, nextDate: occurrence };
+        break; // ვიპოვეთ ყველაზე ახლო მომავალი წესი
       }
     }
 
@@ -240,28 +257,6 @@ export default function AgentsPage() {
     } else {
       setNextPostTime('—');
     }
-  };
-
-  // ✅ ითვლის წესის უახლოეს მომავალ თარიღს
-  const getRuleNextDate = (dayOfWeek: number, timeStr: string, afterDate: Date | null): Date => {
-    const now = afterDate || new Date();
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    
-    // ვიპოვით უახლოეს დღეს, რომელიც ემთხვევა dayOfWeek-ს
-    let targetDate = new Date(now);
-    targetDate.setHours(hours, minutes, 0, 0);
-    
-    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0=ორშაბათი, 6=კვირა
-    let daysUntil = (dayOfWeek - currentDayOfWeek + 7) % 7;
-    
-    targetDate.setDate(now.getDate() + daysUntil);
-    
-    // თუ ეს თარიღი წარსულშია (დრო უკვე გასულია), ვამატებთ 7 დღეს
-    if (targetDate.getTime() <= (afterDate?.getTime() || 0)) {
-      targetDate.setDate(targetDate.getDate() + 7);
-    }
-    
-    return targetDate;
   };
 
   const fetchFailedPosts = async () => {
@@ -373,14 +368,12 @@ export default function AgentsPage() {
     return ALL_ZODIAC_SIGNS[randomIndex];
   };
 
-  // ✅ ახალი ლოგიკა: ვამოწმებთ შემდეგ წესს ბოლო პოსტის მიხედვით
   const checkAndRunPostAgent = async (forceRun: boolean = false) => {
     if (isChecking) return;
     setIsChecking(true);
     addAgentLog("🔍 ვამოწმებ Master Schedule-ს...");
 
     try {
-      // 1. ვიღებთ ბოლო წარმატებულ პოსტს
       const { data: lastPostData } = await supabase
         .from('published_content')
         .select('published_at')
@@ -393,7 +386,6 @@ export default function AgentsPage() {
         ? new Date(lastPostData[0].published_at) 
         : null;
 
-      // 2. ვიღებთ ყველა წესს
       const { data: rules, error } = await supabase
         .from('content_schedule')
         .select('*')
@@ -414,18 +406,19 @@ export default function AgentsPage() {
         return;
       }
 
-      // 3. ვპოულობთ შემდეგ წესს ბოლო პოსტის შემდეგ
+      const referenceDate = lastPostDate || new Date();
       let nextRule: any = null;
+      
       for (const rule of rules) {
-        const ruleDate = getRuleNextDate(rule.day_of_week, rule.time, lastPostDate);
-        if (ruleDate.getTime() > (lastPostDate?.getTime() || 0)) {
-          nextRule = { ...rule, nextDate: ruleDate };
+        const occurrence = getNextOccurrence(rule.day_of_week, rule.time, referenceDate);
+        if (occurrence.getTime() > referenceDate.getTime()) {
+          nextRule = { ...rule, nextDate: occurrence };
           break;
         }
       }
 
       if (!nextRule) {
-        addAgentLog(`️ შემდეგი წესი ვერ მოიძებნა.`);
+        addAgentLog(`⚠️ შემდეგი წესი ვერ მოიძებნა.`);
         setIsChecking(false);
         return;
       }
@@ -433,9 +426,8 @@ export default function AgentsPage() {
       const now = new Date();
       const dayName = DAY_NAMES[nextRule.day_of_week];
       addAgentLog(`📋 შემდეგი წესი: ${dayName} ${nextRule.time} - ${nextRule.content_theme || 'AI will generate theme'}`);
-      addAgentLog(` მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
+      addAgentLog(`🎯 მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
 
-      // 4. ვამოწმებთ: არის თუ არა ამ წესის დრო უკვე მოსული?
       const isTimeReached = nextRule.nextDate.getTime() <= now.getTime();
 
       if (!isTimeReached && !forceRun) {
@@ -446,7 +438,6 @@ export default function AgentsPage() {
         return;
       }
 
-      // 5. ვრთავთ აგენტს
       const zodiacToPost = chooseSmartZodiac(nextRule.zodiac_sign);
       addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
@@ -454,14 +445,14 @@ export default function AgentsPage() {
       if (panelRef.current) {
         const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
         if (success) {
-          addAgentLog(" PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
           fetchTimelineData();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
       } else {
-        addAgentLog("️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
+        addAgentLog("⚠️ InstagramPanel კომპონენტი ვერ მოიძებნა.");
       }
 
     } catch (error) {
