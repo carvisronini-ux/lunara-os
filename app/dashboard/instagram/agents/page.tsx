@@ -144,7 +144,6 @@ export default function AgentsPage() {
     if (data) {
       setMasterPrompt(data.master_prompt || '');
       setThinkingStyle(data.thinking_style || '');
-      // ✅ ყურადღება: ბაზაში სვეტს ერქვა skills_constraints
       setSkills(data.skills_constraints || ''); 
       addAgentLog(`✅ ${agentType.toUpperCase()} კონფიგურაცია ჩაიტვირთა`);
     }
@@ -157,7 +156,7 @@ export default function AgentsPage() {
     setShowConfigModal(true);
   };
 
-  // ✅ კონფიგურაციის შენახვა ბაზაში
+  // ✅ კონფიგურაციის შენახვა ბაზაში (გასწორებულია onConflict-ით)
   const saveAgentConfig = async () => {
     setIsSavingConfig(true);
     addAgentLog(`💾 ${configAgentType.toUpperCase()} კონფიგურაციის შენახვა...`);
@@ -168,9 +167,9 @@ export default function AgentsPage() {
         agent_type: configAgentType,
         master_prompt: masterPrompt,
         thinking_style: thinkingStyle,
-        skills_constraints: skills, // ✅ ყურადღება: ბაზის სვეტის სახელი
+        skills_constraints: skills, 
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'agent_type' }); // ✅ ეს წყვეტს duplicate key შეცდომას!
 
     if (error) {
       addAgentLog(`❌ შეცდომა კონფიგურაციის შენახვისას: ${error.message}`);
