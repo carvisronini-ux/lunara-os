@@ -1,4 +1,3 @@
-// /home/carvisronini-ux/lunara-os/app/dashboard/instagram/agents/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -129,18 +128,36 @@ export default function AgentsPage() {
   
   const panelRef = useRef<any>(null);
 
-  // ✅ ფონური ტაიმერი: მუშაობს მხოლოდ მაშინ, თუ სტატუსი არის 'active'
+  // ✅ ფონური ტაიმერი + localStorage-დან სტატუსების ჩატვირთვა
   useEffect(() => {
-    const interval = setInterval(() => {
-      const postAgent = agents.find(a => a.id === 'post-agent');
-      if (postAgent?.status === 'active') {
-        // false ნიშნავს: მკაცრად შეამოწმე დღე და საათი განრიგის მიხედვით
-        checkAndRunPostAgent(false);
+    // 1. ვცდილობთ წავიკითხოთ შენახული სტატუსები
+    try {
+      const savedStatuses = localStorage.getItem('agent_statuses');
+      if (savedStatuses) {
+        const parsed = JSON.parse(savedStatuses);
+        setAgents(prev => prev.map(agent => ({
+          ...agent,
+          status: parsed[agent.id] || agent.status
+        })));
       }
+    } catch (e) {
+      console.error('Failed to load agent statuses', e);
+    }
+
+    // 2. ვაყენებთ ტაიმერს
+    const interval = setInterval(() => {
+      // ვიღებთ უახლეს სტატუსს
+      setAgents(currentAgents => {
+        const postAgent = currentAgents.find(a => a.id === 'post-agent');
+        if (postAgent?.status === 'active') {
+          checkAndRunPostAgent(false);
+        }
+        return currentAgents;
+      });
     }, 60000); 
 
     return () => clearInterval(interval);
-  }, [agents]);
+  }, []); // ⚠️ ყურადღება: დამოკიდებულების მასივი ცარიელია
 
   const addAgentLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();
@@ -249,7 +266,7 @@ export default function AgentsPage() {
         return;
       }
 
-      addAgentLog(`📋 ნაპოვნია დროისთვის შესაფერისი წესი: ${matchingRule.time} - ${matchingRule.content_theme}`);
+      addAgentLog(`📋 ნაპოვნია დროისთვის შესაფერისი წესი: ${matchingRule.time} - ${matchingRule.content_theme || 'AI will generate theme'}`);
       addAgentLog(`🎯 მიზანი: ${matchingRule.goal} | ნიშანი: ${matchingRule.zodiac_sign || 'ALL/Random'}`);
 
       // 3. ვამოწმებთ, დღეს უკვე გამოქვეყნდა თუ არა ეს კონკრეტული პოსტი
@@ -298,10 +315,20 @@ export default function AgentsPage() {
     }
   };
 
+  // ✅ განახლებული toggleAgent: ინახავს localStorage-ში
   const toggleAgent = (id: string) => {
-    setAgents(prev => prev.map(agent => 
-      agent.id === id ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' } : agent
-    ));
+    setAgents(prev => {
+      const newAgents = prev.map(agent => 
+        agent.id === id ? { ...agent, status: agent.status === 'active' ? 'inactive' : 'active' } : agent
+      );
+      
+      // ვინახავთ ახალ სტატუსებს localStorage-ში
+      const statusesToSave: Record<string, string> = {};
+      newAgents.forEach(a => { statusesToSave[a.id] = a.status; });
+      localStorage.setItem('agent_statuses', JSON.stringify(statusesToSave));
+      
+      return newAgents;
+    });
   };
 
   const activeAgentsCount = agents.filter(a => a.status === 'active').length;
@@ -405,7 +432,6 @@ export default function AgentsPage() {
                         Configure PostAgent
                       </button>
                       <button 
-                        // ✅ true ნიშნავს: აიძულე გაშვება ტესტირების მიზნით, დროის მიუხედავად
                         onClick={() => checkAndRunPostAgent(true)}
                         disabled={isChecking}
                         className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] px-5 py-2.5 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.22)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
