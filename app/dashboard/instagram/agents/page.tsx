@@ -118,6 +118,12 @@ interface FailedPost {
   status: 'failed';
 }
 
+interface NextPostInfo {
+  rule: any;
+  nextDate: Date;
+  timeRemaining: string;
+}
+
 const INITIAL_AGENTS: Agent[] = [
   { id: 'post-agent', name: 'PostAgent', type: 'post', status: 'inactive', nextRun: 'Monday 19:00', lastRun: 'Never', totalPosts: 0 },
   { id: 'story-agent', name: 'StoryAgent', type: 'story', status: 'inactive', nextRun: 'Tuesday 10:00', lastRun: 'Never', totalPosts: 0 },
@@ -151,6 +157,7 @@ export default function AgentsPage() {
   
   const [lastPostTime, setLastPostTime] = useState<string>('არ არის');
   const [nextPostTime, setNextPostTime] = useState<string>('—');
+  const [nextPostInfo, setNextPostInfo] = useState<NextPostInfo | null>(null);
   
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('post');
@@ -186,6 +193,22 @@ export default function AgentsPage() {
     return target;
   };
 
+  // ✅ დარჩენილი დროის ფორმატირება
+  const formatTimeRemaining = (diffMs: number): string => {
+    if (diffMs <= 0) return 'ახლავე';
+    
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours >= 24) {
+      return `${Math.floor(diffHours / 24)} დღე ${diffHours % 24}სთ`;
+    } else if (diffHours > 0) {
+      return `${diffHours}სთ ${diffMinutes}წთ`;
+    } else {
+      return `${diffMinutes} წუთი`;
+    }
+  };
+
   const fetchTimelineData = async () => {
     // 1. ბოლო პოსტის მიღება მხოლოდ თარიღის საჩვენებლად
     const { data: lastPostData } = await supabase
@@ -215,12 +238,12 @@ export default function AgentsPage() {
 
     if (!rules || rules.length === 0) {
       setNextPostTime('—');
+      setNextPostInfo(null);
       nextRuleRef.current = null;
       return;
     }
 
-    // ✅ გასწორებული ლოგიკა: შემდეგი პოსტის საპოვნელად ვიყენებთ მიმდინარე დროს (now)
-    // ეს თავიდან გვაცილებს lastPostDate-ის UTC/ლოკალური დროის შეუსაბამობის ბაგს
+    // ✅ შემდეგი პოსტის საპოვნელად ვიყენებთ მიმდინარე დროს
     const now = new Date();
     let nextRule: any = null;
     let closestTime = Infinity;
@@ -240,25 +263,17 @@ export default function AgentsPage() {
 
     if (nextRule) {
       const diffMs = nextRule.nextDate.getTime() - now.getTime();
+      const timeRemaining = formatTimeRemaining(diffMs);
       
-      if (diffMs <= 0) {
-        setNextPostTime('ახლავე');
-      } else {
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        
-        if (diffHours >= 24) {
-          const dayName = DAY_NAMES[nextRule.day_of_week];
-          const [h, m] = nextRule.time.split(':');
-          setNextPostTime(`${dayName} ${h}:${m}`);
-        } else if (diffHours > 0) {
-          setNextPostTime(`${diffHours}სთ ${diffMinutes}წთ-ში`);
-        } else {
-          setNextPostTime(`${diffMinutes} წუთში`);
-        }
-      }
+      setNextPostTime(timeRemaining);
+      setNextPostInfo({
+        rule: nextRule,
+        nextDate: nextRule.nextDate,
+        timeRemaining
+      });
     } else {
       setNextPostTime('—');
+      setNextPostInfo(null);
     }
   };
 
@@ -279,6 +294,11 @@ export default function AgentsPage() {
   useEffect(() => {
     fetchTimelineData();
     fetchFailedPosts();
+
+    // ✅ აივ განახლება ყოველ 1 წუთში
+    const liveInterval = setInterval(() => {
+      fetchTimelineData();
+    }, 60000); // 60000ms = 1 წუთი
 
     try {
       const savedStatuses = localStorage.getItem('agent_statuses');
@@ -303,7 +323,10 @@ export default function AgentsPage() {
       });
     }, 60000); 
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(liveInterval);
+    };
   }, []);
 
   const addAgentLog = (msg: string) => {
@@ -434,7 +457,7 @@ export default function AgentsPage() {
       const now = new Date();
       const dayName = DAY_NAMES[nextRule.day_of_week];
       addAgentLog(`📋 შემდეგი წესი: ${dayName} ${nextRule.time} - ${nextRule.content_theme || 'AI will generate theme'}`);
-      addAgentLog(`🎯 მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
+      addAgentLog(` მიზანი: ${nextRule.goal} | ნიშანი: ${nextRule.zodiac_sign || 'ALL/Random'}`);
 
       const isTimeReached = nextRule.nextDate.getTime() <= now.getTime();
 
@@ -606,24 +629,66 @@ export default function AgentsPage() {
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+            {/* ✅ განახლებული Timeline ბანერი დეტალური ინფორმაციით */}
             <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
               <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--mute)] mb-3">PostAgent Timeline</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[var(--ok)]">{Icons.check}</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">ბოლო პოსტი</span>
-                  </div>
-                  <p className="text-sm font-medium text-[var(--moon)]">{lastPostTime}</p>
+              
+              {/* ბოლო პოსტი */}
+              <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[var(--ok)]">{Icons.check}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">ბოლო პოსტი</span>
                 </div>
+                <p className="text-sm font-medium text-[var(--moon)]">{lastPostTime}</p>
+              </div>
+
+              {/* შემდეგი პოსტი - დეტალური ინფო */}
+              {nextPostInfo ? (
+                <div className="rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/5 p-3.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[var(--amber)]">{Icons.clock}</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">შემდეგი პოსტი</span>
+                    </div>
+                    <span className="text-xs font-bold text-[var(--amber)]">{nextPostInfo.timeRemaining}</span>
+                  </div>
+                  
+                  <div className="space-y-1.5 mt-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[var(--mute)] w-16">დრო:</span>
+                      <span className="text-xs font-medium text-[var(--moon)]">
+                        {DAY_NAMES[nextPostInfo.rule.day_of_week]} {nextPostInfo.rule.time}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[var(--mute)] w-16">ნიშანი:</span>
+                      <span className="text-xs font-medium text-[var(--violet)]">
+                        {nextPostInfo.rule.zodiac_sign || 'Random'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[var(--mute)] w-16">მიზანი:</span>
+                      <span className="text-xs font-medium text-[var(--moon)]">
+                        {nextPostInfo.rule.goal}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-[10px] text-[var(--mute)] w-16 shrink-0">თემა:</span>
+                      <span className="text-xs font-medium text-[var(--moon)] break-words">
+                        {nextPostInfo.rule.content_theme || 'AI will generate'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[var(--amber)]">{Icons.clock}</span>
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--mute)]">შემდეგი პოსტი</span>
                   </div>
-                  <p className="text-sm font-medium text-[var(--moon)]">{nextPostTime}</p>
+                  <p className="text-sm font-medium text-[var(--moon)]">—</p>
                 </div>
-              </div>
+              )}
             </div>
 
             {failedPosts.length > 0 && (
