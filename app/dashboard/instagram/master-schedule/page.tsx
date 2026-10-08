@@ -75,6 +75,9 @@ const ZODIAC_OPTIONS = [
   { value: 'PISCES', label: '♓ Pisces', color: 'text-[#b3a8ff]' },
 ];
 
+// ✅ ყველა ზოდიაქოს სია ტექსტში საძიებლად
+const ALL_ZODIAC_SIGNS = ['ARIES', 'TAURUS', 'GEMINI', 'CANCER', 'LEO', 'VIRGO', 'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'];
+
 const TYPE_COLORS: Record<string, string> = {
   post: "text-[#b3a8ff] bg-[#9b8cff]/10 border-[#9b8cff]/25",
   story: "text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/25",
@@ -108,20 +111,8 @@ const STATUS_DOT: Record<string, string> = {
 };
 
 const PUBLISH_STATUS_STYLES: Record<string, any> = {
-  published: {
-    bg: "bg-[#5fd6a4]/10",
-    border: "border-[#5fd6a4]/30",
-    text: "text-[#5fd6a4]",
-    label: "დაიპოსტა",
-    icon: Icons.check,
-  },
-  failed: {
-    bg: "bg-[#ff7aa8]/10",
-    border: "border-[#ff7aa8]/30",
-    text: "text-[#ff7aa8]",
-    label: "არდაიპოსტა",
-    icon: Icons.x,
-  },
+  published: { bg: "bg-[#5fd6a4]/10", border: "border-[#5fd6a4]/30", text: "text-[#5fd6a4]", label: "დაიპოსტა", icon: Icons.check },
+  failed: { bg: "bg-[#ff7aa8]/10", border: "border-[#ff7aa8]/30", text: "text-[#ff7aa8]", label: "არდაიპოსტა", icon: Icons.x },
 };
 
 const formatTime = (time: string): string => {
@@ -180,41 +171,25 @@ export default function MasterSchedulePage() {
 
   const fetchSchedule = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("content_schedule")
-      .select("*")
-      .order("day_of_week", { ascending: true })
-      .order("time", { ascending: true });
-    
+    const { data, error } = await supabase.from("content_schedule").select("*").order("day_of_week", { ascending: true }).order("time", { ascending: true });
     if (!error && data) setSchedule(data);
     setLoading(false);
   };
 
   const fetchPublishedToday = async () => {
     const today = new Date().toISOString().split('T')[0];
-    const { data, error } = await supabase
-      .from('published_content')
-      .select('*')
-      .gte('published_at', `${today}T00:00:00`)
-      .lt('published_at', `${today}T23:59:59`)
-      .order('published_at', { ascending: false });
-    
+    const { data, error } = await supabase.from('published_content').select('*').gte('published_at', `${today}T00:00:00`).lt('published_at', `${today}T23:59:59`).order('published_at', { ascending: false });
     if (!error && data) setPublishedToday(data);
   };
 
   const deletePublished = async (id: string) => {
     if (!confirm("წაშლა საშუალებას მისცემს აგენტს ხელახლა დაპოსტოს. დარწმუნებული ხარ?")) return;
     const { error } = await supabase.from('published_content').delete().eq('id', id);
-    if (!error) {
-      setPublishedToday(prev => prev.filter(p => p.id !== id));
-    }
+    if (!error) setPublishedToday(prev => prev.filter(p => p.id !== id));
   };
 
   const getPublishedStatus = (rule: any) => {
-    const matching = publishedToday.find(p => 
-      p.content_type === rule.content_type && 
-      (!rule.zodiac_sign || p.zodiac_sign === rule.zodiac_sign)
-    );
+    const matching = publishedToday.find(p => p.content_type === rule.content_type && (!rule.zodiac_sign || p.zodiac_sign === rule.zodiac_sign));
     if (!matching) return null;
     return matching.status;
   };
@@ -224,13 +199,10 @@ export default function MasterSchedulePage() {
   const currentTimeStr = now.toTimeString().slice(0, 5);
 
   const getRuleStatus = (rule: any) => {
-    if (rule.status && ['pause', 'skip'].includes(rule.status)) {
-      return rule.status;
-    }
+    if (rule.status && ['pause', 'skip'].includes(rule.status)) return rule.status;
     if (!rule.is_active) return 'past';
     if (rule.day_of_week < currentDayIndex) return 'past';
     if (rule.day_of_week > currentDayIndex) return 'upcoming';
-    
     const ruleTime = formatTime(rule.time);
     const ruleTimeHHMM = ruleTime.substring(0, 5);
     if (ruleTimeHHMM <= currentTimeStr) return 'done';
@@ -239,9 +211,7 @@ export default function MasterSchedulePage() {
 
   const toggleRule = async (id: string, currentStatus: boolean) => {
     const { error } = await supabase.from("content_schedule").update({ is_active: !currentStatus }).eq("id", id);
-    if (!error) {
-      setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, is_active: !currentStatus } : rule)));
-    }
+    if (!error) setSchedule((prev) => prev.map((rule) => (rule.id === id ? { ...rule, is_active: !currentStatus } : rule)));
   };
 
   const updateRuleStatus = async (id: string, newStatus: string) => {
@@ -253,35 +223,43 @@ export default function MasterSchedulePage() {
     }
   };
 
-  // ✅ ჭკვიანი განახლება: ცვლის ზოდიაქოს და ავტომატურად ანაცვლებს ძველ ნიშანს ახლით თემის ტექსტში
+  // ✅ ჭკვიანი ლოგიკა: ტექსტში ვეძებთ ნებისმიერ ზოდიაქოს და ვცვლით ახალი არჩევანით
   const updateZodiacSign = async (ruleId: string, newZodiac: string | null) => {
     setSavingZodiac(ruleId);
-
     const currentRule = schedule.find(r => r.id === ruleId);
     let newTheme = currentRule?.content_theme || "";
 
-    // თუ გვაქვს ძველი ნიშანი და ვირჩევთ ახალს, ვცვლით ძველს ახლით თემის ტექსტში
-    if (currentRule?.zodiac_sign && newZodiac) {
-      // 'gi' flag უზრუნველყოფს, რომ შეიცვალოს დამოუკიდებლად რეგისტრისგან (მაგ. "scorpio" ან "SCORPIO")
-      const regex = new RegExp(currentRule.zodiac_sign, 'gi');
-      newTheme = newTheme.replace(regex, newZodiac);
+    if (newZodiac) {
+      // ვქმნით რეგულარულ გამოსახულებას, რომელიც ეძებს ნებისმიერ ზოდიაქოს მთლიანად როგორც სიტყვას (\b), დამოუკიდებლად რეგისტრისგან (gi)
+      const zodiacRegex = new RegExp(`\\b(${ALL_ZODIAC_SIGNS.join('|')})\\b`, 'gi');
+      
+      // თუ ტექსტში ნაპოვნია რაიმე ზოდიაქო, ვცვლით მას ახალით
+      if (zodiacRegex.test(newTheme)) {
+        newTheme = newTheme.replace(zodiacRegex, newZodiac);
+      } else {
+        // უკიდურესი შემთხვევა: თუ ტექსტში საერთოდ არ არის ზოდიაქოს სახელი, პირველ სიტყვას ვცვლით (უსაფრთხოებისთვის)
+        const words = newTheme.split(' ');
+        if (words.length > 0) {
+          words[0] = newZodiac;
+          newTheme = words.join(' ');
+        }
+      }
     }
 
     const { data, error } = await supabase
       .from("content_schedule")
       .update({ 
         zodiac_sign: newZodiac,
-        content_theme: newTheme // ✅ ვინახავთ განახლებულ თემასაც
+        content_theme: newTheme 
       })
       .eq("id", ruleId)
       .select();
 
     if (error) {
-      console.error("❌ შეცდომა ზოდიაქოს განახლებისას:", error);
-      alert(`შეცდომა ბაზაში შენახვისას: ${error.message}`);
+      console.error("❌ შეცდომა:", error);
+      alert(`შეცდომა: ${error.message}`);
     } else if (!data || data.length === 0) {
-      console.error("❌ განახლდა 0 ჩანაწერი. შეამოწმე Supabase RLS policy.");
-      alert("ბაზაში ცვლილება არ შეინახა (0 ჩანაწერი განახლდა).");
+      alert("ბაზაში ცვლილება არ შეინახა.");
     } else {
       setSchedule((prev) => prev.map((rule) =>
         rule.id === ruleId ? { ...rule, zodiac_sign: newZodiac, content_theme: newTheme } : rule
@@ -429,12 +407,7 @@ export default function MasterSchedulePage() {
                         <span className="mono shrink-0 text-xs text-[var(--mute)]">
                           {new Date(p.published_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <button 
-                          onClick={() => deletePublished(p.id)} 
-                          aria-label="წაშლა"
-                          className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]"
-                          title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას"
-                        >
+                        <button onClick={() => deletePublished(p.id)} aria-label="წაშლა" className="rounded-lg p-1.5 text-[var(--mute)] transition-colors hover:bg-[#ff7aa8]/10 hover:text-[var(--rose)]" title="წაშლა - აგენტი ხელახლა შეძლებს დაპოსტვას">
                           {Icons.trash}
                         </button>
                       </div>
@@ -451,18 +424,7 @@ export default function MasterSchedulePage() {
                   const isToday = index === currentDayIndex;
                   const has = count > 0;
                   return (
-                    <a
-                      key={day}
-                      href={has ? `#day-${index}` : undefined}
-                      aria-disabled={!has}
-                      className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                        isToday
-                          ? "border-[#9b8cff]/60 bg-[#9b8cff]/15 text-[var(--moon)]"
-                          : has
-                          ? "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]"
-                          : "pointer-events-none border-[var(--line)] text-[#9d9bbd]/40"
-                      }`}
-                    >
+                    <a key={day} href={has ? `#day-${index}` : undefined} aria-disabled={!has} className={`flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${isToday ? "border-[#9b8cff]/60 bg-[#9b8cff]/15 text-[var(--moon)]" : has ? "border-[var(--line-2)] text-[var(--mute)] hover:text-[var(--moon)]" : "pointer-events-none border-[var(--line)] text-[#9d9bbd]/40"}`}>
                       {day.slice(0, 3)}
                       <span className="mono text-xs opacity-80">{count}</span>
                     </a>
@@ -488,11 +450,7 @@ export default function MasterSchedulePage() {
                 const isToday = index === currentDayIndex;
 
                 return (
-                  <section
-                    key={day}
-                    id={`day-${index}`}
-                    className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}
-                  >
+                  <section key={day} id={`day-${index}`} className={`scroll-mt-24 rounded-2xl border transition-all ${isToday ? "border-[#9b8cff]/50 bg-[#9b8cff]/[0.04] ig-today-glow" : "border-[var(--line)] bg-[var(--ink-2)]"}`}>
                     <div className={`flex items-center justify-between rounded-t-2xl border-b px-4 py-3 ${isToday ? "border-[#9b8cff]/30 bg-[#9b8cff]/10" : "border-[var(--line)] bg-[#1a1e3a]/50"}`}>
                       <div className="flex items-center gap-2.5">
                         <h3 className="text-sm font-semibold">{day}</h3>
@@ -575,10 +533,7 @@ export default function MasterSchedulePage() {
 
                               <div className={`status-dropdown relative ${activeDropdown === rule.id ? 'z-[70]' : 'z-10'}`}>
                                 <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setActiveDropdown(activeDropdown === rule.id ? null : rule.id);
-                                  }}
+                                  onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === rule.id ? null : rule.id); }}
                                   aria-haspopup="menu"
                                   aria-expanded={activeDropdown === rule.id}
                                   className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition-opacity hover:opacity-80 ${statusStyle.bg} ${statusStyle.border} ${statusStyle.text}`}
@@ -591,14 +546,7 @@ export default function MasterSchedulePage() {
                                 {activeDropdown === rule.id && (
                                   <div role="menu" className="ig-pop absolute right-0 top-full z-[100] mt-2 w-40 rounded-xl border border-[var(--line-2)] bg-[var(--ink-2)] p-1 shadow-2xl">
                                     {Object.entries(STATUS_STYLES).map(([key, style]) => (
-                                      <button
-                                        key={key}
-                                        role="menuitem"
-                                        onClick={() => updateRuleStatus(rule.id, key)}
-                                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${
-                                          status === key ? 'bg-white/5 text-[#b3a8ff]' : 'text-[var(--moon)]'
-                                        }`}
-                                      >
+                                      <button key={key} role="menuitem" onClick={() => updateRuleStatus(rule.id, key)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-white/5 ${status === key ? 'bg-white/5 text-[#b3a8ff]' : 'text-[var(--moon)]'}`}>
                                         {style.icon}
                                         {style.label}
                                       </button>
@@ -610,20 +558,12 @@ export default function MasterSchedulePage() {
                               {publishStatus && (
                                 <div className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 ${PUBLISH_STATUS_STYLES[publishStatus].bg} ${PUBLISH_STATUS_STYLES[publishStatus].border} ${PUBLISH_STATUS_STYLES[publishStatus].text}`}>
                                   {PUBLISH_STATUS_STYLES[publishStatus].icon}
-                                  <span className="text-[11px] font-semibold tracking-wide">
-                                    {PUBLISH_STATUS_STYLES[publishStatus].label}
-                                  </span>
+                                  <span className="text-[11px] font-semibold tracking-wide">{PUBLISH_STATUS_STYLES[publishStatus].label}</span>
                                 </div>
                               )}
 
                               <div className="flex items-center gap-1 border-l border-[var(--line)] pl-2">
-                                <button
-                                  role="switch"
-                                  aria-checked={rule.is_active}
-                                  aria-label={rule.is_active ? "Disable rule" : "Enable rule"}
-                                  onClick={() => toggleRule(rule.id, rule.is_active)}
-                                  className={`relative mr-1 h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}
-                                >
+                                <button role="switch" aria-checked={rule.is_active} aria-label={rule.is_active ? "Disable rule" : "Enable rule"} onClick={() => toggleRule(rule.id, rule.is_active)} className={`relative mr-1 h-6 w-11 shrink-0 rounded-full transition-colors ${rule.is_active ? "bg-[var(--ok)]" : "bg-[var(--ink-3)] ring-1 ring-inset ring-[var(--line-2)]"}`}>
                                   <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${rule.is_active ? "left-6" : "left-1"}`} />
                                 </button>
                                 <button onClick={() => openModal(rule)} aria-label="Edit rule" className="rounded-lg p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">{Icons.edit}</button>
@@ -700,7 +640,7 @@ export default function MasterSchedulePage() {
               </div>
               <div>
                 <label htmlFor="rule-theme" className={labelClass}>Content theme</label>
-                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="მაგ: კვირის დაწყება: ARIES ენერგია" className={inputClass} required />
+                <input id="rule-theme" type="text" value={formData.content_theme} onChange={(e) => setFormData({...formData, content_theme: e.target.value})} placeholder="მაგ: SCORPIO & სიყვარული: მითი vs რეალობა" className={inputClass} required />
               </div>
               <div>
                 <label htmlFor="rule-goal" className={labelClass}>Primary goal</label>
