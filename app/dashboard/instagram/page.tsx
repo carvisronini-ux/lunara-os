@@ -7,7 +7,6 @@ import { createClient } from "@supabase/supabase-js";
 import InstagramPanel from "@/components/instagram/InstagramPanel";
 
 type ContentType = "post" | "carousel" | "story" | "reel";
-// ✅ 1. დამატებულია "agents" TabId-ში
 type TabId = "manual" | "agents" | "instaboss" | "analytics";
 
 interface Profile {
@@ -56,7 +55,6 @@ const FORMAT_CONFIG: Record<
   reel: { label: "Reel", size: "1080 × 1920", ratio: "9:16", ratioCss: "9 / 16", hint: "Vertical video discovery" },
 };
 
-// ✅ 2. დამატებულია "Agents" ტაბი
 const TABS: { id: TabId; label: string; soon?: boolean }[] = [
   { id: "manual", label: "Manual" },
   { id: "agents", label: "Agents" },
@@ -89,7 +87,6 @@ const STYLES = `
 }
 `;
 
-/* ---------- small icons ---------- */
 const Icon = {
   back: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -118,7 +115,6 @@ const Icon = {
   ),
 };
 
-/* ---------- page ---------- */
 export default function InstagramPage() {
   const [profiles, setProfiles] = useState<Profile[]>(DEFAULT_PROFILES);
   const [hydrated, setHydrated] = useState(false);
@@ -572,7 +568,6 @@ export default function InstagramPage() {
                 </div>
               )}
 
-              {/* ✅ 3. დამატებულია Agents ტაბის კონტენტი (გადამისამართება) */}
               {activeTab === "agents" && (
                 <div role="tabpanel" className="rounded-3xl border border-[var(--line)] bg-[var(--ink-2)] p-6">
                   <div className="flex flex-col items-center justify-center py-12 text-center">
