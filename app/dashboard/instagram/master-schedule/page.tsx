@@ -298,35 +298,52 @@ export default function MasterSchedulePage() {
     setShowModal(true);
   };
 
+  // ✅ განახლებული handleSave ფუნქცია დეტალური შეცდომის გამოტანით
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // ✅ თუ ველი ცარიელია ან მხოლოდ ჰარებს შეიცავს, ვინახავთ როგორც null-ს
+    // მონაცემების სწორად მომზადება ბაზისთვის
     const themeToSave = formData.content_theme.trim() === '' ? null : formData.content_theme;
+    const zodiacToSave = formData.zodiac_sign === '' ? null : formData.zodiac_sign;
+
+    const payload = { 
+      day_of_week: Number(formData.day_of_week),
+      time: formData.time,
+      content_type: formData.content_type,
+      zodiac_sign: zodiacToSave, 
+      content_theme: themeToSave,
+      goal: formData.goal,
+      is_active: editingRule ? editingRule.is_active : true 
+    };
+
+    console.log("📦 ბაზაში იგზავნება მონაცემები:", payload);
 
     if (editingRule) {
-      const { error } = await supabase.from("content_schedule").update({ 
-        ...formData, 
-        zodiac_sign: formData.zodiac_sign || null,
-        content_theme: themeToSave
-      }).eq("id", editingRule.id);
+      const { error } = await supabase.from("content_schedule").update(payload).eq("id", editingRule.id);
       
-      if (!error) {
-        setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...formData, zodiac_sign: formData.zodiac_sign || null, content_theme: themeToSave } : rule).sort((a, b) => {
-          if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
-          return formatTime(a.time).localeCompare(formatTime(b.time));
-        }));
-        setShowModal(false);
+      if (error) {
+        console.error("❌ Update error:", error);
+        alert(`შეცდომა განახლებისას: ${error.message}\nდეტალები: ${JSON.stringify(error.details || error.hint)}`);
+        return;
       }
-    } else {
-      const { data, error } = await supabase.from("content_schedule").insert([{ 
-        ...formData, 
-        zodiac_sign: formData.zodiac_sign || null, 
-        content_theme: themeToSave,
-        is_active: true 
-      }]).select();
       
-      if (!error && data) {
+      setSchedule((prev) => prev.map((rule) => rule.id === editingRule.id ? { ...rule, ...payload } : rule).sort((a, b) => {
+        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+        return formatTime(a.time).localeCompare(formatTime(b.time));
+      }));
+      setShowModal(false);
+      
+    } else {
+      const { data, error } = await supabase.from("content_schedule").insert([payload]).select();
+      
+      if (error) {
+        console.error("❌ Insert error:", error);
+        // ეს ალერტი ზუსტად გვეტყვის, რა არის პრობლემა
+        alert(`შეცდომა შენახვისას: ${error.message}\n\nდეტალები: ${JSON.stringify(error.details || error.hint)}`);
+        return;
+      }
+      
+      if (data) {
         setSchedule((prev) => [...prev, data[0]].sort((a, b) => {
           if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
           return formatTime(a.time).localeCompare(formatTime(b.time));
@@ -502,7 +519,6 @@ export default function MasterSchedulePage() {
                                   {rule.content_type.charAt(0).toUpperCase() + rule.content_type.slice(1)}
                                   {rule.zodiac_sign && <span className="ml-2 font-normal text-[#b3a8ff]">· {rule.zodiac_sign}</span>}
                                 </p>
-                                {/* ✅ თუ თემა ცარიელია, ვაჩვენებთ შესაბამის შეტყობინებას */}
                                 <p className="truncate text-xs text-[var(--mute)] italic">
                                   {rule.content_theme || "AI will generate theme"}
                                 </p>
@@ -669,7 +685,6 @@ export default function MasterSchedulePage() {
                   onChange={(e) => setFormData({...formData, content_theme: e.target.value})} 
                   placeholder="დატოვე ცარიელი, რომ AI-მ თავად მოიფიქროს თემა" 
                   className={inputClass} 
-                  // ✅ წაშლილია required ატრიბუტი
                 />
               </div>
               <div>
