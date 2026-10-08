@@ -137,13 +137,16 @@ export default function AgentsPage() {
 
     if (error) {
       console.error('Error loading config:', error);
+      addAgentLog(`❌ კონფიგურაციის ჩატვირთვის შეცდომა: ${error.message}`);
       return;
     }
 
     if (data) {
       setMasterPrompt(data.master_prompt || '');
       setThinkingStyle(data.thinking_style || '');
-      setSkills(data.skills || '');
+      // ✅ ყურადღება: ბაზაში სვეტს ერქვა skills_constraints
+      setSkills(data.skills_constraints || ''); 
+      addAgentLog(`✅ ${agentType.toUpperCase()} კონფიგურაცია ჩაიტვირთა`);
     }
   };
 
@@ -157,6 +160,7 @@ export default function AgentsPage() {
   // ✅ კონფიგურაციის შენახვა ბაზაში
   const saveAgentConfig = async () => {
     setIsSavingConfig(true);
+    addAgentLog(`💾 ${configAgentType.toUpperCase()} კონფიგურაციის შენახვა...`);
     
     const { error } = await supabase
       .from('agent_config')
@@ -164,14 +168,15 @@ export default function AgentsPage() {
         agent_type: configAgentType,
         master_prompt: masterPrompt,
         thinking_style: thinkingStyle,
-        skills: skills,
+        skills_constraints: skills, // ✅ ყურადღება: ბაზის სვეტის სახელი
         updated_at: new Date().toISOString()
       });
 
     if (error) {
       addAgentLog(`❌ შეცდომა კონფიგურაციის შენახვისას: ${error.message}`);
+      console.error('Save error:', error);
     } else {
-      addAgentLog(`✅ ${configAgentType.toUpperCase()} აგენტის კონფიგურაცია წარმატებით შეინახა!`);
+      addAgentLog(`✅ ${configAgentType.toUpperCase()} კონფიგურაცია წარმატებით შეინახა!`);
       setShowConfigModal(false);
     }
 
@@ -251,7 +256,7 @@ export default function AgentsPage() {
 
       // ✅ ჭკვიანი არჩევანი
       const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
-      addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
+      addAgentLog(`🌟 არჩეული ოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
@@ -377,7 +382,7 @@ export default function AgentsPage() {
                         className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/30 bg-[var(--violet)]/10 px-4 py-2.5 text-sm font-medium text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
                       >
                         {Icons.brain}
-                        Configure Agent
+                        Configure PostAgent
                       </button>
                       <button 
                         onClick={() => checkAndRunPostAgent()}
@@ -462,7 +467,7 @@ export default function AgentsPage() {
                 <textarea
                   value={masterPrompt}
                   onChange={(e) => setMasterPrompt(e.target.value)}
-                  placeholder="მთავარი ინსტრუქცია აგენტისთვის... (მაგ: შენ ხარ პროფესიონალი ასტროლოგი...)"
+                  placeholder="მთავარი ინსტრუქცია აგენტისთვის..."
                   className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[120px] resize-none"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
@@ -477,7 +482,7 @@ export default function AgentsPage() {
                 <textarea
                   value={thinkingStyle}
                   onChange={(e) => setThinkingStyle(e.target.value)}
-                  placeholder="როგორ ფიქრობს აგენტი... (მაგ: ემოციურად, მაგრამ ლოგიკურად...)"
+                  placeholder="როგორ ფიქრობს აგენტი..."
                   className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
@@ -492,7 +497,7 @@ export default function AgentsPage() {
                 <textarea
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
-                  placeholder="უნარები და შეზღუდვები... (მაგ: ვირუსული ჰუკების შექმნა, არ იყენებ კლიშეებს...)"
+                  placeholder="უნარები და შეზღუდვები..."
                   className="w-full rounded-xl border border-[var(--line-2)] bg-[var(--ink)] px-4 py-3 text-sm outline-none focus:border-[var(--violet)] min-h-[100px] resize-none"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
