@@ -169,7 +169,6 @@ export default function AgentsPage() {
     const currentDayIndex = jsDay === 0 ? 6 : jsDay - 1;
     const currentTimeStr = now.toTimeString().slice(0, 5);
 
-    // ვიღებთ ყველა აქტიურ post წესს, დალაგებულს დროის მიხედვით
     const { data: rules, error } = await supabase
       .from('content_schedule')
       .select('day_of_week, time')
@@ -183,7 +182,6 @@ export default function AgentsPage() {
       return;
     }
 
-    // ვეძებთ პირველ წესს, რომლის დროც ჯერ არ მოსულა
     const nextRule = rules.find((r: any) => {
       if (r.day_of_week > currentDayIndex) return true;
       if (r.day_of_week === currentDayIndex && r.time > currentTimeStr) return true;
@@ -345,7 +343,7 @@ export default function AgentsPage() {
       const matchingRule = rules.find((r: any) => forceRun || r.time <= currentTimeStr);
 
       if (!matchingRule) {
-        addAgentLog(` დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
+        addAgentLog(`⏳ დღეს არის ${rules.length} post წესი, მაგრამ დრო ჯერ არ მოსულა. უახლოესი: ${rules[0].time}`);
         setIsChecking(false);
         return;
       }
@@ -375,15 +373,15 @@ export default function AgentsPage() {
       }
 
       const zodiacToPost = chooseSmartZodiac(matchingRule.zodiac_sign);
-      addAgentLog(` არჩეული ზოდიაქო: ${zodiacToPost}`);
+      addAgentLog(`🌟 არჩეული ზოდიაქო: ${zodiacToPost}`);
       addAgentLog(`🚀 ვრთავ PostAgent-ს...`);
       
       if (panelRef.current) {
         const success = await panelRef.current.executeAutoPostSequence(zodiacToPost);
         if (success) {
-          addAgentLog(" PostAgent-მა წარმატებით დაასრულა ციკლი!");
+          addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
-          fetchLastPostTime();
+          fetchLastPostTime(); // ✅ წარმატების შემდეგ ვაახლებთ დროებს
           fetchNextPostTime();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
@@ -585,7 +583,7 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/15 bg-gradient-to-r from-[var(--violet)]/[.07] via-transparent to-[var(--rose)]/[.04] p-5 text-center shadow-[0_14px_35px_rgba(0,0,0,.12)]">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
