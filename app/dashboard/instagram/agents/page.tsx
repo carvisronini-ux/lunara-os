@@ -481,12 +481,12 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ განახლებული ლოგიკა: თაგლის შეცვლისას ანახლებს ბაზაში შესაბამის ჩანაწერებს
+  // ✅ გასწორებული ლოგიკა: ცხადად მითითებულია 'active' | 'inactive' ტიპი
   const toggleAgent = async (id: string) => {
     const agentToToggle = agents.find(a => a.id === id);
     if (!agentToToggle) return;
 
-    const newStatus = agentToToggle.status === 'active' ? 'inactive' : 'active';
+    const newStatus: 'active' | 'inactive' = agentToToggle.status === 'active' ? 'inactive' : 'active';
 
     // 1. ვაახლებთ ლოკალურ სტეიტს (UI-ს სწრაფი რეაგირებისთვის)
     setAgents(prev => {
