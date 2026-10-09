@@ -185,7 +185,8 @@ export default function HomePage() {
   const [documentationContent, setDocumentationContent] = useState('');
   const [isDocLoading, setIsDocLoading] = useState(false);
   
-  const [activePanel, setActivePanel] = useState<"overview" | "pipeline" | "approvals" | "quality" | "learning" | "emergency" | "knowledge" | "intelligence" | "content-family" | "distribution" | "credentials" | "e2e-test">("overview");
+  // ✅ გამოსწორებულია: ტიპი არის უბრალოდ PanelId, რაც მოიცავს "telegram"-საც, მაგრამ მას არ ვაჩვენებთ inline
+  const [activePanel, setActivePanel] = useState<PanelId>("overview");
   const timersRef = useRef<number[]>([]);
 
   useEffect(() => {
