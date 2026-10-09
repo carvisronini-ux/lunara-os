@@ -45,6 +45,7 @@ interface Agent {
   type: string;
   icon: string;
   color: string;
+  description: string; // ✅ ახალი ველი აღწერისთვის
   status: 'active' | 'inactive';
   nextRun: string;
   lastRun: string;
@@ -67,12 +68,78 @@ interface ScheduleItem {
 }
 
 const TELEGRAM_AGENTS: Agent[] = [
-  { id: 'tg-daily', name: 'Daily Anchor Agent', type: 'daily_anchor', icon: '☀️', color: 'text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/20', status: 'inactive', nextRun: 'Daily 09:00', lastRun: 'Never', totalPosts: 0 },
-  { id: 'tg-interactive', name: 'Interactive Play Agent', type: 'interactive_play', icon: '🎯', color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20', status: 'inactive', nextRun: 'Tue/Thu 15:00', lastRun: 'Never', totalPosts: 0 },
-  { id: 'tg-educational', name: 'Educational Agent', type: 'educational_deep_dive', icon: '📚', color: 'text-[#60a5fa] bg-[#60a5fa]/10 border-[#60a5fa]/20', status: 'inactive', nextRun: 'Wed 13:00', lastRun: 'Never', totalPosts: 0 },
-  { id: 'tg-cosmic', name: 'Cosmic Calendar Agent', type: 'cosmic_calendar', icon: '🌙', color: 'text-[#a78bfa] bg-[#a78bfa]/10 border-[#a78bfa]/20', status: 'inactive', nextRun: 'Sun 16:00', lastRun: 'Never', totalPosts: 0 },
-  { id: 'tg-inner', name: 'Inner Universe Agent', type: 'inner_universe', icon: '💫', color: 'text-[#f472b6] bg-[#f472b6]/10 border-[#f472b6]/20', status: 'inactive', nextRun: 'Thu 15:00', lastRun: 'Never', totalPosts: 0 },
-  { id: 'tg-product', name: 'Product Bridge Agent', type: 'product_bridge', icon: '🚀', color: 'text-[#5fd6a4] bg-[#5fd6a4]/10 border-[#5fd6a4]/20', status: 'inactive', nextRun: 'Fri 12:00', lastRun: 'Never', totalPosts: 0 },
+  { 
+    id: 'tg-daily', 
+    name: 'Daily Anchor Agent', 
+    type: 'daily_anchor', 
+    icon: '☀️', 
+    color: 'text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/20', 
+    description: 'ქმნის დღის საერთო ენერგიის მიმოხილვას, 12 ნიშნის დღიურ ჰოროსკოპსა და დღის ტაროს ბარათს. მიზანია ყოველდღიური დაბრუნების ჩვევის ჩამოყალიბება.',
+    status: 'inactive', 
+    nextRun: 'Daily 09:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
+  { 
+    id: 'tg-interactive', 
+    name: 'Interactive Play Agent', 
+    type: 'interactive_play', 
+    icon: '🎯', 
+    color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20', 
+    description: 'ქმნის „აირჩიე ტაროს ბარათი“, ასტროლოგიურ ვიქტორინებს, გამოკითხვებს და სხვა თამაშებს. მიზანია მომხმარებელი აქტიურ მონაწილედ აქციოს და გაზარდოს ჩართულობა.',
+    status: 'inactive', 
+    nextRun: 'Tue/Thu 15:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
+  { 
+    id: 'tg-educational', 
+    name: 'Educational Agent', 
+    type: 'educational_deep_dive', 
+    icon: '📚', 
+    color: 'text-[#60a5fa] bg-[#60a5fa]/10 border-[#60a5fa]/20', 
+    description: 'ქმნის საგანმანათლებლო პოსტებს: ასტროლოგიის საფუძვლებს, ტაროს არკანების განმარტებებს, ნუმეროლოგიას და „მითი vs რეალობა“ რუბრიკებს ექსპერტული იმიჯის ჩამოსაყალიბებლად.',
+    status: 'inactive', 
+    nextRun: 'Wed 13:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
+  { 
+    id: 'tg-cosmic', 
+    name: 'Cosmic Calendar Agent', 
+    type: 'cosmic_calendar', 
+    icon: '🌙', 
+    color: 'text-[#a78bfa] bg-[#a78bfa]/10 border-[#a78bfa]/20', 
+    description: 'ქმნის კვირის/თვის ასტროლოგიურ მიმოხილვებს, მთვარის ფაზების კალენდარს, დაბნელებებისა და რეტროგრადული პერიოდების გზამკვლევებს აქტუალური ინფორმაციისთვის.',
+    status: 'inactive', 
+    nextRun: 'Sun 16:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
+  { 
+    id: 'tg-inner', 
+    name: 'Inner Universe Agent', 
+    type: 'inner_universe', 
+    icon: '💫', 
+    color: 'text-[#f472b6] bg-[#f472b6]/10 border-[#f472b6]/20', 
+    description: 'ქმნის პოსტებს სიყვარულის დინამიკაზე, პირად საზღვრებზე, ემოციურ გზავნილებსა და დღიურისთვის განკუთვნილ რეფლექსიის კითხვებზე ღრმა ემოციური კავშირისთვის.',
+    status: 'inactive', 
+    nextRun: 'Thu 15:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
+  { 
+    id: 'tg-product', 
+    name: 'Product Bridge Agent', 
+    type: 'product_bridge', 
+    icon: '🚀', 
+    color: 'text-[#5fd6a4] bg-[#5fd6a4]/10 border-[#5fd6a4]/20', 
+    description: 'ქმნის პოსტებს, რომლებიც ბუნებრივად უკავშირებს არხის კონტენტს Lunara-ს Mini App-ის ფუნქციებს (პერსონალური ჰოროსკოპი, ნატალური რუკა, უფასო რესურსები) კონვერსიისთვის.',
+    status: 'inactive', 
+    nextRun: 'Fri 12:00', 
+    lastRun: 'Never', 
+    totalPosts: 0 
+  },
 ];
 
 export default function TelegramAgentsPage() {
@@ -211,7 +278,6 @@ export default function TelegramAgentsPage() {
       const currentMinute = now.getMinutes();
       const currentTimeVal = currentHour * 60 + currentMinute;
 
-      // ✅ გამოსწორებულია: rule პარამეტრს აქვს ScheduleItem ტიპი
       const nextRule = rules.find((rule: ScheduleItem) => {
         if (rule.day_of_week === currentDayCustom) {
           const [h, m] = rule.time.split(':').map(Number);
@@ -272,7 +338,7 @@ export default function TelegramAgentsPage() {
             </Link>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Telegram Agents Control Center</h1>
-              <p className="hidden text-xs text-[var(--mute)] sm:block mt-0.5">Manage specialized AI agents for each content category</p>
+              <p className="hidden text-xs text-[var(--mute)] sm:block mt-0.5">მართე სპეციალიზებული AI აგენტები თითოეული კონტენტის კატეგორიისთვის</p>
             </div>
           </div>
         </div>
@@ -302,12 +368,16 @@ export default function TelegramAgentsPage() {
                   <div className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border text-2xl ${agent.color}`}>
                     {agent.icon}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="text-lg font-semibold text-[var(--moon)]">{agent.name}</h3>
-                    <p className="text-sm capitalize text-[var(--mute)]">{agent.type.replace(/_/g, ' ')}</p>
+                    <p className="text-sm capitalize text-[var(--mute)] mb-1">{agent.type.replace(/_/g, ' ')}</p>
+                    {/* ✅ ახალი აღწერილობის ბლოკი */}
+                    <p className="text-xs text-[var(--mute)] leading-relaxed">
+                      {agent.description}
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 sm:flex-col sm:items-end">
                   <div className="text-right">
                     <p className="text-xs text-[var(--mute)]">Status</p>
                     <p className={`text-sm font-semibold ${agent.status === 'active' ? 'text-[var(--ok)]' : 'text-[var(--mute)]'}`}>
