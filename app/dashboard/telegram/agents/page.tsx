@@ -215,14 +215,12 @@ export default function TelegramAgentsPage() {
     }
   };
 
-  // ✅ გასწორებული ლოგიკა: ცხადად მითითებულია 'active' | 'inactive' ტიპი
   const toggleAgent = (id: string) => {
     setAgents(prev => {
       const newAgents = prev.map(agent => {
         if (agent.id === id) {
           const newStatus: 'active' | 'inactive' = agent.status === 'active' ? 'inactive' : 'active';
           
-          // ვაგზავნით მოთხოვნას ბაზაში, რომ განვაახლოთ ყველა ჩანაწერი ამ აგენტის ტიპისთვის
           supabase.from('content_schedule').update({ is_active: newStatus === 'active' }).eq('content_type', 'telegram');
           addAgentLog(`🔄 TelegramAgent ${newStatus === 'active' ? 'ჩაირთო' : 'გაითიშა'}.`);
           
@@ -233,8 +231,6 @@ export default function TelegramAgentsPage() {
       return newAgents;
     });
   };
-
-  const activeAgentsCount = agents.filter(a => a.status === 'active').length;
 
   return (
     <div className="agents-root min-h-screen">
