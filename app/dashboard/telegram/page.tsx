@@ -39,7 +39,6 @@ export default function TelegramDashboardPage() {
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
-    console.log(`[Telegram Dashboard] ${message}`);
   };
 
   useEffect(() => {
@@ -78,7 +77,7 @@ export default function TelegramDashboardPage() {
       }
     } catch (error) {
       console.error('Failed to save documentation:', error);
-        showToast("❌ Failed to save documentation");
+      showToast("❌ Failed to save documentation");
     }
   };
 
@@ -109,8 +108,8 @@ export default function TelegramDashboardPage() {
           </button>
         </div>
 
-        {/* Main Navigation Cards */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* 1. NEW: Navigation Cards */}
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Card 1: Agents Control Center */}
           <button
             onClick={() => router.push("/dashboard/telegram/agents")}
@@ -148,36 +147,44 @@ export default function TelegramDashboardPage() {
           </button>
         </div>
 
-        {/* Bottom Quick Links Section */}
-        <div className="mt-12 rounded-2xl border border-[var(--line)] bg-[var(--ink-2)] p-6 lg:p-8">
-          <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-            <div>
-              <h3 className="text-lg font-semibold text-[var(--moon)]">LUNARA Official Channel</h3>
-              <p className="mt-1 text-sm text-[var(--mute)]">Your daily cosmic signal. Discover the hidden geometry of the cosmos.</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href="https://t.me/lunaraOS"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-[#0b0d1c]/60 px-4 py-2.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
-              >
-                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.623 4.823-4.351c.192-.192-.054-.3-.297-.108l-5.965 3.759-2.568-.802c-.56-.176-.57-.56.117-.828l10.037-3.869c.466-.174.875.108.713.828z"/></svg>
-                Open Channel
-              </a>
-              <button
-                onClick={() => setIsAnalyticsModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-[#0b0d1c]/60 px-4 py-2.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
-              >
-                <span aria-hidden>📊</span> Analytics
-              </button>
-              <button
-                onClick={() => setIsDocModalOpen(true)}
-                className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-[#0b0d1c]/60 px-4 py-2.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
-              >
-                <span aria-hidden>📄</span> Documentation
-              </button>
-            </div>
+        {/* 2. ORIGINAL: The Big Banner & Quick Links */}
+        <div 
+          className="group relative overflow-hidden rounded-[28px] border border-[var(--line-2)] transition-colors hover:border-[var(--violet)] md:h-80 lg:h-96"
+          style={{ background: "radial-gradient(circle at 78% 24%, #1a1e3a 0 7%, transparent 7.3%), radial-gradient(circle at 74% 26%, #f6c177 0 11%, transparent 11.3%), linear-gradient(160deg, #241c52 0%, #14173a 55%, #0b0d1c 100%)" }}
+        >
+          <div className="absolute right-4 top-4 z-20 flex gap-2">
+            <a
+              href="https://t.me/lunaraOS"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
+            >
+              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.223-.548.223l.188-2.623 4.823-4.351c.192-.192-.054-.3-.297-.108l-5.965 3.759-2.568-.802c-.56-.176-.57-.56.117-.828l10.037-3.869c.466-.174.875.108.713.828z"/></svg>
+              <span className="hidden sm:inline">Open Channel</span>
+            </a>
+            <button
+              onClick={() => setIsAnalyticsModalOpen(true)}
+              className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
+            >
+              <span aria-hidden>📊</span><span className="hidden sm:inline">Analytics</span>
+            </button>
+            <button
+              onClick={() => setIsDocModalOpen(true)}
+              className="flex items-center gap-2 rounded-full border border-[var(--line-2)] bg-[#0b0d1c]/60 px-3.5 py-1.5 text-sm font-medium text-[var(--moon)] backdrop-blur-md transition-colors hover:bg-white/10"
+            >
+              <span aria-hidden>📄</span><span className="hidden sm:inline">Docs</span>
+            </button>
+          </div>
+
+          <div className="relative z-10 flex h-full flex-col justify-end p-6 lg:p-10">
+            <h2 className="text-5xl font-bold tracking-tight text-[var(--moon)] md:text-6xl lg:text-7xl">LUNARA</h2>
+            <p className="mt-2 hidden max-w-xl text-lg text-[#ece9f7]/75 sm:block">
+              Your daily cosmic signal. Discover the hidden geometry of the cosmos.
+            </p>
+            <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[var(--moon)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-transform group-hover:translate-x-1">
+              View documentation
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </span>
           </div>
         </div>
       </div>
