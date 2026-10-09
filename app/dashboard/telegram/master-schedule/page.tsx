@@ -71,7 +71,7 @@ export default function TelegramMasterSchedulePage() {
   const [formData, setFormData] = useState({
     day_of_week: 0,
     time: "09:00",
-    content_type: "telegram", // ✅ ფიქსირებულია ტელეგრამზე
+    content_type: "telegram",
     zodiac_sign: "",
     content_theme: "",
     goal: "Engagement",
@@ -98,7 +98,7 @@ export default function TelegramMasterSchedulePage() {
     const { data, error } = await supabase
       .from("content_schedule")
       .select("*")
-      .eq("content_type", "telegram") // ✅ მხოლოდ ტელეგრამის ჩანაწერები
+      .eq("content_type", "telegram")
       .order("day_of_week", { ascending: true })
       .order("time", { ascending: true });
     if (!error && data) setSchedule(data);
@@ -188,7 +188,7 @@ export default function TelegramMasterSchedulePage() {
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold tracking-tight">Telegram Master Schedule</h1>
               <p className="hidden truncate text-xs text-[var(--mute)] sm:block">Manage automated Telegram channel posting rules</p>
-                </div>
+            </div>
           </div>
           <button onClick={() => openModal()} className="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--violet)] px-4 py-2 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">
             {Icons.plus} Add Telegram Rule
@@ -296,7 +296,8 @@ export default function TelegramMasterSchedulePage() {
                 <label className={labelClass}>Zodiac (optional)</label>
                 <select value={formData.zodiac_sign} onChange={(e) => setFormData({...formData, zodiac_sign: e.target.value})} className={inputClass}>
                   <option value="">🎲 Random</option>
-                  {ZODIAC_OPTIONS.filter(z => z.value).map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
+                  {/* ✅ გასწორებულია: z.value !== null შემოწმება და as string გამოყენება */}
+                  {ZODIAC_OPTIONS.filter(z => z.value !== null).map((z) => <option key={z.value as string} value={z.value as string}>{z.label}</option>)}
                 </select>
               </div>
               <div>
@@ -306,7 +307,7 @@ export default function TelegramMasterSchedulePage() {
               <div className="flex gap-2 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 rounded-xl border border-[var(--line-2)] py-2.5 text-sm font-semibold transition-colors hover:bg-white/5">Cancel</button>
                 <button type="submit" className="flex-1 rounded-xl bg-[var(--violet)] py-2.5 text-sm font-semibold text-[var(--ink)] transition-opacity hover:opacity-90">{editingRule ? "Update Rule" : "Save Rule"}</button>
-                </div>
+              </div>
             </form>
           </div>
         </div>
