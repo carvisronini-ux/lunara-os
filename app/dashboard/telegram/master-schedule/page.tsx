@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
+// ✅ გამოსწორებულია: გამოყენებულია პროექტის რეალური გარემოს ცვლადები
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY!
 );
 
 const STYLES = `
@@ -28,7 +29,6 @@ const STYLES = `
 .tg-pulse{animation:tg-pulse 2s ease-in-out infinite}
 `;
 
-// კატეგორიების კონფიგურაცია
 const CATEGORIES = [
   { value: "daily_anchor", label: "🌞 Daily Anchor", color: "#f6c177", icon: "☀️" },
   { value: "interactive_play", label: "🎮 Interactive Play", color: "#ff7aa8", icon: "🎯" },
@@ -38,7 +38,6 @@ const CATEGORIES = [
   { value: "product_bridge", label: "📱 Product Bridge", color: "#5fd6a4", icon: "🚀" },
 ];
 
-// პოსტის ტიპები თითოეული კატეგორიისთვის
 const POST_TYPES: Record<string, Array<{ value: string; label: string }>> = {
   daily_anchor: [
     { value: "daily_horoscope_12_signs", label: "12 ნიშნის ჰოროსკოპი" },
@@ -90,7 +89,6 @@ const POST_TYPES: Record<string, Array<{ value: string; label: string }>> = {
   ],
 };
 
-// კონტენტის ტიპები (ფორმატები)
 const CONTENT_TYPES = [
   { value: "telegram_text", label: "📝 ტექსტი", icon: "📝" },
   { value: "telegram_photo", label: "🖼️ ფოტო + ტექსტი", icon: "🖼️" },
@@ -101,16 +99,14 @@ const CONTENT_TYPES = [
   { value: "telegram_document", label: "📄 დოკუმენტი", icon: "📄" },
 ];
 
-// მიზნები
 const GOALS = [
-  { value: "retention", label: "🔄 Retention (დაბრუნება)", color: "#5fd6a4" },
-  { value: "engagement", label: "💬 Engagement (ჩართულობა)", color: "#ff7aa8" },
-  { value: "trust", label: "🎓 Trust (ნდობა)", color: "#60a5fa" },
-  { value: "reach", label: "📢 Reach (გავრცელება)", color: "#f6c177" },
-  { value: "conversion", label: "📱 Conversion (კონვერსია)", color: "#a78bfa" },
+  { value: "retention", label: "🔄 Retention", color: "#5fd6a4" },
+  { value: "engagement", label: "💬 Engagement", color: "#ff7aa8" },
+  { value: "trust", label: "🎓 Trust", color: "#60a5fa" },
+  { value: "reach", label: "📢 Reach", color: "#f6c177" },
+  { value: "conversion", label: "📱 Conversion", color: "#a78bfa" },
 ];
 
-// ზოდიაქოს ნიშნები
 const ZODIAC_SIGNS = [
   { value: "", label: "🎲 ALL / Random" },
   { value: "ARIES", label: "♈ Aries" },
@@ -306,7 +302,6 @@ export default function TelegramMasterSchedulePage() {
     <div className="tg-root min-h-screen">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      {/* Header */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[#0b0d1c]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3.5 lg:px-8">
           <div className="flex min-w-0 items-center gap-4">
@@ -338,7 +333,6 @@ export default function TelegramMasterSchedulePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 lg:px-8 lg:py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -401,7 +395,6 @@ export default function TelegramMasterSchedulePage() {
                           key={item.id}
                           className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
                         >
-                          {/* Time */}
                           <div className="flex w-[88px] shrink-0 items-center gap-2.5">
                             <span
                               className={`h-2 w-2 shrink-0 rounded-full ${
@@ -411,7 +404,6 @@ export default function TelegramMasterSchedulePage() {
                             <span className="mono text-sm font-medium">{item.time.slice(0, 5)}</span>
                           </div>
 
-                          {/* Content Info */}
                           <div
                             className={`flex min-w-[200px] flex-1 items-center gap-3 ${
                               !item.is_active ? "opacity-55" : ""
@@ -433,7 +425,6 @@ export default function TelegramMasterSchedulePage() {
                             </div>
                           </div>
 
-                          {/* Goal Badge */}
                           <div className="shrink-0">
                             <span
                               className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -447,7 +438,6 @@ export default function TelegramMasterSchedulePage() {
                             </span>
                           </div>
 
-                          {/* Actions */}
                           <div className="ml-auto flex flex-wrap items-center gap-2">
                             <button
                               role="switch"
@@ -495,7 +485,6 @@ export default function TelegramMasterSchedulePage() {
         )}
       </main>
 
-      {/* Modal */}
       {showModal && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
@@ -520,7 +509,6 @@ export default function TelegramMasterSchedulePage() {
             </div>
 
             <form onSubmit={handleSave} className="space-y-4">
-              {/* Day & Time */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">Day</label>
@@ -550,7 +538,6 @@ export default function TelegramMasterSchedulePage() {
                 </div>
               </div>
 
-              {/* Category */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">Category</label>
                 <select
@@ -574,7 +561,6 @@ export default function TelegramMasterSchedulePage() {
                 </select>
               </div>
 
-              {/* Post Type */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">Post Type</label>
                 <select
@@ -590,7 +576,6 @@ export default function TelegramMasterSchedulePage() {
                 </select>
               </div>
 
-              {/* Content Type & Goal */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">Format</label>
@@ -622,7 +607,6 @@ export default function TelegramMasterSchedulePage() {
                 </div>
               </div>
 
-              {/* Zodiac Sign */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
                   Zodiac Sign (optional)
@@ -640,7 +624,6 @@ export default function TelegramMasterSchedulePage() {
                 </select>
               </div>
 
-              {/* Content Theme */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
                   Content Theme
@@ -654,7 +637,6 @@ export default function TelegramMasterSchedulePage() {
                 />
               </div>
 
-              {/* Priority */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-[var(--mute)]">
                   Priority (1-10)
@@ -671,7 +653,6 @@ export default function TelegramMasterSchedulePage() {
                 />
               </div>
 
-              {/* Buttons */}
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
