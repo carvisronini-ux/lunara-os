@@ -4,7 +4,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -99,12 +98,12 @@ const CONTENT_TYPES = [
   { value: "telegram_poll", label: "📊 გამოკითხვა", icon: "📊" },
   { value: "telegram_quiz", label: "❓ ვიქტორინა", icon: "❓" },
   { value: "telegram_video", label: "🎬 ვიდეო", icon: "🎬" },
-  { value: "telegram_document", label: " დოკუმენტი", icon: "📄" },
+  { value: "telegram_document", label: "📄 დოკუმენტი", icon: "📄" },
 ];
 
 // მიზნები
 const GOALS = [
-  { value: "retention", label: " Retention (დაბრუნება)", color: "#5fd6a4" },
+  { value: "retention", label: "🔄 Retention (დაბრუნება)", color: "#5fd6a4" },
   { value: "engagement", label: "💬 Engagement (ჩართულობა)", color: "#ff7aa8" },
   { value: "trust", label: "🎓 Trust (ნდობა)", color: "#60a5fa" },
   { value: "reach", label: "📢 Reach (გავრცელება)", color: "#f6c177" },
@@ -113,7 +112,7 @@ const GOALS = [
 
 // ზოდიაქოს ნიშნები
 const ZODIAC_SIGNS = [
-  { value: null, label: " ALL / Random" },
+  { value: "", label: "🎲 ALL / Random" },
   { value: "ARIES", label: "♈ Aries" },
   { value: "TAURUS", label: "♉ Taurus" },
   { value: "GEMINI", label: "♊ Gemini" },
@@ -122,10 +121,10 @@ const ZODIAC_SIGNS = [
   { value: "VIRGO", label: "♍ Virgo" },
   { value: "LIBRA", label: "♎ Libra" },
   { value: "SCORPIO", label: "♏ Scorpio" },
-  { value: "SAGITTARIUS", label: " Sagittarius" },
+  { value: "SAGITTARIUS", label: "♐ Sagittarius" },
   { value: "CAPRICORN", label: "♑ Capricorn" },
   { value: "AQUARIUS", label: "♒ Aquarius" },
-  { value: "PISCES", label: " Pisces" },
+  { value: "PISCES", label: "♓ Pisces" },
 ];
 
 const DAYS_OF_WEEK = ["ორშაბათი", "სამშაბათი", "ოთხშაბათი", "ხუთშაბათი", "პარასკევი", "შაბათი", "კვირა"];
@@ -146,7 +145,6 @@ interface ScheduleItem {
 }
 
 export default function TelegramMasterSchedulePage() {
-  const router = useRouter();
   const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
