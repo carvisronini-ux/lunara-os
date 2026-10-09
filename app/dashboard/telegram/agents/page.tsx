@@ -51,6 +51,21 @@ interface Agent {
   totalPosts: number;
 }
 
+interface ScheduleItem {
+  id: string;
+  day_of_week: number;
+  time: string;
+  content_category: string;
+  post_type: string;
+  content_type: string;
+  goal: string;
+  zodiac_sign: string | null;
+  content_theme: string | null;
+  is_active: boolean;
+  priority: number;
+  payload: any;
+}
+
 const TELEGRAM_AGENTS: Agent[] = [
   { id: 'tg-daily', name: 'Daily Anchor Agent', type: 'daily_anchor', icon: '☀️', color: 'text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/20', status: 'inactive', nextRun: 'Daily 09:00', lastRun: 'Never', totalPosts: 0 },
   { id: 'tg-interactive', name: 'Interactive Play Agent', type: 'interactive_play', icon: '🎯', color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20', status: 'inactive', nextRun: 'Tue/Thu 15:00', lastRun: 'Never', totalPosts: 0 },
@@ -196,7 +211,8 @@ export default function TelegramAgentsPage() {
       const currentMinute = now.getMinutes();
       const currentTimeVal = currentHour * 60 + currentMinute;
 
-      const nextRule = rules.find(rule => {
+      // ✅ გამოსწორებულია: rule პარამეტრს აქვს ScheduleItem ტიპი
+      const nextRule = rules.find((rule: ScheduleItem) => {
         if (rule.day_of_week === currentDayCustom) {
           const [h, m] = rule.time.split(':').map(Number);
           const ruleTimeVal = h * 60 + m;
