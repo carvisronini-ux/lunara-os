@@ -481,12 +481,17 @@ export default function AgentsPage() {
     }
   };
 
-  const toggleAgent = (id: string) => {
+  // ✅ განახლებული ლოგიკა: თაგლის შეცვლისას ანახლებს ბაზაში შესაბამის ჩანაწერებს
+  const toggleAgent = async (id: string) => {
+    const agentToToggle = agents.find(a => a.id === id);
+    if (!agentToToggle) return;
+
+    const newStatus = agentToToggle.status === 'active' ? 'inactive' : 'active';
+
+    // 1. ვაახლებთ ლოკალურ სტეიტს (UI-ს სწრაფი რეაგირებისთვის)
     setAgents(prev => {
       const newAgents = prev.map(agent => 
-        agent.id === id 
-          ? { ...agent, status: (agent.status === 'active' ? 'inactive' : 'active') as 'active' | 'inactive' } 
-          : agent
+        agent.id === id ? { ...agent, status: newStatus } : agent
       );
       
       const statusesToSave: Record<string, 'active' | 'inactive'> = {};
@@ -495,6 +500,21 @@ export default function AgentsPage() {
       
       return newAgents;
     });
+
+    // 2. ვაგზავნით მოთხოვნას ბაზაში, რომ განვაახლოთ ყველა ჩანაწერი ამ აგენტის ტიპისთვის
+    addAgentLog(`🔄 ${agentToToggle.name} ${newStatus === 'active' ? 'ჩაირთო' : 'გაითიშა'}. განრიგის განახლება...`);
+    
+    const { error } = await supabase
+      .from('content_schedule')
+      .update({ is_active: newStatus === 'active' })
+      .eq('content_type', agentToToggle.type);
+
+    if (error) {
+      console.error('Failed to update schedule rules:', error);
+      addAgentLog(`❌ შეცდომა განრიგის განახლებისას: ${error.message}`);
+    } else {
+      addAgentLog(`✅ ${agentToToggle.name}-ის ყველა ჩანაწერი განრიგში წარმატებით განახლდა.`);
+    }
   };
 
   const openFailedPostDetails = (post: FailedPost) => {
