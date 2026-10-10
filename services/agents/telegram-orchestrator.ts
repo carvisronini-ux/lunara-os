@@ -1,4 +1,6 @@
 // /home/carvisronini-ux/lunara-os/services/agents/telegram-orchestrator.ts
+"use server"; // ✅ ეს ხაზი აუცილებელია! ის ამ ფუნქციას სერვერზე გადაყვანს.
+
 import { supabase } from '@/lib/supabase';
 import { credentialVault } from '../credentials/credential-vault';
 import { accessManager } from '../credentials/access-manager';
@@ -36,11 +38,11 @@ export class TelegramOrchestrator {
 
       console.log(`[Orchestrator] ✅ Loaded config for ${request.agentType}`);
 
-      // ✅ ახალი: ველოდებით სანამ CredentialVault მზად იქნება და ქეში ჩაიტვირთება!
+      // 2. ველოდებით სანამ CredentialVault მზად იქნება და ქეში ჩაიტვირთება!
       await credentialVault.ready;
       console.log(`[Orchestrator] ✅ CredentialVault is ready and cache is populated.`);
 
-      // 2. მოვითხოვოთ დროებითი წვდომა LLM-ზე (Groq)
+      // 3. მოვითხოვოთ დროებითი წვდომა LLM-ზე (Groq)
       const leaseId = accessManager.requestAccess(
         `${request.agentType}-agent`,
         'groq',
@@ -57,7 +59,7 @@ export class TelegramOrchestrator {
       let generatedContent: any = null;
 
       try {
-        // 3. მივიღოთ API გასაღები და მეტამონაცემები უსაფრთხო საცავიდან
+        // 4. მივიღოთ API გასაღები და მეტამონაცემები უსაფრთხო საცავიდან
         const cred = credentialVault.getCredentialByProvider('groq', 'spend');
         if (!cred) {
           throw new Error('Groq credential not found in vault');
@@ -68,11 +70,11 @@ export class TelegramOrchestrator {
           throw new Error('Failed to decrypt API key');
         }
 
-        // ✅ დინამიურად ვიღებთ რეკომენდებულ მოდელს მეტამონაცემებიდან (ან ვიყენებთ უსაფრთხო fallback-ს)
+        // დინამიურად ვიღებთ რეკომენდებულ მოდელს მეტამონაცემებიდან
         const targetModel = cred.metadata?.recommendedModel || "llama-3.3-70b-versatile";
         console.log(`[Orchestrator] 🤖 Using dynamic model from Vault: ${targetModel}`);
 
-        // 4. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
+        // 5. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
         const systemPrompt = `${config.master_prompt}
 
 THINKING STYLE:
@@ -89,7 +91,7 @@ Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
 Generate the content now following ALL constraints. Return ONLY valid JSON.`;
 
-        // 5. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
+        // 6. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -97,7 +99,7 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: targetModel, // ✅ აქ ვიყენებთ დინამიურ მოდელს
+            model: targetModel,
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt }
@@ -117,7 +119,7 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
 
         console.log(`[Orchestrator] ✅ LLM response received`);
 
-        // 6. გავპარსოთ JSON
+        // 7. გავპარსოთ JSON
         try {
           generatedContent = JSON.parse(rawContent);
         } catch (e) {
@@ -125,14 +127,14 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
         }
 
       } finally {
-        // 7. აუცილებლად გავაუქმოთ ლიზი, მიზეზის მიუხედავად
+        // 8. აუცილებლად გავაუქმოთ ლიზი, მიზეზის მიუხედავად
         if (leaseId) {
           accessManager.revokeLease(leaseId, 'system_cleanup');
           console.log(`[Orchestrator] 🔒 Lease revoked`);
         }
       }
 
-      // 8. გამოვაქვეყნოთ Telegram-ში
+      // 9. გამოვაქვეყნოთ Telegram-ში
       if (!generatedContent.caption) {
         throw new Error('AI did not return a caption in JSON');
       }
@@ -150,7 +152,7 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
 
       console.log(`[Orchestrator] 🎉 Successfully published! Message ID: ${publishResult.messageId}`);
 
-      // 9. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
+      // 10. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
       try {
         await supabase.from('published_content').insert({
           agent_type: request.agentType,
