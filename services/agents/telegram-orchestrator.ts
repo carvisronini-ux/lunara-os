@@ -1,5 +1,4 @@
 // /home/carvisronini-ux/lunara-os/services/agents/telegram-orchestrator.ts
-"use server"; // ✅ ეს ხაზი აუცილებელია! ის ამ ფუნქციას სერვერზე გადაყვანს.
 
 import { supabase } from '@/lib/supabase';
 import { credentialVault } from '../credentials/credential-vault';

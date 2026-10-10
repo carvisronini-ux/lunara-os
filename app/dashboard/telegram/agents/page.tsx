@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import { runTelegramAgentAction } from "@/app/actions/telegram-actions"; // ✅ ახალი იმპორტი
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
@@ -371,10 +372,8 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონფიგურაცია წარმატებით ჩაიტვირთა.`);
       addAgentLog(`🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...`);
 
-      // ✅ დინამიურად ჩავტვირთოთ ორქესტრატორი და გავუშვათ რეალური პროცესი
-      const { telegramOrchestrator } = await import('@/services/agents/telegram-orchestrator');
-
-      const result = await telegramOrchestrator.generateAndPublish({
+      // ✅ ვიყენებთ Server Action-ს, რათა უსაფრთხოდ მივმართოთ სერვერს და წავიკითხოთ .env ცვლადები
+      const result = await runTelegramAgentAction({
         agentType: agentType,
         postType: nextRule.post_type,
         contentTheme: nextRule.content_theme || undefined,
