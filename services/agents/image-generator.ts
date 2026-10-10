@@ -8,7 +8,7 @@ export interface ImageGenerationResult {
   imageBuffer?: Buffer;
   error?: string;
   provider?: string;
-  generationLogs: string[]; // ✅ ახალი: ლოგები ფრონტენდისთვის
+  generationLogs: string[];
 }
 
 export class ImageGenerator {
@@ -20,11 +20,10 @@ export class ImageGenerator {
     logs.push(`🎨 იწყება სურათის გენერაცია აგენტისთვის: ${agentType}`);
     logs.push(`📝 Prompt: ${imagePrompt.substring(0, 80)}...`);
 
-    // ველოდებით CredentialVault-ის მზადყოფნას
     await credentialVault.ready;
 
     // ============================================================
-    // მეთოდი 1: KIE AI (დინამიური მოდელის შემოწმება)
+    // მეთოდი 1: KIE AI (მკაცრად დინამიური მოდელის აღმოჩენა)
     // ============================================================
     try {
       logs.push(`🔄 [1/2] ვამოწმებ KIE AI-ს ხელმისაწვდომ მოდელებს...`);
@@ -39,7 +38,7 @@ export class ImageGenerator {
     }
 
     // ============================================================
-    // მეთოდი 2: Gemini (დინამიური მოდელის შემოწმება)
+    // მეთოდი 2: Gemini (მკაცრად დინამიური მოდელის აღმოჩენა)
     // ============================================================
     try {
       logs.push(`🔄 [2/2] ვამოწმებ Gemini-ს ხელმისაწვდომ სურათის მოდელებს...`);
@@ -81,27 +80,31 @@ export class ImageGenerator {
         headers: { 'Authorization': `Bearer ${apiKey}` }
       });
       
-      let targetModel = cred.metadata?.recommendedModel || 'flux1-kontext'; // Fallback
+      let targetModel: string | null = null; // ❌ არანაირი წინასწარ ჩაწერილი მნიშვნელობა
       
       if (modelsRes.ok) {
         const modelsData = await modelsRes.json();
+        // ვეძებთ მოდელებს, რომელთა ID შეიცავს სურათთან დაკავშირებულ სიტყვებს
         const imageModels = modelsData.data?.filter((m: any) => 
           m.id.toLowerCase().includes('flux') || 
           m.id.toLowerCase().includes('image') || 
-          m.id.toLowerCase().includes('kontext')
+          m.id.toLowerCase().includes('kontext') ||
+          m.id.toLowerCase().includes('sd')
         ) || [];
         
         if (imageModels.length > 0) {
-          targetModel = imageModels[0].id; // ვიღებთ პირველ ხელმისაწვდომ სურათის მოდელს
+          targetModel = imageModels[0].id; // ვიღებთ პირველს, რასაც API გვაძლევს
           logs.push(`✅ KIE AI-მ დააბრუნა მოდელი: ${targetModel}`);
         } else {
-          logs.push(`⚠️ KIE AI-მ ვერ დააბრუნა სურათის მოდელები. ვიყენებთ fallback-ს: ${targetModel}`);
+          logs.push(`⚠️ KIE AI API-მ არ დააბრუნა არცერთი სურათის გენერაციის მოდელი.`);
+          return { success: false, error: 'No image models returned by KIE API', generationLogs: logs };
         }
       } else {
-        logs.push(`⚠️ KIE AI მოდელების სიის მიღება ვერ მოხერხდა (${modelsRes.status}). ვიყენებთ fallback-ს: ${targetModel}`);
+        logs.push(`⚠️ KIE AI მოდელების სიის მიღება ვერ მოხერხდა (${modelsRes.status}).`);
+        return { success: false, error: `Failed to fetch KIE models: ${modelsRes.status}`, generationLogs: logs };
       }
 
-      // 2. ვცდილობთ გენერაციას ნაპოვნი მოდელით
+      // 2. ვცდილობთ გენერაციას მხოლოდ იმ მოდელით, რაც API-მ დააბრუნა
       logs.push(`🤖 ვცდილობთ გენერაციას KIE AI მოდელით: ${targetModel}`);
       const response = await fetch('https://api.kie.ai/v1/images/generations', {
         method: 'POST',
@@ -144,41 +147,37 @@ export class ImageGenerator {
 
       // 1. ვიღებთ ხელმისაწვდომ მოდელებს Gemini-დან
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-      let targetModel = 'imagen-3.0-generate-002'; // Fallback
+      
+      let targetModel: string | null = null; // ❌ არანაირი წინასწარ ჩაწერილი მნიშვნელობა (არც Imagen, არც Flash)
 
       if (modelsRes.ok) {
         const modelsData = await modelsRes.json();
-        // ვეძებთ მოდელებს, რომლებიც მხარს უჭერენ generateImages-ს ან შეიცავენ 'imagen'-ს
+        // ვეძებთ მხოლოდ იმ მოდელებს, რომლებიც API-ს თქმით, მხარს უჭერენ 'generateImages'-ს
         const imageModels = modelsData.models?.filter((m: any) => 
-          m.supportedGenerationMethods?.includes('generateImages') || 
-          m.name.includes('imagen')
+          m.supportedGenerationMethods?.includes('generateImages')
         ).map((m: any) => m.name.replace('models/', '')) || [];
 
         if (imageModels.length > 0) {
-          targetModel = imageModels[0]; // ვიღებთ პირველ ხელმისაწვდომ სურათის მოდელს
-          logs.push(`✅ Gemini-მ დააბრუნა მოდელი: ${targetModel}`);
+          targetModel = imageModels[0]; // ვიღებთ პირველს, რასაც API გვაძლევს
+          logs.push(`✅ Gemini-მ დააბრუნა სურათის მოდელი: ${targetModel}`);
         } else {
-          logs.push(`⚠️ Gemini-მ ვერ დააბრუნა სურათის მოდელები. ვცდილობთ fallback მოდელით.`);
+          logs.push(`⚠️ Gemini API-მ არ დააბრუნა არცერთი სურათის გენერაციის მოდელი ამ გასაღებისთვის.`);
+          return { success: false, error: 'No image models returned by Gemini API', generationLogs: logs };
         }
       } else {
         logs.push(`⚠️ Gemini მოდელების სიის მიღება ვერ მოხერხდა (${modelsRes.status}).`);
+        return { success: false, error: `Failed to fetch Gemini models: ${modelsRes.status}`, generationLogs: logs };
       }
 
-      // 2. ვცდილობთ გენერაციას ნაპოვნი მოდელით (Imagen 3 ფორმატი ან Flash)
+      // 2. ვცდილობთ გენერაციას მხოლოდ იმ მოდელით, რაც API-მ დააბრუნა
       logs.push(`🤖 ვცდილობთ გენერაციას Gemini მოდელით: ${targetModel}`);
       
-      // თუ მოდელი არის Imagen, ვიყენებთ generateImages endpoint-ს, თუ არა - generateContent
-      const isImagen = targetModel.includes('imagen');
-      const url = isImagen 
-        ? `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateImages?key=${apiKey}`
-        : `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
-
-      const body = isImagen ? {
+      // რადგან 'generateImages'-ის მხარდაჭერა გვაქვს, ვიყენებთ generateImages endpoint-ს
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateImages?key=${apiKey}`;
+      
+      const body = {
         instances: [{ prompt: imagePrompt }],
         parameters: { sampleCount: 1, aspectRatio: '4:5', personGeneration: 'allow_all' }
-      } : {
-        contents: [{ parts: [{ text: `Generate image: ${imagePrompt}` }] }],
-        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
       };
 
       const response = await fetch(url, {
@@ -194,16 +193,10 @@ export class ImageGenerator {
 
       const data = await response.json();
       
-      if (isImagen && data.predictions?.[0]?.bytesBase64Encoded) {
-        return { success: true, imageBuffer: Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64'), provider: 'gemini-imagen', generationLogs: logs };
-      } else if (!isImagen) {
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-          if (part.inlineData?.data) {
-            return { success: true, imageBuffer: Buffer.from(part.inlineData.data, 'base64'), provider: 'gemini-flash', generationLogs: logs };
-          }
-        }
+      if (data.predictions?.[0]?.bytesBase64Encoded) {
+        return { success: true, imageBuffer: Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64'), provider: 'gemini', generationLogs: logs };
       }
+      
       throw new Error('No image data found in Gemini response');
 
     } finally {
