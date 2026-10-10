@@ -19,16 +19,20 @@ export interface OrchestratorResponse {
   error?: string;
   caption?: string;
   imageUrl?: string;
-  hasImagePrompt?: boolean; // ✅ ახალი ველი: ჰქონდა თუ არა AI-ს image_prompt
-  imageProvider?: string;   // ✅ ახალი ველი: რომელი პროვაიდერი გამოიყენა (kie, gemini, ან none)
+  hasImagePrompt?: boolean; 
+  imageProvider?: string;   
+  imageError?: string;      // ✅ ახალი ველი: ზუსტი შეცდომა სურათის გენერაციისას
 }
 
 export class TelegramOrchestrator {
   async generateAndPublish(request: OrchestratorRequest): Promise<OrchestratorResponse> {
-    console.log(`[Orchestrator] 🚀 Starting generation for ${request.agentType}/${request.postType}`);
+    console.log(`\n[Orchestrator] 🚀 ==========================================`);
+    console.log(`[Orchestrator] 🚀 Starting generation for ${request.agentType} / ${request.postType}`);
+    console.log(`[Orchestrator] 🚀 Theme: ${request.contentTheme || 'N/A'}, Zodiac: ${request.zodiacSign || 'N/A'}`);
 
     try {
       // 1. წავიკითხოთ აგენტის კონფიგურაცია ბაზიდან
+      console.log(`[Orchestrator] 📡 Requesting agent config from Supabase for: ${request.agentType}`);
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('*')
@@ -38,14 +42,15 @@ export class TelegramOrchestrator {
       if (configError || !config) {
         throw new Error(`Failed to load agent config: ${configError?.message || 'Config not found'}`);
       }
-
-      console.log(`[Orchestrator] ✅ Loaded config for ${request.agentType}`);
+      console.log(`[Orchestrator] ✅ Successfully loaded config for ${request.agentType}`);
 
       // 2. ველოდებით სანამ CredentialVault მზად იქნება და ქეში ჩაიტვირთება!
+      console.log(`[Orchestrator] ⏳ Waiting for CredentialVault cache to populate...`);
       await credentialVault.ready;
-      console.log(`[Orchestrator] ✅ CredentialVault is ready and cache is populated.`);
+      console.log(`[Orchestrator] ✅ CredentialVault is ready and cache is fully populated.`);
 
       // 3. მოვითხოვოთ დროებითი წვდომა LLM-ზე (Groq)
+      console.log(`[Orchestrator] 🔑 Requesting LLM access lease from AccessManager...`);
       const leaseId = accessManager.requestAccess(
         `${request.agentType}-agent`,
         'groq',
@@ -56,37 +61,33 @@ export class TelegramOrchestrator {
       );
 
       if (!leaseId) {
-        throw new Error('Failed to acquire LLM access lease. Check console for details.');
+        throw new Error('Failed to acquire LLM access lease. Check AccessManager logs.');
       }
+      console.log(`[Orchestrator] 🔓 Lease acquired successfully: ${leaseId}`);
 
       let generatedContent: any = null;
 
       try {
         // 4. მივიღოთ API გასაღები და მეტამონაცემები უსაფრთხო საცავიდან
+        console.log(`[Orchestrator] 🔐 Fetching Groq credential from Vault (scope: spend)...`);
         const cred = credentialVault.getCredentialByProvider('groq', 'spend');
         if (!cred) {
-          throw new Error('Groq credential not found in vault');
+          throw new Error('Groq credential not found in vault. Please add it in the API Vault.');
         }
 
+        console.log(`[Orchestrator] 🔓 Decrypting API key for agent: ${request.agentType}-agent...`);
         const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${request.agentType}-agent`);
         if (!apiKey) {
-          throw new Error('Failed to decrypt API key');
+          throw new Error('Failed to decrypt API key. Check owner permissions in Vault.');
         }
 
         // დინამიურად ვიღებთ რეკომენდებულ მოდელს მეტამონაცემებიდან
         const targetModel = cred.metadata?.recommendedModel || "llama-3.3-70b-versatile";
-        console.log(`[Orchestrator] 🤖 Using dynamic model from Vault: ${targetModel}`);
+        console.log(`[Orchestrator] 🤖 Using dynamic model from Vault metadata: ${targetModel}`);
 
         // 5. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
-        const systemPrompt = `${config.master_prompt}
+        const systemPrompt = `${config.master_prompt}\n\nTHINKING STYLE:\n${config.thinking_style}\n\nSKILLS & CONSTRAINTS:\n${config.skills_constraints}`;
 
-THINKING STYLE:
-${config.thinking_style}
-
-SKILLS & CONSTRAINTS:
-${config.skills_constraints}`;
-
-        // ✅ გამკაცრებული userPrompt, რომ აუცილებლად დააბრუნოს image_prompt
         const userPrompt = `Task: Create a Telegram post.
 Category: ${request.agentType}
 Post Type: ${request.postType}
@@ -104,6 +105,7 @@ Return ONLY valid JSON with this exact structure:
 }`;
 
         // 6. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
+        console.log(`[Orchestrator] 📤 Sending request to Groq API (Model: ${targetModel})...`);
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -126,68 +128,68 @@ Return ONLY valid JSON with this exact structure:
           throw new Error(`LLM API Error: ${response.status} - ${errorText}`);
         }
 
+        console.log(`[Orchestrator] 📥 Received successful response from Groq API.`);
         const data = await response.json();
         const rawContent = data.choices[0].message.content;
 
-        console.log(`[Orchestrator] ✅ LLM response received`);
-
         // 7. გავპარსოთ JSON
+        console.log(`[Orchestrator] 🧠 Parsing AI response as JSON...`);
         try {
           generatedContent = JSON.parse(rawContent);
-          // ✅ დებაგინგის ლოგი: ვნახოთ ზუსტად რა დააბრუნა AI-მ (ჩანს სერვერის კონსოლში)
-          console.log('[Orchestrator] 📦 Raw AI JSON Response:', JSON.stringify(generatedContent, null, 2));
+          console.log(`[Orchestrator] 📦 Raw AI JSON Response parsed successfully:`);
+          console.log(JSON.stringify(generatedContent, null, 2));
         } catch (e) {
-          throw new Error(`Failed to parse AI response as JSON: ${rawContent}`);
+          console.error(`[Orchestrator] ❌ Raw content received:`, rawContent);
+          throw new Error(`Failed to parse AI response as JSON: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
         }
 
       } finally {
         // 8. აუცილებლად გავაუქმოთ ლიზი, მიზეზის მიუხედავად
         if (leaseId) {
+          console.log(`[Orchestrator] 🔒 Revoking lease: ${leaseId} (system_cleanup)`);
           accessManager.revokeLease(leaseId, 'system_cleanup');
-          console.log(`[Orchestrator] 🔒 Lease revoked`);
         }
       }
 
       // 9. ვალიდაცია
       if (!generatedContent.caption) {
-        throw new Error('AI did not return a caption in JSON');
+        throw new Error('AI did not return a "caption" in JSON response.');
       }
 
       const caption = generatedContent.caption;
       const imagePrompt = generatedContent.image_prompt;
       const hashtags = generatedContent.hashtags || [];
       
-      // ვაერთიანებთ caption-ს და hashtags-ს
       const fullCaption = [caption, ...hashtags].filter(Boolean).join('\n\n');
 
       console.log(`[Orchestrator] 📝 Caption length: ${caption.length} chars`);
-      if (imagePrompt) {
-        console.log(`[Orchestrator] 🎨 Image prompt: ${imagePrompt.substring(0, 100)}...`);
-      } else {
-        console.warn(`[Orchestrator] ⚠️ AI did NOT return an image_prompt. Sending text only.`);
-      }
+      
+      let imageResult: any = null;
+      let imageErrorLog: string | undefined = undefined;
 
       // 10. სურათის გენერაცია (თუ image_prompt არსებობს)
-      let imageResult = null;
       if (imagePrompt) {
-        console.log(`[Orchestrator] 🎨 Generating image...`);
+        console.log(`[Orchestrator] 🎨 Image prompt detected. Requesting image generation from ImageGenerator...`);
+        console.log(`[Orchestrator] 🎨 Prompt preview: ${imagePrompt.substring(0, 100)}...`);
+        
         imageResult = await imageGenerator.generateImage(imagePrompt, request.agentType);
         
         if (imageResult.success) {
-          console.log(`[Orchestrator] ✅ Image generated successfully with ${imageResult.provider}`);
+          console.log(`[Orchestrator] ✅ Image generated successfully! Provider: ${imageResult.provider}`);
         } else {
-          console.warn(`[Orchestrator] ⚠️ Image generation failed: ${imageResult.error}. Sending text only.`);
+          imageErrorLog = imageResult.error || 'Unknown image generation error';
+          console.warn(`[Orchestrator] ⚠️ Image generation FAILED. Error: ${imageErrorLog}. Falling back to text-only.`);
         }
+      } else {
+        console.warn(`[Orchestrator] ⚠️ AI did NOT return an "image_prompt" key. Proceeding with text-only.`);
       }
 
       // 11. გამოვაქვეყნოთ Telegram-ში
-      console.log(`[Orchestrator] 📤 Publishing to Telegram...`);
-
+      console.log(`[Orchestrator] 📤 Preparing to publish to Telegram...`);
       let publishResult;
       
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
-        // სურათიანი პოსტი
-        console.log(`[Orchestrator] 🖼️ Sending photo with caption...`);
+        console.log(`[Orchestrator] 🖼️ Sending PHOTO with caption to Telegram...`);
         publishResult = await sendTelegramPhoto({
           caption: fullCaption,
           imageUrl: imageResult.imageUrl,
@@ -195,8 +197,7 @@ Return ONLY valid JSON with this exact structure:
           parse_mode: 'HTML',
         });
       } else {
-        // მხოლოდ ტექსტი (fallback)
-        console.log(`[Orchestrator] 📝 Sending text only...`);
+        console.log(`[Orchestrator] 📝 Sending TEXT-ONLY message to Telegram (Fallback)...`);
         publishResult = await sendTelegramMessage({
           text: fullCaption,
           parse_mode: 'HTML',
@@ -207,9 +208,10 @@ Return ONLY valid JSON with this exact structure:
         throw new Error(`Telegram publish failed: ${publishResult.error}`);
       }
 
-      console.log(`[Orchestrator] 🎉 Successfully published! Message ID: ${publishResult.messageId}`);
+      console.log(`[Orchestrator] 🎉 Successfully published to Telegram! Message ID: ${publishResult.messageId}`);
 
       // 12. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
+      console.log(`[Orchestrator] 💾 Logging publication to Supabase 'published_content' table...`);
       try {
         await supabase.from('published_content').insert({
           agent_type: request.agentType,
@@ -220,23 +222,31 @@ Return ONLY valid JSON with this exact structure:
           status: 'published',
           published_at: new Date().toISOString(),
         });
+        console.log(`[Orchestrator] ✅ Database log successful.`);
       } catch (dbError) {
         console.error('[Orchestrator] ⚠️ Failed to log to database:', dbError);
       }
 
-      // ✅ განახლებული return ობიექტი დამატებითი ინფორმაციით
+      console.log(`[Orchestrator] 🚀 ==========================================\n`);
+
+      // ✅ განახლებული return ობიექტი დეტალური ინფორმაციით
       return {
         success: true,
         messageId: publishResult.messageId,
         caption: caption,
         imageUrl: imageResult?.imageUrl,
-        hasImagePrompt: !!imagePrompt, // true თუ image_prompt არსებობდა, false თუ არა
-        imageProvider: imageResult?.provider || 'none', // 'kie', 'gemini', ან 'none'
+        hasImagePrompt: !!imagePrompt,
+        imageProvider: imageResult?.provider || 'none',
+        imageError: imageErrorLog, // ✅ ვაბრუნებთ ზუსტ შეცდომას Frontend-ისთვის
       };
 
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Orchestrator] ❌ Critical error:', errorMsg);
+      console.error(`\n[Orchestrator] ❌ ==========================================`);
+      console.error(`[Orchestrator] ❌ CRITICAL ERROR:`, errorMsg);
+      console.error(`[Orchestrator] ❌ Stack:`, error instanceof Error ? error.stack : 'No stack trace');
+      console.error(`[Orchestrator] ❌ ==========================================\n`);
+      
       return {
         success: false,
         error: errorMsg

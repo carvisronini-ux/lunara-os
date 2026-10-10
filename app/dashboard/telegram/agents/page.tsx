@@ -396,15 +396,17 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
       addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
       
-      // ✅ დეტალური ლოგები სურათის სტატუსის შესახებ
+      // ✅ დეტალური ლოგები სურათის სტატუსის შესახებ (ახლა შეცდომის ტექსტით)
       if (result.hasImagePrompt) {
         if (result.imageProvider && result.imageProvider !== 'none') {
           addAgentLog(`🎨 სურათი წარმატებით შეიქმნა (${result.imageProvider})`);
         } else {
-          addAgentLog(`⚠️ სურათის გენერაცია ვერ მოხერხდა (მხოლოდ ტექსტი გაიგზავნა)`);
+          addAgentLog(`⚠️ სურათის გენერაცია ვერ მოხერხდა: ${result.imageError || 'უცნობი შეცდომა'}`);
+          addAgentLog(`📝 გაიგზავნა მხოლოდ ტექსტი (Fallback)`);
         }
       } else {
-        addAgentLog(`⚠️ AI-მ არ დააბრუნა "image_prompt" (მხოლოდ ტექსტი გაიგზავნა)`);
+        addAgentLog(`⚠️ AI-მ არ დააბრუნა "image_prompt"`);
+        addAgentLog(`📝 გაიგზავნა მხოლოდ ტექსტი`);
       }
 
       addAgentLog(`📤 Telegram-ში გაიგზავნა! Message ID: ${result.messageId}`);
