@@ -53,7 +53,7 @@ export class TelegramOrchestrator {
       let generatedContent: any = null;
 
       try {
-        // 3. მივიღოთ API გასაღები უსაფრთხო საცავიდან
+        // 3. მივიღოთ API გასაღები და მეტამონაცემები უსაფრთხო საცავიდან
         const cred = credentialVault.getCredentialByProvider('groq', 'spend');
         if (!cred) {
           throw new Error('Groq credential not found in vault');
@@ -64,9 +64,11 @@ export class TelegramOrchestrator {
           throw new Error('Failed to decrypt API key');
         }
 
-        console.log(`[Orchestrator] 🧠 Generating content with Groq...`);
+        // ✅ დინამიურად ვიღებთ რეკომენდებულ მოდელს მეტამონაცემებიდან (ან ვიყენებთ უსაფრთხო fallback-ს)
+        const targetModel = cred.metadata?.recommendedModel || "llama-3.3-70b-versatile";
+        console.log(`[Orchestrator] 🤖 Using dynamic model from Vault: ${targetModel}`);
 
-        // 4. ავაგოთ Prompt ჩვენი აგენტის კონფიგურაციის მიხედვით
+        // 4. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
         const systemPrompt = `${config.master_prompt}
 
 THINKING STYLE:
@@ -83,7 +85,7 @@ Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
 Generate the content now following ALL constraints. Return ONLY valid JSON.`;
 
-        // 5. გამოვიძახოთ LLM API
+        // 5. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -91,13 +93,13 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: "llama3-70b-8192", // Groq-ის სწრაფი და ჭკვიანი მოდელი
+            model: targetModel, // ✅ აქ ვიყენებთ დინამიურ მოდელს
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt }
             ],
             temperature: 0.7,
-            response_format: { type: "json_object" } // ვაიძულებთ JSON-ის დაბრუნებას
+            response_format: { type: "json_object" }
           })
         });
 
@@ -126,7 +128,7 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
         }
       }
 
-      // 8. გამოვაქვეყნოთ Telegram-ში (ჯერ ტექსტურად, სურათის გენერაცია შემდეგ ეტაპზეა)
+      // 8. გამოვაქვეყნოთ Telegram-ში
       if (!generatedContent.caption) {
         throw new Error('AI did not return a caption in JSON');
       }
