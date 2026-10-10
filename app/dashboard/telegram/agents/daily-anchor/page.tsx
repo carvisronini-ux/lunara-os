@@ -281,6 +281,9 @@ const STYLES = `
 .profile-root main > div > .section-card:nth-child(2) textarea{min-height:300px}
 .profile-root main > div > .section-card:nth-child(3) textarea{min-height:280px}
 .profile-root main > div > .section-card:nth-child(4) textarea{min-height:320px}
+.profile-root main > div > .section-card:nth-child(5) textarea{min-height:180px}
+.profile-root main > div > .section-card:nth-child(6) textarea{min-height:220px}
+.profile-root main > div > .section-card:nth-child(7) textarea{min-height:120px}
 .profile-root main > div > .section-card:nth-child(5) .grid > div,
 .profile-root main > div > .section-card:nth-child(5) .grid > div > div{
   border-radius:15px!important;
@@ -498,7 +501,7 @@ You are NOT a generic "horoscope writer." You are a **digital astrological guide
 ## Your Persona
 - **Tone:** Empathetic, calming, wise, but grounded and understandable.
 - **Voice:** Like an experienced, caring friend who speaks with quiet confidence.
-- **Language:** Georgian (highest literary and grammatical standards). Poetic but not overly archaic or heavy.
+- **Language:** English (highest literary and grammatical standards). Poetic but not overly archaic or heavy.
 - **Style:** Short paragraphs, airy structure, tasteful use of emojis (max 3-4 per post), generous whitespace for easy reading.
 
 ## Core Principles
@@ -552,20 +555,20 @@ Follow this structured process for EVERY post:
 - Specify aspect ratio 4:5 for Telegram.
 
 ## Step 6: Hashtag Selection
-- Choose 3-5 relevant hashtags mixing brand, topic, and language-appropriate Georgian hashtags.
+- Choose 3-5 relevant hashtags mixing brand, topic, and English keywords.
 
 ## Step 7: Final Validation
 - Caption must not exceed 200 words.
 - Check forbidden phrases and constraints.
 - Ensure valid JSON output.
-- Check Georgian language quality.`,
+- Check English language quality and grammar.`,
 
   skills_constraints: `# SKILLS & CONSTRAINTS
 
 ## MANDATORY RULES
 
 ### Language & Style
-- Write the caption in Georgian with excellent grammar and literary quality.
+- Write the caption strictly in ENGLISH with excellent grammar and literary quality.
 - Use short paragraphs (2-3 sentences maximum).
 - Use emojis tastefully (maximum 3-4 per post).
 - Include whitespace between sections.
@@ -592,7 +595,7 @@ Follow this structured process for EVERY post:
 
 Expected structure:
 {
-  "caption": "Full Georgian text with emojis and line breaks",
+  "caption": "Full English text with emojis and line breaks",
   "image_prompt": "Detailed English prompt for image generator",
   "hashtags": ["#LUNARA", "#topic1", "#topic2"]
 }
@@ -626,27 +629,39 @@ Expected structure:
 - Never return anything other than valid JSON.
 - Never include markdown code blocks in the output.
 - Never add explanations before or after the JSON.`,
+
+  agent_tools: `Text Engine: Groq, DeepSeek (LLM for caption generation)
+Visual Engine: KIE AI, Gemini (Image generation)
+Publisher: sendPhoto, sendMessage (Telegram distribution)`,
+
+  execution_workflow: `1. Receive Schedule Trigger: Read post_type, content_theme, and zodiac_sign from telegram_schedule
+2. Load Configuration: Fetch master_prompt, thinking_style, and skills_constraints from agent_config
+3. Request Credential Lease: Acquire temporary access to Groq and KIE AI via AccessManager
+4. Generate Caption: Send a structured prompt to the LLM and receive JSON with caption, image_prompt, and hashtags
+5. Generate Image: Send image_prompt to KIE AI/Gemini and receive the image URL or buffer
+6. Publish to Telegram: Call sendTelegramPhoto with the caption and generated image
+7. Cleanup & Logging: Revoke leases, log to published_content, and emit events`,
+
+  output_format: `{
+  "caption": "Full English text with emojis and line breaks",
+  "image_prompt": "Detailed English prompt for image generator",
+  "hashtags": ["#LUNARA", "#topic1", "#topic2"]
+}`
 };
 
 export default function DailyAnchorProfilePage() {
   const router = useRouter();
 
-  const [masterPrompt, setMasterPrompt] = useState(
-    DEFAULT_PROFILE.master_prompt
-  );
-  const [thinkingStyle, setThinkingStyle] = useState(
-    DEFAULT_PROFILE.thinking_style
-  );
-  const [skills, setSkills] = useState(
-    DEFAULT_PROFILE.skills_constraints
-  );
+  const [masterPrompt, setMasterPrompt] = useState(DEFAULT_PROFILE.master_prompt);
+  const [thinkingStyle, setThinkingStyle] = useState(DEFAULT_PROFILE.thinking_style);
+  const [skills, setSkills] = useState(DEFAULT_PROFILE.skills_constraints);
+  const [agentTools, setAgentTools] = useState(DEFAULT_PROFILE.agent_tools);
+  const [executionWorkflow, setExecutionWorkflow] = useState(DEFAULT_PROFILE.execution_workflow);
+  const [outputFormat, setOutputFormat] = useState(DEFAULT_PROFILE.output_format);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
@@ -654,10 +669,7 @@ export default function DailyAnchorProfilePage() {
     loadConfig();
   }, []);
 
-  const showToast = (
-    message: string,
-    type: "success" | "error"
-  ) => {
+  const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
@@ -675,20 +687,13 @@ export default function DailyAnchorProfilePage() {
       console.error("Error loading config:", error);
       showToast("Error loading configuration", "error");
     } else if (data) {
-      setMasterPrompt(
-        data.master_prompt || DEFAULT_PROFILE.master_prompt
-      );
-      setThinkingStyle(
-        data.thinking_style || DEFAULT_PROFILE.thinking_style
-      );
-      setSkills(
-        data.skills_constraints || DEFAULT_PROFILE.skills_constraints
-      );
-      setLastSaved(
-        data.updated_at
-          ? new Date(data.updated_at).toLocaleString("ka-GE")
-          : null
-      );
+      setMasterPrompt(data.master_prompt || DEFAULT_PROFILE.master_prompt);
+      setThinkingStyle(data.thinking_style || DEFAULT_PROFILE.thinking_style);
+      setSkills(data.skills_constraints || DEFAULT_PROFILE.skills_constraints);
+      setAgentTools(data.agent_tools || DEFAULT_PROFILE.agent_tools);
+      setExecutionWorkflow(data.execution_workflow || DEFAULT_PROFILE.execution_workflow);
+      setOutputFormat(data.output_format || DEFAULT_PROFILE.output_format);
+      setLastSaved(data.updated_at ? new Date(data.updated_at).toLocaleString("ka-GE") : null);
     }
 
     setLoading(false);
@@ -705,6 +710,9 @@ export default function DailyAnchorProfilePage() {
           master_prompt: masterPrompt,
           thinking_style: thinkingStyle,
           skills_constraints: skills,
+          agent_tools: agentTools,
+          execution_workflow: executionWorkflow,
+          output_format: outputFormat,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "agent_type" }
@@ -722,14 +730,13 @@ export default function DailyAnchorProfilePage() {
   };
 
   const resetToDefault = () => {
-    if (
-      confirm(
-        "Are you sure? All changes will be lost and the profile will return to default."
-      )
-    ) {
+    if (confirm("Are you sure? All changes will be lost and the profile will return to default.")) {
       setMasterPrompt(DEFAULT_PROFILE.master_prompt);
       setThinkingStyle(DEFAULT_PROFILE.thinking_style);
       setSkills(DEFAULT_PROFILE.skills_constraints);
+      setAgentTools(DEFAULT_PROFILE.agent_tools);
+      setExecutionWorkflow(DEFAULT_PROFILE.execution_workflow);
+      setOutputFormat(DEFAULT_PROFILE.output_format);
       setHasUnsavedChanges(true);
     }
   };
@@ -738,9 +745,12 @@ export default function DailyAnchorProfilePage() {
     setHasUnsavedChanges(
       masterPrompt !== DEFAULT_PROFILE.master_prompt ||
         thinkingStyle !== DEFAULT_PROFILE.thinking_style ||
-        skills !== DEFAULT_PROFILE.skills_constraints
+        skills !== DEFAULT_PROFILE.skills_constraints ||
+        agentTools !== DEFAULT_PROFILE.agent_tools ||
+        executionWorkflow !== DEFAULT_PROFILE.execution_workflow ||
+        outputFormat !== DEFAULT_PROFILE.output_format
     );
-  }, [masterPrompt, thinkingStyle, skills]);
+  }, [masterPrompt, thinkingStyle, skills, agentTools, executionWorkflow, outputFormat]);
 
   return (
     <div className="profile-root min-h-screen">
@@ -863,7 +873,7 @@ export default function DailyAnchorProfilePage() {
                     </span>
                     <span className="rounded-lg border border-[var(--line)] bg-black/20 px-3 py-2 text-xs text-[var(--mute)]">
                       <span className="mr-1.5 text-[var(--amber)]">✦</span>
-                      Georgian language
+                      English language
                     </span>
                   </div>
 
@@ -997,182 +1007,91 @@ export default function DailyAnchorProfilePage() {
               </div>
             </section>
 
-            {/* Agent Tools */}
+            {/* Agent Tools (Now Editable) */}
             <section className="section-card rounded-2xl border border-[var(--line)] p-6">
               <div className="mb-5 flex items-start gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--blue)]/15 text-[var(--blue)]">
                   {Icons.tools}
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">🛠️ Agent Tools</h2>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">🛠️ Agent Tools</h2>
+                    <span className="rounded-full border border-[var(--blue)]/20 bg-[var(--blue)]/[.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-[var(--blue)]">
+                      Configurable
+                    </span>
+                  </div>
                   <p className="text-xs text-[var(--mute)]">
-                    External services configured for this agent
+                    External services configured for this agent (Editable)
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--violet)]/10 text-lg">
-                      🧠
-                    </span>
-                    <h3 className="text-sm font-semibold">Text Engine</h3>
-                  </div>
-                  <p className="mb-4 text-xs text-[var(--mute)]">
-                    LLM for caption generation
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      Groq
-                    </span>
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      DeepSeek
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--rose)]/10 text-lg">
-                      🎨
-                    </span>
-                    <h3 className="text-sm font-semibold">Visual Engine</h3>
-                  </div>
-                  <p className="mb-4 text-xs text-[var(--mute)]">
-                    Image generation
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      KIE AI
-                    </span>
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      Gemini
-                    </span>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--ok)]/10 text-lg">
-                      📡
-                    </span>
-                    <h3 className="text-sm font-semibold">Publisher</h3>
-                  </div>
-                  <p className="mb-4 text-xs text-[var(--mute)]">
-                    Telegram distribution
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      sendPhoto
-                    </span>
-                    <span className="rounded-full bg-[var(--amber)]/15 px-2.5 py-1 text-xs font-medium text-[var(--amber)]">
-                      sendMessage
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <textarea
+                value={agentTools}
+                onChange={(e) => setAgentTools(e.target.value)}
+                placeholder="List the tools and engines used by this agent..."
+                spellCheck={false}
+                className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--amber)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--amber)]/5 min-h-[180px] resize-y font-mono leading-relaxed"
+              />
             </section>
 
-            {/* Execution Workflow */}
+            {/* Execution Workflow (Now Editable) */}
             <section className="section-card rounded-2xl border border-[var(--line)] p-6">
               <div className="mb-5 flex items-start gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--amber)]/15 text-[var(--amber)]">
                   {Icons.workflow}
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    🔄 Execution Workflow
-                  </h2>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">🔄 Execution Workflow</h2>
+                    <span className="rounded-full border border-[var(--amber)]/20 bg-[var(--amber)]/[.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-[var(--amber)]">
+                      Configurable
+                    </span>
+                  </div>
                   <p className="text-xs text-[var(--mute)]">
-                    How this agent processes a request
+                    How this agent processes a request (Editable)
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {[
-                  {
-                    n: "1",
-                    title: "Receive Schedule Trigger",
-                    desc: "Read post_type, content_theme, and zodiac_sign from telegram_schedule",
-                  },
-                  {
-                    n: "2",
-                    title: "Load Configuration",
-                    desc: "Fetch master_prompt, thinking_style, and skills_constraints from agent_config",
-                  },
-                  {
-                    n: "3",
-                    title: "Request Credential Lease",
-                    desc: "Acquire temporary access to Groq and KIE AI via AccessManager",
-                  },
-                  {
-                    n: "4",
-                    title: "Generate Caption",
-                    desc: "Send a structured prompt to the LLM and receive JSON with caption, image_prompt, and hashtags",
-                  },
-                  {
-                    n: "5",
-                    title: "Generate Image",
-                    desc: "Send image_prompt to KIE AI/Gemini and receive the image URL or buffer",
-                  },
-                  {
-                    n: "6",
-                    title: "Publish to Telegram",
-                    desc: "Call sendTelegramPhoto with the caption and generated image",
-                  },
-                  {
-                    n: "7",
-                    title: "Cleanup & Logging",
-                    desc: "Revoke leases, log to published_content, and emit events",
-                  },
-                ].map((step) => (
-                  <div
-                    key={step.n}
-                    className="flex items-start gap-3 rounded-xl border border-[var(--line-2)] bg-black/20 p-3.5"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-[var(--amber)]/20 bg-[var(--amber)]/10 text-xs font-extrabold text-[var(--amber)]">
-                      {step.n}
-                    </div>
-                    <div className="min-w-0 flex-1 pt-0.5">
-                      <p className="text-sm font-semibold text-[var(--moon)]">
-                        {step.title}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--mute)]">
-                        {step.desc}
-                      </p>
-                    </div>
-                    <span className="mt-2 hidden h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--amber)]/50 sm:block" />
-                  </div>
-                ))}
-              </div>
+              <textarea
+                value={executionWorkflow}
+                onChange={(e) => setExecutionWorkflow(e.target.value)}
+                placeholder="Describe the step-by-step execution workflow..."
+                spellCheck={false}
+                className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--amber)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--amber)]/5 min-h-[220px] resize-y font-mono leading-relaxed"
+              />
             </section>
 
-            {/* Output Format */}
+            {/* Output Format (Now Editable) */}
             <section className="section-card rounded-2xl border border-[var(--line)] p-6">
               <div className="mb-5 flex items-start gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--blue)]/15 text-[var(--blue)]">
                   {Icons.output}
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold">📦 Output Format</h2>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold">📦 Output Format</h2>
+                    <span className="rounded-full border border-[var(--blue)]/20 bg-[var(--blue)]/[.06] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-[var(--blue)]">
+                      Configurable
+                    </span>
+                  </div>
                   <p className="text-xs text-[var(--mute)]">
-                    Expected JSON structure from the agent
+                    Expected JSON structure from the agent (Editable)
                   </p>
                 </div>
               </div>
 
-              <pre className="overflow-x-auto rounded-xl border border-[var(--line-2)] bg-black/40 p-4 text-xs font-mono text-[var(--moon)]">
-{`{
-  "caption": "Full Georgian text with emojis and line breaks",
-  "image_prompt": "Detailed English prompt for image generator",
-  "hashtags": ["#LUNARA", "#topic1", "#topic2"]
-}`}
-              </pre>
+              <textarea
+                value={outputFormat}
+                onChange={(e) => setOutputFormat(e.target.value)}
+                placeholder="Define the expected JSON output structure..."
+                spellCheck={false}
+                className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--amber)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--amber)]/5 min-h-[120px] resize-y font-mono leading-relaxed"
+              />
+              
               <p className="mt-3 text-xs text-[var(--mute)]">
-                The response must be valid JSON without markdown or explanatory
-                text outside the object.
+                The response must be valid JSON without markdown or explanatory text outside the object.
               </p>
             </section>
 
