@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -35,6 +36,7 @@ const Icons = {
   back: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>,
   settings: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
   brain: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>,
+  eye: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
 };
@@ -45,7 +47,7 @@ interface Agent {
   type: string;
   icon: string;
   color: string;
-  description: string; // ✅ ახალი ველი აღწერისთვის
+  description: string;
   status: 'active' | 'inactive';
   nextRun: string;
   lastRun: string;
@@ -86,7 +88,7 @@ const TELEGRAM_AGENTS: Agent[] = [
     type: 'interactive_play', 
     icon: '🎯', 
     color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20', 
-    description: 'ქმნის „აირჩიე ტაროს ბარათი“, ასტროლოგიურ ვიქტორინებს, გამოკითხვებს და სხვა თამაშებს. მიზანია მომხმარებელი აქტიურ მონაწილედ აქციოს და გაზარდოს ჩართულობა.',
+    description: 'ქმნის „აირჩიე ტაროს ბარათი", ასტროლოგიურ ვიქტორინებს, გამოკითხვებს და სხვა თამაშებს. მიზანია მომხმარებელი აქტიურ მონაწილედ აქციოს და გაზარდოს ჩართულობა.',
     status: 'inactive', 
     nextRun: 'Tue/Thu 15:00', 
     lastRun: 'Never', 
@@ -98,7 +100,7 @@ const TELEGRAM_AGENTS: Agent[] = [
     type: 'educational_deep_dive', 
     icon: '📚', 
     color: 'text-[#60a5fa] bg-[#60a5fa]/10 border-[#60a5fa]/20', 
-    description: 'ქმნის საგანმანათლებლო პოსტებს: ასტროლოგიის საფუძვლებს, ტაროს არკანების განმარტებებს, ნუმეროლოგიას და „მითი vs რეალობა“ რუბრიკებს ექსპერტული იმიჯის ჩამოსაყალიბებლად.',
+    description: 'ქმნის საგანმანათლებლო პოსტებს: ასტროლოგიის საფუძვლებს, ტაროს არკანების განმარტებებს, ნუმეროლოგიას და „მითი vs რეალობა" რუბრიკებს ექსპერტული იმიჯის ჩამოსაყალიბებლად.',
     status: 'inactive', 
     nextRun: 'Wed 13:00', 
     lastRun: 'Never', 
@@ -143,6 +145,7 @@ const TELEGRAM_AGENTS: Agent[] = [
 ];
 
 export default function TelegramAgentsPage() {
+  const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>(TELEGRAM_AGENTS);
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
@@ -371,7 +374,6 @@ export default function TelegramAgentsPage() {
                   <div className="min-w-0 flex-1">
                     <h3 className="text-lg font-semibold text-[var(--moon)]">{agent.name}</h3>
                     <p className="text-sm capitalize text-[var(--mute)] mb-1">{agent.type.replace(/_/g, ' ')}</p>
-                    {/* ✅ ახალი აღწერილობის ბლოკი */}
                     <p className="text-xs text-[var(--mute)] leading-relaxed">
                       {agent.description}
                     </p>
@@ -406,13 +408,21 @@ export default function TelegramAgentsPage() {
                 </div>
               </div>
               
+              {/* ✅ განახლებული ღილაკების ბლოკი */}
               <div className="mt-6 flex flex-wrap gap-2">
                 <button 
+                  onClick={() => router.push(`/dashboard/telegram/agents/${agent.type}`)}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-4 py-2.5 text-sm font-semibold text-[var(--moon)] transition-colors hover:bg-white/5 sm:flex-none"
+                >
+                  {Icons.eye}
+                  View Profile
+                </button>
+                <button 
                   onClick={() => openConfigModal(agent.type)}
-                  className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/25 bg-[var(--violet)]/[.09] px-4 py-2.5 text-sm font-semibold shadow-[0_8px_25px_rgba(128,108,246,.08)] text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
+                  className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/25 bg-[var(--violet)]/[.09] px-4 py-2.5 text-sm font-semibold text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
                 >
                   {Icons.brain}
-                  Configure
+                  Quick Config
                 </button>
                 <button 
                   onClick={() => checkAndRunAgent(agent.type)}
@@ -471,7 +481,7 @@ export default function TelegramAgentsPage() {
                 <textarea
                   value={masterPrompt}
                   onChange={(e) => setMasterPrompt(e.target.value)}
-                  placeholder="მაგალითად: შენ ხარ Lunara-ს Daily Anchor ექსპერტი. შენი მიზანია შექმნა მოკლე, შთამაგონებელი და პერსონალიზებული ჰოროსკოპი..."
+                  placeholder="მაგალითად: შენ ხარ Lunara-ს Daily Anchor ექსპერტი..."
                   className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[150px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
@@ -486,7 +496,7 @@ export default function TelegramAgentsPage() {
                 <textarea
                   value={thinkingStyle}
                   onChange={(e) => setThinkingStyle(e.target.value)}
-                  placeholder="მაგალითად: იფიქრე ნაბიჯ-ნაბიჯ. ჯერ განსაზღვრე დღის ენერგია, შემდეგ დაუკავშირე ის კონკრეტულ ზოდიაქოს ნიშანს. გამოიყენე ემპათიური, მაგრამ არა ზედმეტად დრამატული ტონი."
+                  placeholder="მაგალითად: იფიქრე ნაბიჯ-ნაბიჯ..."
                   className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
@@ -501,7 +511,7 @@ export default function TelegramAgentsPage() {
                 <textarea
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
-                  placeholder="მაგალითად: არასდროს გამოიყენო სიტყვები 'გარანტირებული', 'აუცილებლად'. ყოველთვის დაამატე 3-5 შესაბამისი ჰეშთეგი. ტექსტი არ უნდა აღემატებოდეს 150 სიტყვას."
+                  placeholder="მაგალითად: არასდროს გამოიყენო სიტყვები 'გარანტირებული'..."
                   className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
                 />
                 <p className="mt-1 text-xs text-[var(--mute)]">
