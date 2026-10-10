@@ -15,7 +15,6 @@ export interface ImageGenerationResult {
 const getProviderEndpoints = (provider: string) => {
   const p = provider.toLowerCase();
   
-  // ცნობილი პროვაიდერების endpoint-ები
   const knownEndpoints: Record<string, { models: string; images: string }> = {
     groq: {
       models: 'https://api.groq.com/openai/v1/models',
@@ -23,7 +22,7 @@ const getProviderEndpoints = (provider: string) => {
     },
     gemini: {
       models: 'https://generativelanguage.googleapis.com/v1beta/models',
-      images: 'https://generativelanguage.googleapis.com/v1beta/models' // model appended dynamically
+      images: 'https://generativelanguage.googleapis.com/v1beta/models'
     },
     deepseek: {
       models: 'https://api.deepseek.com/v1/models',
@@ -39,11 +38,11 @@ const getProviderEndpoints = (provider: string) => {
     },
     huggingface: {
       models: 'https://api-inference.huggingface.co/models',
-      images: 'https://api-inference.huggingface.co/models' // model appended dynamically
+      images: 'https://api-inference.huggingface.co/models'
     },
     cloudflare: {
       models: 'https://api.cloudflare.com/client/v4/accounts',
-      images: 'https://api.cloudflare.com/client/v4/accounts' // account_id appended dynamically
+      images: 'https://api.cloudflare.com/client/v4/accounts'
     },
     mistral: {
       models: 'https://api.mistral.ai/v1/models',
@@ -51,49 +50,32 @@ const getProviderEndpoints = (provider: string) => {
     }
   };
 
-  // თუ პროვაიდერი ცნობილია, ვიყენებთ მის endpoint-ებს
   if (knownEndpoints[p]) {
     return knownEndpoints[p];
   }
 
-  // თუ პროვაიდერი უცნობია, ვცდილობთ სტანდარტული OpenAI-ს თავსებადი endpoint-ების აგებას
-  // ეს მუშაობს ბევრი პროვაიდერისთვის (Together AI, Perplexity, და ა.შ.)
   return {
     models: `https://api.${p}.com/v1/models`,
     images: `https://api.${p}.com/v1/images/generations`
   };
 };
 
-// უნივერსალური ავტორიზაციის ჰედერის გენერატორი
 const getAuthHeaders = (provider: string, apiKey: string): Record<string, string> => {
   const p = provider.toLowerCase();
-  
-  // Gemini იყენებს API key-ს URL-ში, არა header-ში
-  if (p === 'gemini') {
-    return {};
-  }
-
-  // Cloudflare იყენებს Bearer token-ს
-  if (p === 'cloudflare') {
-    return { 'Authorization': `Bearer ${apiKey}` };
-  }
-
-  // ყველა სხვა პროვაიდერი იყენებს სტანდარტულ Bearer token-ს
+  if (p === 'gemini') return {};
+  if (p === 'cloudflare') return { 'Authorization': `Bearer ${apiKey}` };
   return { 'Authorization': `Bearer ${apiKey}` };
 };
 
-// უნივერსალური მოდელის ფილტრი - პოულობს სურათის მოდელებს ნებისმიერი პროვაიდერისგან
 const filterImageModels = (provider: string, models: any[]): string[] => {
   const p = provider.toLowerCase();
   
-  // Gemini-სთვის ვეძებთ generateImages მეთოდს
   if (p === 'gemini') {
     return models
       .filter((m: any) => m.supportedGenerationMethods?.includes('generateImages'))
       .map((m: any) => m.name.replace('models/', ''));
   }
 
-  // HuggingFace-ისთვის ვეძებთ image/text-to-image ტასკებს
   if (p === 'huggingface') {
     return models
       .filter((m: any) => 
@@ -106,7 +88,6 @@ const filterImageModels = (provider: string, models: any[]): string[] => {
       .map((m: any) => m.id);
   }
 
-  // Cloudflare-ისთვის ვეძებთ @cf პრეფიქსს
   if (p === 'cloudflare') {
     return models
       .filter((m: any) => 
@@ -116,26 +97,24 @@ const filterImageModels = (provider: string, models: any[]): string[] => {
       .map((m: any) => m.id);
   }
 
-  // ყველა სხვა პროვაიდერისთვის (OpenAI-ს თავსებადი API)
   return models
     .filter((m: any) => 
-      m.id && (
-        m.id.toLowerCase().includes('image') ||
-        m.id.toLowerCase().includes('vision') ||
-        m.id.toLowerCase().includes('flux') ||
-        m.id.toLowerCase().includes('dall-e') ||
-        m.id.toLowerCase().includes('kontext') ||
-        m.id.toLowerCase().includes('sd')
+      (m.id || m.name) && (
+        (m.id || m.name).toLowerCase().includes('image') ||
+        (m.id || m.name).toLowerCase().includes('vision') ||
+        (m.id || m.name).toLowerCase().includes('flux') ||
+        (m.id || m.name).toLowerCase().includes('dall-e') ||
+        (m.id || m.name).toLowerCase().includes('kontext') ||
+        (m.id || m.name).toLowerCase().includes('sd') ||
+        (m.id || m.name).toLowerCase().includes('generate')
       )
     )
-    .map((m: any) => m.id);
+    .map((m: any) => m.id || m.name);
 };
 
-// უნივერსალური გენერაციის სხეულის აგება
 const buildGenerationBody = (provider: string, model: string, prompt: string): any => {
   const p = provider.toLowerCase();
   
-  // Gemini-სთვის Imagen ფორმატი
   if (p === 'gemini') {
     return {
       instances: [{ prompt }],
@@ -143,17 +122,14 @@ const buildGenerationBody = (provider: string, model: string, prompt: string): a
     };
   }
 
-  // HuggingFace-ისთვის მარტივი prompt
   if (p === 'huggingface') {
     return { inputs: prompt };
   }
 
-  // Cloudflare-ისთვის
   if (p === 'cloudflare') {
     return { prompt };
   }
 
-  // ყველა სხვა პროვაიდერისთვის (OpenAI-ს თავსებადი)
   return {
     model,
     prompt,
@@ -162,30 +138,25 @@ const buildGenerationBody = (provider: string, model: string, prompt: string): a
   };
 };
 
-// უნივერსალური პასუხის პარსერი
 const parseImageResponse = (provider: string, data: any): { url?: string; b64?: string } | null => {
   const p = provider.toLowerCase();
   
-  // Gemini-სთვის
   if (p === 'gemini') {
     if (data.predictions?.[0]?.bytesBase64Encoded) {
       return { b64: data.predictions[0].bytesBase64Encoded };
     }
   }
 
-  // HuggingFace-ისთვის (ხშირად აბრუნებს binary-ს, მაგრამ ზოგჯერ JSON-ს)
   if (p === 'huggingface') {
     if (data.url) return { url: data.url };
     if (data.output?.url) return { url: data.output.url };
   }
 
-  // Cloudflare-ისთვის
   if (p === 'cloudflare') {
     if (data.result?.output?.url) return { url: data.result.output.url };
     if (data.result?.output?.image) return { b64: data.result.output.image };
   }
 
-  // ყველა სხვა პროვაიდერისთვის (OpenAI-ს თავსებადი)
   if (data.data?.[0]?.url) return { url: data.data[0].url };
   if (data.data?.[0]?.b64_json) return { b64: data.data[0].b64_json };
   
@@ -198,13 +169,12 @@ export class ImageGenerator {
     agentType: string
   ): Promise<ImageGenerationResult> {
     const logs: string[] = [];
-    logs.push(` იწყება სურათის გენერაცია აგენტისთვის: ${agentType}`);
+    logs.push(`🎨 იწყება სურათის გენერაცია აგენტისთვის: ${agentType}`);
     logs.push(`📝 Prompt: ${imagePrompt.substring(0, 80)}...`);
     logs.push(`🔍 ვიწყებ API საცავის სრულ სკანირებას...`);
 
     await credentialVault.ready;
 
-    // ✅ ვიღებთ ყველა credentials-ს საცავიდან
     const allCredentials = this.getAllCredentials();
     
     if (allCredentials.length === 0) {
@@ -214,7 +184,6 @@ export class ImageGenerator {
 
     logs.push(`📦 საცავში ნაპოვნია ${allCredentials.length} API გასაღები.`);
 
-    // ✅ ვაჯგუფებთ პროვაიდერების მიხედვით (unique providers)
     const providersMap = new Map<string, any[]>();
     allCredentials.forEach(cred => {
       const provider = cred.provider.toLowerCase();
@@ -226,9 +195,8 @@ export class ImageGenerator {
 
     const providerNames = Array.from(providersMap.keys()).map(p => p.toUpperCase()).join(', ');
     logs.push(`🏢 ნაპოვნი პროვაიდერები: ${providerNames}`);
-    logs.push(` ვამოწმებ თითოეულ პროვაიდერს სურათის გენერაციის შესაძლებლობაზე...\n`);
+    logs.push(`🔎 ვამოწმებ თითოეულ პროვაიდერს სურათის გენერაციის შესაძლებლობაზე...\n`);
 
-    // ✅ ვამოწმებთ თითოეულ პროვაიდერს
     let attemptNumber = 0;
     const totalProviders = providersMap.size;
 
@@ -239,7 +207,6 @@ export class ImageGenerator {
       logs.push(`🔄 [${attemptNumber}/${totalProviders}] ვამოწმებ ${providerUpper}-ს...`);
       logs.push(`═══════════════════════════════════════`);
 
-      // ვიღებთ endpoint-ებს ამ პროვაიდერისთვის
       const endpoints = getProviderEndpoints(provider);
       logs.push(`📡 ${providerUpper}: API Endpoint: ${endpoints.models}`);
 
@@ -262,14 +229,13 @@ export class ImageGenerator {
           try {
             const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${agentType}-img-${provider}`);
             if (!apiKey) {
-              logs.push(`️ ${providerUpper}: გასაღების დეშიფრაცია ვერ მოხერხდა.`);
+              logs.push(`⚠️ ${providerUpper}: გასაღების დეშიფრაცია ვერ მოხერხდა.`);
               continue;
             }
 
             logs.push(`🔑 ${providerUpper}: გასაღები წარმატებით დეშიფრირდა.`);
             logs.push(`📡 ${providerUpper}: ვითხოვ მოდელების სიას...`);
             
-            // ვითხოვთ მოდელების სიას
             const modelsUrl = (provider === 'gemini') 
               ? `${endpoints.models}?key=${apiKey}`
               : endpoints.models;
@@ -287,32 +253,33 @@ export class ImageGenerator {
 
             const modelsData = await modelsRes.json();
             
-            // ვიღებთ მოდელების მასივს (სხვადასხვა პროვაიდერს სხვადასხვა ფორმატი აქვს)
-            const modelsArray = modelsData.data || modelsData.models || modelsData.result || [];
+            const modelsArray = modelsData.data || modelsData.models || modelsData.result || (Array.isArray(modelsData) ? modelsData : []);
             
             logs.push(`📋 ${providerUpper}: მიღებულია ${modelsArray.length} მოდელი.`);
 
-            // ვფილტრავთ სურათის მოდელებს
             const imageModels = filterImageModels(provider, modelsArray);
 
             if (imageModels.length === 0) {
               logs.push(`⚠️ ${providerUpper}: არ დაუბრუნებია სურათის გენერაციის მოდელები.`);
+              
+              // ✅ DEEP DEBUG ბლოკი: თუ მოდელები არსებობს, მაგრამ ფილტრმა ვერ ამოიცნო, ვაჩვენებთ ნიმუშებს
+              if (modelsArray.length > 0) {
+                const sampleModels = modelsArray.slice(0, 5).map((m: any) => m.id || m.name || JSON.stringify(m)).join(' | ');
+                logs.push(`🔍 DEBUG ${providerUpper}: ფილტრმა ვერ ამოიცნო მოდელები. API-ს მიერ დაბრუნებული ნიმუშები: [${sampleModels}]`);
+              }
               continue;
             }
 
-            // ✅ წარმატება! ვიპოვეთ სურათის მოდელი
             const targetModel = imageModels[0];
             logs.push(`✅ ${providerUpper}: დააბრუნა სურათის მოდელი: ${targetModel}`);
             logs.push(`🤖 ${providerUpper}: ვცდილობ გენერაციას...`);
 
-            // ვაგებთ გენერაციის URL-ს
             let genUrl = endpoints.images;
             if (provider === 'gemini') {
               genUrl = `${endpoints.images}/${targetModel}:generateImages?key=${apiKey}`;
             } else if (provider === 'huggingface') {
               genUrl = `${endpoints.images}/${targetModel}`;
             } else if (provider === 'cloudflare') {
-              // Cloudflare-სთვის გვჭირდება account_id
               genUrl = `${endpoints.images}/${cred.metadata?.accountId || 'default'}/ai/run/${targetModel}`;
             }
 
@@ -330,7 +297,7 @@ export class ImageGenerator {
             if (!genRes.ok) {
               const errorText = await genRes.text();
               logs.push(`❌ ${providerUpper}: გენერაცია ვერ მოხერხდა (HTTP ${genRes.status}).`);
-              logs.push(`   შეცდომა: ${errorText.substring(0, 100)}`);
+              logs.push(`   შეცდომა: ${errorText.substring(0, 150)}`);
               continue;
             }
 
@@ -342,7 +309,6 @@ export class ImageGenerator {
               continue;
             }
 
-            // ✅ სრული წარმატება!
             logs.push(`🎉 ${providerUpper}: სურათი წარმატებით შეიქმნა!`);
             logs.push(`═══════════════════════════════════════\n`);
             
@@ -377,25 +343,18 @@ export class ImageGenerator {
     };
   }
 
-  // ✅ უნივერსალური მეთოდი ყველა credentials-ის მისაღებად
   private getAllCredentials(): any[] {
     try {
-      // მეთოდი 1: თუ აქვს getAllCredentials მეთოდი
       if (typeof (credentialVault as any).getAllCredentials === 'function') {
         return (credentialVault as any).getAllCredentials() || [];
       }
-      
-      // მეთოდი 2: თუ აქვს credentials property
       if ((credentialVault as any).credentials && Array.isArray((credentialVault as any).credentials)) {
         return (credentialVault as any).credentials;
       }
-
-      // მეთოდი 3: თუ აქვს getCredentials მეთოდი
       if (typeof (credentialVault as any).getCredentials === 'function') {
         return (credentialVault as any).getCredentials() || [];
       }
 
-      // მეთოდი 4: ვცდილობთ ყველა ცნობილ პროვაიდერს
       const allCreds: any[] = [];
       const knownProviders = ['groq', 'gemini', 'deepseek', 'kie', 'openai', 'anthropic', 'mistral', 'cohere', 'huggingface', 'cloudflare'];
       
@@ -406,7 +365,7 @@ export class ImageGenerator {
             allCreds.push(cred);
           }
         } catch (e) {
-          // პროვაიდერი არ არის საცავში, ვტოვებთ
+          // ვტოვებთ
         }
       }
       
