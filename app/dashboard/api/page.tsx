@@ -20,14 +20,13 @@ const STYLES = `
 `;
 
 export default function APIVaultPage() {
-  const [isMounted, setIsMounted] = useState(false);
+  // ✅ წაშლილია ზედმეტი isMounted ცვლადი
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     console.log("🚀 [API Vault] 1. Component is mounting...");
-    setIsMounted(true);
 
     // მცირე დაყოვნება იმისთვის, რომ Next.js-ს ჰქონდეს დრო კომპონენტების სწორად ჰიდრატაციისთვის
     const timer = setTimeout(() => {
@@ -47,7 +46,9 @@ export default function APIVaultPage() {
       <div className="api-root min-h-screen flex items-center justify-center p-4">
         <div className="rounded-2xl border border-[var(--rose)]/30 bg-[var(--rose)]/10 p-6 max-w-lg text-center fade-in">
           <h2 className="text-xl font-bold text-[var(--rose)] mb-2">⚠️ კომპონენტის ჩატვირთვის შეცდომა</h2>
-          <p className="text-sm text-[var(--mute)] mb-4 font-mono bg-black/20 p-2 rounded">{errorMessage}</p>
+          <p className="text-sm text-[var(--mute)] mb-4 font-mono bg-black/20 p-2 rounded break-all">
+            {errorMessage}
+          </p>
           <p className="text-xs text-[var(--mute)] mb-4">
             გთხოვთ, დააჭიროთ <strong>F12</strong>, გადახვიდეთ <strong>Console</strong> ტაბზე და მომაწოდოთ იქ არსებული წითელი ტექსტი.
           </p>
@@ -100,7 +101,13 @@ export default function APIVaultPage() {
         ) : (
           <div className="fade-in">
             {/* აქ ხდება რეალური კომპონენტის რენდერი */}
-            <CredentialsPanel />
+            <CredentialsPanel 
+              onError={(err: string) => {
+                console.error("❌ [API Vault] CredentialsPanel threw an error:", err);
+                setHasError(true);
+                setErrorMessage(err);
+              }} 
+            />
           </div>
         )}
       </main>
