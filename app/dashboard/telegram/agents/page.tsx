@@ -12,24 +12,81 @@ const supabase = createClient(
 );
 
 const STYLES = `
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Noto+Sans+Georgian:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Georgian:wght@400;500;600;700&display=swap");
 .agents-root{
-  --ink:#070812; --ink-2:#0d1020; --ink-3:#15192d; --ink-4:#1b2038;
-  --line:rgba(236,233,247,.075); --line-2:rgba(236,233,247,.14);
-  --moon:#f4f1fb; --mute:#8f8da8; --violet:#a99cff; --violet-2:#806cf6; --rose:#ff83ad; --amber:#f6c177; --ok:#65dfab;
-  --blue:#60a5fa; --purple:#a78bfa; --pink:#f472b6;
-  font-family:"Bricolage Grotesque","Noto Sans Georgian",system-ui,sans-serif;
-  background: radial-gradient(900px 420px at 78% -8%, rgba(128,108,246,.12), transparent 62%), var(--ink);
-  color:var(--moon);
+  --ink:#090a12; --ink-2:#10121f; --ink-3:#191c2d; --ink-4:#222640;
+  --line:rgba(226,226,255,.09); --line-2:rgba(226,226,255,.16);
+  --moon:#f6f5ff; --mute:#a2a3bd; --violet:#c0b5ff; --violet-2:#8d79ff;
+  --rose:#ff91bd; --amber:#ffd18a; --ok:#75e2b4; --blue:#80b7ff;
+  font-family:"Manrope","Noto Sans Georgian",system-ui,sans-serif;
+  min-height:100vh; color:var(--moon);
+  background:
+    radial-gradient(ellipse 800px 430px at 82% -10%,rgba(133,104,255,.17),transparent 68%),
+    radial-gradient(ellipse 520px 360px at -12% 38%,rgba(90,117,255,.07),transparent 72%),
+    #090a12;
+  letter-spacing:-.012em;
 }
 .agents-root *{box-sizing:border-box}
 .agents-root *:focus-visible{outline:2px solid var(--violet);outline-offset:3px;border-radius:10px}
-.agents-root .custom-scrollbar{scrollbar-width:thin;scrollbar-color:rgba(169,156,255,.28) transparent}
+.agents-root .custom-scrollbar{scrollbar-width:thin;scrollbar-color:rgba(192,181,255,.32) transparent}
 .agents-root .custom-scrollbar::-webkit-scrollbar{width:6px;height:6px}
 .agents-root .custom-scrollbar::-webkit-scrollbar-track{background:transparent}
-.agents-root .custom-scrollbar::-webkit-scrollbar-thumb{background:rgba(169,156,255,.24);border-radius:999px}
-.agents-root .stat-card{background:linear-gradient(145deg,rgba(18,22,41,.94),rgba(10,13,27,.94));box-shadow:0 14px 35px rgba(0,0,0,.14)}
-.agents-root .agent-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(19,23,43,.96),rgba(10,13,27,.96));box-shadow:0 18px 45px rgba(0,0,0,.16)}
+.agents-root .custom-scrollbar::-webkit-scrollbar-thumb{background:rgba(192,181,255,.28);border-radius:999px}
+.agents-root header{background:rgba(9,10,18,.78)!important;border-color:var(--line)!important;box-shadow:0 12px 40px rgba(0,0,0,.16)!important}
+.agents-root header > div{min-height:78px}
+.agents-root header h1{font-size:clamp(1.1rem,1.5vw,1.45rem);font-weight:800;letter-spacing:-.045em;color:#fff}
+.agents-root header p{font-size:12px;line-height:1.6;color:#a6a5c0}
+.agents-root header a{border-color:var(--line-2)!important;background:rgba(255,255,255,.035)!important;color:#c5c3d9!important;min-height:42px}
+.agents-root header a:hover{background:rgba(255,255,255,.075)!important;border-color:rgba(192,181,255,.32)!important;color:white!important}
+.agents-root main{max-width:1440px!important;padding-top:34px!important;padding-bottom:52px!important}
+.agents-root .stat-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(24,27,47,.94),rgba(15,17,30,.97));border:1px solid var(--line)!important;border-radius:22px!important;box-shadow:0 12px 32px rgba(0,0,0,.13);transition:transform .2s ease,border-color .2s ease}
+.agents-root .stat-card:hover{border-color:rgba(192,181,255,.2)!important;transform:translateY(-2px)}
+.agents-root .stat-card p:first-child{font-size:11px!important;letter-spacing:.11em!important;font-weight:800!important;color:#a4a4c1!important}
+.agents-root .stat-card p:nth-child(2){font-size:34px!important;line-height:1.1!important;margin-top:13px!important;font-weight:800!important;letter-spacing:-.06em!important}
+.agents-root .stat-card p:nth-child(2)::after{content:"";display:block;width:34px;height:3px;margin-top:12px;border-radius:10px;background:linear-gradient(90deg,var(--violet),transparent);opacity:.8}
+.agents-root .agent-card{position:relative;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:linear-gradient(155deg,rgba(25,28,49,.97),rgba(14,16,29,.99) 74%);border:1px solid rgba(226,226,255,.105)!important;border-radius:24px!important;padding:23px!important;box-shadow:0 16px 42px rgba(0,0,0,.18);transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.agents-root .agent-card::before{content:"";position:absolute;top:0;left:24px;right:24px;height:1px;background:linear-gradient(90deg,transparent,rgba(192,181,255,.34),transparent);pointer-events:none}
+.agents-root .agent-card:hover{transform:translateY(-4px)!important;border-color:rgba(192,181,255,.28)!important;box-shadow:0 24px 55px rgba(0,0,0,.28)!important}
+.agents-root .agent-card > div:first-child{gap:15px!important;min-height:112px}
+.agents-root .agent-card > div:first-child > div:first-child{gap:14px!important;min-width:0}
+.agents-root .agent-card > div:first-child > div:first-child > div:first-child{width:54px!important;height:54px!important;min-width:54px;border-radius:17px!important;font-size:25px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.agents-root .agent-card h3{font-size:16px!important;line-height:1.35!important;font-weight:800!important;letter-spacing:-.035em!important;color:#fff!important;overflow-wrap:anywhere}
+.agents-root .agent-card p.capitalize{font-size:10px!important;letter-spacing:.09em!important;text-transform:uppercase!important;font-weight:800!important;color:#a9a7c9!important;margin-top:5px!important;margin-bottom:9px!important}
+.agents-root .agent-card p.text-xs{font-size:12px!important;line-height:1.75!important;color:#b0b0c8!important}
+.agents-root .agent-card > div:first-child > div:last-child{gap:8px!important}
+.agents-root .agent-card > div:first-child > div:last-child p:first-child{font-size:10px!important;text-transform:uppercase;letter-spacing:.1em;font-weight:800;color:#898aa8!important}
+.agents-root .agent-card > div:first-child > div:last-child p:last-child{font-size:12px!important;font-weight:800!important;white-space:nowrap}
+.agents-root .agent-card button[aria-label],.agents-root .agent-card button{cursor:pointer}
+.agents-root .agent-card > div:nth-child(2){margin-top:20px!important;gap:10px!important}
+.agents-root .agent-card > div:nth-child(2) > div{border:1px solid rgba(226,226,255,.075)!important;background:rgba(5,6,13,.25)!important;border-radius:15px!important;padding:13px 14px!important;min-width:0}
+.agents-root .agent-card > div:nth-child(2) p:first-child{font-size:10px!important;font-weight:800!important;letter-spacing:.07em;text-transform:uppercase;color:#9292af!important}
+.agents-root .agent-card > div:nth-child(2) p:last-child{font-size:13px!important;font-weight:700!important;margin-top:7px!important;overflow-wrap:anywhere}
+.agents-root .agent-card > div:nth-child(3){margin-top:auto!important;padding-top:20px;gap:8px!important}
+.agents-root .agent-card > div:nth-child(3) button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;border-radius:12px!important;padding:10px 13px!important;font-size:12px!important;font-weight:800!important;white-space:nowrap;transition:all .18s ease}
+.agents-root .agent-card > div:nth-child(3) button:first-child{background:rgba(255,255,255,.045)!important;border-color:var(--line-2)!important;color:#e7e5f7!important}
+.agents-root .agent-card > div:nth-child(3) button:first-child:hover{background:rgba(255,255,255,.09)!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(2){background:rgba(160,144,255,.1)!important;border-color:rgba(192,181,255,.25)!important;color:#d0c8ff!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(2):hover{background:rgba(160,144,255,.18)!important}
+.agents-root .agent-card > div:nth-child(3) button:last-child{background:linear-gradient(135deg,#c4b8ff,#8d79ff)!important;color:#111020!important;box-shadow:0 8px 20px rgba(141,121,255,.18)!important}
+.agents-root .agent-card > div:nth-child(3) button:last-child:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.agents-root .agent-card > div:nth-child(3) button:disabled{cursor:not-allowed;filter:grayscale(.2);transform:none}
+.agents-root main > .stat-card{padding:22px!important}
+.agents-root main > .stat-card h4{font-size:14px!important;font-weight:800!important;letter-spacing:-.02em}
+.agents-root main > .stat-card .custom-scrollbar{background:rgba(5,6,13,.42)!important;border-color:rgba(226,226,255,.08)!important;border-radius:16px!important;padding:16px!important;font-size:12px!important;line-height:1.7}
+.agents-root main > .stat-card .custom-scrollbar > div{border-color:rgba(226,226,255,.08)!important;padding-bottom:10px!important;margin-bottom:10px!important;color:#d4d2e8!important;overflow-wrap:anywhere}
+.agents-root .fixed.inset-0{padding:20px!important}
+.agents-root .fixed.inset-0 > div{border-radius:25px!important;border-color:rgba(226,226,255,.15)!important;background:rgba(16,18,31,.98)!important;box-shadow:0 35px 110px rgba(0,0,0,.62)!important}
+.agents-root .fixed.inset-0 h3{font-size:18px!important;letter-spacing:-.035em;font-weight:800!important}
+.agents-root .fixed.inset-0 label{font-size:11px!important;letter-spacing:.1em!important}
+.agents-root .fixed.inset-0 textarea{background:rgba(5,6,13,.38)!important;border-color:rgba(226,226,255,.13)!important;border-radius:15px!important;color:#f6f5ff!important;font-size:13px!important;line-height:1.7!important}
+.agents-root .fixed.inset-0 textarea:focus{border-color:rgba(192,181,255,.55)!important;box-shadow:0 0 0 4px rgba(160,144,255,.08)!important}
+.agents-root .fixed.inset-0 textarea::placeholder{color:#777892!important}
+.agents-root .fixed.inset-0 p{line-height:1.65}
+.agents-root .fixed.inset-0 button{min-height:44px;border-radius:12px!important;font-size:12px!important;font-weight:800!important}
+@media (min-width:1280px){.agents-root main > div:nth-child(2){grid-template-columns:repeat(3,minmax(0,1fr));gap:20px!important}}
+@media (max-width:1023px){.agents-root main{padding-top:24px!important}.agents-root .agent-card{padding:20px!important}}
+@media (max-width:640px){.agents-root main{padding-left:14px!important;padding-right:14px!important;padding-top:18px!important}.agents-root header > div{padding:13px 14px!important;min-height:68px}.agents-root header h1{font-size:15px!important}.agents-root header a{padding:9px 10px!important}.agents-root .agent-card{padding:17px!important;border-radius:19px!important}.agents-root .agent-card > div:first-child{flex-direction:column!important;align-items:stretch!important}.agents-root .agent-card > div:first-child > div:last-child{flex-direction:row!important;align-items:center!important;justify-content:space-between!important}.agents-root .agent-card > div:nth-child(2){grid-template-columns:repeat(2,minmax(0,1fr))!important}.agents-root .agent-card > div:nth-child(3){display:grid!important;grid-template-columns:1fr 1fr!important}.agents-root .agent-card > div:nth-child(3) button:last-child{grid-column:1 / -1}.agents-root .stat-card{padding:17px!important;border-radius:18px!important}.agents-root .stat-card p:nth-child(2){font-size:29px!important}.agents-root .fixed.inset-0{padding:10px!important}.agents-root .fixed.inset-0 > div{padding:18px!important;border-radius:20px!important}}
+@media (prefers-reduced-motion:reduce){.agents-root *{transition:none!important;scroll-behavior:auto!important}}
 `;
 
 const Icons = {
@@ -70,77 +127,77 @@ interface ScheduleItem {
 }
 
 const TELEGRAM_AGENTS: Agent[] = [
-  { 
-    id: 'tg-daily', 
-    name: 'Daily Anchor Agent', 
-    type: 'daily_anchor', 
-    icon: '☀️', 
-    color: 'text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/20', 
+  {
+    id: 'tg-daily',
+    name: 'Daily Anchor Agent',
+    type: 'daily_anchor',
+    icon: '☀️',
+    color: 'text-[#f6c177] bg-[#f6c177]/10 border-[#f6c177]/20',
     description: 'ქმნის დღის საერთო ენერგიის მიმოხილვას, 12 ნიშნის დღიურ ჰოროსკოპსა და დღის ტაროს ბარათს. მიზანია ყოველდღიური დაბრუნების ჩვევის ჩამოყალიბება.',
-    status: 'inactive', 
-    nextRun: 'Daily 09:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Daily 09:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
-  { 
-    id: 'tg-interactive', 
-    name: 'Interactive Play Agent', 
-    type: 'interactive_play', 
-    icon: '🎯', 
-    color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20', 
+  {
+    id: 'tg-interactive',
+    name: 'Interactive Play Agent',
+    type: 'interactive_play',
+    icon: '🎯',
+    color: 'text-[#ff7aa8] bg-[#ff7aa8]/10 border-[#ff7aa8]/20',
     description: 'ქმნის „აირჩიე ტაროს ბარათი", ასტროლოგიურ ვიქტორინებს, გამოკითხვებს და სხვა თამაშებს. მიზანია მომხმარებელი აქტიურ მონაწილედ აქციოს და გაზარდოს ჩართულობა.',
-    status: 'inactive', 
-    nextRun: 'Tue/Thu 15:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Tue/Thu 15:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
-  { 
-    id: 'tg-educational', 
-    name: 'Educational Agent', 
-    type: 'educational_deep_dive', 
-    icon: '📚', 
-    color: 'text-[#60a5fa] bg-[#60a5fa]/10 border-[#60a5fa]/20', 
+  {
+    id: 'tg-educational',
+    name: 'Educational Agent',
+    type: 'educational_deep_dive',
+    icon: '📚',
+    color: 'text-[#60a5fa] bg-[#60a5fa]/10 border-[#60a5fa]/20',
     description: 'ქმნის საგანმანათლებლო პოსტებს: ასტროლოგიის საფუძვლებს, ტაროს არკანების განმარტებებს, ნუმეროლოგიას და „მითი vs რეალობა" რუბრიკებს ექსპერტული იმიჯის ჩამოსაყალიბებლად.',
-    status: 'inactive', 
-    nextRun: 'Wed 13:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Wed 13:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
-  { 
-    id: 'tg-cosmic', 
-    name: 'Cosmic Calendar Agent', 
-    type: 'cosmic_calendar', 
-    icon: '🌙', 
-    color: 'text-[#a78bfa] bg-[#a78bfa]/10 border-[#a78bfa]/20', 
+  {
+    id: 'tg-cosmic',
+    name: 'Cosmic Calendar Agent',
+    type: 'cosmic_calendar',
+    icon: '🌙',
+    color: 'text-[#a78bfa] bg-[#a78bfa]/10 border-[#a78bfa]/20',
     description: 'ქმნის კვირის/თვის ასტროლოგიურ მიმოხილვებს, მთვარის ფაზების კალენდარს, დაბნელებებისა და რეტროგრადული პერიოდების გზამკვლევებს აქტუალური ინფორმაციისთვის.',
-    status: 'inactive', 
-    nextRun: 'Sun 16:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Sun 16:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
-  { 
-    id: 'tg-inner', 
-    name: 'Inner Universe Agent', 
-    type: 'inner_universe', 
-    icon: '💫', 
-    color: 'text-[#f472b6] bg-[#f472b6]/10 border-[#f472b6]/20', 
+  {
+    id: 'tg-inner',
+    name: 'Inner Universe Agent',
+    type: 'inner_universe',
+    icon: '💫',
+    color: 'text-[#f472b6] bg-[#f472b6]/10 border-[#f472b6]/20',
     description: 'ქმნის პოსტებს სიყვარულის დინამიკაზე, პირად საზღვრებზე, ემოციურ გზავნილებსა და დღიურისთვის განკუთვნილ რეფლექსიის კითხვებზე ღრმა ემოციური კავშირისთვის.',
-    status: 'inactive', 
-    nextRun: 'Thu 15:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Thu 15:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
-  { 
-    id: 'tg-product', 
-    name: 'Product Bridge Agent', 
-    type: 'product_bridge', 
-    icon: '🚀', 
-    color: 'text-[#5fd6a4] bg-[#5fd6a4]/10 border-[#5fd6a4]/20', 
+  {
+    id: 'tg-product',
+    name: 'Product Bridge Agent',
+    type: 'product_bridge',
+    icon: '🚀',
+    color: 'text-[#5fd6a4] bg-[#5fd6a4]/10 border-[#5fd6a4]/20',
     description: 'ქმნის პოსტებს, რომლებიც ბუნებრივად უკავშირებს არხის კონტენტს Lunara-ს Mini App-ის ფუნქციებს (პერსონალური ჰოროსკოპი, ნატალური რუკა, უფასო რესურსები) კონვერსიისთვის.',
-    status: 'inactive', 
-    nextRun: 'Fri 12:00', 
-    lastRun: 'Never', 
-    totalPosts: 0 
+    status: 'inactive',
+    nextRun: 'Fri 12:00',
+    lastRun: 'Never',
+    totalPosts: 0
   },
 ];
 
@@ -149,7 +206,7 @@ export default function TelegramAgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(TELEGRAM_AGENTS);
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
-  
+
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('');
   const [masterPrompt, setMasterPrompt] = useState('');
@@ -193,7 +250,7 @@ export default function TelegramAgentsPage() {
     if (data) {
       setMasterPrompt(data.master_prompt || '');
       setThinkingStyle(data.thinking_style || '');
-      setSkills(data.skills_constraints || ''); 
+      setSkills(data.skills_constraints || '');
       addAgentLog(`✅ ${agentType} კონფიგურაცია ჩაიტვირთა`);
     } else {
       setMasterPrompt('');
@@ -212,14 +269,14 @@ export default function TelegramAgentsPage() {
   const saveAgentConfig = async () => {
     setIsSavingConfig(true);
     addAgentLog(`💾 ${configAgentType} კონფიგურაციის შენახვა...`);
-    
+
     const { error } = await supabase
       .from('agent_config')
       .upsert({
         agent_type: configAgentType,
         master_prompt: masterPrompt,
         thinking_style: thinkingStyle,
-        skills_constraints: skills, 
+        skills_constraints: skills,
         updated_at: new Date().toISOString()
       }, { onConflict: 'agent_type' });
 
@@ -235,19 +292,19 @@ export default function TelegramAgentsPage() {
 
   const toggleAgent = (type: string) => {
     setAgents(prev => {
-      const newAgents = prev.map(agent => 
-        agent.type === type 
-          ? { ...agent, status: (agent.status === 'active' ? 'inactive' : 'active') as 'active' | 'inactive' } 
+      const newAgents = prev.map(agent =>
+        agent.type === type
+          ? { ...agent, status: (agent.status === 'active' ? 'inactive' : 'active') as 'active' | 'inactive' }
           : agent
       );
-      
+
       const statusesToSave: Record<string, 'active' | 'inactive'> = {};
       newAgents.forEach(a => { statusesToSave[a.type] = a.status; });
       localStorage.setItem('tg_agent_statuses', JSON.stringify(statusesToSave));
-      
+
       const newStatus = newAgents.find(a => a.type === type)?.status === 'active';
       supabase.from('telegram_schedule').update({ is_active: newStatus }).eq('content_category', type);
-      
+
       addAgentLog(`🔄 ${type} აგენტი ${newStatus ? 'ჩაირთო' : 'გაითიშა'}. განრიგი განახლდა.`);
       return newAgents;
     });
@@ -313,9 +370,9 @@ export default function TelegramAgentsPage() {
 
       addAgentLog(`✅ კონფიგურაცია წარმატებით ჩაიტვირთა.`);
       addAgentLog(`🚀 AI იწყებს კონტენტის გენერაციას... (Demo Mode)`);
-      
+
       addAgentLog(`🎉 ${agentName}-მა წარმატებით დაასრულა ციკლი!`);
-      
+
       setAgents(prev => prev.map(a => a.type === agentType ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
 
     } catch (error) {
@@ -348,7 +405,7 @@ export default function TelegramAgentsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl space-y-7 px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--mute)]">Total Agents</p>
             <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--moon)]">{agents.length}</p>
@@ -363,9 +420,9 @@ export default function TelegramAgentsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
           {agents.map((agent) => (
-            <div key={agent.id} className="agent-card rounded-2xl border border-[var(--line)] p-5 sm:p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--line-2)] hover:shadow-[0_22px_55px_rgba(0,0,0,.2)]">
+            <div key={agent.id} className="agent-card rounded-2xl border border-[var(--line)] p-5 sm:p-6 transition-all duration-300">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-start gap-4">
                   <div className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border text-2xl ${agent.color}`}>
@@ -396,7 +453,7 @@ export default function TelegramAgentsPage() {
                   </button>
                 </div>
               </div>
-              
+
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
                   <p className="text-xs text-[var(--mute)]">Next Run</p>
@@ -407,24 +464,24 @@ export default function TelegramAgentsPage() {
                   <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
                 </div>
               </div>
-              
-              {/* ✅ განახლებული ღილაკების ბლოკი (.replace('_', '-') დამატებულია) */}
+
+              {/* განახლებული ღილაკების ბლოკი */}
               <div className="mt-6 flex flex-wrap gap-2">
-                <button 
-                  onClick={() => router.push(`/dashboard/telegram/agents/${agent.type.replace('_', '-')}`)}
+                <button
+                  onClick={() => router.push(`/dashboard/telegram/agents/${agent.type}`)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-4 py-2.5 text-sm font-semibold text-[var(--moon)] transition-colors hover:bg-white/5 sm:flex-none"
                 >
                   {Icons.eye}
                   View Profile
                 </button>
-                <button 
+                <button
                   onClick={() => openConfigModal(agent.type)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/25 bg-[var(--violet)]/[.09] px-4 py-2.5 text-sm font-semibold text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
                 >
                   {Icons.brain}
                   Quick Config
                 </button>
-                <button 
+                <button
                   onClick={() => checkAndRunAgent(agent.type)}
                   disabled={isChecking || agent.status === 'inactive'}
                   className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] px-5 py-2.5 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.22)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
@@ -491,7 +548,7 @@ export default function TelegramAgentsPage() {
 
               <div>
                 <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--amber)]">
-                   🧠 Thinking Style
+                  🧠 Thinking Style
                 </label>
                 <textarea
                   value={thinkingStyle}
@@ -506,7 +563,7 @@ export default function TelegramAgentsPage() {
 
               <div>
                 <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ok)]">
-                   🛡️ Skills & Constraints
+                  🛡️ Skills & Constraints
                 </label>
                 <textarea
                   value={skills}
