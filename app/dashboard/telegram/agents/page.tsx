@@ -408,10 +408,10 @@ export default function TelegramAgentsPage() {
                 </div>
               </div>
               
-              {/* ✅ განახლებული ღილაკების ბლოკი */}
+              {/* ✅ განახლებული ღილაკების ბლოკი (.replace('_', '-') დამატებულია) */}
               <div className="mt-6 flex flex-wrap gap-2">
                 <button 
-                  onClick={() => router.push(`/dashboard/telegram/agents/${agent.type}`)}
+                  onClick={() => router.push(`/dashboard/telegram/agents/${agent.type.replace('_', '-')}`)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-4 py-2.5 text-sm font-semibold text-[var(--moon)] transition-colors hover:bg-white/5 sm:flex-none"
                 >
                   {Icons.eye}
