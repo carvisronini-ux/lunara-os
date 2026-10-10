@@ -1,3 +1,4 @@
+// /home/carvisronini-ux/lunara-os/services/distribution/telegram.ts
 // ============================================================
 // LUNARA OS — Telegram Distribution Adapter (Enhanced Logging)
 // Foundation: §28 (Echo Distribution), §40 (Secrets), §53 (Deployment)
@@ -18,7 +19,7 @@ export interface TelegramPhotoOptions {
 }
 
 // ============================================================
-// 1. მხოლოდ ტექსტის გაგზავნა (არსებული ფუნქცია)
+// 1. მხოლოდ ტექსტის გაგზავნა
 // ============================================================
 
 export async function sendTelegramMessage(
@@ -86,7 +87,7 @@ export async function sendTelegramMessage(
 }
 
 // ============================================================
-// 2. სურათიანი პოსტის გაგზავნა (ახალი ფუნქცია: Photo + Caption)
+// 2. სურათიანი პოსტის გაგზავნა (Photo + Caption)
 // ============================================================
 
 export async function sendTelegramPhoto(

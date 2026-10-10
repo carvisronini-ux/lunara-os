@@ -3,7 +3,8 @@
 import { supabase } from '@/lib/supabase';
 import { credentialVault } from '../credentials/credential-vault';
 import { accessManager } from '../credentials/access-manager';
-import { sendTelegramMessage } from '../distribution/telegram';
+import { sendTelegramMessage, sendTelegramPhoto } from '../distribution/telegram';
+import { imageGenerator } from './image-generator';
 
 export interface OrchestratorRequest {
   agentType: string;
@@ -17,6 +18,7 @@ export interface OrchestratorResponse {
   messageId?: number;
   error?: string;
   caption?: string;
+  imageUrl?: string;
 }
 
 export class TelegramOrchestrator {
@@ -88,7 +90,12 @@ Post Type: ${request.postType}
 Theme: ${request.contentTheme || 'AI will determine based on category'}
 Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
-Generate the content now following ALL constraints. Return ONLY valid JSON.`;
+Generate the content now following ALL constraints. Return ONLY valid JSON with this exact structure:
+{
+  "caption": "Your post text here (150-200 words, empathetic tone, no guarantees)",
+  "image_prompt": "Detailed English description for image generation. No text, no logos, no watermarks. Mystical, cosmic style. --ar 4:5",
+  "hashtags": ["#LUNARA", "#topic1", "#topic2"]
+}`;
 
         // 6. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -133,17 +140,58 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
         }
       }
 
-      // 9. გამოვაქვეყნოთ Telegram-ში
+      // 9. ვალიდაცია
       if (!generatedContent.caption) {
         throw new Error('AI did not return a caption in JSON');
       }
 
+      const caption = generatedContent.caption;
+      const imagePrompt = generatedContent.image_prompt;
+      const hashtags = generatedContent.hashtags || [];
+      
+      // ვაერთიანებთ caption-ს და hashtags-ს
+      const fullCaption = [caption, ...hashtags].filter(Boolean).join('\n\n');
+
+      console.log(`[Orchestrator] 📝 Caption length: ${caption.length} chars`);
+      if (imagePrompt) {
+        console.log(`[Orchestrator] 🎨 Image prompt: ${imagePrompt.substring(0, 100)}...`);
+      }
+
+      // 10. სურათის გენერაცია (თუ image_prompt არსებობს)
+      let imageResult = null;
+      if (imagePrompt) {
+        console.log(`[Orchestrator] 🎨 Generating image...`);
+        imageResult = await imageGenerator.generateImage(imagePrompt, request.agentType);
+        
+        if (imageResult.success) {
+          console.log(`[Orchestrator] ✅ Image generated successfully with ${imageResult.provider}`);
+        } else {
+          console.warn(`[Orchestrator] ⚠️ Image generation failed: ${imageResult.error}. Sending text only.`);
+        }
+      }
+
+      // 11. გამოვაქვეყნოთ Telegram-ში
       console.log(`[Orchestrator] 📤 Publishing to Telegram...`);
 
-      const publishResult = await sendTelegramMessage({
-        text: generatedContent.caption,
-        parse_mode: 'HTML',
-      });
+      let publishResult;
+      
+      if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
+        // სურათიანი პოსტი
+        console.log(`[Orchestrator] 🖼️ Sending photo with caption...`);
+        publishResult = await sendTelegramPhoto({
+          caption: fullCaption,
+          imageUrl: imageResult.imageUrl,
+          imageBuffer: imageResult.imageBuffer,
+          parse_mode: 'HTML',
+        });
+      } else {
+        // მხოლოდ ტექსტი (fallback)
+        console.log(`[Orchestrator] 📝 Sending text only...`);
+        publishResult = await sendTelegramMessage({
+          text: fullCaption,
+          parse_mode: 'HTML',
+        });
+      }
 
       if (!publishResult.success) {
         throw new Error(`Telegram publish failed: ${publishResult.error}`);
@@ -151,13 +199,13 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
 
       console.log(`[Orchestrator] 🎉 Successfully published! Message ID: ${publishResult.messageId}`);
 
-      // 10. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
+      // 12. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
       try {
         await supabase.from('published_content').insert({
           agent_type: request.agentType,
           post_type: request.postType,
           platform: 'telegram',
-          content_text: generatedContent.caption,
+          content_text: fullCaption,
           message_id: publishResult.messageId,
           status: 'published',
           published_at: new Date().toISOString(),
@@ -169,7 +217,8 @@ Generate the content now following ALL constraints. Return ONLY valid JSON.`;
       return {
         success: true,
         messageId: publishResult.messageId,
-        caption: generatedContent.caption,
+        caption: caption,
+        imageUrl: imageResult?.imageUrl,
       };
 
     } catch (error) {
