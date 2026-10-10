@@ -36,6 +36,10 @@ export class TelegramOrchestrator {
 
       console.log(`[Orchestrator] ✅ Loaded config for ${request.agentType}`);
 
+      // ✅ ახალი: ველოდებით სანამ CredentialVault მზად იქნება და ქეში ჩაიტვირთება!
+      await credentialVault.ready;
+      console.log(`[Orchestrator] ✅ CredentialVault is ready and cache is populated.`);
+
       // 2. მოვითხოვოთ დროებითი წვდომა LLM-ზე (Groq)
       const leaseId = accessManager.requestAccess(
         `${request.agentType}-agent`,
@@ -47,7 +51,7 @@ export class TelegramOrchestrator {
       );
 
       if (!leaseId) {
-        throw new Error('Failed to acquire LLM access lease');
+        throw new Error('Failed to acquire LLM access lease. Check console for details.');
       }
 
       let generatedContent: any = null;
