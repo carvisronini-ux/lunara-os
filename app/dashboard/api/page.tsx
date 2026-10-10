@@ -1,6 +1,7 @@
 // /home/carvisronini-ux/lunara-os/app/dashboard/api/page.tsx
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { CredentialsPanel } from "@/components/credentials/CredentialsPanel";
 
@@ -14,9 +15,55 @@ const STYLES = `
   background:var(--ink); color:var(--moon); min-height:100vh;
 }
 .api-root *:focus-visible{outline:2px solid var(--violet); outline-offset:2px; border-radius:10px}
+@keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fade-in 0.3s ease-out forwards; }
 `;
 
 export default function APIVaultPage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    console.log("🚀 [API Vault] 1. Component is mounting...");
+    setIsMounted(true);
+
+    // მცირე დაყოვნება იმისთვის, რომ Next.js-ს ჰქონდეს დრო კომპონენტების სწორად ჰიდრატაციისთვის
+    const timer = setTimeout(() => {
+      console.log("✅ [API Vault] 2. Hydration complete. Attempting to render CredentialsPanel...");
+      setIsLoading(false);
+    }, 200);
+
+    return () => {
+      clearTimeout(timer);
+      console.log("🧹 [API Vault] Component unmounting...");
+    };
+  }, []);
+
+  // თუ კომპონენტის რენდერის დროს რაიმე კრიტიკული შეცდომა მოხდა
+  if (hasError) {
+    return (
+      <div className="api-root min-h-screen flex items-center justify-center p-4">
+        <div className="rounded-2xl border border-[var(--rose)]/30 bg-[var(--rose)]/10 p-6 max-w-lg text-center fade-in">
+          <h2 className="text-xl font-bold text-[var(--rose)] mb-2">⚠️ კომპონენტის ჩატვირთვის შეცდომა</h2>
+          <p className="text-sm text-[var(--mute)] mb-4 font-mono bg-black/20 p-2 rounded">{errorMessage}</p>
+          <p className="text-xs text-[var(--mute)] mb-4">
+            გთხოვთ, დააჭიროთ <strong>F12</strong>, გადახვიდეთ <strong>Console</strong> ტაბზე და მომაწოდოთ იქ არსებული წითელი ტექსტი.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-[var(--violet)] text-[var(--ink)] rounded-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            გვერდის განახლება
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  console.log("🔄 [API Vault] 3. Rendering UI. isLoading:", isLoading);
+
   return (
     <div className="api-root">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
@@ -29,18 +76,33 @@ export default function APIVaultPage() {
               className="flex shrink-0 items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-3.5 py-2 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="hidden sm:inline">მთავარი გვერდი</span>
             </Link>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">API Credentials Vault</h1>
-              <p className="hidden text-xs text-[var(--mute)] sm:block">მართე LLM და დისტრიბუციის პროვაიდერების გასაღებები უსაფრთხოდ</p>
+              <p className="hidden text-xs text-[var(--mute)] sm:block">მართე LLM და დისტრიბუციის პროვაიდერების გასაღებები უსაფრთხო საცავში</p>
             </div>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl p-4 lg:p-8">
-        <CredentialsPanel />
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-[50vh] gap-4 fade-in">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[var(--violet)] border-t-transparent"></div>
+            <p className="text-sm font-medium text-[var(--mute)] animate-pulse">
+              API საცავის კომპონენტის ინიციალიზაცია...
+            </p>
+            <p className="text-xs text-[var(--mute)] opacity-70">
+              (შეამოწმეთ კონსოლი დეტალებისთვის: F12 → Console)
+            </p>
+          </div>
+        ) : (
+          <div className="fade-in">
+            {/* აქ ხდება რეალური კომპონენტის რენდერი */}
+            <CredentialsPanel />
+          </div>
+        )}
       </main>
     </div>
   );
