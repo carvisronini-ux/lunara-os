@@ -84,16 +84,20 @@ ${config.thinking_style}
 SKILLS & CONSTRAINTS:
 ${config.skills_constraints}`;
 
+        // ✅ გამკაცრებული userPrompt, რომ აუცილებლად დააბრუნოს image_prompt
         const userPrompt = `Task: Create a Telegram post.
 Category: ${request.agentType}
 Post Type: ${request.postType}
 Theme: ${request.contentTheme || 'AI will determine based on category'}
 Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
-Generate the content now following ALL constraints. Return ONLY valid JSON with this exact structure:
+CRITICAL: You MUST return a valid JSON object with EXACTLY these three keys: "caption", "image_prompt", and "hashtags". 
+DO NOT omit the "image_prompt" key. It must be a detailed English description for an image generator.
+
+Return ONLY valid JSON with this exact structure:
 {
   "caption": "Your post text here (150-200 words, empathetic tone, no guarantees)",
-  "image_prompt": "Detailed English description for image generation. No text, no logos, no watermarks. Mystical, cosmic style. --ar 4:5",
+  "image_prompt": "Detailed English description for image generation. Mystical, cosmic, dark luxury style. No text, no logos, no watermarks. --ar 4:5",
   "hashtags": ["#LUNARA", "#topic1", "#topic2"]
 }`;
 
@@ -128,6 +132,8 @@ Generate the content now following ALL constraints. Return ONLY valid JSON with 
         // 7. გავპარსოთ JSON
         try {
           generatedContent = JSON.parse(rawContent);
+          // ✅ ახალი დებაგინგის ლოგი: ვნახოთ ზუსტად რა დააბრუნა AI-მ
+          console.log('[Orchestrator] 📦 Raw AI JSON Response:', JSON.stringify(generatedContent, null, 2));
         } catch (e) {
           throw new Error(`Failed to parse AI response as JSON: ${rawContent}`);
         }
@@ -155,6 +161,8 @@ Generate the content now following ALL constraints. Return ONLY valid JSON with 
       console.log(`[Orchestrator] 📝 Caption length: ${caption.length} chars`);
       if (imagePrompt) {
         console.log(`[Orchestrator] 🎨 Image prompt: ${imagePrompt.substring(0, 100)}...`);
+      } else {
+        console.warn(`[Orchestrator] ⚠️ AI did NOT return an image_prompt. Sending text only.`);
       }
 
       // 10. სურათის გენერაცია (თუ image_prompt არსებობს)
