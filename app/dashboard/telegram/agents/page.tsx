@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
-import { runTelegramAgentAction } from "@/app/actions/telegram-actions"; // ✅ ახალი იმპორტი
+import { runTelegramAgentAction } from "@/app/actions/telegram-actions";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
@@ -97,6 +97,7 @@ const Icons = {
   eye: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
   check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  copy: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>,
 };
 
 interface Agent {
@@ -233,6 +234,13 @@ export default function TelegramAgentsPage() {
   const addAgentLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();
     setAgentLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
+  };
+
+  const copyLogsToClipboard = () => {
+    const logsText = agentLogs.join('\n');
+    navigator.clipboard.writeText(logsText).then(() => {
+      addAgentLog("📋 ლოგები დაკოპირდა ბუფერში!");
+    });
   };
 
   const loadAgentConfig = async (agentType: string) => {
@@ -372,7 +380,6 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონფიგურაცია წარმატებით ჩაიტვირთა.`);
       addAgentLog(`🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...`);
 
-      // ✅ ვიყენებთ Server Action-ს, რათა უსაფრთხოდ მივმართოთ სერვერს და წავიკითხოთ .env ცვლადები
       const result = await runTelegramAgentAction({
         agentType: agentType,
         postType: nextRule.post_type,
@@ -388,6 +395,18 @@ export default function TelegramAgentsPage() {
 
       addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
       addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
+      
+      // ✅ დეტალური ლოგები სურათის სტატუსის შესახებ
+      if (result.hasImagePrompt) {
+        if (result.imageProvider && result.imageProvider !== 'none') {
+          addAgentLog(`🎨 სურათი წარმატებით შეიქმნა (${result.imageProvider})`);
+        } else {
+          addAgentLog(`⚠️ სურათის გენერაცია ვერ მოხერხდა (მხოლოდ ტექსტი გაიგზავნა)`);
+        }
+      } else {
+        addAgentLog(`⚠️ AI-მ არ დააბრუნა "image_prompt" (მხოლოდ ტექსტი გაიგზავნა)`);
+      }
+
       addAgentLog(`📤 Telegram-ში გაიგზავნა! Message ID: ${result.messageId}`);
       addAgentLog(`🎉 ${agentName}-მა წარმატებით დაასრულა ციკლი!`);
 
@@ -510,11 +529,22 @@ export default function TelegramAgentsPage() {
           ))}
         </div>
 
+        {/* ✅ განახლებული Live Execution Logs პანელი Copy ღილაკით */}
         <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
-          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
-            Live Execution Logs
-          </h4>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
+              Live Execution Logs
+            </h4>
+            <button
+              onClick={copyLogsToClipboard}
+              disabled={agentLogs.length === 0}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--line-2)] bg-white/[.025] px-2.5 py-1.5 text-xs font-semibold text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {Icons.copy}
+              <span>Copy Logs</span>
+            </button>
+          </div>
           <div className="h-64 overflow-y-auto rounded-xl border border-white/[.035] bg-black/20 p-3.5 font-mono text-xs space-y-1 custom-scrollbar">
             {agentLogs.length === 0 ? (
               <p className="text-[var(--mute)]">ლოგები გამოჩნდება აქ, როცა რომელიმე აგენტი ამოქმედდება...</p>

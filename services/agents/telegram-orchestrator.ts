@@ -19,6 +19,8 @@ export interface OrchestratorResponse {
   error?: string;
   caption?: string;
   imageUrl?: string;
+  hasImagePrompt?: boolean; // ✅ ახალი ველი: ჰქონდა თუ არა AI-ს image_prompt
+  imageProvider?: string;   // ✅ ახალი ველი: რომელი პროვაიდერი გამოიყენა (kie, gemini, ან none)
 }
 
 export class TelegramOrchestrator {
@@ -132,7 +134,7 @@ Return ONLY valid JSON with this exact structure:
         // 7. გავპარსოთ JSON
         try {
           generatedContent = JSON.parse(rawContent);
-          // ✅ ახალი დებაგინგის ლოგი: ვნახოთ ზუსტად რა დააბრუნა AI-მ
+          // ✅ დებაგინგის ლოგი: ვნახოთ ზუსტად რა დააბრუნა AI-მ (ჩანს სერვერის კონსოლში)
           console.log('[Orchestrator] 📦 Raw AI JSON Response:', JSON.stringify(generatedContent, null, 2));
         } catch (e) {
           throw new Error(`Failed to parse AI response as JSON: ${rawContent}`);
@@ -222,11 +224,14 @@ Return ONLY valid JSON with this exact structure:
         console.error('[Orchestrator] ⚠️ Failed to log to database:', dbError);
       }
 
+      // ✅ განახლებული return ობიექტი დამატებითი ინფორმაციით
       return {
         success: true,
         messageId: publishResult.messageId,
         caption: caption,
         imageUrl: imageResult?.imageUrl,
+        hasImagePrompt: !!imagePrompt, // true თუ image_prompt არსებობდა, false თუ არა
+        imageProvider: imageResult?.provider || 'none', // 'kie', 'gemini', ან 'none'
       };
 
     } catch (error) {
