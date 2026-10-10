@@ -25,21 +25,34 @@ export function CredentialsPanel() {
   
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
+  const [isVaultReady, setIsVaultReady] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
-      const creds = await credentialVault.getMetadata();
-      // ✅ მხოლოდ ACTIVE სტატუსის ჩანაწერების ჩვენება (წაშლილები დაიმალება)
-      setCredentials(creds.filter((c: any) => c.status === 'ACTIVE'));
+      console.log("⏳ [CredentialsPanel] ველოდებით CredentialVault-ის მზადყოფნას...");
+      
+      // ✅ ველოდებით სანამ ქეში ბოლომდე ჩაიტვირთება Supabase-იდან
+      await credentialVault.ready;
+      setIsVaultReady(true);
+      
+      console.log("✅ [CredentialsPanel] CredentialVault მზადაა! ვიღებთ მეტამონაცემებს...");
+      const creds = credentialVault.getMetadata();
+      console.log("📦 [CredentialsPanel] ნედლი მონაცემები ვოლტიდან:", creds);
+      
+      const activeCreds = creds.filter((c: any) => c.status === 'ACTIVE');
+      console.log("🟢 [CredentialsPanel] აქტიური გასაღებები:", activeCreds);
+      
+      setCredentials(activeCreds);
       setLeases(accessManager.getActiveLeases());
       setAudit(credentialVault.getAuditLog(15));
     };
+    
     loadData();
   }, []);
 
   const refreshData = async () => {
-    const creds = await credentialVault.getMetadata();
-    // ✅ მხოლოდ ACTIVE სტატუსის ჩანაწერების ჩვენება
+    await credentialVault.ready;
+    const creds = credentialVault.getMetadata();
     setCredentials(creds.filter((c: any) => c.status === 'ACTIVE'));
     setLeases(accessManager.getActiveLeases());
     setAudit(credentialVault.getAuditLog(15));
@@ -94,7 +107,7 @@ export function CredentialsPanel() {
       );
       if (success) {
         setShowDeleteConfirm(null);
-        refreshData(); // ✅ ეს განაახლებს სიას და REVOKED ჩანაწერი გაქრება
+        refreshData();
       }
     } catch (error) {
       console.error("Failed to delete credential:", error);
@@ -163,7 +176,6 @@ export function CredentialsPanel() {
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
               
-              {/* 1. Custom Name */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Custom Name (Optional)</label>
                 <input 
@@ -175,7 +187,6 @@ export function CredentialsPanel() {
                 />
               </div>
 
-              {/* 2. Provider (თავისუფალი ტექსტი რეკომენდაციებით) */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
                 <input 
@@ -198,7 +209,6 @@ export function CredentialsPanel() {
                 <p className="text-[10px] text-slate-500 mt-1">You can type any custom provider name.</p>
               </div>
 
-              {/* 3. Permission Scope */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
                 <select 
@@ -214,7 +224,6 @@ export function CredentialsPanel() {
                 </select>
               </div>
 
-              {/* 4. API Key */}
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">API Key / Secret</label>
                 <input 
@@ -330,7 +339,12 @@ export function CredentialsPanel() {
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
           <h3 className="text-lg font-bold text-white mb-4">Registered Credentials (Metadata Only)</h3>
           <div className="space-y-3">
-            {credentials.length === 0 ? (
+            {!isVaultReady ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent mr-3"></div>
+                <span className="text-slate-400 text-sm">Loading secure vault...</span>
+              </div>
+            ) : credentials.length === 0 ? (
               <p className="text-slate-500 text-sm">No active credentials registered yet. Add one to begin.</p>
             ) : (
               credentials.map((cred: any) => {
