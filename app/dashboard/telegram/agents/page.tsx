@@ -369,8 +369,27 @@ export default function TelegramAgentsPage() {
       }
 
       addAgentLog(`✅ კონფიგურაცია წარმატებით ჩაიტვირთა.`);
-      addAgentLog(`🚀 AI იწყებს კონტენტის გენერაციას... (Demo Mode)`);
+      addAgentLog(`🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...`);
 
+      // ✅ დინამიურად ჩავტვირთოთ ორქესტრატორი და გავუშვათ რეალური პროცესი
+      const { telegramOrchestrator } = await import('@/services/agents/telegram-orchestrator');
+
+      const result = await telegramOrchestrator.generateAndPublish({
+        agentType: agentType,
+        postType: nextRule.post_type,
+        contentTheme: nextRule.content_theme || undefined,
+        zodiacSign: nextRule.zodiac_sign || undefined,
+      });
+
+      if (!result.success) {
+        addAgentLog(`❌ პუბლიკაცია ვერ მოხერხდა: ${result.error}`);
+        setIsChecking(false);
+        return;
+      }
+
+      addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
+      addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
+      addAgentLog(`📤 Telegram-ში გაიგზავნა! Message ID: ${result.messageId}`);
       addAgentLog(`🎉 ${agentName}-მა წარმატებით დაასრულა ციკლი!`);
 
       setAgents(prev => prev.map(a => a.type === agentType ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
@@ -465,7 +484,6 @@ export default function TelegramAgentsPage() {
                 </div>
               </div>
 
-              {/* ✅ განახლებული ღილაკების ბლოკი (.replace('_', '-') დამატებულია) */}
               <div className="mt-6 flex flex-wrap gap-2">
                 <button
                   onClick={() => router.push(`/dashboard/telegram/agents/${agent.type.replace('_', '-')}`)}
