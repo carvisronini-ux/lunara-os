@@ -8,276 +8,203 @@ export interface ImageGenerationResult {
   imageBuffer?: Buffer;
   error?: string;
   provider?: string;
+  generationLogs: string[]; // ✅ ახალი: ლოგები ფრონტენდისთვის
 }
 
 export class ImageGenerator {
-  /**
-   * გენერირებს სურათს image_prompt-ის საფუძველზე.
-   * იყენებს KIE AI-ს (primary) ან Gemini Imagen/Gemini Flash-ს (fallback).
-   */
   async generateImage(
     imagePrompt: string,
     agentType: string
   ): Promise<ImageGenerationResult> {
-    console.log(`\n[ImageGenerator] 🎨 ==========================================`);
-    console.log(`[ImageGenerator] 🎨 Starting image generation for: ${agentType}`);
-    console.log(`[ImageGenerator] 📝 Prompt preview: ${imagePrompt.substring(0, 100)}...`);
+    const logs: string[] = [];
+    logs.push(`🎨 იწყება სურათის გენერაცია აგენტისთვის: ${agentType}`);
+    logs.push(`📝 Prompt: ${imagePrompt.substring(0, 80)}...`);
 
     // ველოდებით CredentialVault-ის მზადყოფნას
     await credentialVault.ready;
 
-    // 1. ცდილობს KIE AI-ის გამოყენებას
+    // ============================================================
+    // მეთოდი 1: KIE AI (დინამიური მოდელის შემოწმება)
+    // ============================================================
     try {
-      console.log(`[ImageGenerator] 🔄 Attempt 1: Trying KIE AI...`);
-      const kieResult = await this.generateWithKIE(imagePrompt, agentType);
+      logs.push(`🔄 [1/2] ვამოწმებ KIE AI-ს ხელმისაწვდომ მოდელებს...`);
+      const kieResult = await this.generateWithKIE(imagePrompt, agentType, logs);
       if (kieResult.success) {
-        console.log(`[ImageGenerator] ✅ KIE AI succeeded!`);
-        return kieResult;
+        logs.push(`✅ KIE AI-მ წარმატებით შექმნა სურათი!`);
+        return { ...kieResult, generationLogs: logs };
       }
-      console.warn(`[ImageGenerator] ⚠️ KIE AI failed: ${kieResult.error}. Moving to fallback...`);
-    } catch (error) {
-      console.error(`[ImageGenerator] ❌ KIE AI critical error:`, error);
+      logs.push(`⚠️ KIE AI ვერ გამოიყენა: ${kieResult.error}`);
+    } catch (error: any) {
+      logs.push(`❌ KIE AI კრიტიკული შეცდომა: ${error.message}`);
     }
 
-    // 2. Fallback: Gemini Imagen 3 (სპეციალური სურათების მოდელი)
+    // ============================================================
+    // მეთოდი 2: Gemini (დინამიური მოდელის შემოწმება)
+    // ============================================================
     try {
-      console.log(`[ImageGenerator] 🔄 Attempt 2: Trying Gemini Imagen 3...`);
-      const imagenResult = await this.generateWithGeminiImagen(imagePrompt, agentType);
-      if (imagenResult.success) {
-        console.log(`[ImageGenerator] ✅ Gemini Imagen 3 succeeded!`);
-        return imagenResult;
+      logs.push(`🔄 [2/2] ვამოწმებ Gemini-ს ხელმისაწვდომ სურათის მოდელებს...`);
+      const geminiResult = await this.generateWithGemini(imagePrompt, agentType, logs);
+      if (geminiResult.success) {
+        logs.push(`✅ Gemini-მ წარმატებით შექმნა სურათი!`);
+        return { ...geminiResult, generationLogs: logs };
       }
-      console.warn(`[ImageGenerator] ⚠️ Gemini Imagen 3 failed: ${imagenResult.error}. Moving to next fallback...`);
-    } catch (error) {
-      console.error(`[ImageGenerator] ❌ Gemini Imagen 3 critical error:`, error);
+      logs.push(`⚠️ Gemini ვერ გამოიყენა: ${geminiResult.error}`);
+    } catch (error: any) {
+      logs.push(`❌ Gemini კრიტიკული შეცდომა: ${error.message}`);
     }
 
-    // 3. Fallback: Gemini 2.0 Flash Exp (მულტიმოდალური მოდელი, ხშირად სხვა ლიმიტით)
-    try {
-      console.log(`[ImageGenerator] 🔄 Attempt 3: Trying Gemini 2.0 Flash Exp...`);
-      const flashResult = await this.generateWithGeminiFlash(imagePrompt, agentType);
-      if (flashResult.success) {
-        console.log(`[ImageGenerator] ✅ Gemini 2.0 Flash succeeded!`);
-        return flashResult;
-      }
-      console.warn(`[ImageGenerator] ⚠️ Gemini 2.0 Flash failed: ${flashResult.error}.`);
-    } catch (error) {
-      console.error(`[ImageGenerator] ❌ Gemini 2.0 Flash critical error:`, error);
-    }
-
-    // ყველა მეთოდი ვერ იმუშავა
-    console.error(`[ImageGenerator] ❌ ==========================================`);
-    console.error(`[ImageGenerator] ❌ All image generation methods failed.`);
+    logs.push(`❌ ყველა მეთოდი ვერ იმუშავა. სურათი ვერ შეიქმნა.`);
     return {
       success: false,
-      error: 'All image generators (KIE AI, Gemini Imagen 3, Gemini 2.0 Flash) failed. Check API credentials, quotas, or prompt validity.'
+      error: 'All image generators failed dynamically.',
+      generationLogs: logs
     };
   }
 
-  /**
-   * KIE AI-ის გამოყენებით სურათის გენერაცია
-   */
   private async generateWithKIE(
     imagePrompt: string,
-    agentType: string
+    agentType: string,
+    logs: string[]
   ): Promise<ImageGenerationResult> {
     const cred = credentialVault.getCredentialByProvider('kie', 'spend');
-    if (!cred) {
-      return { success: false, error: 'KIE AI credential not found in vault' };
-    }
+    if (!cred) return { success: false, error: 'KIE AI credential not found', generationLogs: logs };
 
-    const leaseId = accessManager.requestAccess(
-      `${agentType}-img-kie`,
-      'kie',
-      'spend',
-      `Generate image for ${agentType}`,
-      null,
-      120
-    );
-
-    if (!leaseId) {
-      return { success: false, error: 'Failed to acquire KIE AI lease' };
-    }
+    const leaseId = accessManager.requestAccess(`${agentType}-img-kie`, 'kie', 'spend', 'Image Gen', null, 120);
+    if (!leaseId) return { success: false, error: 'Failed to acquire KIE AI lease', generationLogs: logs };
 
     try {
       const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${agentType}-img-kie`);
-      if (!apiKey) {
-        return { success: false, error: 'Failed to decrypt KIE AI API key' };
+      if (!apiKey) return { success: false, error: 'Failed to decrypt KIE AI API key', generationLogs: logs };
+
+      // 1. ვიღებთ ხელმისაწვდომ მოდელებს KIE AI-დან
+      const modelsRes = await fetch('https://api.kie.ai/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      
+      let targetModel = cred.metadata?.recommendedModel || 'flux1-kontext'; // Fallback
+      
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        const imageModels = modelsData.data?.filter((m: any) => 
+          m.id.toLowerCase().includes('flux') || 
+          m.id.toLowerCase().includes('image') || 
+          m.id.toLowerCase().includes('kontext')
+        ) || [];
+        
+        if (imageModels.length > 0) {
+          targetModel = imageModels[0].id; // ვიღებთ პირველ ხელმისაწვდომ სურათის მოდელს
+          logs.push(`✅ KIE AI-მ დააბრუნა მოდელი: ${targetModel}`);
+        } else {
+          logs.push(`⚠️ KIE AI-მ ვერ დააბრუნა სურათის მოდელები. ვიყენებთ fallback-ს: ${targetModel}`);
+        }
+      } else {
+        logs.push(`⚠️ KIE AI მოდელების სიის მიღება ვერ მოხერხდა (${modelsRes.status}). ვიყენებთ fallback-ს: ${targetModel}`);
       }
 
-      const model = cred.metadata?.recommendedModel || 'flux1-kontext';
-      console.log(`[ImageGenerator] 🤖 Using KIE AI model: ${model}`);
-
+      // 2. ვცდილობთ გენერაციას ნაპოვნი მოდელით
+      logs.push(`🤖 ვცდილობთ გენერაციას KIE AI მოდელით: ${targetModel}`);
       const response = await fetch('https://api.kie.ai/v1/images/generations', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: model,
-          prompt: imagePrompt,
-          n: 1,
-          size: '1024x1280', // 4:5 პროპორცია Telegram-ისთვის
-        }),
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: targetModel, prompt: imagePrompt, n: 1, size: '1024x1280' }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`KIE AI API Error: ${response.status} - ${errorText.substring(0, 200)}`);
+        throw new Error(`KIE AI API Error: ${response.status} - ${errorText.substring(0, 150)}`);
       }
 
       const data = await response.json();
-      
-      if (data.data && data.data[0] && data.data[0].url) {
-        return { success: true, imageUrl: data.data[0].url, provider: 'kie' };
-      } else if (data.data && data.data[0] && data.data[0].b64_json) {
-        const buffer = Buffer.from(data.data[0].b64_json, 'base64');
-        return { success: true, imageBuffer: buffer, provider: 'kie' };
-      } else {
-        throw new Error('Invalid response format from KIE AI');
+      if (data.data?.[0]?.url) {
+        return { success: true, imageUrl: data.data[0].url, provider: 'kie', generationLogs: logs };
+      } else if (data.data?.[0]?.b64_json) {
+        return { success: true, imageBuffer: Buffer.from(data.data[0].b64_json, 'base64'), provider: 'kie', generationLogs: logs };
       }
+      throw new Error('Invalid response format from KIE AI');
 
     } finally {
       accessManager.revokeLease(leaseId, 'system_cleanup');
     }
   }
 
-  /**
-   * Gemini Imagen 3-ის გამოყენებით სურათის გენერაცია (სპეციალური მოდელი)
-   */
-  private async generateWithGeminiImagen(
+  private async generateWithGemini(
     imagePrompt: string,
-    agentType: string
+    agentType: string,
+    logs: string[]
   ): Promise<ImageGenerationResult> {
     const cred = credentialVault.getCredentialByProvider('gemini', 'spend');
-    if (!cred) {
-      return { success: false, error: 'Gemini credential not found in vault' };
-    }
+    if (!cred) return { success: false, error: 'Gemini credential not found', generationLogs: logs };
 
-    const leaseId = accessManager.requestAccess(
-      `${agentType}-img-imagen`,
-      'gemini',
-      'spend',
-      `Generate image with Imagen 3 for ${agentType}`,
-      null,
-      120
-    );
-
-    if (!leaseId) {
-      return { success: false, error: 'Failed to acquire Gemini Imagen lease' };
-    }
+    const leaseId = accessManager.requestAccess(`${agentType}-img-gemini`, 'gemini', 'spend', 'Image Gen', null, 120);
+    if (!leaseId) return { success: false, error: 'Failed to acquire Gemini lease', generationLogs: logs };
 
     try {
-      const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${agentType}-img-imagen`);
-      if (!apiKey) {
-        return { success: false, error: 'Failed to decrypt Gemini API key' };
-      }
+      const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${agentType}-img-gemini`);
+      if (!apiKey) return { success: false, error: 'Failed to decrypt Gemini API key', generationLogs: logs };
 
-      console.log(`[ImageGenerator] 🤖 Using Gemini Imagen 3 model...`);
+      // 1. ვიღებთ ხელმისაწვდომ მოდელებს Gemini-დან
+      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      let targetModel = 'imagen-3.0-generate-002'; // Fallback
 
-      // Imagen 3-ის სპეციფიური API endpoint და ფორმატი
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:generateImages?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instances: [{ prompt: imagePrompt }],
-            parameters: {
-              sampleCount: 1,
-              aspectRatio: '4:5',
-              personGeneration: 'allow_all'
-            }
-          }),
+      if (modelsRes.ok) {
+        const modelsData = await modelsRes.json();
+        // ვეძებთ მოდელებს, რომლებიც მხარს უჭერენ generateImages-ს ან შეიცავენ 'imagen'-ს
+        const imageModels = modelsData.models?.filter((m: any) => 
+          m.supportedGenerationMethods?.includes('generateImages') || 
+          m.name.includes('imagen')
+        ).map((m: any) => m.name.replace('models/', '')) || [];
+
+        if (imageModels.length > 0) {
+          targetModel = imageModels[0]; // ვიღებთ პირველ ხელმისაწვდომ სურათის მოდელს
+          logs.push(`✅ Gemini-მ დააბრუნა მოდელი: ${targetModel}`);
+        } else {
+          logs.push(`⚠️ Gemini-მ ვერ დააბრუნა სურათის მოდელები. ვცდილობთ fallback მოდელით.`);
         }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini Imagen API Error: ${response.status} - ${errorText.substring(0, 300)}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
-        const buffer = Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64');
-        return { success: true, imageBuffer: buffer, provider: 'gemini-imagen' };
       } else {
-        throw new Error('No image data found in Gemini Imagen response');
+        logs.push(`⚠️ Gemini მოდელების სიის მიღება ვერ მოხერხდა (${modelsRes.status}).`);
       }
 
-    } finally {
-      accessManager.revokeLease(leaseId, 'system_cleanup');
-    }
-  }
+      // 2. ვცდილობთ გენერაციას ნაპოვნი მოდელით (Imagen 3 ფორმატი ან Flash)
+      logs.push(`🤖 ვცდილობთ გენერაციას Gemini მოდელით: ${targetModel}`);
+      
+      // თუ მოდელი არის Imagen, ვიყენებთ generateImages endpoint-ს, თუ არა - generateContent
+      const isImagen = targetModel.includes('imagen');
+      const url = isImagen 
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateImages?key=${apiKey}`
+        : `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`;
 
-  /**
-   * Gemini 2.0 Flash Exp-ის გამოყენებით სურათის გენერაცია (მულტიმოდალური fallback)
-   */
-  private async generateWithGeminiFlash(
-    imagePrompt: string,
-    agentType: string
-  ): Promise<ImageGenerationResult> {
-    const cred = credentialVault.getCredentialByProvider('gemini', 'spend');
-    if (!cred) {
-      return { success: false, error: 'Gemini credential not found in vault' };
-    }
+      const body = isImagen ? {
+        instances: [{ prompt: imagePrompt }],
+        parameters: { sampleCount: 1, aspectRatio: '4:5', personGeneration: 'allow_all' }
+      } : {
+        contents: [{ parts: [{ text: `Generate image: ${imagePrompt}` }] }],
+        generationConfig: { responseModalities: ['IMAGE', 'TEXT'] }
+      };
 
-    const leaseId = accessManager.requestAccess(
-      `${agentType}-img-flash`,
-      'gemini',
-      'spend',
-      `Generate image with Flash for ${agentType}`,
-      null,
-      120
-    );
-
-    if (!leaseId) {
-      return { success: false, error: 'Failed to acquire Gemini Flash lease' };
-    }
-
-    try {
-      const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${agentType}-img-flash`);
-      if (!apiKey) {
-        return { success: false, error: 'Failed to decrypt Gemini API key' };
-      }
-
-      console.log(`[ImageGenerator] 🤖 Using Gemini 2.0 Flash Exp model...`);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: `Generate a high-quality image based on this exact description, no text or watermarks: ${imagePrompt}` }]
-            }],
-            generationConfig: {
-              responseModalities: ['IMAGE', 'TEXT']
-            }
-          }),
-        }
-      );
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini Flash API Error: ${response.status} - ${errorText.substring(0, 300)}`);
+        throw new Error(`Gemini API Error: ${response.status} - ${errorText.substring(0, 200)}`);
       }
 
       const data = await response.json();
-      const candidate = data.candidates?.[0];
-      const parts = candidate?.content?.parts || [];
       
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          const buffer = Buffer.from(part.inlineData.data, 'base64');
-          return { success: true, imageBuffer: buffer, provider: 'gemini-flash' };
+      if (isImagen && data.predictions?.[0]?.bytesBase64Encoded) {
+        return { success: true, imageBuffer: Buffer.from(data.predictions[0].bytesBase64Encoded, 'base64'), provider: 'gemini-imagen', generationLogs: logs };
+      } else if (!isImagen) {
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            return { success: true, imageBuffer: Buffer.from(part.inlineData.data, 'base64'), provider: 'gemini-flash', generationLogs: logs };
+          }
         }
       }
-
-      throw new Error('No image data found in Gemini Flash response');
+      throw new Error('No image data found in Gemini response');
 
     } finally {
       accessManager.revokeLease(leaseId, 'system_cleanup');

@@ -396,12 +396,20 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
       addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
       
-      // ✅ დეტალური ლოგები სურათის სტატუსის შესახებ (ახლა შეცდომის ტექსტით)
+      // ✅ ახალი: დეტალური ლოგების გამოტანა სერვერიდან ფრონტენდზე
+      // .reverse() გამოიყენება იმისთვის, რომ ქრონოლოგიურად პირველი ნაბიჯი ქვემოთ იყოს, ბოლო კი ზემოთ
+      if (result.generationLogs && result.generationLogs.length > 0) {
+        result.generationLogs.slice().reverse().forEach((log: string) => {
+          addAgentLog(log);
+        });
+      }
+
+      // საბოლოო შეჯამება
       if (result.hasImagePrompt) {
         if (result.imageProvider && result.imageProvider !== 'none') {
-          addAgentLog(`🎨 სურათი წარმატებით შეიქმნა (${result.imageProvider})`);
+          addAgentLog(`🎉 საბოლოო შედეგი: სურათი წარმატებით შეიქმნა (${result.imageProvider})`);
         } else {
-          addAgentLog(`⚠️ სურათის გენერაცია ვერ მოხერხდა: ${result.imageError || 'უცნობი შეცდომა'}`);
+          addAgentLog(`⚠️ საბოლოო შედეგი: სურათის გენერაცია ვერ მოხერხდა. ${result.imageError || ''}`);
           addAgentLog(`📝 გაიგზავნა მხოლოდ ტექსტი (Fallback)`);
         }
       } else {

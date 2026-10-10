@@ -21,7 +21,8 @@ export interface OrchestratorResponse {
   imageUrl?: string;
   hasImagePrompt?: boolean; 
   imageProvider?: string;   
-  imageError?: string;      // ✅ ახალი ველი: ზუსტი შეცდომა სურათის გენერაციისას
+  imageError?: string;      
+  generationLogs?: string[]; // ✅ ახალი ველი: სურათის გენერაციის დეტალური ლოგები ფრონტენდისთვის
 }
 
 export class TelegramOrchestrator {
@@ -166,6 +167,7 @@ Return ONLY valid JSON with this exact structure:
       
       let imageResult: any = null;
       let imageErrorLog: string | undefined = undefined;
+      let genLogs: string[] = []; // ✅ ინიციალიზაცია ლოგებისთვის
 
       // 10. სურათის გენერაცია (თუ image_prompt არსებობს)
       if (imagePrompt) {
@@ -173,6 +175,7 @@ Return ONLY valid JSON with this exact structure:
         console.log(`[Orchestrator] 🎨 Prompt preview: ${imagePrompt.substring(0, 100)}...`);
         
         imageResult = await imageGenerator.generateImage(imagePrompt, request.agentType);
+        genLogs = imageResult.generationLogs || []; // ✅ ვინახავთ ლოგებს ფრონტენდისთვის გადასაცემად
         
         if (imageResult.success) {
           console.log(`[Orchestrator] ✅ Image generated successfully! Provider: ${imageResult.provider}`);
@@ -237,7 +240,8 @@ Return ONLY valid JSON with this exact structure:
         imageUrl: imageResult?.imageUrl,
         hasImagePrompt: !!imagePrompt,
         imageProvider: imageResult?.provider || 'none',
-        imageError: imageErrorLog, // ✅ ვაბრუნებთ ზუსტ შეცდომას Frontend-ისთვის
+        imageError: imageErrorLog,
+        generationLogs: genLogs, // ✅ ვაბრუნებთ ლოგებს ფრონტენდისთვის
       };
 
     } catch (error) {
