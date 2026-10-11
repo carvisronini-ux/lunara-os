@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
-import { testCredential } from '@/services/credentials/credential-tester';
+import { testCredentialAction } from '@/app/actions/credential-actions'; // ✅ შეცვლილი იმპორტი
 import type { PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
@@ -79,7 +79,6 @@ export function CredentialsPanel() {
     }
 
     try {
-      // ცდილობს გამოიყენოს ახალი მეთოდი, თუ არა - ძველი, უკანა თავსებადობისთვის
       if ((credentialVault as any).addCredential) {
         await (credentialVault as any).addCredential({
           provider: newCredProvider,
@@ -181,12 +180,13 @@ export function CredentialsPanel() {
     }
   };
 
+  // ✅ განახლებული: იყენებს Server Action-ს CORS-ის თავიდან ასაცილებლად
   const handleTestCredential = async (credentialId: string) => {
     setTestingId(credentialId);
     try {
-      const result = await testCredential(credentialId);
+      const result = await testCredentialAction(credentialId);
       setTestResults(prev => ({ ...prev, [credentialId]: result }));
-      refreshData();
+      refreshData(); // განვაახლოთ სია, რომ ახალი მოდელები გამოჩნდეს
     } catch (error) {
       setTestResults(prev => ({
         ...prev,
@@ -207,7 +207,7 @@ export function CredentialsPanel() {
     setEditCredScope(cred.scope || 'spend');
     setEditCredEmail(cred.email || '');
     setEditCredMetadata(cred.metadata ? JSON.stringify(cred.metadata, null, 2) : '');
-    setEditCredValue(''); // უსაფრთხოებისთვის, გასაღების ხელახალი ჩაწერაა საჭირო
+    setEditCredValue('');
     setShowEditModal(true);
   };
 
