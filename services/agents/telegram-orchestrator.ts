@@ -22,7 +22,7 @@ export interface OrchestratorResponse {
   hasImagePrompt?: boolean; 
   imageProvider?: string;   
   imageError?: string;      
-  generationLogs?: string[]; // ✅ ახალი ველი: სურათის გენერაციის დეტალური ლოგები ფრონტენდისთვის
+  generationLogs?: string[]; // ✅ დეტალური ლოგები ფრონტენდისთვის
 }
 
 export class TelegramOrchestrator {
@@ -89,19 +89,19 @@ export class TelegramOrchestrator {
         // 5. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
         const systemPrompt = `${config.master_prompt}\n\nTHINKING STYLE:\n${config.thinking_style}\n\nSKILLS & CONSTRAINTS:\n${config.skills_constraints}`;
 
+        // ✅ ატომურად მდგრადი JSON პრომპტი (მკაცრი ინსტრუქციებით)
         const userPrompt = `Task: Create a Telegram post.
 Category: ${request.agentType}
 Post Type: ${request.postType}
 Theme: ${request.contentTheme || 'AI will determine based on category'}
 Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
-CRITICAL: You MUST return a valid JSON object with EXACTLY these three keys: "caption", "image_prompt", and "hashtags". 
-DO NOT omit the "image_prompt" key. It must be a detailed English description for an image generator.
+CRITICAL INSTRUCTION: You must output ONLY raw, valid JSON. Do NOT use markdown formatting (no \`\`\`json or \`\`\` tags). Do NOT include any conversational text before or after the JSON. Ensure all internal quotes in strings are properly escaped.
 
-Return ONLY valid JSON with this exact structure:
+The JSON must have EXACTLY these three keys:
 {
   "caption": "Your post text here (150-200 words, empathetic tone, no guarantees)",
-  "image_prompt": "Detailed English description for image generation. Mystical, cosmic, dark luxury style. No text, no logos, no watermarks. --ar 4:5",
+  "image_prompt": "Detailed English description for image generation. Mystical, cosmic, dark luxury style. No text, no logos, no watermarks.",
   "hashtags": ["#LUNARA", "#topic1", "#topic2"]
 }`;
 
@@ -131,14 +131,16 @@ Return ONLY valid JSON with this exact structure:
 
         console.log(`[Orchestrator] 📥 Received successful response from Groq API.`);
         const data = await response.json();
-        const rawContent = data.choices[0].message.content;
+        let rawContent = data.choices[0].message.content;
 
-        // 7. გავპარსოთ JSON
+        // 7. გავპარსოთ JSON (უსაფრთხოების ზომა: Markdown ბექტიკების მოშორება)
         console.log(`[Orchestrator] 🧠 Parsing AI response as JSON...`);
         try {
+          // ✅ ავტომატურად ვშლით \`\`\`json და \`\`\` თუ მოდელმა მაინც დაამატა
+          rawContent = rawContent.replace(/^```json\s*|\s*```$/g, '').trim();
+          
           generatedContent = JSON.parse(rawContent);
-          console.log(`[Orchestrator] 📦 Raw AI JSON Response parsed successfully:`);
-          console.log(JSON.stringify(generatedContent, null, 2));
+          console.log(`[Orchestrator] 📦 Raw AI JSON Response parsed successfully.`);
         } catch (e) {
           console.error(`[Orchestrator] ❌ Raw content received:`, rawContent);
           throw new Error(`Failed to parse AI response as JSON: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
