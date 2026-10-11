@@ -7,7 +7,7 @@ import {
   sendTelegramMessage,
   sendTelegramPhoto,
 } from '../distribution/telegram';
-import { imageGenerator } from './image-generator';
+import { imageGenerator, type ImageGenerationResult as ImgGenResult } from './image-generator';
 
 // ============================================================
 // TYPES
@@ -39,15 +39,6 @@ interface GeneratedContent {
   hashtags?: string[];
 }
 
-interface ImageGenerationResult {
-  success: boolean;
-  imageUrl?: string;
-  imageBuffer?: unknown;
-  provider?: string;
-  error?: string;
-  generationLogs?: string[];
-}
-
 interface TelegramPublishResult {
   success: boolean;
   messageId?: number;
@@ -58,19 +49,14 @@ interface TelegramPublishResult {
 // CONSTANTS
 // ============================================================
 
-const GROQ_API_URL =
-  'https://api.groq.com/openai/v1/chat/completions';
-
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
-
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
 // Telegram limits are measured after entity parsing.
-// Conservative limits help avoid rejected messages.
 const TELEGRAM_MESSAGE_LIMIT = 3_800;
 const TELEGRAM_CAPTION_LIMIT = 950;
-
 const MAX_ERROR_LENGTH = 1_500;
 
 // ============================================================
@@ -82,7 +68,6 @@ function logInfo(message: string, details?: unknown): void {
     console.info(`[Orchestrator] ${message}`, details);
     return;
   }
-
   console.info(`[Orchestrator] ${message}`);
 }
 
@@ -91,7 +76,6 @@ function logWarn(message: string, details?: unknown): void {
     console.warn(`[Orchestrator] ${message}`, details);
     return;
   }
-
   console.warn(`[Orchestrator] ${message}`);
 }
 
@@ -100,7 +84,6 @@ function logError(message: string, details?: unknown): void {
     console.error(`[Orchestrator] ${message}`, details);
     return;
   }
-
   console.error(`[Orchestrator] ${message}`);
 }
 
@@ -108,11 +91,9 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-
   if (typeof error === 'string') {
     return error;
   }
-
   return 'An unknown error occurred.';
 }
 
@@ -120,15 +101,11 @@ function truncateError(message: string): string {
   if (message.length <= MAX_ERROR_LENGTH) {
     return message;
   }
-
   return `${message.slice(0, MAX_ERROR_LENGTH)}...`;
 }
 
 /**
  * Escape generated text before sending it using Telegram HTML mode.
- *
- * AI-generated content is untrusted input. Without escaping,
- * characters such as <, > and & can break Telegram formatting.
  */
 function escapeTelegramHtml(text: string): string {
   return text
@@ -139,35 +116,23 @@ function escapeTelegramHtml(text: string): string {
 
 /**
  * Split HTML-escaped text into safe chunks.
- *
- * Keeps HTML entities and Unicode surrogate pairs intact.
- * This implementation is intended for escaped plain text,
- * not arbitrary HTML markup.
  */
-function splitTelegramText(
-  text: string,
-  maxLength: number,
-): string[] {
+function splitTelegramText(text: string, maxLength: number): string[] {
   if (!text) {
     return [];
   }
 
   const tokens =
-    text.match(/&(?:amp|lt|gt|quot|#39);|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ??
-    [];
+    text.match(/&(?:amp|lt|gt|quot|#39);|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
 
   const chunks: string[] = [];
   let current = '';
 
   for (const token of tokens) {
-    if (
-      current.length + token.length > maxLength &&
-      current.length > 0
-    ) {
+    if (current.length + token.length > maxLength && current.length > 0) {
       chunks.push(current);
       current = '';
     }
-
     current += token;
   }
 
@@ -199,62 +164,34 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
   try {
     parsed = JSON.parse(normalized);
   } catch {
-    throw new Error(
-      'The AI returned invalid JSON. Check the model response and prompt.',
-    );
+    throw new Error('The AI returned invalid JSON. Check the model response and prompt.');
   }
 
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error('The AI response must be a JSON object.');
   }
 
   const data = parsed as Record<string, unknown>;
 
-  if (
-    typeof data.caption !== 'string' ||
-    !data.caption.trim()
-  ) {
-    throw new Error(
-      'The AI response does not contain a valid caption.',
-    );
+  if (typeof data.caption !== 'string' || !data.caption.trim()) {
+    throw new Error('The AI response does not contain a valid caption.');
   }
 
-  if (
-    data.image_prompt !== undefined &&
-    data.image_prompt !== null &&
-    typeof data.image_prompt !== 'string'
-  ) {
-    throw new Error(
-      'The AI returned an invalid image_prompt field.',
-    );
+  if (data.image_prompt !== undefined && data.image_prompt !== null && typeof data.image_prompt !== 'string') {
+    throw new Error('The AI returned an invalid image_prompt field.');
   }
 
-  if (
-    data.hashtags !== undefined &&
-    !Array.isArray(data.hashtags)
-  ) {
-    throw new Error(
-      'The AI returned an invalid hashtags field.',
-    );
+  if (data.hashtags !== undefined && !Array.isArray(data.hashtags)) {
+    throw new Error('The AI returned an invalid hashtags field.');
   }
 
   const hashtags = Array.isArray(data.hashtags)
-    ? data.hashtags.filter(
-        (item): item is string =>
-          typeof item === 'string' && item.trim().length > 0,
-      )
+    ? data.hashtags.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     : [];
 
   return {
     caption: data.caption.trim(),
-    image_prompt:
-      typeof data.image_prompt === 'string'
-        ? data.image_prompt.trim()
-        : undefined,
+    image_prompt: typeof data.image_prompt === 'string' ? data.image_prompt.trim() : undefined,
     hashtags,
   };
 }
@@ -262,9 +199,7 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 /**
  * Create the prompt from the agent configuration stored in Supabase.
  */
-function buildUserPrompt(
-  request: OrchestratorRequest,
-): string {
+function buildUserPrompt(request: OrchestratorRequest): string {
   return `
 Task: Create a high-quality Telegram post for the Lunara astrology brand.
 
@@ -317,9 +252,7 @@ export class TelegramOrchestrator {
    * Generates content, optionally generates an image,
    * publishes the result to Telegram and records the publication.
    */
-  async generateAndPublish(
-    request: OrchestratorRequest,
-  ): Promise<OrchestratorResponse> {
+  async generateAndPublish(request: OrchestratorRequest): Promise<OrchestratorResponse> {
     const generationLogs: string[] = [];
     const warnings: string[] = [];
 
@@ -327,7 +260,7 @@ export class TelegramOrchestrator {
 
     let caption = '';
     let imagePrompt = '';
-    let imageResult: ImageGenerationResult | null = null;
+    let imageResult: ImgGenResult | null = null;
     let imageError: string | undefined;
     let imageProvider = 'none';
 
@@ -343,9 +276,7 @@ export class TelegramOrchestrator {
     };
 
     addLog('================================================');
-    addLog(
-      `Starting generation: ${request.agentType} / ${request.postType}`,
-    );
+    addLog(`Starting generation: ${request.agentType} / ${request.postType}`);
     addLog(`Theme: ${request.contentTheme || 'Automatic'}`);
     addLog(`Zodiac sign: ${request.zodiacSign || 'General'}`);
 
@@ -353,20 +284,13 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 1. Validate the request
       // --------------------------------------------------------
-
-      if (
-        !request.agentType?.trim() ||
-        !request.postType?.trim()
-      ) {
-        throw new Error(
-          'Both agentType and postType are required.',
-        );
+      if (!request.agentType?.trim() || !request.postType?.trim()) {
+        throw new Error('Both agentType and postType are required.');
       }
 
       // --------------------------------------------------------
       // 2. Load agent configuration
       // --------------------------------------------------------
-
       addLog('Loading agent configuration from Supabase...');
 
       const { data: config, error: configError } = await supabase
@@ -376,20 +300,11 @@ export class TelegramOrchestrator {
         .single();
 
       if (configError || !config) {
-        throw new Error(
-          `Failed to load agent configuration: ${
-            configError?.message || 'Configuration not found'
-          }`,
-        );
+        throw new Error(`Failed to load agent configuration: ${configError?.message || 'Configuration not found'}`);
       }
 
-      if (
-        typeof config.master_prompt !== 'string' ||
-        !config.master_prompt.trim()
-      ) {
-        throw new Error(
-          `Agent "${request.agentType}" has no master_prompt configured.`,
-        );
+      if (typeof config.master_prompt !== 'string' || !config.master_prompt.trim()) {
+        throw new Error(`Agent "${request.agentType}" has no master_prompt configured.`);
       }
 
       addLog('Agent configuration loaded successfully.');
@@ -397,17 +312,13 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 3. Wait for the credential vault
       // --------------------------------------------------------
-
       addLog('Waiting for CredentialVault initialization...');
-
       await credentialVault.ready;
-
       addLog('CredentialVault is ready.');
 
       // --------------------------------------------------------
       // 4. Acquire temporary access to Groq
       // --------------------------------------------------------
-
       addLog('Requesting temporary Groq access lease...');
 
       leaseId = accessManager.requestAccess(
@@ -416,13 +327,11 @@ export class TelegramOrchestrator {
         'spend',
         `Generate Telegram content for ${request.postType}`,
         null,
-        ACCESS_LEASE_DURATION_SECONDS,
+        ACCESS_LEASE_DURATION_SECONDS
       );
 
       if (!leaseId) {
-        throw new Error(
-          'Could not acquire Groq access. Check AccessManager permissions and logs.',
-        );
+        throw new Error('Could not acquire Groq access. Check AccessManager permissions and logs.');
       }
 
       addLog('Groq access lease acquired.');
@@ -430,36 +339,22 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 5. Generate content with Groq
       // --------------------------------------------------------
-
       try {
         addLog('Retrieving Groq credentials from the vault...');
 
-        const credential =
-          credentialVault.getCredentialByProvider(
-            'groq',
-            'spend',
-          );
+        const credential = credentialVault.getCredentialByProvider('groq', 'spend');
 
         if (!credential) {
-          throw new Error(
-            'Groq credentials were not found. Add a valid credential in the API Vault.',
-          );
+          throw new Error('Groq credentials were not found. Add a valid credential in the API Vault.');
         }
 
-        const apiKey = credentialVault.getDecryptedValue(
-          credential.credential_id,
-          `${request.agentType}-agent`,
-        );
+        const apiKey = credentialVault.getDecryptedValue(credential.credential_id, `${request.agentType}-agent`);
 
         if (!apiKey) {
-          throw new Error(
-            'Could not decrypt the Groq API key. Check vault permissions.',
-          );
+          throw new Error('Could not decrypt the Groq API key. Check vault permissions.');
         }
 
-        const targetModel =
-          credential.metadata?.recommendedModel ||
-          DEFAULT_GROQ_MODEL;
+        const targetModel = credential.metadata?.recommendedModel || DEFAULT_GROQ_MODEL;
 
         addLog(`Using Groq model: ${targetModel}`);
         addLog('Building generation prompts...');
@@ -483,7 +378,6 @@ export class TelegramOrchestrator {
         addLog('Sending content-generation request to Groq...');
 
         const controller = new AbortController();
-
         const timeoutId = setTimeout(() => {
           controller.abort();
         }, GROQ_TIMEOUT_MS);
@@ -500,97 +394,58 @@ export class TelegramOrchestrator {
             body: JSON.stringify({
               model: targetModel,
               messages: [
-                {
-                  role: 'system',
-                  content: systemPrompt,
-                },
-                {
-                  role: 'user',
-                  content: userPrompt,
-                },
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
               ],
-              temperature: 0.7,
-              response_format: {
-                type: 'json_object',
-              },
+              temperature: 0.7
+              // NOTE: response_format is intentionally omitted to prevent Groq's strict 
+              // server-side JSON validation from throwing 400 errors on minor formatting quirks.
+              // Our parseGeneratedContent function safely handles Markdown fences and validation.
             }),
             signal: controller.signal,
           });
         } catch (error) {
-          if (
-            error instanceof Error &&
-            error.name === 'AbortError'
-          ) {
-            throw new Error(
-              `Groq request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`,
-            );
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error(`Groq request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
           }
-
-          throw new Error(
-            `Could not connect to Groq: ${getErrorMessage(error)}`,
-          );
+          throw new Error(`Could not connect to Groq: ${getErrorMessage(error)}`);
         } finally {
           clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
-          const errorText = truncateError(
-            await response.text().catch(() => 'No response body'),
-          );
-
-          throw new Error(
-            `Groq API returned HTTP ${response.status}: ${errorText}`,
-          );
+          const errorText = truncateError(await response.text().catch(() => 'No response body'));
+          throw new Error(`Groq API returned HTTP ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
-
         const rawContent = data?.choices?.[0]?.message?.content;
 
         addLog('Groq response received. Validating generated JSON...');
 
-        const generatedContent =
-          parseGeneratedContent(rawContent);
+        const generatedContent = parseGeneratedContent(rawContent);
 
         caption = generatedContent.caption;
         imagePrompt = generatedContent.image_prompt || '';
 
         const hashtags = generatedContent.hashtags || [];
-
-        const fullCaption = [
-          caption,
-          ...hashtags,
-        ]
-          .filter(Boolean)
-          .join('\n\n');
-
+        const fullCaption = [caption, ...hashtags].filter(Boolean).join('\n\n');
         caption = fullCaption;
 
-        addLog(
-          `Content generated successfully. Caption length: ${caption.length} characters.`,
-        );
+        addLog(`Content generated successfully. Caption length: ${caption.length} characters.`);
 
       } finally {
         // ------------------------------------------------------
         // 6. Always release the temporary access lease
         // ------------------------------------------------------
-
         if (leaseId) {
           addLog('Releasing Groq access lease...');
-
           try {
-            accessManager.revokeLease(
-              leaseId,
-              'system_cleanup',
-            );
-
+            accessManager.revokeLease(leaseId, 'system_cleanup');
             addLog('Groq access lease released.');
           } catch (leaseError) {
-            addWarning(
-              `Could not explicitly revoke the Groq lease: ${getErrorMessage(leaseError)}`,
-            );
+            addWarning(`Could not explicitly revoke the Groq lease: ${getErrorMessage(leaseError)}`);
           }
-
           leaseId = null;
         }
       }
@@ -598,40 +453,20 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 7. Generate the image
       // --------------------------------------------------------
-
       if (imagePrompt) {
         addLog('Starting image generation...');
-        addLog(
-          `Image prompt preview: ${imagePrompt.slice(0, 120)}`,
-        );
+        addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}`);
 
         try {
-          const result =
-            await imageGenerator.generateImage(
-              imagePrompt,
-              request.agentType,
-            );
+          const result = await imageGenerator.generateImage(imagePrompt, request.agentType);
+          imageResult = result as ImgGenResult;
 
-          imageResult = result as ImageGenerationResult;
-
-          if (
-            imageResult.success &&
-            (imageResult.imageUrl || imageResult.imageBuffer)
-          ) {
+          if (imageResult.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
             imageProvider = imageResult.provider || 'unknown';
-
-            addLog(
-              `Image generated successfully using ${imageProvider}.`,
-            );
+            addLog(`Image generated successfully using ${imageProvider}.`);
           } else {
-            imageError =
-              imageResult.error ||
-              'Image generation failed or returned no image.';
-
-            addWarning(
-              `Image generation failed: ${imageError}`,
-            );
-
+            imageError = imageResult.error || 'Image generation failed or returned no image.';
+            addWarning(`Image generation failed: ${imageError}`);
             imageResult = null;
           }
 
@@ -640,25 +475,17 @@ export class TelegramOrchestrator {
           }
         } catch (error) {
           imageError = getErrorMessage(error);
-
-          addWarning(
-            `Image generation threw an exception: ${imageError}`,
-          );
-
+          addWarning(`Image generation threw an exception: ${imageError}`);
           imageResult = null;
         }
       } else {
-        addWarning(
-          'No image_prompt was generated. Publishing text only.',
-        );
+        addWarning('No image_prompt was generated. Publishing text only.');
       }
 
       // --------------------------------------------------------
       // 8. Prepare Telegram content
       // --------------------------------------------------------
-
       addLog('Preparing Telegram publication...');
-
       const escapedCaption = escapeTelegramHtml(caption);
 
       let publishedMessageId: number | undefined;
@@ -667,161 +494,108 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 9. Try publishing the image
       // --------------------------------------------------------
-
-      if (
-        imageResult?.success &&
-        (imageResult.imageUrl || imageResult.imageBuffer)
-      ) {
-        const captionChunks = splitTelegramText(
-          escapedCaption,
-          TELEGRAM_CAPTION_LIMIT,
-        );
-
+      if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
+        const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
 
         addLog('Attempting to publish a photo to Telegram...');
 
         let photoResult: TelegramPublishResult;
-
         try {
-          photoResult = await sendTelegramPhoto({
+          photoResult = (await sendTelegramPhoto({
             caption: photoCaption,
             imageUrl: imageResult.imageUrl,
-            imageBuffer: imageResult.imageBuffer,
+            imageBuffer: imageResult.imageBuffer as Buffer | undefined,
             parse_mode: 'HTML',
-          }) as TelegramPublishResult;
+          })) as TelegramPublishResult;
         } catch (error) {
-          photoResult = {
-            success: false,
-            error: getErrorMessage(error),
-          };
+          photoResult = { success: false, error: getErrorMessage(error) };
         }
 
         if (photoResult.success) {
           publishedWithImage = true;
           publishedMessageId = photoResult.messageId;
-
           addLog('Photo published successfully.');
 
-          // Telegram photo captions have a smaller limit than messages.
-          // Send the remaining caption in additional text messages.
           const remainingChunks = captionChunks.slice(1);
-
           if (remainingChunks.length > 0) {
-            addLog(
-              `Caption exceeds the photo limit. Sending ${remainingChunks.length} additional text chunk(s).`,
-            );
-
+            addLog(`Caption exceeds the photo limit. Sending ${remainingChunks.length} additional text chunk(s).`);
             for (const chunk of remainingChunks) {
               try {
-                const continuationResult =
-                  await sendTelegramMessage({
-                    text: chunk,
-                    parse_mode: 'HTML',
-                  }) as TelegramPublishResult;
+                const continuationResult = (await sendTelegramMessage({
+                  text: chunk,
+                  parse_mode: 'HTML',
+                })) as TelegramPublishResult;
 
                 if (!continuationResult.success) {
-                  addWarning(
-                    `Photo was published, but a caption continuation failed: ${continuationResult.error || 'Unknown error'}`,
-                  );
-
+                  addWarning(`Photo was published, but a caption continuation failed: ${continuationResult.error || 'Unknown error'}`);
                   break;
                 }
               } catch (error) {
-                addWarning(
-                  `Photo was published, but a caption continuation failed: ${getErrorMessage(error)}`,
-                );
-
+                addWarning(`Photo was published, but a caption continuation failed: ${getErrorMessage(error)}`);
                 break;
               }
             }
           }
         } else {
-          imageError =
-            photoResult.error ||
-            'Telegram rejected the photo publication.';
-
-          addWarning(
-            `Photo publication failed. Falling back to text: ${imageError}`,
-          );
+          imageError = photoResult.error || 'Telegram rejected the photo publication.';
+          addWarning(`Photo publication failed. Falling back to text: ${imageError}`);
         }
       }
 
       // --------------------------------------------------------
       // 10. Text-only fallback
       // --------------------------------------------------------
-
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
-
-        const textChunks = splitTelegramText(
-          escapedCaption,
-          TELEGRAM_MESSAGE_LIMIT,
-        );
+        const textChunks = splitTelegramText(escapedCaption, TELEGRAM_MESSAGE_LIMIT);
 
         if (textChunks.length === 0) {
-          throw new Error(
-            'The generated Telegram caption is empty.',
-          );
+          throw new Error('The generated Telegram caption is empty.');
         }
 
         for (let index = 0; index < textChunks.length; index++) {
           const chunk = textChunks[index];
-
           let messageResult: TelegramPublishResult;
 
           try {
-            messageResult = await sendTelegramMessage({
+            messageResult = (await sendTelegramMessage({
               text: chunk,
               parse_mode: 'HTML',
-            }) as TelegramPublishResult;
+            })) as TelegramPublishResult;
           } catch (error) {
-            throw new Error(
-              `Telegram message ${index + 1}/${textChunks.length} failed: ${getErrorMessage(error)}`,
-            );
+            throw new Error(`Telegram message ${index + 1}/${textChunks.length} failed: ${getErrorMessage(error)}`);
           }
 
           if (!messageResult.success) {
-            throw new Error(
-              `Telegram message ${index + 1}/${textChunks.length} failed: ${messageResult.error || 'Unknown Telegram error'}`,
-            );
+            throw new Error(`Telegram message ${index + 1}/${textChunks.length} failed: ${messageResult.error || 'Unknown Telegram error'}`);
           }
 
           if (index === 0) {
             publishedMessageId = messageResult.messageId;
           }
 
-          addLog(
-            `Text message ${index + 1}/${textChunks.length} published successfully.`,
-          );
+          addLog(`Text message ${index + 1}/${textChunks.length} published successfully.`);
         }
       }
 
       // --------------------------------------------------------
       // 11. Record publication in Supabase
       // --------------------------------------------------------
-
       addLog('Recording publication in Supabase...');
 
-      const { error: databaseError } = await supabase
-        .from('published_content')
-        .insert({
-          agent_type: request.agentType,
-          post_type: request.postType,
-          platform: 'telegram',
-          content_text: caption,
-          message_id: publishedMessageId,
-          status: 'published',
-          published_at: new Date().toISOString(),
-        });
+      const { error: databaseError } = await supabase.from('published_content').insert({
+        agent_type: request.agentType,
+        post_type: request.postType,
+        platform: 'telegram',
+        content_text: caption,
+        message_id: publishedMessageId,
+        status: 'published',
+        published_at: new Date().toISOString(),
+      });
 
       if (databaseError) {
-        // The post has already been published.
-        // Do not report the entire operation as failed merely
-        // because analytics logging could not be completed.
-        addWarning(
-          `Telegram publication succeeded, but Supabase logging failed: ${databaseError.message}`,
-        );
+        addWarning(`Telegram publication succeeded, but Supabase logging failed: ${databaseError.message}`);
       } else {
         addLog('Publication recorded successfully.');
       }
@@ -829,7 +603,6 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 12. Return structured result to the caller
       // --------------------------------------------------------
-
       addLog('Generation and publication workflow completed.');
       addLog('================================================');
 
@@ -837,13 +610,9 @@ export class TelegramOrchestrator {
         success: true,
         messageId: publishedMessageId,
         caption,
-        imageUrl: publishedWithImage
-          ? imageResult?.imageUrl
-          : undefined,
+        imageUrl: publishedWithImage ? imageResult?.imageUrl : undefined,
         hasImagePrompt: Boolean(imagePrompt),
-        imageProvider: publishedWithImage
-          ? imageProvider
-          : 'none',
+        imageProvider: publishedWithImage ? imageProvider : 'none',
         imageError,
         generationLogs,
         warnings,
@@ -858,25 +627,15 @@ export class TelegramOrchestrator {
         error: errorMessage,
       });
 
-      // Defensive cleanup if an error occurred outside the
-      // inner Groq generation block.
       if (leaseId) {
         try {
-          accessManager.revokeLease(
-            leaseId,
-            'system_cleanup',
-          );
+          accessManager.revokeLease(leaseId, 'system_cleanup');
         } catch (leaseError) {
-          logError(
-            'Failed to release access lease during error cleanup.',
-            getErrorMessage(leaseError),
-          );
+          logError('Failed to release access lease during error cleanup.', getErrorMessage(leaseError));
         }
       }
 
-      generationLogs.push(
-        `[${new Date().toISOString()}] ERROR: ${errorMessage}`,
-      );
+      generationLogs.push(`[${new Date().toISOString()}] ERROR: ${errorMessage}`);
 
       return {
         success: false,
@@ -896,5 +655,4 @@ export class TelegramOrchestrator {
 // SINGLETON
 // ============================================================
 
-export const telegramOrchestrator =
-  new TelegramOrchestrator();
+export const telegramOrchestrator = new TelegramOrchestrator();
