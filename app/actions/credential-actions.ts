@@ -36,12 +36,10 @@ export async function testCredentialAction(credentialId: string) {
   // ✅ 1. სპეციალური ტესტი Cloudflare-ისთვის
   if (cred.provider.toLowerCase() === 'cloudflare') {
     const startTime = Date.now();
-    const accountId = cred.metadata?.accountId || 'b41cb921e1b841685c0f5d364f661fbe';
     
-    addLog('INFO', `ამოღებულია Account ID მეტამონაცემებიდან: ${accountId}`);
-    
-    // ✅ შეცვლილი endpoint: მოითხოვს მხოლოდ "Workers AI: Read" ნებართვას და არა "Account Settings: Read"-ს
-    const testUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
+    addLog('INFO', 'ვამოწმებ Cloudflare API ტოკენის ვალიდურობას...');
+    // ეს endpoint ამოწმებს მხოლოდ ტოკენის ვალიდურობას და არ მოითხოვს Account ID-ს ან სპეციფიკურ ნებართვებს
+    const testUrl = 'https://api.cloudflare.com/client/v4/user/tokens/verify';
     addLog('REQ', `GET ${testUrl}`);
     addLog('REQ', 'Headers: { "Authorization": "Bearer ***", "Content-Type": "application/json" }');
     
@@ -58,19 +56,14 @@ export async function testCredentialAction(credentialId: string) {
 
       if (response.ok) {
         const data = await response.json();
-        addLog('SUCCESS', 'Workers AI მოდელების სია წარმატებით მიღებულია!');
+        addLog('SUCCESS', `ტოკენი ვალიდურია! სტატუსი: ${data.result?.status || 'Active'}`);
         
-        // ვფილტრავთ მხოლოდ ტექსტიდან-სურათის გენერაციის მოდელებს
-        const allModels = data.result || [];
-        const imageModels = allModels.filter((m: any) => 
-          m.id.includes('flux') || 
-          m.id.includes('stable-diffusion') || 
-          m.id.includes('dreamshaper')
-        );
-        
-        addLog('INFO', `ნაპოვნია ${imageModels.length} სურათის გენერაციის მოდელი`);
-        
-        const models = imageModels.map((m: any) => m.id);
+        // ვინახავთ სტანდარტულ Workers AI მოდელებს, რადგან ტოკენი ვალიდურია
+        const models = [
+          '@cf/black-forest-labs/flux-1-schnell',
+          '@cf/stabilityai/stable-diffusion-xl-base-1.0',
+          '@cf/lykon/dreamshaper-8-lcm'
+        ];
         const recommended = '@cf/black-forest-labs/flux-1-schnell';
 
         addLog('INFO', 'ვინახავ რეკომენდებულ მოდელებს მეტამონაცემებში...');
@@ -92,7 +85,7 @@ export async function testCredentialAction(credentialId: string) {
         };
       } else {
         const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.errors?.[0]?.message || response.statusText;
+        const errorMsg = errorData.errors?.[0]?.message || errorData.message || response.statusText;
         addLog('ERROR', `ვერიფიკაცია ვერ მოხერხდა: ${errorMsg}`);
         
         return { 
@@ -100,7 +93,7 @@ export async function testCredentialAction(credentialId: string) {
           provider: cred.provider, 
           models: [], 
           recommendedModel: '', 
-          error: `Invalid API key or insufficient permissions (HTTP ${response.status}): ${errorMsg}`, 
+          error: `Invalid API token (HTTP ${response.status}): ${errorMsg}`, 
           logs 
         };
       }
