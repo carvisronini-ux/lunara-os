@@ -15,12 +15,21 @@ export function CredentialsPanel() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
+  // Add Modal State
   const [newCredName, setNewCredName] = useState('');
   const [newCredProvider, setNewCredProvider] = useState<string>(''); 
   const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); 
+  const [newCredEmail, setNewCredEmail] = useState('');
+  const [newCredMetadata, setNewCredMetadata] = useState('');
   const [newCredValue, setNewCredValue] = useState('');
   
+  // Edit Modal State
   const [editCredId, setEditCredId] = useState<string | null>(null);
+  const [editCredName, setEditCredName] = useState('');
+  const [editCredProvider, setEditCredProvider] = useState('');
+  const [editCredScope, setEditCredScope] = useState<PermissionScope>('spend');
+  const [editCredEmail, setEditCredEmail] = useState('');
+  const [editCredMetadata, setEditCredMetadata] = useState('');
   const [editCredValue, setEditCredValue] = useState('');
   
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -30,17 +39,12 @@ export function CredentialsPanel() {
   useEffect(() => {
     const loadData = async () => {
       console.log("⏳ [CredentialsPanel] ველოდებით CredentialVault-ის მზადყოფნას...");
-      
-      // ✅ ველოდებით სანამ ქეში ბოლომდე ჩაიტვირთება Supabase-იდან
       await credentialVault.ready;
       setIsVaultReady(true);
       
       console.log("✅ [CredentialsPanel] CredentialVault მზადაა! ვიღებთ მეტამონაცემებს...");
       const creds = credentialVault.getMetadata();
-      console.log("📦 [CredentialsPanel] ნედლი მონაცემები ვოლტიდან:", creds);
-      
       const activeCreds = creds.filter((c: any) => c.status === 'ACTIVE');
-      console.log("🟢 [CredentialsPanel] აქტიური გასაღებები:", activeCreds);
       
       setCredentials(activeCreds);
       setLeases(accessManager.getActiveLeases());
@@ -63,18 +67,47 @@ export function CredentialsPanel() {
       alert("გთხოვთ, მიუთითოთ როგორც პროვაიდერის სახელი, ასევე API გასაღები.");
       return;
     }
+
+    let parsedMetadata = {};
+    if (newCredMetadata.trim()) {
+      try {
+        parsedMetadata = JSON.parse(newCredMetadata);
+      } catch (e) {
+        alert("შეცდომა: Metadata ველი უნდა იყოს ვალიდური JSON ფორმატში (მაგ: {\"accountId\": \"123\"})");
+        return;
+      }
+    }
+
     try {
-      await credentialVault.addCredentialSimple(
-        newCredProvider, 
-        newCredValue, 
-        "human_executive", 
-        newCredName || undefined,
-        newCredScope
-      );
+      // ცდილობს გამოიყენოს ახალი მეთოდი, თუ არა - ძველი, უკანა თავსებადობისთვის
+      if ((credentialVault as any).addCredential) {
+        await (credentialVault as any).addCredential({
+          provider: newCredProvider,
+          encryptedValue: newCredValue,
+          owner: "human_executive",
+          name: newCredName || undefined,
+          scope: newCredScope,
+          email: newCredEmail || undefined,
+          metadata: parsedMetadata
+        });
+      } else {
+        await (credentialVault as any).addCredentialSimple?.(
+          newCredProvider, 
+          newCredValue, 
+          "human_executive", 
+          newCredName || undefined,
+          newCredScope,
+          newCredEmail || undefined,
+          parsedMetadata
+        );
+      }
+
       setNewCredValue('');
       setNewCredName('');
       setNewCredProvider('');
       setNewCredScope('spend');
+      setNewCredEmail('');
+      setNewCredMetadata('');
       setShowAddModal(false);
       refreshData();
     } catch (error) {
@@ -84,17 +117,44 @@ export function CredentialsPanel() {
   };
 
   const handleEditCredential = async () => {
-    if (!editCredId || !editCredValue) return;
+    if (!editCredId || !editCredValue) {
+      alert("გთხოვთ, მიუთითოთ ახალი API გასაღები.");
+      return;
+    }
+
+    let parsedMetadata = {};
+    if (editCredMetadata.trim()) {
+      try {
+        parsedMetadata = JSON.parse(editCredMetadata);
+      } catch (e) {
+        alert("შეცდომა: Metadata ველი უნდა იყოს ვალიდური JSON ფორმატში.");
+        return;
+      }
+    }
+
     try {
-      const success = await credentialVault.updateCredential(editCredId, editCredValue, "human_executive");
+      const success = await (credentialVault as any).updateCredential?.(
+        editCredId, 
+        editCredValue, 
+        "human_executive",
+        editCredName,
+        editCredProvider,
+        editCredScope,
+        editCredEmail,
+        parsedMetadata
+      );
+      
       if (success) {
         setEditCredValue('');
         setEditCredId(null);
         setShowEditModal(false);
         refreshData();
+      } else {
+        alert("ვერ მოხერხდა განახლება. შეამოწმეთ კონსოლი.");
       }
     } catch (error) {
       console.error("Failed to update credential:", error);
+      alert("Failed to update credential. Check console for details.");
     }
   };
 
@@ -142,7 +202,12 @@ export function CredentialsPanel() {
 
   const openEditModal = (cred: any) => {
     setEditCredId(cred.credential_id);
-    setEditCredValue('');
+    setEditCredName(cred.name || '');
+    setEditCredProvider(cred.provider || '');
+    setEditCredScope(cred.scope || 'spend');
+    setEditCredEmail(cred.email || '');
+    setEditCredMetadata(cred.metadata ? JSON.stringify(cred.metadata, null, 2) : '');
+    setEditCredValue(''); // უსაფრთხოებისთვის, გასაღების ხელახალი ჩაწერაა საჭირო
     setShowEditModal(true);
   };
 
@@ -171,8 +236,8 @@ export function CredentialsPanel() {
 
       {/* Add Credential Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
               
@@ -183,7 +248,7 @@ export function CredentialsPanel() {
                   value={newCredName}
                   onChange={(e) => setNewCredName(e.target.value)}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="e.g., KIE AI Image Key"
+                  placeholder="e.g., Cloudflare Workers AI"
                 />
               </div>
 
@@ -194,9 +259,10 @@ export function CredentialsPanel() {
                   value={newCredProvider}
                   onChange={(e) => setNewCredProvider(e.target.value.toLowerCase())}
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="Type or select (e.g., kie, gemini, openai)"
+                  placeholder="Type or select (e.g., cloudflare, kie, gemini)"
                 />
                 <datalist id="provider-suggestions">
+                  <option value="cloudflare" />
                   <option value="kie" />
                   <option value="gemini" />
                   <option value="huggingface" />
@@ -206,7 +272,17 @@ export function CredentialsPanel() {
                   <option value="mistral" />
                   <option value="telegram" />
                 </datalist>
-                <p className="text-[10px] text-slate-500 mt-1">You can type any custom provider name.</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Associated Email</label>
+                <input 
+                  type="email" 
+                  value={newCredEmail}
+                  onChange={(e) => setNewCredEmail(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                  placeholder="account@example.com"
+                />
               </div>
 
               <div>
@@ -222,6 +298,18 @@ export function CredentialsPanel() {
                   <option value="write">write (Databases, Storage)</option>
                   <option value="read">read (Read-only access)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Metadata (JSON)</label>
+                <textarea 
+                  value={newCredMetadata}
+                  onChange={(e) => setNewCredMetadata(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  rows={3}
+                  placeholder='{"accountId": "b41cb921e1b841685c0f5d364f661fbe"}'
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Optional. Must be valid JSON format.</p>
               </div>
 
               <div>
@@ -242,6 +330,8 @@ export function CredentialsPanel() {
                     setNewCredName('');
                     setNewCredProvider('');
                     setNewCredScope('spend');
+                    setNewCredEmail('');
+                    setNewCredMetadata('');
                     setNewCredValue('');
                   }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
@@ -263,33 +353,87 @@ export function CredentialsPanel() {
 
       {/* Edit Credential Modal */}
       {showEditModal && editCredId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black text-white mb-2">Edit Credential</h3>
             <p className="text-xs text-slate-400 mb-4">
-              🔐 §40: Enter the new API key. The old key will be permanently replaced and all active leases will be revoked.
+              🔐 §40: Update any field. Changing the API key will permanently replace the old one and revoke active leases.
             </p>
             <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Custom Name</label>
+                <input 
+                  type="text" 
+                  value={editCredName}
+                  onChange={(e) => setEditCredName(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
+                <input 
+                  list="provider-suggestions"
+                  value={editCredProvider}
+                  onChange={(e) => setEditCredProvider(e.target.value.toLowerCase())}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Associated Email</label>
+                <input 
+                  type="email" 
+                  value={editCredEmail}
+                  onChange={(e) => setEditCredEmail(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
+                <select 
+                  value={editCredScope}
+                  onChange={(e) => setEditCredScope(e.target.value as PermissionScope)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="spend">spend</option>
+                  <option value="execute">execute</option>
+                  <option value="publish">publish</option>
+                  <option value="write">write</option>
+                  <option value="read">read</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase">Metadata (JSON)</label>
+                <textarea 
+                  value={editCredMetadata}
+                  onChange={(e) => setEditCredMetadata(e.target.value)}
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white font-mono focus:border-blue-500 focus:outline-none"
+                  rows={3}
+                  placeholder='{"accountId": "..."}'
+                />
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">New API Key / Secret</label>
                 <input 
                   type="password" 
                   value={editCredValue}
                   onChange={(e) => setEditCredValue(e.target.value)}
-                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
-                  placeholder="Enter new API key..."
+                  className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  placeholder="Enter new API key to rotate..."
                   autoFocus
                 />
+                <p className="text-[10px] text-yellow-500 mt-1">⚠️ Required to save changes. Old key will be permanently replaced.</p>
               </div>
-              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/30 p-3 text-xs text-yellow-300">
-                ⚠️ <strong>Warning:</strong> This action will rotate the credential and revoke all active access leases.
-              </div>
+
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => {
                     setShowEditModal(false);
                     setEditCredId(null);
-                    setEditCredValue('');
                   }}
                   className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2 text-sm font-bold text-slate-300 hover:bg-white/10"
                 >
@@ -310,7 +454,7 @@ export function CredentialsPanel() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-slate-900 p-6 shadow-2xl">
             <h3 className="text-xl font-black text-red-400 mb-2">⚠️ Delete Credential</h3>
             <p className="text-sm text-slate-300 mb-4">
@@ -353,12 +497,22 @@ export function CredentialsPanel() {
                 
                 return (
                   <div key={cred.credential_id} className="rounded-xl border border-white/5 bg-white/5 p-4">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="font-bold text-white">{cred.name}</div>
-                        <div className="text-xs text-slate-400 uppercase">
+                        <div className="font-bold text-white text-lg">{cred.name || cred.provider}</div>
+                        <div className="text-xs text-slate-400 uppercase mt-1">
                           {cred.provider} • Scope: {cred.scope} • Owner: {cred.owner}
                         </div>
+                        {cred.email && (
+                          <div className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                            ✉️ {cred.email}
+                          </div>
+                        )}
+                        {cred.metadata && Object.keys(cred.metadata).length > 0 && (
+                          <div className="text-[10px] text-slate-500 mt-1 font-mono bg-black/20 p-2 rounded border border-white/5">
+                            Metadata: {JSON.stringify(cred.metadata).substring(0, 80)}...
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`rounded-lg px-3 py-1 text-xs font-black ${
@@ -410,48 +564,11 @@ export function CredentialsPanel() {
                               <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
                                 <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Model:</div>
                                 <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
-                                <div className="text-xs text-slate-500 mt-1">System will use this model automatically</div>
-                              </div>
-                            )}
-                            {testResult.models && testResult.models.length > 0 && (
-                              <div>
-                                <div className="text-xs text-slate-400 mb-1">Available Models ({testResult.models.length}):</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {testResult.models.slice(0, 6).map((model: any, idx: number) => (
-                                    <span 
-                                      key={idx} 
-                                      className={`text-xs rounded px-2 py-0.5 font-mono ${
-                                        model.id === testResult.recommendedModel 
-                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
-                                          : 'bg-white/5 border border-white/10 text-slate-300'
-                                      }`}
-                                    >
-                                      {model.id}
-                                    </span>
-                                  ))}
-                                  {testResult.models.length > 6 && (
-                                    <span className="text-xs text-slate-500 px-2 py-0.5">+{testResult.models.length - 6} more</span>
-                                  )}
-                                </div>
                               </div>
                             )}
                           </>
                         ) : (
-                          <div className="text-red-400 text-sm">
-                            ❌ Test Failed: {testResult.error}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {!testResult && cred.metadata?.recommendedModel && (
-                      <div className="mt-3 p-2 rounded bg-blue-500/5 border border-blue-500/20">
-                        <div className="text-xs text-slate-400">Last tested model:</div>
-                        <div className="text-sm font-mono text-blue-400">{cred.metadata.recommendedModel}</div>
-                        {cred.metadata.lastTestedAt && (
-                          <div className="text-xs text-slate-500 mt-1">
-                            Tested: {new Date(cred.metadata.lastTestedAt).toLocaleString()}
-                          </div>
+                          <div className="text-red-400 text-sm">❌ Test Failed: {testResult.error}</div>
                         )}
                       </div>
                     )}
