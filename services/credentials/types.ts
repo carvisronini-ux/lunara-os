@@ -3,7 +3,7 @@
 // Foundation: §21, §22, §40, §51
 // ============================================================
 
-// ✅ განახლებული: ნებისმიერი სტრიქონი (string), რათა მომავალში კოდის შეცვლის გარეშე დაემატოს ახალი პროვაიდერები (მაგ: "kie", "stability", "midjourney")
+// ✅ განახლებული: ნებისმიერი სტრიქონი (string), რათა მომავალში კოდის შეცვლის გარეშე დაემატოს ახალი პროვაიდერები
 export type Provider = string;
 
 export type CredentialStatus = "ACTIVE" | "SUSPENDED" | "EXPIRED" | "REVOKED";
@@ -26,18 +26,18 @@ export interface Credential {
   scope: PermissionScope;
   status: CredentialStatus;
   owner: "human_executive" | string; // §35: Human executive ფლობს sensitive credentials-ს
+  
+  // ✅ ახალი: ელფოსტის მისამართი, რომელიც ასოცირდება ამ გასაღებთან
+  email?: string; 
+  
   created_at: number;
   last_rotated_at: number | null;
   expires_at: number | null;
   
-  // ✅ ახალი: ტესტირების შედეგებისა და მოდელების შესანახად
-  metadata?: {
-    models?: string[];
-    recommendedModel?: string;
-    lastTestedAt?: number;
-    testSuccess?: boolean;
-    testLatency?: number;
-  };
+  // ✅ განახლებული: მეტამონაცემები ახლა არის დინამიური JSON ობიექტი (Record<string, any>).
+  // ეს საშუალებას გვაძლევს შევინახოთ ნებისმიერი დამატებითი ინფორმაცია, 
+  // როგორიცაა: accountId, region, models, recommendedModel, lastTestedAt და ა.შ.
+  metadata?: Record<string, any>;
 }
 
 export interface AccessLease {

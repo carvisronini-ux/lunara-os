@@ -56,6 +56,7 @@ export class CredentialVault {
             scope: item.scope,
             status: item.status,
             owner: item.owner,
+            email: item.email || undefined, // ✅ ახალი: email ველის ჩატვირთვა
             created_at: new Date(item.created_at).getTime(),
             last_rotated_at: item.last_rotated_at ? new Date(item.last_rotated_at).getTime() : null,
             expires_at: item.expires_at ? new Date(item.expires_at).getTime() : null,
@@ -79,13 +80,15 @@ export class CredentialVault {
     if (this.auditLog.length > 100) this.auditLog.pop();
   }
 
-  // ✅ განახლებული: იღებს optional customName და customScope პარამეტრებს UI-დან
+  // ✅ განახლებული: იღებს optional customName, customScope, email და metadata პარამეტრებს UI-დან
   public async addCredentialSimple(
     provider: string, 
     plaintextValue: string, 
     owner: string = "human_executive",
     customName?: string,
-    customScope?: PermissionScope // <-- ახალი პარამეტრი
+    customScope?: PermissionScope,
+    email?: string, // ✅ ახალი პარამეტრი
+    metadata?: Record<string, any> // ✅ ახალი პარამეტრი
   ): Promise<string> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -95,8 +98,18 @@ export class CredentialVault {
     const name = customName || `${provider.toUpperCase()} Key`;
 
     const { error } = await supabase.from('credentials').insert({
-      id, provider, name, encrypted_value: mockEncrypt(plaintextValue),
-      scope, status: "ACTIVE", owner, created_at: now, last_rotated_at: null, expires_at: null, metadata: {}
+      id, 
+      provider, 
+      name, 
+      encrypted_value: mockEncrypt(plaintextValue),
+      scope, 
+      status: "ACTIVE", 
+      owner, 
+      email: email || null, // ✅ ახალი: email-ის შენახვა
+      metadata: metadata || {}, // ✅ ახალი: metadata-ს შენახვა
+      created_at: now, 
+      last_rotated_at: null, 
+      expires_at: null
     });
 
     if (error) {
@@ -112,9 +125,11 @@ export class CredentialVault {
       scope, 
       status: "ACTIVE", 
       owner, 
+      email: email || undefined, // ✅ ახალი
       created_at: Date.now(), 
       last_rotated_at: null, 
-      expires_at: null
+      expires_at: null,
+      metadata: metadata || undefined // ✅ ახალი
     };
     this.cache.set(id, newCred);
 
@@ -178,17 +193,35 @@ export class CredentialVault {
     return true;
   }
 
-  // ✅ მუდმივი განახლება: API გასაღების შეცვლა (Rotation)
-  public async updateCredential(credentialId: string, newPlaintextValue: string, updatedBy: string = "human_executive"): Promise<boolean> {
+  // ✅ მუდმივი განახლება: API გასაღების შეცვლა (Rotation) - ახლა იღებს ყველა ველს
+  public async updateCredential(
+    credentialId: string, 
+    newPlaintextValue: string, 
+    updatedBy: string = "human_executive",
+    newName?: string, // ✅ ახალი
+    newProvider?: string, // ✅ ახალი
+    newScope?: PermissionScope, // ✅ ახალი
+    newEmail?: string, // ✅ ახალი
+    newMetadata?: Record<string, any> // ✅ ახალი
+  ): Promise<boolean> {
     const cred = this.cache.get(credentialId);
     if (!cred) return false;
 
+    const updateData: any = { 
+      encrypted_value: mockEncrypt(newPlaintextValue),
+      last_rotated_at: new Date().toISOString()
+    };
+
+    // ✅ ახალი: თუ სხვა ველებიც მოწოდებულია, მათაც ვაახლებთ
+    if (newName !== undefined) updateData.name = newName;
+    if (newProvider !== undefined) updateData.provider = newProvider;
+    if (newScope !== undefined) updateData.scope = newScope;
+    if (newEmail !== undefined) updateData.email = newEmail;
+    if (newMetadata !== undefined) updateData.metadata = newMetadata;
+
     const { error } = await supabase
       .from('credentials')
-      .update({ 
-        encrypted_value: mockEncrypt(newPlaintextValue),
-        last_rotated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', credentialId);
 
     if (error) {
@@ -196,8 +229,15 @@ export class CredentialVault {
       return false;
     }
 
+    // ✅ ახალი: ქეშის განახლება ყველა ველით
     cred.encrypted_value = mockEncrypt(newPlaintextValue);
     cred.last_rotated_at = Date.now();
+    if (newName !== undefined) cred.name = newName;
+    if (newProvider !== undefined) cred.provider = newProvider as Provider;
+    if (newScope !== undefined) cred.scope = newScope;
+    if (newEmail !== undefined) cred.email = newEmail;
+    if (newMetadata !== undefined) cred.metadata = newMetadata;
+
     this.cache.set(credentialId, cred);
 
     accessManager.revokeAllLeasesForCredential(credentialId, updatedBy);
