@@ -72,44 +72,44 @@ const filterImageModels = (provider: string, models: any[]): string[] => {
   
   if (p === 'gemini') {
     return models
-      .filter((m: any) => m.supportedGenerationMethods?.includes('generateImages'))
+      .filter((m: any) => typeof m === 'object' && m.supportedGenerationMethods?.includes('generateImages'))
       .map((m: any) => m.name.replace('models/', ''));
   }
 
   if (p === 'huggingface') {
     return models
-      .filter((m: any) => 
-        m.pipeline_tag === 'text-to-image' || 
-        m.pipeline_tag === 'image-to-image' ||
-        m.id?.toLowerCase().includes('flux') ||
-        m.id?.toLowerCase().includes('stable-diffusion') ||
-        m.id?.toLowerCase().includes('sdxl')
-      )
-      .map((m: any) => m.id);
+      .filter((m: any) => {
+        const id = (typeof m === 'string' ? m : m.id || '').toLowerCase();
+        return m.pipeline_tag === 'text-to-image' || 
+               m.pipeline_tag === 'image-to-image' ||
+               id.includes('flux') ||
+               id.includes('stable-diffusion') ||
+               id.includes('sdxl');
+      })
+      .map((m: any) => typeof m === 'string' ? m : m.id);
   }
 
   if (p === 'cloudflare') {
     return models
-      .filter((m: any) => 
-        m.id?.startsWith('@cf/') && 
-        (m.id?.toLowerCase().includes('image') || m.id?.toLowerCase().includes('flux'))
-      )
-      .map((m: any) => m.id);
+      .filter((m: any) => {
+        const id = (typeof m === 'string' ? m : m.id || '').toLowerCase();
+        return id.startsWith('@cf/') && (id.includes('image') || id.includes('flux'));
+      })
+      .map((m: any) => typeof m === 'string' ? m : m.id);
   }
 
   return models
-    .filter((m: any) => 
-      (m.id || m.name) && (
-        (m.id || m.name).toLowerCase().includes('image') ||
-        (m.id || m.name).toLowerCase().includes('vision') ||
-        (m.id || m.name).toLowerCase().includes('flux') ||
-        (m.id || m.name).toLowerCase().includes('dall-e') ||
-        (m.id || m.name).toLowerCase().includes('kontext') ||
-        (m.id || m.name).toLowerCase().includes('sd') ||
-        (m.id || m.name).toLowerCase().includes('generate')
-      )
-    )
-    .map((m: any) => m.id || m.name);
+    .filter((m: any) => {
+      const idOrName = (typeof m === 'string' ? m : (m.id || m.name || '')).toLowerCase();
+      return idOrName.includes('image') ||
+             idOrName.includes('vision') ||
+             idOrName.includes('flux') ||
+             idOrName.includes('dall-e') ||
+             idOrName.includes('kontext') ||
+             idOrName.includes('sd') ||
+             idOrName.includes('generate');
+    })
+    .map((m: any) => typeof m === 'string' ? m : (m.id || m.name));
 };
 
 const buildGenerationBody = (provider: string, model: string, prompt: string): any => {
@@ -264,7 +264,10 @@ export class ImageGenerator {
               
               // ✅ DEEP DEBUG ბლოკი: თუ მოდელები არსებობს, მაგრამ ფილტრმა ვერ ამოიცნო, ვაჩვენებთ ნიმუშებს
               if (modelsArray.length > 0) {
-                const sampleModels = modelsArray.slice(0, 5).map((m: any) => m.id || m.name || JSON.stringify(m)).join(' | ');
+                const sampleModels = modelsArray.slice(0, 5).map((m: any) => {
+                  if (typeof m === 'string') return m;
+                  return m.id || m.name || JSON.stringify(m);
+                }).join(' | ');
                 logs.push(`🔍 DEBUG ${providerUpper}: ფილტრმა ვერ ამოიცნო მოდელები. API-ს მიერ დაბრუნებული ნიმუშები: [${sampleModels}]`);
               }
               continue;
