@@ -3,8 +3,15 @@
 import { supabase } from '@/lib/supabase';
 import { credentialVault } from '../credentials/credential-vault';
 import { accessManager } from '../credentials/access-manager';
-import { sendTelegramMessage, sendTelegramPhoto } from '../distribution/telegram';
+import {
+  sendTelegramMessage,
+  sendTelegramPhoto,
+} from '../distribution/telegram';
 import { imageGenerator } from './image-generator';
+
+// ============================================================
+// TYPES
+// ============================================================
 
 export interface OrchestratorRequest {
   agentType: string;
@@ -19,21 +26,349 @@ export interface OrchestratorResponse {
   error?: string;
   caption?: string;
   imageUrl?: string;
-  hasImagePrompt?: boolean; 
-  imageProvider?: string;   
-  imageError?: string;      
-  generationLogs?: string[]; // ✅ დეტალური ლოგები ფრონტენდისთვის
+  hasImagePrompt?: boolean;
+  imageProvider?: string;
+  imageError?: string;
+  generationLogs?: string[];
+  warnings?: string[];
 }
 
+interface GeneratedContent {
+  caption: string;
+  image_prompt?: string;
+  hashtags?: string[];
+}
+
+interface ImageGenerationResult {
+  success: boolean;
+  imageUrl?: string;
+  imageBuffer?: unknown;
+  provider?: string;
+  error?: string;
+  generationLogs?: string[];
+}
+
+interface TelegramPublishResult {
+  success: boolean;
+  messageId?: number;
+  error?: string;
+}
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const GROQ_API_URL =
+  'https://api.groq.com/openai/v1/chat/completions';
+
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+
+const GROQ_TIMEOUT_MS = 60_000;
+const ACCESS_LEASE_DURATION_SECONDS = 120;
+
+// Telegram limits are measured after entity parsing.
+// Conservative limits help avoid rejected messages.
+const TELEGRAM_MESSAGE_LIMIT = 3_800;
+const TELEGRAM_CAPTION_LIMIT = 950;
+
+const MAX_ERROR_LENGTH = 1_500;
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function logInfo(message: string, details?: unknown): void {
+  if (details !== undefined) {
+    console.info(`[Orchestrator] ${message}`, details);
+    return;
+  }
+
+  console.info(`[Orchestrator] ${message}`);
+}
+
+function logWarn(message: string, details?: unknown): void {
+  if (details !== undefined) {
+    console.warn(`[Orchestrator] ${message}`, details);
+    return;
+  }
+
+  console.warn(`[Orchestrator] ${message}`);
+}
+
+function logError(message: string, details?: unknown): void {
+  if (details !== undefined) {
+    console.error(`[Orchestrator] ${message}`, details);
+    return;
+  }
+
+  console.error(`[Orchestrator] ${message}`);
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return 'An unknown error occurred.';
+}
+
+function truncateError(message: string): string {
+  if (message.length <= MAX_ERROR_LENGTH) {
+    return message;
+  }
+
+  return `${message.slice(0, MAX_ERROR_LENGTH)}...`;
+}
+
+/**
+ * Escape generated text before sending it using Telegram HTML mode.
+ *
+ * AI-generated content is untrusted input. Without escaping,
+ * characters such as <, > and & can break Telegram formatting.
+ */
+function escapeTelegramHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Split HTML-escaped text into safe chunks.
+ *
+ * Keeps HTML entities and Unicode surrogate pairs intact.
+ * This implementation is intended for escaped plain text,
+ * not arbitrary HTML markup.
+ */
+function splitTelegramText(
+  text: string,
+  maxLength: number,
+): string[] {
+  if (!text) {
+    return [];
+  }
+
+  const tokens =
+    text.match(/&(?:amp|lt|gt|quot|#39);|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ??
+    [];
+
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const token of tokens) {
+    if (
+      current.length + token.length > maxLength &&
+      current.length > 0
+    ) {
+      chunks.push(current);
+      current = '';
+    }
+
+    current += token;
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
+
+/**
+ * Normalize and validate the AI-generated JSON response.
+ */
+function parseGeneratedContent(rawContent: unknown): GeneratedContent {
+  if (typeof rawContent !== 'string' || !rawContent.trim()) {
+    throw new Error('The AI returned an empty response.');
+  }
+
+  let normalized = rawContent.trim();
+
+  // Handle accidental Markdown code fences.
+  normalized = normalized
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(normalized);
+  } catch {
+    throw new Error(
+      'The AI returned invalid JSON. Check the model response and prompt.',
+    );
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error('The AI response must be a JSON object.');
+  }
+
+  const data = parsed as Record<string, unknown>;
+
+  if (
+    typeof data.caption !== 'string' ||
+    !data.caption.trim()
+  ) {
+    throw new Error(
+      'The AI response does not contain a valid caption.',
+    );
+  }
+
+  if (
+    data.image_prompt !== undefined &&
+    data.image_prompt !== null &&
+    typeof data.image_prompt !== 'string'
+  ) {
+    throw new Error(
+      'The AI returned an invalid image_prompt field.',
+    );
+  }
+
+  if (
+    data.hashtags !== undefined &&
+    !Array.isArray(data.hashtags)
+  ) {
+    throw new Error(
+      'The AI returned an invalid hashtags field.',
+    );
+  }
+
+  const hashtags = Array.isArray(data.hashtags)
+    ? data.hashtags.filter(
+        (item): item is string =>
+          typeof item === 'string' && item.trim().length > 0,
+      )
+    : [];
+
+  return {
+    caption: data.caption.trim(),
+    image_prompt:
+      typeof data.image_prompt === 'string'
+        ? data.image_prompt.trim()
+        : undefined,
+    hashtags,
+  };
+}
+
+/**
+ * Create the prompt from the agent configuration stored in Supabase.
+ */
+function buildUserPrompt(
+  request: OrchestratorRequest,
+): string {
+  return `
+Task: Create a high-quality Telegram post for the Lunara astrology brand.
+
+Category: ${request.agentType}
+Post type: ${request.postType}
+Theme: ${request.contentTheme || 'Choose an appropriate theme for this category'}
+Zodiac sign: ${request.zodiacSign || 'General / All signs'}
+
+CONTENT REQUIREMENTS:
+- Write an engaging, empathetic, natural-sounding post.
+- Aim for 150-200 words when appropriate for the selected post type.
+- Adapt the content to the specified category, theme and zodiac sign.
+- Avoid repetitive, generic AI language.
+- Do not present astrology or tarot as scientifically proven facts.
+- Do not make guaranteed predictions or absolute claims about the future.
+- Do not make medical, financial or other high-stakes promises.
+- Include a clear, natural call to action where appropriate.
+- Write the caption in the language specified by the agent configuration.
+- Use relevant hashtags. Include #LUNARA where appropriate.
+
+IMAGE REQUIREMENTS:
+- Create a detailed English image-generation prompt.
+- Use a consistent mystical, cosmic, dark-luxury visual identity.
+- Prefer deep midnight tones, sophisticated lighting and elegant celestial imagery.
+- Avoid clutter, excessive visual effects and generic stock-image aesthetics.
+- Do not request text, lettering, logos or watermarks inside the image.
+- Make the composition suitable for a Telegram social-media post.
+- Adapt the visual subject to the actual post theme.
+
+OUTPUT REQUIREMENTS:
+Return ONLY a valid JSON object.
+Do not include Markdown fences or explanations.
+Use exactly these three keys:
+{
+  "caption": "The complete post text",
+  "image_prompt": "Detailed English visual-generation prompt",
+  "hashtags": ["#LUNARA", "#RelevantHashtag"]
+}
+
+Ensure that all JSON strings are properly escaped.
+`.trim();
+}
+
+// ============================================================
+// TELEGRAM ORCHESTRATOR
+// ============================================================
+
 export class TelegramOrchestrator {
-  async generateAndPublish(request: OrchestratorRequest): Promise<OrchestratorResponse> {
-    console.log(`\n[Orchestrator] 🚀 ==========================================`);
-    console.log(`[Orchestrator] 🚀 Starting generation for ${request.agentType} / ${request.postType}`);
-    console.log(`[Orchestrator] 🚀 Theme: ${request.contentTheme || 'N/A'}, Zodiac: ${request.zodiacSign || 'N/A'}`);
+  /**
+   * Generates content, optionally generates an image,
+   * publishes the result to Telegram and records the publication.
+   */
+  async generateAndPublish(
+    request: OrchestratorRequest,
+  ): Promise<OrchestratorResponse> {
+    const generationLogs: string[] = [];
+    const warnings: string[] = [];
+
+    let leaseId: string | null = null;
+
+    let caption = '';
+    let imagePrompt = '';
+    let imageResult: ImageGenerationResult | null = null;
+    let imageError: string | undefined;
+    let imageProvider = 'none';
+
+    const addLog = (message: string): void => {
+      const timestamp = new Date().toISOString();
+      generationLogs.push(`[${timestamp}] ${message}`);
+      logInfo(message);
+    };
+
+    const addWarning = (message: string): void => {
+      warnings.push(message);
+      logWarn(message);
+    };
+
+    addLog('================================================');
+    addLog(
+      `Starting generation: ${request.agentType} / ${request.postType}`,
+    );
+    addLog(`Theme: ${request.contentTheme || 'Automatic'}`);
+    addLog(`Zodiac sign: ${request.zodiacSign || 'General'}`);
 
     try {
-      // 1. წავიკითხოთ აგენტის კონფიგურაცია ბაზიდან
-      console.log(`[Orchestrator] 📡 Requesting agent config from Supabase for: ${request.agentType}`);
+      // --------------------------------------------------------
+      // 1. Validate the request
+      // --------------------------------------------------------
+
+      if (
+        !request.agentType?.trim() ||
+        !request.postType?.trim()
+      ) {
+        throw new Error(
+          'Both agentType and postType are required.',
+        );
+      }
+
+      // --------------------------------------------------------
+      // 2. Load agent configuration
+      // --------------------------------------------------------
+
+      addLog('Loading agent configuration from Supabase...');
+
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('*')
@@ -41,224 +376,525 @@ export class TelegramOrchestrator {
         .single();
 
       if (configError || !config) {
-        throw new Error(`Failed to load agent config: ${configError?.message || 'Config not found'}`);
+        throw new Error(
+          `Failed to load agent configuration: ${
+            configError?.message || 'Configuration not found'
+          }`,
+        );
       }
-      console.log(`[Orchestrator] ✅ Successfully loaded config for ${request.agentType}`);
 
-      // 2. ველოდებით სანამ CredentialVault მზად იქნება და ქეში ჩაიტვირთება!
-      console.log(`[Orchestrator] ⏳ Waiting for CredentialVault cache to populate...`);
+      if (
+        typeof config.master_prompt !== 'string' ||
+        !config.master_prompt.trim()
+      ) {
+        throw new Error(
+          `Agent "${request.agentType}" has no master_prompt configured.`,
+        );
+      }
+
+      addLog('Agent configuration loaded successfully.');
+
+      // --------------------------------------------------------
+      // 3. Wait for the credential vault
+      // --------------------------------------------------------
+
+      addLog('Waiting for CredentialVault initialization...');
+
       await credentialVault.ready;
-      console.log(`[Orchestrator] ✅ CredentialVault is ready and cache is fully populated.`);
 
-      // 3. მოვითხოვოთ დროებითი წვდომა LLM-ზე (Groq)
-      console.log(`[Orchestrator] 🔑 Requesting LLM access lease from AccessManager...`);
-      const leaseId = accessManager.requestAccess(
+      addLog('CredentialVault is ready.');
+
+      // --------------------------------------------------------
+      // 4. Acquire temporary access to Groq
+      // --------------------------------------------------------
+
+      addLog('Requesting temporary Groq access lease...');
+
+      leaseId = accessManager.requestAccess(
         `${request.agentType}-agent`,
         'groq',
         'spend',
-        `Generate content for ${request.postType}`,
+        `Generate Telegram content for ${request.postType}`,
         null,
-        120 // 2 წუთიანი ლიზი
+        ACCESS_LEASE_DURATION_SECONDS,
       );
 
       if (!leaseId) {
-        throw new Error('Failed to acquire LLM access lease. Check AccessManager logs.');
+        throw new Error(
+          'Could not acquire Groq access. Check AccessManager permissions and logs.',
+        );
       }
-      console.log(`[Orchestrator] 🔓 Lease acquired successfully: ${leaseId}`);
 
-      let generatedContent: any = null;
+      addLog('Groq access lease acquired.');
+
+      // --------------------------------------------------------
+      // 5. Generate content with Groq
+      // --------------------------------------------------------
 
       try {
-        // 4. მივიღოთ API გასაღები და მეტამონაცემები უსაფრთხო საცავიდან
-        console.log(`[Orchestrator] 🔐 Fetching Groq credential from Vault (scope: spend)...`);
-        const cred = credentialVault.getCredentialByProvider('groq', 'spend');
-        if (!cred) {
-          throw new Error('Groq credential not found in vault. Please add it in the API Vault.');
+        addLog('Retrieving Groq credentials from the vault...');
+
+        const credential =
+          credentialVault.getCredentialByProvider(
+            'groq',
+            'spend',
+          );
+
+        if (!credential) {
+          throw new Error(
+            'Groq credentials were not found. Add a valid credential in the API Vault.',
+          );
         }
 
-        console.log(`[Orchestrator] 🔓 Decrypting API key for agent: ${request.agentType}-agent...`);
-        const apiKey = credentialVault.getDecryptedValue(cred.credential_id, `${request.agentType}-agent`);
+        const apiKey = credentialVault.getDecryptedValue(
+          credential.credential_id,
+          `${request.agentType}-agent`,
+        );
+
         if (!apiKey) {
-          throw new Error('Failed to decrypt API key. Check owner permissions in Vault.');
+          throw new Error(
+            'Could not decrypt the Groq API key. Check vault permissions.',
+          );
         }
 
-        // დინამიურად ვიღებთ რეკომენდებულ მოდელს მეტამონაცემებიდან
-        const targetModel = cred.metadata?.recommendedModel || "llama-3.3-70b-versatile";
-        console.log(`[Orchestrator] 🤖 Using dynamic model from Vault metadata: ${targetModel}`);
+        const targetModel =
+          credential.metadata?.recommendedModel ||
+          DEFAULT_GROQ_MODEL;
 
-        // 5. ავაგოთ Prompt აგენტის კონფიგურაციის მიხედვით
-        const systemPrompt = `${config.master_prompt}\n\nTHINKING STYLE:\n${config.thinking_style}\n\nSKILLS & CONSTRAINTS:\n${config.skills_constraints}`;
+        addLog(`Using Groq model: ${targetModel}`);
+        addLog('Building generation prompts...');
 
-        // ✅ ატომურად მდგრადი JSON პრომპტი (მკაცრი ინსტრუქციებით)
-        const userPrompt = `Task: Create a Telegram post.
-Category: ${request.agentType}
-Post Type: ${request.postType}
-Theme: ${request.contentTheme || 'AI will determine based on category'}
-Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
+        const systemPrompt = [
+          config.master_prompt,
+          '',
+          'THINKING STYLE:',
+          config.thinking_style || 'Use clear, structured reasoning internally.',
+          '',
+          'SKILLS & CONSTRAINTS:',
+          config.skills_constraints || 'Follow the agent instructions and brand guidelines.',
+          '',
+          'OUTPUT FORMAT:',
+          'Return only a valid JSON object with caption, image_prompt and hashtags.',
+          'Never expose internal reasoning.',
+        ].join('\n');
 
-CRITICAL INSTRUCTION: You must output ONLY raw, valid JSON. Do NOT use markdown formatting (no \`\`\`json or \`\`\` tags). Do NOT include any conversational text before or after the JSON. Ensure all internal quotes in strings are properly escaped.
+        const userPrompt = buildUserPrompt(request);
 
-The JSON must have EXACTLY these three keys:
-{
-  "caption": "Your post text here (150-200 words, empathetic tone, no guarantees)",
-  "image_prompt": "Detailed English description for image generation. Mystical, cosmic, dark luxury style. No text, no logos, no watermarks.",
-  "hashtags": ["#LUNARA", "#topic1", "#topic2"]
-}`;
+        addLog('Sending content-generation request to Groq...');
 
-        // 6. გამოვიძახოთ LLM API დინამიურად არჩეული მოდელით
-        console.log(`[Orchestrator] 📤 Sending request to Groq API (Model: ${targetModel})...`);
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: targetModel,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt }
-            ],
-            temperature: 0.7,
-            response_format: { type: "json_object" }
-          })
-        });
+        const controller = new AbortController();
+
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+        }, GROQ_TIMEOUT_MS);
+
+        let response: Response;
+
+        try {
+          response = await fetch(GROQ_API_URL, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: targetModel,
+              messages: [
+                {
+                  role: 'system',
+                  content: systemPrompt,
+                },
+                {
+                  role: 'user',
+                  content: userPrompt,
+                },
+              ],
+              temperature: 0.7,
+              response_format: {
+                type: 'json_object',
+              },
+            }),
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.name === 'AbortError'
+          ) {
+            throw new Error(
+              `Groq request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`,
+            );
+          }
+
+          throw new Error(
+            `Could not connect to Groq: ${getErrorMessage(error)}`,
+          );
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`LLM API Error: ${response.status} - ${errorText}`);
+          const errorText = truncateError(
+            await response.text().catch(() => 'No response body'),
+          );
+
+          throw new Error(
+            `Groq API returned HTTP ${response.status}: ${errorText}`,
+          );
         }
 
-        console.log(`[Orchestrator] 📥 Received successful response from Groq API.`);
         const data = await response.json();
-        let rawContent = data.choices[0].message.content;
 
-        // 7. გავპარსოთ JSON (უსაფრთხოების ზომა: Markdown ბექტიკების მოშორება)
-        console.log(`[Orchestrator] 🧠 Parsing AI response as JSON...`);
-        try {
-          // ✅ ავტომატურად ვშლით \`\`\`json და \`\`\` თუ მოდელმა მაინც დაამატა
-          rawContent = rawContent.replace(/^```json\s*|\s*```$/g, '').trim();
-          
-          generatedContent = JSON.parse(rawContent);
-          console.log(`[Orchestrator] 📦 Raw AI JSON Response parsed successfully.`);
-        } catch (e) {
-          console.error(`[Orchestrator] ❌ Raw content received:`, rawContent);
-          throw new Error(`Failed to parse AI response as JSON: ${e instanceof Error ? e.message : 'Unknown parsing error'}`);
-        }
+        const rawContent = data?.choices?.[0]?.message?.content;
+
+        addLog('Groq response received. Validating generated JSON...');
+
+        const generatedContent =
+          parseGeneratedContent(rawContent);
+
+        caption = generatedContent.caption;
+        imagePrompt = generatedContent.image_prompt || '';
+
+        const hashtags = generatedContent.hashtags || [];
+
+        const fullCaption = [
+          caption,
+          ...hashtags,
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+
+        caption = fullCaption;
+
+        addLog(
+          `Content generated successfully. Caption length: ${caption.length} characters.`,
+        );
 
       } finally {
-        // 8. აუცილებლად გავაუქმოთ ლიზი, მიზეზის მიუხედავად
+        // ------------------------------------------------------
+        // 6. Always release the temporary access lease
+        // ------------------------------------------------------
+
         if (leaseId) {
-          console.log(`[Orchestrator] 🔒 Revoking lease: ${leaseId} (system_cleanup)`);
-          accessManager.revokeLease(leaseId, 'system_cleanup');
+          addLog('Releasing Groq access lease...');
+
+          try {
+            accessManager.revokeLease(
+              leaseId,
+              'system_cleanup',
+            );
+
+            addLog('Groq access lease released.');
+          } catch (leaseError) {
+            addWarning(
+              `Could not explicitly revoke the Groq lease: ${getErrorMessage(leaseError)}`,
+            );
+          }
+
+          leaseId = null;
         }
       }
 
-      // 9. ვალიდაცია
-      if (!generatedContent.caption) {
-        throw new Error('AI did not return a "caption" in JSON response.');
-      }
+      // --------------------------------------------------------
+      // 7. Generate the image
+      // --------------------------------------------------------
 
-      const caption = generatedContent.caption;
-      const imagePrompt = generatedContent.image_prompt;
-      const hashtags = generatedContent.hashtags || [];
-      
-      const fullCaption = [caption, ...hashtags].filter(Boolean).join('\n\n');
-
-      console.log(`[Orchestrator] 📝 Caption length: ${caption.length} chars`);
-      
-      let imageResult: any = null;
-      let imageErrorLog: string | undefined = undefined;
-      let genLogs: string[] = []; // ✅ ინიციალიზაცია ლოგებისთვის
-
-      // 10. სურათის გენერაცია (თუ image_prompt არსებობს)
       if (imagePrompt) {
-        console.log(`[Orchestrator] 🎨 Image prompt detected. Requesting image generation from ImageGenerator...`);
-        console.log(`[Orchestrator] 🎨 Prompt preview: ${imagePrompt.substring(0, 100)}...`);
-        
-        imageResult = await imageGenerator.generateImage(imagePrompt, request.agentType);
-        genLogs = imageResult.generationLogs || []; // ✅ ვინახავთ ლოგებს ფრონტენდისთვის გადასაცემად
-        
-        if (imageResult.success) {
-          console.log(`[Orchestrator] ✅ Image generated successfully! Provider: ${imageResult.provider}`);
-        } else {
-          imageErrorLog = imageResult.error || 'Unknown image generation error';
-          console.warn(`[Orchestrator] ⚠️ Image generation FAILED. Error: ${imageErrorLog}. Falling back to text-only.`);
+        addLog('Starting image generation...');
+        addLog(
+          `Image prompt preview: ${imagePrompt.slice(0, 120)}`,
+        );
+
+        try {
+          const result =
+            await imageGenerator.generateImage(
+              imagePrompt,
+              request.agentType,
+            );
+
+          imageResult = result as ImageGenerationResult;
+
+          if (
+            imageResult.success &&
+            (imageResult.imageUrl || imageResult.imageBuffer)
+          ) {
+            imageProvider = imageResult.provider || 'unknown';
+
+            addLog(
+              `Image generated successfully using ${imageProvider}.`,
+            );
+          } else {
+            imageError =
+              imageResult.error ||
+              'Image generation failed or returned no image.';
+
+            addWarning(
+              `Image generation failed: ${imageError}`,
+            );
+
+            imageResult = null;
+          }
+
+          if (result.generationLogs?.length) {
+            generationLogs.push(...result.generationLogs);
+          }
+        } catch (error) {
+          imageError = getErrorMessage(error);
+
+          addWarning(
+            `Image generation threw an exception: ${imageError}`,
+          );
+
+          imageResult = null;
         }
       } else {
-        console.warn(`[Orchestrator] ⚠️ AI did NOT return an "image_prompt" key. Proceeding with text-only.`);
+        addWarning(
+          'No image_prompt was generated. Publishing text only.',
+        );
       }
 
-      // 11. გამოვაქვეყნოთ Telegram-ში
-      console.log(`[Orchestrator] 📤 Preparing to publish to Telegram...`);
-      let publishResult;
-      
-      if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
-        console.log(`[Orchestrator] 🖼️ Sending PHOTO with caption to Telegram...`);
-        publishResult = await sendTelegramPhoto({
-          caption: fullCaption,
-          imageUrl: imageResult.imageUrl,
-          imageBuffer: imageResult.imageBuffer,
-          parse_mode: 'HTML',
-        });
-      } else {
-        console.log(`[Orchestrator] 📝 Sending TEXT-ONLY message to Telegram (Fallback)...`);
-        publishResult = await sendTelegramMessage({
-          text: fullCaption,
-          parse_mode: 'HTML',
-        });
+      // --------------------------------------------------------
+      // 8. Prepare Telegram content
+      // --------------------------------------------------------
+
+      addLog('Preparing Telegram publication...');
+
+      const escapedCaption = escapeTelegramHtml(caption);
+
+      let publishedMessageId: number | undefined;
+      let publishedWithImage = false;
+
+      // --------------------------------------------------------
+      // 9. Try publishing the image
+      // --------------------------------------------------------
+
+      if (
+        imageResult?.success &&
+        (imageResult.imageUrl || imageResult.imageBuffer)
+      ) {
+        const captionChunks = splitTelegramText(
+          escapedCaption,
+          TELEGRAM_CAPTION_LIMIT,
+        );
+
+        const photoCaption = captionChunks[0] || '';
+
+        addLog('Attempting to publish a photo to Telegram...');
+
+        let photoResult: TelegramPublishResult;
+
+        try {
+          photoResult = await sendTelegramPhoto({
+            caption: photoCaption,
+            imageUrl: imageResult.imageUrl,
+            imageBuffer: imageResult.imageBuffer,
+            parse_mode: 'HTML',
+          }) as TelegramPublishResult;
+        } catch (error) {
+          photoResult = {
+            success: false,
+            error: getErrorMessage(error),
+          };
+        }
+
+        if (photoResult.success) {
+          publishedWithImage = true;
+          publishedMessageId = photoResult.messageId;
+
+          addLog('Photo published successfully.');
+
+          // Telegram photo captions have a smaller limit than messages.
+          // Send the remaining caption in additional text messages.
+          const remainingChunks = captionChunks.slice(1);
+
+          if (remainingChunks.length > 0) {
+            addLog(
+              `Caption exceeds the photo limit. Sending ${remainingChunks.length} additional text chunk(s).`,
+            );
+
+            for (const chunk of remainingChunks) {
+              try {
+                const continuationResult =
+                  await sendTelegramMessage({
+                    text: chunk,
+                    parse_mode: 'HTML',
+                  }) as TelegramPublishResult;
+
+                if (!continuationResult.success) {
+                  addWarning(
+                    `Photo was published, but a caption continuation failed: ${continuationResult.error || 'Unknown error'}`,
+                  );
+
+                  break;
+                }
+              } catch (error) {
+                addWarning(
+                  `Photo was published, but a caption continuation failed: ${getErrorMessage(error)}`,
+                );
+
+                break;
+              }
+            }
+          }
+        } else {
+          imageError =
+            photoResult.error ||
+            'Telegram rejected the photo publication.';
+
+          addWarning(
+            `Photo publication failed. Falling back to text: ${imageError}`,
+          );
+        }
       }
 
-      if (!publishResult.success) {
-        throw new Error(`Telegram publish failed: ${publishResult.error}`);
+      // --------------------------------------------------------
+      // 10. Text-only fallback
+      // --------------------------------------------------------
+
+      if (!publishedWithImage) {
+        addLog('Publishing Telegram text message(s)...');
+
+        const textChunks = splitTelegramText(
+          escapedCaption,
+          TELEGRAM_MESSAGE_LIMIT,
+        );
+
+        if (textChunks.length === 0) {
+          throw new Error(
+            'The generated Telegram caption is empty.',
+          );
+        }
+
+        for (let index = 0; index < textChunks.length; index++) {
+          const chunk = textChunks[index];
+
+          let messageResult: TelegramPublishResult;
+
+          try {
+            messageResult = await sendTelegramMessage({
+              text: chunk,
+              parse_mode: 'HTML',
+            }) as TelegramPublishResult;
+          } catch (error) {
+            throw new Error(
+              `Telegram message ${index + 1}/${textChunks.length} failed: ${getErrorMessage(error)}`,
+            );
+          }
+
+          if (!messageResult.success) {
+            throw new Error(
+              `Telegram message ${index + 1}/${textChunks.length} failed: ${messageResult.error || 'Unknown Telegram error'}`,
+            );
+          }
+
+          if (index === 0) {
+            publishedMessageId = messageResult.messageId;
+          }
+
+          addLog(
+            `Text message ${index + 1}/${textChunks.length} published successfully.`,
+          );
+        }
       }
 
-      console.log(`[Orchestrator] 🎉 Successfully published to Telegram! Message ID: ${publishResult.messageId}`);
+      // --------------------------------------------------------
+      // 11. Record publication in Supabase
+      // --------------------------------------------------------
 
-      // 12. დავაფიქსიროთ წარმატებული პუბლიკაცია ბაზაში სტატისტიკისთვის
-      console.log(`[Orchestrator] 💾 Logging publication to Supabase 'published_content' table...`);
-      try {
-        await supabase.from('published_content').insert({
+      addLog('Recording publication in Supabase...');
+
+      const { error: databaseError } = await supabase
+        .from('published_content')
+        .insert({
           agent_type: request.agentType,
           post_type: request.postType,
           platform: 'telegram',
-          content_text: fullCaption,
-          message_id: publishResult.messageId,
+          content_text: caption,
+          message_id: publishedMessageId,
           status: 'published',
           published_at: new Date().toISOString(),
         });
-        console.log(`[Orchestrator] ✅ Database log successful.`);
-      } catch (dbError) {
-        console.error('[Orchestrator] ⚠️ Failed to log to database:', dbError);
+
+      if (databaseError) {
+        // The post has already been published.
+        // Do not report the entire operation as failed merely
+        // because analytics logging could not be completed.
+        addWarning(
+          `Telegram publication succeeded, but Supabase logging failed: ${databaseError.message}`,
+        );
+      } else {
+        addLog('Publication recorded successfully.');
       }
 
-      console.log(`[Orchestrator] 🚀 ==========================================\n`);
+      // --------------------------------------------------------
+      // 12. Return structured result to the caller
+      // --------------------------------------------------------
 
-      // ✅ განახლებული return ობიექტი დეტალური ინფორმაციით
+      addLog('Generation and publication workflow completed.');
+      addLog('================================================');
+
       return {
         success: true,
-        messageId: publishResult.messageId,
-        caption: caption,
-        imageUrl: imageResult?.imageUrl,
-        hasImagePrompt: !!imagePrompt,
-        imageProvider: imageResult?.provider || 'none',
-        imageError: imageErrorLog,
-        generationLogs: genLogs, // ✅ ვაბრუნებთ ლოგებს ფრონტენდისთვის
+        messageId: publishedMessageId,
+        caption,
+        imageUrl: publishedWithImage
+          ? imageResult?.imageUrl
+          : undefined,
+        hasImagePrompt: Boolean(imagePrompt),
+        imageProvider: publishedWithImage
+          ? imageProvider
+          : 'none',
+        imageError,
+        generationLogs,
+        warnings,
       };
 
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`\n[Orchestrator] ❌ ==========================================`);
-      console.error(`[Orchestrator] ❌ CRITICAL ERROR:`, errorMsg);
-      console.error(`[Orchestrator] ❌ Stack:`, error instanceof Error ? error.stack : 'No stack trace');
-      console.error(`[Orchestrator] ❌ ==========================================\n`);
-      
+      const errorMessage = getErrorMessage(error);
+
+      logError('Generation/publication workflow failed.', {
+        agentType: request.agentType,
+        postType: request.postType,
+        error: errorMessage,
+      });
+
+      // Defensive cleanup if an error occurred outside the
+      // inner Groq generation block.
+      if (leaseId) {
+        try {
+          accessManager.revokeLease(
+            leaseId,
+            'system_cleanup',
+          );
+        } catch (leaseError) {
+          logError(
+            'Failed to release access lease during error cleanup.',
+            getErrorMessage(leaseError),
+          );
+        }
+      }
+
+      generationLogs.push(
+        `[${new Date().toISOString()}] ERROR: ${errorMessage}`,
+      );
+
       return {
         success: false,
-        error: errorMsg
+        error: errorMessage,
+        caption: caption || undefined,
+        hasImagePrompt: Boolean(imagePrompt),
+        imageProvider,
+        imageError,
+        generationLogs,
+        warnings,
       };
     }
   }
 }
 
-export const telegramOrchestrator = new TelegramOrchestrator();
+// ============================================================
+// SINGLETON
+// ============================================================
+
+export const telegramOrchestrator =
+  new TelegramOrchestrator();
