@@ -113,21 +113,6 @@ interface Agent {
   totalPosts: number;
 }
 
-interface ScheduleItem {
-  id: string;
-  day_of_week: number;
-  time: string;
-  content_category: string;
-  post_type: string;
-  content_type: string;
-  goal: string;
-  zodiac_sign: string | null;
-  content_theme: string | null;
-  is_active: boolean;
-  priority: number;
-  payload: any;
-}
-
 const TELEGRAM_AGENTS: Agent[] = [
   {
     id: 'tg-daily',
@@ -331,7 +316,7 @@ export default function TelegramAgentsPage() {
         .select('*')
         .eq('content_category', agentType)
         .eq('is_active', true)
-        .order('priority', { ascending: true }); // ✅ ვალაგებთ პრიორიტეტის მიხედვით
+        .order('priority', { ascending: true });
 
       if (error || !rules || rules.length === 0) {
         addAgentLog(`⚠️ ${agentType}-ისთვის აქტიური წესი ვერ მოიძებნა.`);
@@ -376,8 +361,7 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
       addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
       
-      // ✅ ახალი: დეტალური ლოგების გამოტანა სერვერიდან ფრონტენდზე
-      // .reverse() გამოიყენება იმისთვის, რომ ქრონოლოგიურად პირველი ნაბიჯი ქვემოთ იყოს, ბოლო კი ზემოთ
+      // ✅ დეტალური ლოგების გამოტანა სერვერიდან ფრონტენდზე
       if (result.generationLogs && result.generationLogs.length > 0) {
         result.generationLogs.slice().reverse().forEach((log: string) => {
           addAgentLog(log);
