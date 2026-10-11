@@ -19,7 +19,7 @@ export class ImageGenerator {
 
     await credentialVault.ready;
 
-    // ✅ პირდაპირ ვცდილობთ Cloudflare Workers AI-ს გამოყენებას, რადგან ვიცით, რომ მუშაობს!
+    // ✅ პირდაპირ ვცდილობთ Cloudflare Workers AI-ს გამოყენებას
     logs.push(`🔄 [1/1] ვცდილობთ Cloudflare Workers AI-ს...`);
     const cloudflareResult = await this.tryCloudflareAI(imagePrompt, agentType, logs);
     
@@ -43,13 +43,11 @@ export class ImageGenerator {
     agentType: string,
     logs: string[]
   ): Promise<ImageGenerationResult> {
-    // ვეძებთ cloudflare გასაღებს
     const cred = credentialVault.getCredentialByProvider('cloudflare', 'spend');
     if (!cred) {
       return { success: false, error: 'Cloudflare credential not found in vault', generationLogs: logs };
     }
 
-    // ვიღებთ Account ID-ს მეტამონაცემებიდან
     const accountId = cred.metadata?.accountId || 'b41cb921e1b841685c0f5d364f661fbe';
     logs.push(`📋 Cloudflare: ვიყენებ Account ID-ს: ${accountId}`);
 
@@ -64,11 +62,9 @@ export class ImageGenerator {
         return { success: false, error: 'Failed to decrypt Cloudflare API key', generationLogs: logs };
       }
 
-      // ✅ ვიყენებთ საუკეთესო და ყველაზე სწრაფ მოდელს
       const modelName = '@cf/black-forest-labs/flux-1-schnell';
       logs.push(`🤖 Cloudflare: ვიყენებ მოდელს: ${modelName}`);
 
-      // ✅ სწორი URL, რომელიც მოიცავს Account ID-ს შუაში
       const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
       logs.push(`📤 Cloudflare: ვგზავნი მოთხოვნას...`);
 
@@ -80,7 +76,7 @@ export class ImageGenerator {
         },
         body: JSON.stringify({
           prompt: imagePrompt,
-          steps: 4, // ოპტიმალური ბალანსი ხარისხსა და სისწრაფეს შორის
+          steps: 4,
           seed: Math.floor(Math.random() * 10000)
         })
       });
@@ -94,7 +90,6 @@ export class ImageGenerator {
 
       const data = await response.json();
 
-      // Cloudflare აბრუნებს base64 სურათს 'result.image' ან პირდაპირ 'image' ველში
       if (data.result?.image) {
         logs.push(`✅ Cloudflare: სურათი წარმატებით შეიქმნა!`);
         return {
