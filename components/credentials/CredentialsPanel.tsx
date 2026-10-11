@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
-import { testCredentialAction } from '@/app/actions/credential-actions'; // ✅ შეცვლილი იმპორტი
+import { testCredentialAction } from '@/app/actions/credential-actions';
 import type { PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
@@ -34,6 +34,8 @@ export function CredentialsPanel() {
   
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
+  // ✅ ახალი: ლოგების შესანახად თითოეული გასაღებისთვის
+  const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
 
   useEffect(() => {
@@ -180,21 +182,28 @@ export function CredentialsPanel() {
     }
   };
 
-  // ✅ განახლებული: იყენებს Server Action-ს CORS-ის თავიდან ასაცილებლად
+  // ✅ განახლებული: იღებს ლოგებს სერვერიდან და ინახავს სტეიტში
   const handleTestCredential = async (credentialId: string) => {
     setTestingId(credentialId);
+    setActiveLogs(prev => ({ ...prev, [credentialId]: [] })); // ლოგების გასუფთავება ტესტის დაწყებისას
+    
     try {
       const result = await testCredentialAction(credentialId);
       setTestResults(prev => ({ ...prev, [credentialId]: result }));
-      refreshData(); // განვაახლოთ სია, რომ ახალი მოდელები გამოჩნდეს
+      if (result.logs) {
+        setActiveLogs(prev => ({ ...prev, [credentialId]: result.logs }));
+      }
+      refreshData();
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setTestResults(prev => ({
         ...prev,
         [credentialId]: {
           success: false,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: errorMsg
         }
       }));
+      setActiveLogs(prev => ({ ...prev, [credentialId]: [...(prev[credentialId] || []), `[ERROR] ${errorMsg}`] }));
     } finally {
       setTestingId(null);
     }
@@ -240,7 +249,6 @@ export function CredentialsPanel() {
           <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-black text-white mb-4">Add New Credential</h3>
             <div className="space-y-4">
-              
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Custom Name (Optional)</label>
                 <input 
@@ -251,7 +259,6 @@ export function CredentialsPanel() {
                   placeholder="e.g., Cloudflare Workers AI"
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
                 <input 
@@ -273,7 +280,6 @@ export function CredentialsPanel() {
                   <option value="telegram" />
                 </datalist>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Associated Email</label>
                 <input 
@@ -284,7 +290,6 @@ export function CredentialsPanel() {
                   placeholder="account@example.com"
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
                 <select 
@@ -299,7 +304,6 @@ export function CredentialsPanel() {
                   <option value="read">read (Read-only access)</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Metadata (JSON)</label>
                 <textarea 
@@ -311,7 +315,6 @@ export function CredentialsPanel() {
                 />
                 <p className="text-[10px] text-slate-500 mt-1">Optional. Must be valid JSON format.</p>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">API Key / Secret</label>
                 <input 
@@ -322,7 +325,6 @@ export function CredentialsPanel() {
                   placeholder="Paste your API key here..."
                 />
               </div>
-
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => {
@@ -369,7 +371,6 @@ export function CredentialsPanel() {
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Platform / Provider</label>
                 <input 
@@ -379,7 +380,6 @@ export function CredentialsPanel() {
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Associated Email</label>
                 <input 
@@ -389,7 +389,6 @@ export function CredentialsPanel() {
                   className="w-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Permission Scope</label>
                 <select 
@@ -404,7 +403,6 @@ export function CredentialsPanel() {
                   <option value="read">read</option>
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">Metadata (JSON)</label>
                 <textarea 
@@ -415,7 +413,6 @@ export function CredentialsPanel() {
                   placeholder='{"accountId": "..."}'
                 />
               </div>
-
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase">New API Key / Secret</label>
                 <input 
@@ -428,7 +425,6 @@ export function CredentialsPanel() {
                 />
                 <p className="text-[10px] text-yellow-500 mt-1">⚠️ Required to save changes. Old key will be permanently replaced.</p>
               </div>
-
               <div className="flex gap-3 pt-2">
                 <button 
                   onClick={() => {
@@ -482,7 +478,7 @@ export function CredentialsPanel() {
         {/* Credentials List */}
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/50 p-6">
           <h3 className="text-lg font-bold text-white mb-4">Registered Credentials (Metadata Only)</h3>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!isVaultReady ? (
               <div className="flex items-center justify-center py-8">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent mr-3"></div>
@@ -494,6 +490,7 @@ export function CredentialsPanel() {
               credentials.map((cred: any) => {
                 const testResult = testResults[cred.credential_id];
                 const isTesting = testingId === cred.credential_id;
+                const logs = activeLogs[cred.credential_id] || [];
                 
                 return (
                   <div key={cred.credential_id} className="rounded-xl border border-white/5 bg-white/5 p-4">
@@ -548,25 +545,37 @@ export function CredentialsPanel() {
                       </div>
                     </div>
                     
-                    {testResult && (
+                    {/* ✅ ახალი: დეტალური ტერმინალის სტილის ლოგერი */}
+                    {logs.length > 0 && (
+                      <div className="mt-3 rounded-lg bg-black/60 border border-white/10 p-3 font-mono text-[11px] space-y-1 max-h-48 overflow-y-auto custom-scrollbar shadow-inner">
+                        {logs.map((log, i) => {
+                          let colorClass = 'text-slate-300';
+                          if (log.includes('[ERROR]')) colorClass = 'text-red-400';
+                          else if (log.includes('[SUCCESS]')) colorClass = 'text-emerald-400';
+                          else if (log.includes('[REQ]')) colorClass = 'text-blue-400';
+                          else if (log.includes('[RES]')) colorClass = 'text-yellow-400';
+                          
+                          return (
+                            <div key={i} className={`${colorClass} break-all`}>
+                              {log}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* ტესტის საბოლოო შედეგის ბანერი (ლოგერის ქვემოთ) */}
+                    {testResult && !isTesting && (
                       <div className={`mt-3 rounded-lg border p-3 ${
                         testResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
                       }`}>
                         {testResult.success ? (
-                          <>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-emerald-400 text-sm font-bold">✅ Test Successful</span>
-                              {testResult.latency && (
-                                <span className="text-xs text-slate-400">Latency: {testResult.latency}ms</span>
-                              )}
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-emerald-400 text-sm font-bold">✅ Test Successful</span>
                             {testResult.recommendedModel && (
-                              <div className="mb-3 p-2 rounded bg-white/5 border border-white/10">
-                                <div className="text-xs text-slate-400 mb-1">🎯 Auto-detected Model:</div>
-                                <div className="text-sm font-mono font-bold text-white">{testResult.recommendedModel}</div>
-                              </div>
+                              <span className="text-xs text-slate-400">| Model: <span className="text-white font-mono">{testResult.recommendedModel}</span></span>
                             )}
-                          </>
+                          </div>
                         ) : (
                           <div className="text-red-400 text-sm">❌ Test Failed: {testResult.error}</div>
                         )}
