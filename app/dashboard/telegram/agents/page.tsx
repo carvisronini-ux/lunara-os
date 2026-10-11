@@ -331,8 +331,7 @@ export default function TelegramAgentsPage() {
         .select('*')
         .eq('content_category', agentType)
         .eq('is_active', true)
-        .order('day_of_week', { ascending: true })
-        .order('time', { ascending: true });
+        .order('priority', { ascending: true }); // ✅ ვალაგებთ პრიორიტეტის მიხედვით
 
       if (error || !rules || rules.length === 0) {
         addAgentLog(`⚠️ ${agentType}-ისთვის აქტიური წესი ვერ მოიძებნა.`);
@@ -340,29 +339,10 @@ export default function TelegramAgentsPage() {
         return;
       }
 
-      const now = new Date();
-      const currentDayJs = now.getDay();
-      const currentDayCustom = currentDayJs === 0 ? 6 : currentDayJs - 1;
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const currentTimeVal = currentHour * 60 + currentMinute;
+      // ✅ "Run Now" ღილაკისთვის ვიღებთ პირველსავე აქტიურ წესს (დროის შეზღუდვის გარეშე), რათა დაუყოვნებლივ ვატესტოთ
+      const nextRule = rules[0];
 
-      const nextRule = rules.find((rule: ScheduleItem) => {
-        if (rule.day_of_week === currentDayCustom) {
-          const [h, m] = rule.time.split(':').map(Number);
-          const ruleTimeVal = h * 60 + m;
-          return ruleTimeVal <= currentTimeVal;
-        }
-        return false;
-      });
-
-      if (!nextRule) {
-        addAgentLog(`⏳ ${agentType}-ის დრო ჯერ არ მოსულა.`);
-        setIsChecking(false);
-        return;
-      }
-
-      addAgentLog(`🎯 წესი ნაპოვნია: ${nextRule.content_theme || nextRule.post_type}`);
+      addAgentLog(`🎯 წესი ნაპოვნია: ${nextRule.content_theme || nextRule.post_type} (მყისიერი გაშვება)`);
       addAgentLog(`🧠 იტვირთება ${agentType} კონფიგურაცია...`);
 
       const { data: config } = await supabase
