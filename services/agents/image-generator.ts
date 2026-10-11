@@ -19,7 +19,6 @@ export class ImageGenerator {
 
     await credentialVault.ready;
 
-    // ✅ პირდაპირ ვცდილობთ Cloudflare Workers AI-ს გამოყენებას
     logs.push(`🔄 [1/1] ვცდილობთ Cloudflare Workers AI-ს...`);
     const cloudflareResult = await this.tryCloudflareAI(imagePrompt, agentType, logs);
     
@@ -68,6 +67,7 @@ export class ImageGenerator {
       const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
       logs.push(`📤 Cloudflare: ვგზავნი მოთხოვნას...`);
 
+      // ✅ წაშლილია 'seed' პარამეტრი, რადგან Cloudflare-ის Flux მოდელი მას არ იღებს და იწვევს 400 შეცდომას
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -76,8 +76,7 @@ export class ImageGenerator {
         },
         body: JSON.stringify({
           prompt: imagePrompt,
-          steps: 4,
-          seed: Math.floor(Math.random() * 10000)
+          steps: 4
         })
       });
 
