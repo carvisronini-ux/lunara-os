@@ -54,9 +54,8 @@ const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
-// Telegram limits are measured after entity parsing.
 const TELEGRAM_MESSAGE_LIMIT = 3_800;
-const TELEGRAM_CAPTION_LIMIT = 950; // მკაცრი ლიმიტი ფოტოს caption-ისთვის
+const TELEGRAM_CAPTION_LIMIT = 950;
 const MAX_ERROR_LENGTH = 1_500;
 
 // ============================================================
@@ -185,7 +184,7 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 }
 
 /**
- * ✅ იდეალური პრომპტი: მკაცრი ლიმიტებით და კონტექსტზე მორგებული ფოტოს ფორმულით
+ * ✅ განახლებული: მკაცრი აკრძალვა ჰაშთაგების caption-ში ჩაწერაზე
  */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
@@ -197,27 +196,27 @@ Theme: ${request.contentTheme || 'Choose an appropriate theme for this category'
 Zodiac sign: ${request.zodiacSign || 'General / All signs'}
 
 CONTENT REQUIREMENTS (STRICT):
-- STRICT LENGTH LIMIT: Maximum 850 characters TOTAL (including hashtags). This is critical to fit in a single Telegram photo caption.
-- If listing all 12 zodiac signs, use ONLY 1 short, punchy sentence per sign (e.g., "♈ Aries: Simplify your routine today.").
+- STRICT LENGTH LIMIT: Maximum 800 characters for the caption text (hashtags will be added automatically, bringing total to ~850).
+- If listing all 12 zodiac signs, use ONLY 1 short, punchy sentence per sign.
 - Tone: Engaging, empathetic, mystical, natural-sounding.
 - Avoid repetitive, generic AI language, guaranteed predictions, or high-stakes promises.
 - Include a clear, natural call to action at the end.
+- CRITICAL: Do NOT include any hashtags inside the "caption" field. They will be added automatically by the system.
 
 IMAGE PROMPT REQUIREMENTS (STRICT & CONTEXT-AWARE):
 1. FIRST, analyze the core theme of the caption you are generating. 
-2. SECOND, translate THAT SPECIFIC THEME into a visual description. (e.g., If the post is about all 12 zodiac signs, the prompt MUST describe a visual representation of all 12 signs or a cosmic wheel. If it's about a specific sign, focus on that sign's symbol. If it's about tarot, describe a mystical card).
+2. SECOND, translate THAT SPECIFIC THEME into a visual description. (e.g., If the post is about all 12 zodiac signs, describe a cosmic wheel with 12 subtle symbols. If it's about tarot, describe a mystical card).
 3. THIRD, construct the "image_prompt" using EXACTLY this structure:
 "[Specific Subject related to post theme], [Background/Setting], [Lighting & Atmosphere], [Art Style/Medium]. NO text, NO typography, NO logos, NO watermarks, NO letters."
 
 EXAMPLES OF PERFECT IMAGE PROMPTS:
 - For a 12-sign post: "A beautiful cosmic wheel featuring subtle, elegant, glowing symbols of all 12 zodiac signs, deep purple velvet night sky background, soft milky white and gold ethereal glow, dark luxury editorial photography, 8k, highly detailed, photorealistic. NO text, NO letters."
 - For a Tarot post: "A single, glowing, ornate tarot card floating in a mystical void, deep midnight blue background, cinematic lighting, dark luxury aesthetic, 8k resolution. NO text, NO writing on the card."
-- For a specific sign (e.g., Leo): "A majestic, abstract golden lion constellation emerging from cosmic dust, deep indigo background, dramatic cinematic lighting, dark luxury editorial style, 8k, highly detailed. NO text, NO letters."
 
 OUTPUT REQUIREMENTS:
 Return ONLY a valid JSON object. Do not include Markdown fences or explanations.
 {
-  "caption": "The complete post text (max 850 chars total)",
+  "caption": "The complete post text WITHOUT ANY HASHTAGS (max 800 chars)",
   "image_prompt": "Detailed English prompt following the strict, context-aware formula above",
   "hashtags": ["#LUNARA", "#RelevantHashtag1", "#RelevantHashtag2"]
 }
@@ -376,10 +375,16 @@ export class TelegramOrchestrator {
         caption = generatedContent.caption;
         imagePrompt = generatedContent.image_prompt || '';
 
-        // ✅ ჰაშთაგები ერთ ხაზზე, space-ით გამოყოფილი
+        // ✅ გასწორებულია: ჰაშთაგების დუბლირების თავიდან აცილება
+        // 1. ვშლით ნებისმიერ ჰაშთაგს, რომელიც AI-მ შემთხვევით ჩაწერა caption-ის ბოლოში
+        const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
+        
+        // 2. ვაერთიანებთ სისტემურ ჰაშთაგებს ერთ ხაზზე
         const hashtags = generatedContent.hashtags || [];
         const hashtagsLine = hashtags.join(' ');
-        const fullCaption = hashtagsLine ? `${caption}\n\n${hashtagsLine}` : caption;
+        
+        // 3. ვაწყობთ საბოლოო ტექსტს
+        const fullCaption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
         caption = fullCaption;
 
         addLog(`Content generated successfully. Caption length: ${caption.length} characters.`);
@@ -457,7 +462,7 @@ export class TelegramOrchestrator {
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`Caption exceeds the photo limit (${TELEGRAM_CAPTION_LIMIT}). Sending ${remainingChunks.length} additional text chunk(s). AI should be prompted to write shorter captions.`);
+            addWarning(`Caption exceeds the photo limit (${TELEGRAM_CAPTION_LIMIT}). Sending ${remainingChunks.length} additional text chunk(s).`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
