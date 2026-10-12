@@ -109,14 +109,6 @@ function truncateError(message: string): string {
   return `${message.slice(0, MAX_ERROR_LENGTH)}...`;
 }
 
-// ✅ უსაფრთხოების ფუნქცია: გარდაქმნის < და > -ს, მაგრამ ტოვებს <b> და </b> ტეგებს
-function escapeTelegramHtmlPreservingBold(text: string): string {
-  return text
-    .replace(/&(?!amp;|lt;|gt;)/g, '&amp;') // Escape & but not already escaped ones
-    .replace(/<(?!\/?b>)/g, '&lt;')         // Escape < but not <b> or </b>
-    .replace(/>(?!)/g, '&gt;');             // Escape > 
-}
-
 function splitTelegramText(text: string, maxLength: number): string[] {
   if (!text) {
     return [];
@@ -290,10 +282,11 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       addLog('Loading job-specific instructions from agent_jobs...');
       let jobImageLogic = '';
+      let useAiImage = true; // ნაგულისხმევად ჩართულია
       
       const { data: jobData, error: jobError } = await supabase
         .from('agent_jobs')
-        .select('image_prompt_logic')
+        .select('image_prompt_logic, use_ai_image') // ✅ ვიღებთ ახალ ველსაც
         .eq('agent_type', request.agentType)
         .eq('post_type', request.postType)
         .single();
@@ -302,9 +295,10 @@ export class TelegramOrchestrator {
         addWarning(`⚠️ დავალების ინსტრუქციის წაკითხვის შეცდომა: ${jobError.message}`);
       }
 
-      if (jobData?.image_prompt_logic) {
-        jobImageLogic = jobData.image_prompt_logic;
-        addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
+      if (jobData) {
+        jobImageLogic = jobData.image_prompt_logic || '';
+        useAiImage = jobData.use_ai_image ?? true; // ✅ ვკითხულობთ თაგლის მდგომარეობას
+        addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType} (AI Image: ${useAiImage ? 'ON' : 'OFF'})`);
       } else {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
@@ -451,14 +445,12 @@ export class TelegramOrchestrator {
       }
 
       // ============================================================
-      // ✅ 5. IMAGE GENERATION LOGIC (WITH STATIC RANDOM FALLBACK)
+      // ✅ 5. IMAGE GENERATION LOGIC (WITH TOGGLE SWITCH SUPPORT)
       // ============================================================
       
-      // შევამოწმოთ "თაგლი"
-      const useStaticFallback = request.postType === 'daily_horoscope_12_signs' && jobImageLogic?.trim().toUpperCase() === 'STATIC_RANDOM';
-
-      if (useStaticFallback) {
-        addLog('🖼️ აქტიურებულია STATIC_RANDOM თაგლი. AI გენერაცია გამოტოვებულია.');
+      if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
+        // 🔴 ღილაკი გამორთულია: ვიყენებთ სტატიკურ სურათს
+        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებთ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
         addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
         
@@ -469,7 +461,8 @@ export class TelegramOrchestrator {
         } as ImgGenResult;
         imageProvider = 'static_fallback';
       } else if (imagePrompt) {
-        addLog('Starting AI image generation...');
+        // 🟢 ღილაკი ჩართულია: ვიყენებთ AI-ს
+        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას...');
         addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
         try {
