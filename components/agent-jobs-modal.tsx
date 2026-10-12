@@ -626,6 +626,7 @@ export default function AgentJobsModal({
                     <button
                       type="button"
                       onClick={() => {
+                        if (!selectedJobId) return;
                         const job = agentJobs.find((j) => j.id === selectedJobId);
                         if (job) {
                           void saveJob(selectedJobId, "description", job.description || "");
