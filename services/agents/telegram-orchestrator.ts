@@ -49,13 +49,13 @@ interface TelegramPublishResult {
 // CONSTANTS
 // ============================================================
 
-const DEFAULT_TEXT_PROVIDER = 'groq'; // Fallback provider name
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_TEXT_PROVIDER = 'groq'; 
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'; // მხოლოდ უკიდურესი fallback-ისთვის
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
 const TELEGRAM_MESSAGE_LIMIT = 3_800;
-const TELEGRAM_CAPTION_LIMIT = 950; // Safe limit for photo captions (hard limit is 1024)
+const TELEGRAM_CAPTION_LIMIT = 950; 
 const MAX_ERROR_LENGTH = 1_500;
 
 // ============================================================
@@ -182,16 +182,23 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 }
 
 /**
- * ✅ მხოლოდ დინამიური პარამეტრების გადაცემა.
- * ყველა სტატიკური წესი, სტილი და შეზღუდვა მოდის Supabase-დან (systemPrompt).
+ * ✅ 100% დინამიური და კონტექსტზე ორიენტირებული პრომპტი.
+ * არ შეიცავს ჰარდკოდირებულ სცენარებს. აიძულებს AI-ს, გააანალიზოს შინაარსი და შექმნას მასთან ასოცირებული ვიზუალი.
  */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
 Request Parameters:
 - Agent Type: ${request.agentType}
 - Post Type: ${request.postType}
-- Content Theme: ${request.contentTheme || 'Automatic (choose an appropriate theme)'}
+- Content Theme: ${request.contentTheme || 'Automatic'}
 - Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
+
+CRITICAL INSTRUCTION FOR IMAGE PROMPT GENERATION:
+1. ANALYZE: Before writing the "image_prompt", analyze the core context and create a mental short summary of the post you are generating.
+2. ASSOCIATE: The "image_prompt" MUST be semantically close and visually associated with this specific post's theme. 
+3. AVOID GENERIC IMAGERY: DO NOT use generic, disconnected, or random visuals. Translate the post's central concept into a concrete, elegant visual subject.
+4. AESTHETIC: Apply the LUNARA "dark-luxury cosmic editorial" aesthetic (midnight black, deep indigo, moonlit silver, elegant geometry, cinematic lighting, 4:5 vertical composition).
+5. RESTRICTIONS: You MUST explicitly end the image prompt with: "NO text, NO typography, NO letters, NO logos, NO watermarks".
 
 Generate the content strictly following the system instructions provided above.
 `.trim();
@@ -312,7 +319,7 @@ export class TelegramOrchestrator {
           'Never expose internal reasoning.',
         ].join('\n');
 
-        // ✅ USER PROMPT: Only dynamic request parameters
+        // ✅ USER PROMPT: Only dynamic request parameters + Context-aware image rule
         const userPrompt = buildUserPrompt(request);
         
         addLog('Sending content-generation request...');
@@ -362,14 +369,9 @@ export class TelegramOrchestrator {
         imagePrompt = generatedContent.image_prompt || '';
 
         // ✅ HASHTAG DEDUPLICATION & FORMATTING
-        // 1. Remove any hashtags the AI might have accidentally placed at the end of the caption
         const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
-        
-        // 2. Join system hashtags into a single line
         const hashtags = generatedContent.hashtags || [];
         const hashtagsLine = hashtags.join(' ');
-        
-        // 3. Assemble final caption
         const fullCaption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
         caption = fullCaption;
 
