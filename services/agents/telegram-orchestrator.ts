@@ -50,7 +50,7 @@ interface TelegramPublishResult {
 // ============================================================
 
 const DEFAULT_TEXT_PROVIDER = 'groq'; 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'; // მხოლოდ უკიდურესი fallback-ისთვის
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'; 
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
@@ -182,8 +182,8 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 }
 
 /**
- * ✅ 100% დინამიური და კონტექსტზე ორიენტირებული პრომპტი.
- * არ შეიცავს ჰარდკოდირებულ სცენარებს. აიძულებს AI-ს, გააანალიზოს შინაარსი და შექმნას მასთან ასოცირებული ვიზუალი.
+ * ✅ მხოლოდ დინამიური პარამეტრების გადაცემა.
+ * ყველა სტატიკური წესი, სტილი და შეზღუდვა მოდის Supabase-დან (systemPrompt).
  */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
@@ -192,13 +192,6 @@ Request Parameters:
 - Post Type: ${request.postType}
 - Content Theme: ${request.contentTheme || 'Automatic'}
 - Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
-
-CRITICAL INSTRUCTION FOR IMAGE PROMPT GENERATION:
-1. ANALYZE: Before writing the "image_prompt", analyze the core context and create a mental short summary of the post you are generating.
-2. ASSOCIATE: The "image_prompt" MUST be semantically close and visually associated with this specific post's theme. 
-3. AVOID GENERIC IMAGERY: DO NOT use generic, disconnected, or random visuals. Translate the post's central concept into a concrete, elegant visual subject.
-4. AESTHETIC: Apply the LUNARA "dark-luxury cosmic editorial" aesthetic (midnight black, deep indigo, moonlit silver, elegant geometry, cinematic lighting, 4:5 vertical composition).
-5. RESTRICTIONS: You MUST explicitly end the image prompt with: "NO text, NO typography, NO letters, NO logos, NO watermarks".
 
 Generate the content strictly following the system instructions provided above.
 `.trim();
@@ -262,14 +255,38 @@ export class TelegramOrchestrator {
       addLog('Agent configuration loaded successfully.');
 
       // --------------------------------------------------------
-      // 2. Wait for Credential Vault
+      // 2. Load Job-Specific Instructions (NEW!)
+      // --------------------------------------------------------
+      addLog('Loading job-specific instructions from agent_jobs...');
+      let jobImageLogic = '';
+      
+      const { data: jobData, error: jobError } = await supabase
+        .from('agent_jobs')
+        .select('image_prompt_logic')
+        .eq('agent_type', request.agentType)
+        .eq('post_type', request.postType)
+        .single();
+
+      if (jobError && jobError.code !== 'PGRST116') {
+        addWarning(`⚠️ დავალების ინსტრუქციის წაკითხვის შეცდომა: ${jobError.message}`);
+      }
+
+      if (jobData?.image_prompt_logic) {
+        jobImageLogic = jobData.image_prompt_logic;
+        addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
+      } else {
+        addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის. გამოიყენება ზოგადი წესები.`);
+      }
+
+      // --------------------------------------------------------
+      // 3. Wait for Credential Vault
       // --------------------------------------------------------
       addLog('Waiting for CredentialVault initialization...');
       await credentialVault.ready;
       addLog('CredentialVault is ready.');
 
       // --------------------------------------------------------
-      // 3. Acquire temporary access lease for Text Generation
+      // 4. Acquire temporary access lease for Text Generation
       // --------------------------------------------------------
       addLog(`Requesting temporary access lease for ${DEFAULT_TEXT_PROVIDER}...`);
       leaseId = accessManager.requestAccess(
@@ -304,7 +321,7 @@ export class TelegramOrchestrator {
         addLog(`Using model: ${targetModel} (from metadata or fallback)`);
         addLog('Building generation prompts...');
 
-        // ✅ SYSTEM PROMPT: 100% driven by database configuration
+        // ✅ SYSTEM PROMPT: 100% driven by database configuration + JOB INSTRUCTIONS
         const systemPrompt = [
           config.master_prompt,
           '',
@@ -314,12 +331,15 @@ export class TelegramOrchestrator {
           'SKILLS & CONSTRAINTS:',
           config.skills_constraints || 'Follow the agent instructions and brand guidelines.',
           '',
+          'JOB-SPECIFIC IMAGE INSTRUCTIONS:',
+          jobImageLogic || 'Follow general LUNARA visual guidelines.',
+          '',
           'OUTPUT FORMAT:',
           'Return only a valid JSON object with caption, image_prompt and hashtags.',
           'Never expose internal reasoning.',
         ].join('\n');
 
-        // ✅ USER PROMPT: Only dynamic request parameters + Context-aware image rule
+        // ✅ USER PROMPT: Only dynamic request parameters
         const userPrompt = buildUserPrompt(request);
         
         addLog('Sending content-generation request...');
@@ -384,7 +404,7 @@ export class TelegramOrchestrator {
 
       } finally {
         // ------------------------------------------------------
-        // 4. Always release the temporary access lease
+        // 5. Always release the temporary access lease
         // ------------------------------------------------------
         if (leaseId) {
           addLog(`Releasing ${DEFAULT_TEXT_PROVIDER} access lease...`);
@@ -399,7 +419,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 5. Generate the image
+      // 6. Generate the image
       // --------------------------------------------------------
       if (imagePrompt) {
         addLog('Starting image generation...');
@@ -431,7 +451,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 6. Prepare Telegram content
+      // 7. Prepare Telegram content
       // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
       const escapedCaption = escapeTelegramHtml(caption);
@@ -440,7 +460,7 @@ export class TelegramOrchestrator {
       let publishedWithImage = false;
 
       // --------------------------------------------------------
-      // 7. Try publishing the image
+      // 8. Try publishing the image
       // --------------------------------------------------------
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
@@ -492,7 +512,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 8. Text-only fallback
+      // 9. Text-only fallback
       // --------------------------------------------------------
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
@@ -527,7 +547,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 9. Record publication in Supabase
+      // 10. Record publication in Supabase
       // --------------------------------------------------------
       addLog('Recording publication in Supabase...');
       const { error: databaseError } = await supabase.from('published_content').insert({
@@ -547,7 +567,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 10. Return structured result
+      // 11. Return structured result
       // --------------------------------------------------------
       addLog('Generation and publication workflow completed.');
       addLog('================================================');
