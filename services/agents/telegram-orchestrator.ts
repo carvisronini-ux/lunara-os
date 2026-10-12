@@ -181,10 +181,6 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
   };
 }
 
-/**
- * ✅ მხოლოდ დინამიური პარამეტრების გადაცემა.
- * ყველა სტატიკური წესი, სტილი და შეზღუდვა მოდის Supabase-დან (systemPrompt).
- */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
 Request Parameters:
@@ -358,7 +354,7 @@ export class TelegramOrchestrator {
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
               ],
-              temperature: 0.3 // ✅ შემცირებულია ზუსტი ფორმატირებისთვის
+              temperature: 0.3 // ✅ დაბალი ტემპერატურა ზუსტი ფორმატირებისთვის
             }),
             signal: controller.signal,
           });
@@ -382,10 +378,11 @@ export class TelegramOrchestrator {
         addLog('Response received. Validating generated JSON...');
         const generatedContent = parseGeneratedContent(rawContent);
 
-        caption = generatedContent.caption;
+        // ✅ ნაბიჯი 1: ჯერ ვაცუროთ (escape) მთლიანი ტექსტი, რათა AI-ის მიერ გენერირებულმა < > სიმბოლოებმა არ დაარღვიოს Telegram HTML
+        let safeCaption = escapeTelegramHtml(generatedContent.caption);
         imagePrompt = generatedContent.image_prompt || '';
 
-        // ✅ AUTO-FORMAT: Ensure zodiac signs have emojis and bold formatting
+        // ✅ ნაბიჯი 2: ახლა, როცა ტექსტი უსაფრთხოა, პირდაპირ ვსვამთ <b> ტეგებს (რადგან ეს ახლა მოხდა, ისინი არ გაესკეიპება)
         if (request.postType === 'daily_horoscope_12_signs') {
           const zodiacMap = [
             { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
@@ -397,24 +394,21 @@ export class TelegramOrchestrator {
           ];
 
           zodiacMap.forEach(({ name, emoji }) => {
-            // Match the sign name followed by a colon, with optional existing emoji or asterisks
+            // ემთხვევა სახელს, ოფციონალურ ემოჯის, ოფციონალურ ვარსკვლავებს (**) და ორწერტილს
             const regex = new RegExp(`(^|\\n)\\s*(?:${emoji}\\s*)?\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
-            caption = caption.replace(regex, `$1${emoji} **${name}**:`);
+            // პირდაპირ ვსვამთ <b> ტეგს, რომელიც უკვე უსაფრთხო გარემოშია
+            safeCaption = safeCaption.replace(regex, `$1${emoji} <b>${name}</b>:`);
           });
 
-          // ✅ ახალი ხაზი: Markdown ბოლდის (**text**) HTML ბოლდში (<b>text</b>) გადაყვანა Telegram-ისთვის
-          caption = caption.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-
-          // Remove trailing emojis or random symbols at the very end of the caption (preserve hashtags)
-          caption = caption.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+          // ბოლოში ზედმეტი ემოჯების/სიმბოლოების მოშორება (ჰეშთეგების შენარჩუნებით)
+          safeCaption = safeCaption.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
         }
 
-        // ✅ HASHTAG DEDUPLICATION & FORMATTING
-        const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
+        // ✅ ნაბიჯი 3: ჰეშთეგების ფორმატირება
+        const cleanCaption = safeCaption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
         const hashtags = generatedContent.hashtags || [];
         const hashtagsLine = hashtags.join(' ');
-        const fullCaption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
-        caption = fullCaption;
+        caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
 
         // ✅ CRITICAL LENGTH CHECK
         if (caption.length > TELEGRAM_CAPTION_LIMIT) {
@@ -475,7 +469,8 @@ export class TelegramOrchestrator {
       // 7. Prepare Telegram content
       // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
-      const escapedCaption = escapeTelegramHtml(caption);
+      // აქ caption უკვე შეიცავს უსაფრთხო <b> ტეგებს, ამიტომ escapeTelegramHtml-ს ხელახლა არ ვუშვებთ მთლიან სტრიქონზე
+      const escapedCaption = caption; 
 
       let publishedMessageId: number | undefined;
       let publishedWithImage = false;
