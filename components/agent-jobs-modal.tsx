@@ -1,6 +1,12 @@
+// /home/carvisronini-ux/lunara-os/components/agent-jobs-modal.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -26,14 +32,100 @@ interface AgentJobsModalProps {
   onLog: (msg: string) => void;
 }
 
-const JOB_POSITIONS = [
-  { x: 166, y: 100 },
-  { x: 833, y: 100 },
-  { x: 166, y: 300 },
-  { x: 833, y: 300 },
-  { x: 166, y: 500 },
-  { x: 833, y: 500 },
-];
+type EditableField = "description" | "image_prompt_logic";
+
+interface JobStyle {
+  icon: string;
+  accent: string;
+  soft: string;
+  border: string;
+  label: string;
+}
+
+const getJobStyle = (postType: string): JobStyle => {
+  switch (postType) {
+    case "daily_energy":
+      return {
+        icon: "☀️",
+        accent: "#F6BD60",
+        soft: "rgba(246,189,96,.12)",
+        border: "rgba(246,189,96,.30)",
+        label: "დღის ენერგია",
+      };
+
+    case "daily_horoscope_12_signs":
+      return {
+        icon: "♈",
+        accent: "#B9A2FF",
+        soft: "rgba(185,162,255,.12)",
+        border: "rgba(185,162,255,.30)",
+        label: "12 ნიშნის ჰოროსკოპი",
+      };
+
+    case "daily_horoscope_single":
+      return {
+        icon: "✦",
+        accent: "#7DCBFF",
+        soft: "rgba(125,203,255,.12)",
+        border: "rgba(125,203,255,.30)",
+        label: "ერთი ნიშნის ჰოროსკოპი",
+      };
+
+    case "daily_tarot_card":
+      return {
+        icon: "✧",
+        accent: "#F3A6D5",
+        soft: "rgba(243,166,213,.12)",
+        border: "rgba(243,166,213,.30)",
+        label: "ტაროს ბარათი",
+      };
+
+    case "morning_question":
+      return {
+        icon: "🌅",
+        accent: "#75D9B0",
+        soft: "rgba(117,217,176,.12)",
+        border: "rgba(117,217,176,.30)",
+        label: "დილის კითხვა",
+      };
+
+    case "evening_reflection":
+      return {
+        icon: "🌙",
+        accent: "#B9B8FF",
+        soft: "rgba(185,184,255,.12)",
+        border: "rgba(185,184,255,.30)",
+        label: "საღამოს რეფლექსია",
+      };
+
+    case "weekly_start_message":
+      return {
+        icon: "✦",
+        accent: "#84B9FF",
+        soft: "rgba(132,185,255,.12)",
+        border: "rgba(132,185,255,.30)",
+        label: "კვირის დასაწყისი",
+      };
+
+    case "monthly_start_themes":
+      return {
+        icon: "🌌",
+        accent: "#D0A7FF",
+        soft: "rgba(208,167,255,.12)",
+        border: "rgba(208,167,255,.30)",
+        label: "თვის თემები",
+      };
+
+    default:
+      return {
+        icon: "✧",
+        accent: "#C5C9D8",
+        soft: "rgba(197,201,216,.10)",
+        border: "rgba(197,201,216,.25)",
+        label: postType.replace(/_/g, " "),
+      };
+  }
+};
 
 export default function AgentJobsModal({
   agentType,
@@ -45,32 +137,166 @@ export default function AgentJobsModal({
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [isSavingJob, setIsSavingJob] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadAgentJobs = useCallback(async () => {
-    setIsLoading(true);
+  // Keep the latest logger without making the data-loading effect rerun.
+  const onLogRef = useRef(onLog);
 
-    const { data, error } = await supabase
-      .from("agent_jobs")
-      .select("*")
-      .eq("agent_type", agentType)
-      .order("created_at", { ascending: true });
+  // Prevent stale requests from overwriting newer data.
+  const requestIdRef = useRef(0);
 
-    if (error) {
-      onLog(`❌ დავალებების ჩატვირთვის შეცდომა: ${error.message}`);
-    } else {
-      setAgentJobs((data || []) as AgentJob[]);
-      onLog(`✅ ${agentType}-ის დავალებები ჩაიტვირთა`);
-    }
-
-    setIsLoading(false);
-  }, [agentType, onLog]);
+  // Track which field is currently being saved.
+  const savingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (isOpen && agentType) {
+    onLogRef.current = onLog;
+  }, [onLog]);
+
+  const loadAgentJobs = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const { data, error } = await supabase
+        .from("agent_jobs")
+        .select("*")
+        .eq("agent_type", agentType)
+        .order("created_at", { ascending: true });
+
+      // Ignore the result if a newer request has started.
+      if (requestId !== requestIdRef.current) return;
+
+      if (error) {
+        console.error("[AgentJobsModal] Supabase error:", error);
+
+        setLoadError(
+          `დავალებების ჩატვირთვა ვერ მოხერხდა: ${error.message}`
+        );
+
+        onLogRef.current(
+          `❌ ${agentType}-ის დავალებების ჩატვირთვის შეცდომა: ${error.message}`
+        );
+
+        return;
+      }
+
+      const jobs = (data || []) as AgentJob[];
+
+      setAgentJobs(jobs);
       setSelectedJobId(null);
-      void loadAgentJobs();
+
+      onLogRef.current(
+        `✅ ${agentType}-ის დავალებები ჩაიტვირთა (${jobs.length})`
+      );
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "უცნობი ქსელური შეცდომა";
+
+      console.error("[AgentJobsModal] Unexpected error:", error);
+
+      setLoadError(`მოულოდნელი შეცდომა: ${message}`);
+
+      onLogRef.current(
+        `❌ დავალებების ჩატვირთვის შეცდომა: ${message}`
+      );
+    } finally {
+      // Only the latest request can end the loading state.
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
+  }, [agentType]);
+
+  // This effect depends on a stable loader.
+  // Changing the parent's onLog callback will not trigger another request.
+  useEffect(() => {
+    if (!isOpen || !agentType) return;
+
+    void loadAgentJobs();
+
+    return () => {
+      // Invalidate requests still running after close or agent change.
+      requestIdRef.current += 1;
+    };
   }, [isOpen, agentType, loadAgentJobs]);
+
+  const saveJob = useCallback(
+    async (
+      jobId: string,
+      field: EditableField,
+      value: string
+    ) => {
+      const saveKey = `${jobId}:${field}`;
+
+      if (savingRef.current.has(saveKey)) return;
+
+      savingRef.current.add(saveKey);
+      setIsSavingJob(jobId);
+
+      try {
+        const { error } = await supabase
+          .from("agent_jobs")
+          .update({ [field]: value })
+          .eq("id", jobId);
+
+        if (error) {
+          console.error("[AgentJobsModal] Save error:", error);
+
+          onLogRef.current(
+            `❌ დავალების შენახვის შეცდომა: ${error.message}`
+          );
+
+          return;
+        }
+
+        setAgentJobs((previous) =>
+          previous.map((job) =>
+            job.id === jobId
+              ? { ...job, [field]: value }
+              : job
+          )
+        );
+
+        onLogRef.current(
+          `✅ "${field === "description" ? "აღწერა" : "ფოტოს გენერაციის ლოგიკა"}" შენახულია`
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "უცნობი შეცდომა";
+
+        console.error("[AgentJobsModal] Save exception:", error);
+
+        onLogRef.current(
+          `❌ დავალების შენახვის შეცდომა: ${message}`
+        );
+      } finally {
+        savingRef.current.delete(saveKey);
+
+        setIsSavingJob((current) =>
+          current === jobId ? null : current
+        );
+      }
+    },
+    []
+  );
+
+  const selectedJob = agentJobs.find(
+    (job) => job.id === selectedJobId
+  );
+
+  const isEditing = Boolean(selectedJob);
+
+  const closeModal = useCallback(() => {
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -80,122 +306,38 @@ export default function AgentJobsModal({
         if (selectedJobId) {
           setSelectedJobId(null);
         } else {
-          onClose();
+          closeModal();
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, selectedJobId, onClose]);
 
-  const saveJob = async (
-    jobId: string,
-    field: "description" | "image_prompt_logic",
-    value: string
-  ) => {
-    setIsSavingJob(jobId);
-
-    const { error } = await supabase
-      .from("agent_jobs")
-      .update({ [field]: value })
-      .eq("id", jobId);
-
-    if (error) {
-      onLog(`❌ დავალების შენახვის შეცდომა: ${error.message}`);
-    } else {
-      setAgentJobs((prev) =>
-        prev.map((job) =>
-          job.id === jobId ? { ...job, [field]: value } : job
-        )
-      );
-      onLog("✅ დავალება წარმატებით შეინახა!");
-    }
-
-    setIsSavingJob(null);
-  };
-
-  const selectedJob = agentJobs.find((job) => job.id === selectedJobId);
-
-  const getJobStyle = (postType: string) => {
-    switch (postType) {
-      case "daily_energy":
-        return {
-          icon: "☀️",
-          accent: "#F6BD60",
-          soft: "rgba(246,189,96,.12)",
-          border: "rgba(246,189,96,.3)",
-          label: "დღის ენერგია",
-        };
-      case "daily_horoscope_12_signs":
-        return {
-          icon: "♈",
-          accent: "#B9A2FF",
-          soft: "rgba(185,162,255,.12)",
-          border: "rgba(185,162,255,.3)",
-          label: "12 ნიშნის ჰოროსკოპი",
-        };
-      case "daily_horoscope_single":
-        return {
-          icon: "✦",
-          accent: "#7DCBFF",
-          soft: "rgba(125,203,255,.12)",
-          border: "rgba(125,203,255,.3)",
-          label: "ერთი ნიშნის ჰოროსკოპი",
-        };
-      case "daily_tarot_card":
-        return {
-          icon: "🃏",
-          accent: "#F3A6D5",
-          soft: "rgba(243,166,213,.12)",
-          border: "rgba(243,166,213,.3)",
-          label: "ტაროს ბარათი",
-        };
-      case "morning_question":
-        return {
-          icon: "🌅",
-          accent: "#75D9B0",
-          soft: "rgba(117,217,176,.12)",
-          border: "rgba(117,217,176,.3)",
-          label: "დილის კითხვა",
-        };
-      case "evening_reflection":
-        return {
-          icon: "🌙",
-          accent: "#B9B8FF",
-          soft: "rgba(185,184,255,.12)",
-          border: "rgba(185,184,255,.3)",
-          label: "საღამოს რეფლექსია",
-        };
-      default:
-        return {
-          icon: "✧",
-          accent: "#C5C9D8",
-          soft: "rgba(197,201,216,.1)",
-          border: "rgba(197,201,216,.25)",
-          label: postType.replace(/_/g, " "),
-        };
-    }
-  };
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, selectedJobId, closeModal]);
 
   if (!isOpen) return null;
 
   const agentName = agentType.replace(/_/g, " ");
-  const isEditing = Boolean(selectedJobId && selectedJob);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#05050a]/80 p-2 backdrop-blur-xl sm:p-5"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#05050a]/85 p-2 backdrop-blur-xl sm:p-5"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          closeModal();
+        }
+      }}
     >
       <section
         role="dialog"
         aria-modal="true"
         aria-label="აგენტის დავალებების მართვა"
-        onClick={(event) => event.stopPropagation()}
-        className="relative flex max-h-[96dvh] w-full max-w-[1120px] flex-col overflow-hidden rounded-[24px] border border-white/[0.09] bg-[#0d0d17] shadow-[0_30px_120px_rgba(0,0,0,.65)] sm:rounded-[28px]"
+        className="relative flex max-h-[96dvh] w-full max-w-[1120px] flex-col overflow-hidden rounded-[22px] border border-white/[0.09] bg-[#0d0d17] shadow-[0_30px_120px_rgba(0,0,0,.65)] sm:rounded-[28px]"
       >
-        {/* Subtle ambient background */}
+        {/* Ambient background */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -right-32 -top-40 h-80 w-80 rounded-full bg-violet-500/[0.09] blur-[100px]" />
           <div className="absolute -bottom-40 -left-32 h-80 w-80 rounded-full bg-amber-400/[0.05] blur-[100px]" />
@@ -204,25 +346,28 @@ export default function AgentJobsModal({
         {/* Header */}
         <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.07] px-4 py-4 sm:px-7 sm:py-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] border border-violet-300/20 bg-violet-400/[0.12] text-lg text-violet-200">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] border border-violet-300/20 bg-violet-400/[0.12] text-xl text-violet-200">
               {isEditing ? "✎" : "✧"}
             </div>
 
             <div className="min-w-0">
               <h2 className="truncate text-base font-semibold tracking-tight text-white sm:text-lg">
-                {isEditing ? "დავალების რედაქტირება" : "აგენტის სამუშაო სქემა"}
+                {isEditing
+                  ? "დავალების რედაქტირება"
+                  : "აგენტის სამუშაო სქემა"}
               </h2>
+
               <p className="mt-1 truncate text-[11px] text-white/40 sm:text-xs">
                 {isEditing
                   ? "ინსტრუქციები და გენერაციის ლოგიკა"
-                  : `${agentName} · სამუშაოების კავშირი`}
+                  : `${agentName} · სამუშაოების მართვა`}
               </p>
             </div>
           </div>
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeModal}
             aria-label="დახურვა"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/50 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
           >
@@ -243,21 +388,64 @@ export default function AgentJobsModal({
         {/* Main content */}
         <main className="relative z-10 min-h-0 flex-1 overflow-y-auto p-3 sm:p-6">
           {isLoading ? (
-            <div className="flex min-h-[420px] flex-col items-center justify-center gap-4">
-              <div className="h-9 w-9 animate-spin rounded-full border-2 border-violet-300/15 border-t-violet-300" />
-              <p className="text-sm text-white/45">დავალებები იტვირთება...</p>
+            <div className="flex min-h-[360px] flex-col items-center justify-center gap-4">
+              <div className="relative flex h-12 w-12 items-center justify-center">
+                <div className="absolute inset-0 animate-spin rounded-full border-2 border-violet-300/15 border-t-violet-300" />
+                <span className="text-lg text-violet-200">✧</span>
+              </div>
+
+              <p className="text-sm text-white/65">
+                დავალებები იტვირთება...
+              </p>
+
+              <p className="text-xs text-white/30">
+                Supabase-თან კავშირი
+              </p>
+            </div>
+          ) : loadError ? (
+            /* Error state */
+            <div className="flex min-h-[360px] flex-col items-center justify-center px-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-300/15 bg-rose-400/[0.08] text-2xl text-rose-300">
+                !
+              </div>
+
+              <h3 className="mt-4 text-base font-semibold text-white">
+                ჩატვირთვა ვერ მოხერხდა
+              </h3>
+
+              <p className="mt-2 max-w-md break-words text-sm leading-6 text-white/50">
+                {loadError}
+              </p>
+
+              <p className="mt-2 max-w-md text-xs leading-5 text-white/35">
+                შეამოწმე Supabase-ის გარემოს ცვლადები, ცხრილის
+                არსებობა და წვდომის (RLS) პოლიტიკა.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => void loadAgentJobs()}
+                className="mt-5 rounded-xl border border-violet-300/20 bg-violet-400/[0.12] px-5 py-2.5 text-sm font-medium text-violet-100 transition hover:bg-violet-400/[0.2]"
+              >
+                ხელახლა ცდა
+              </button>
             </div>
           ) : agentJobs.length === 0 ? (
-            <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
+            /* Empty state */
+            <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-3xl text-white/50">
                 ✧
               </div>
+
               <h3 className="text-base font-semibold text-white/85">
-                დავალებები ჯერ არ არის
+                დავალებები ვერ მოიძებნა
               </h3>
+
               <p className="mt-2 max-w-sm text-sm leading-6 text-white/40">
-                ამ აგენტისთვის `agent_jobs` ცხრილში დავალებები ვერ მოიძებნა.
+                ამ აგენტისთვის `agent_jobs` ცხრილში ჩანაწერები
+                არ დაბრუნებულა.
               </p>
+
               <button
                 type="button"
                 onClick={() => void loadAgentJobs()}
@@ -267,8 +455,8 @@ export default function AgentJobsModal({
               </button>
             </div>
           ) : isEditing && selectedJob ? (
-            /* EDITOR */
-            <div className="mx-auto max-w-4xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            /* Editor */
+            <div className="mx-auto max-w-4xl">
               <button
                 type="button"
                 onClick={() => setSelectedJobId(null)}
@@ -302,9 +490,10 @@ export default function AgentJobsModal({
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-lg font-semibold text-white sm:text-xl">
+                    <h3 className="break-words text-lg font-semibold text-white sm:text-xl">
                       {selectedJob.job_name}
                     </h3>
+
                     <p className="mt-1 break-words text-xs text-white/40">
                       {selectedJob.post_type}
                     </p>
@@ -319,70 +508,87 @@ export default function AgentJobsModal({
                 </div>
 
                 <div className="space-y-6">
+                  {/* Description */}
                   <div>
-                    <label className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
+                    <label
+                      htmlFor="agent-job-description"
+                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
+                    >
                       <span className="text-base">✎</span>
                       დავალების აღწერა
                     </label>
+
                     <p className="mb-3 text-xs leading-5 text-white/40">
-                      განსაზღვრე, რა უნდა გააკეთოს აგენტმა ამ დავალების
-                      შესრულებისას.
+                      განსაზღვრე, რა უნდა გააკეთოს აგენტმა ამ
+                      დავალების შესრულებისას.
                     </p>
+
                     <textarea
+                      id="agent-job-description"
                       value={selectedJob.description || ""}
                       onChange={(event) => {
                         const value = event.target.value;
-                        setAgentJobs((prev) =>
-                          prev.map((job) =>
+
+                        setAgentJobs((previous) =>
+                          previous.map((job) =>
                             job.id === selectedJob.id
                               ? { ...job, description: value }
                               : job
                           )
                         );
                       }}
-                      onBlur={(event) =>
+                      onBlur={(event) => {
                         void saveJob(
                           selectedJob.id,
                           "description",
                           event.target.value
-                        )
-                      }
+                        );
+                      }}
                       className="min-h-[140px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#080811]/80 px-4 py-3.5 text-sm leading-6 text-white/85 outline-none transition placeholder:text-white/25 focus:border-violet-300/40 focus:ring-2 focus:ring-violet-300/[0.07]"
                       placeholder="აღწერე დავალების მიზანი და შესრულების წესები..."
                     />
                   </div>
 
+                  {/* Image prompt logic */}
                   <div>
-                    <label className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
+                    <label
+                      htmlFor="agent-job-image-logic"
+                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
+                    >
                       <span className="text-base">✧</span>
                       ფოტოს გენერაციის ლოგიკა
                     </label>
+
                     <p className="mb-3 text-xs leading-5 text-white/40">
-                      ინსტრუქცია, რომლითაც AI შექმნის პოსტისთვის ვიზუალურ
-                      პრომპტს.
+                      ინსტრუქცია, რომლითაც AI შექმნის პოსტისთვის
+                      ვიზუალურ პრომპტს.
                     </p>
+
                     <textarea
+                      id="agent-job-image-logic"
                       value={selectedJob.image_prompt_logic || ""}
                       onChange={(event) => {
                         const value = event.target.value;
-                        setAgentJobs((prev) =>
-                          prev.map((job) =>
+
+                        setAgentJobs((previous) =>
+                          previous.map((job) =>
                             job.id === selectedJob.id
                               ? { ...job, image_prompt_logic: value }
                               : job
                           )
                         );
                       }}
-                      onBlur={(event) =>
+                      onBlur={(event) => {
                         void saveJob(
                           selectedJob.id,
                           "image_prompt_logic",
                           event.target.value
-                        )
-                      }
+                        );
+                      }}
                       className="min-h-[180px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#080811]/80 px-4 py-3.5 font-mono text-[13px] leading-6 text-emerald-100/80 outline-none transition placeholder:text-white/25 focus:border-emerald-300/40 focus:ring-2 focus:ring-emerald-300/[0.06]"
                       placeholder="მიუთითე ვიზუალური სტილი, კომპოზიცია, განათება და სხვა მოთხოვნები..."
                     />
+
                     <p className="mt-2.5 flex items-center gap-2 text-[11px] text-white/35">
                       <span className="text-emerald-300">●</span>
                       შენახვა ავტომატურად იწყება ველიდან გამოსვლისას.
@@ -392,30 +598,29 @@ export default function AgentJobsModal({
               </div>
             </div>
           ) : (
-            /* HUB & SPOKE SCHEMA */
+            /* Hub & Spoke layout */
             <div className="mx-auto max-w-[1020px]">
-              {/* Legend */}
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <div>
                   <h3 className="text-sm font-medium text-white/85">
                     სამუშაოების რუკა
                   </h3>
+
                   <p className="mt-1 text-[11px] text-white/35">
-                    აირჩიე ნებისმიერი დავალება მისი ინსტრუქციების სანახავად.
+                    აირჩიე დავალება მისი ინსტრუქციების სანახავად.
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.025] px-3 py-1.5">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
                   <span className="text-[11px] text-white/55">
                     {agentJobs.length} დავალება
                   </span>
                 </div>
               </div>
 
-              {/* Desktop radial layout */}
+              {/* Desktop diagram: six cards surrounding the agent */}
               <div className="relative hidden min-h-[510px] overflow-hidden rounded-2xl border border-white/[0.055] bg-[#090912]/70 md:block">
-                {/* Decorative grid */}
                 <div
                   className="pointer-events-none absolute inset-0 opacity-[0.13]"
                   style={{
@@ -425,10 +630,9 @@ export default function AgentJobsModal({
                   }}
                 />
 
-                {/* Soft center glow */}
                 <div className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-400/[0.055] blur-[65px]" />
 
-                {/* Connection lines */}
+                {/* Lines */}
                 <svg
                   className="pointer-events-none absolute inset-0 h-full w-full"
                   viewBox="0 0 1000 600"
@@ -443,17 +647,35 @@ export default function AgentJobsModal({
                       x2="100%"
                       y2="100%"
                     >
-                      <stop offset="0%" stopColor="#B9A2FF" stopOpacity=".45" />
-                      <stop offset="100%" stopColor="#F6BD60" stopOpacity=".35" />
+                      <stop
+                        offset="0%"
+                        stopColor="#B9A2FF"
+                        stopOpacity=".45"
+                      />
+                      <stop
+                        offset="100%"
+                        stopColor="#F6BD60"
+                        stopOpacity=".35"
+                      />
                     </linearGradient>
                   </defs>
 
                   {agentJobs.slice(0, 6).map((job, index) => {
-                    const point = JOB_POSITIONS[index];
+                    const points = [
+                      { x: 166, y: 100 },
+                      { x: 833, y: 100 },
+                      { x: 166, y: 300 },
+                      { x: 833, y: 300 },
+                      { x: 166, y: 500 },
+                      { x: 833, y: 500 },
+                    ];
+
+                    const point = points[index];
+
                     if (!point) return null;
 
                     return (
-                      <g key={`connection-${job.id}`}>
+                      <g key={`line-${job.id}`}>
                         <line
                           x1="500"
                           y1="300"
@@ -464,6 +686,7 @@ export default function AgentJobsModal({
                           strokeDasharray="4 7"
                           opacity=".8"
                         />
+
                         <circle
                           cx={point.x}
                           cy={point.y}
@@ -476,7 +699,6 @@ export default function AgentJobsModal({
                   })}
                 </svg>
 
-                {/* Six compact cards around the central agent */}
                 <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 items-center justify-items-center gap-2 p-3">
                   {agentJobs.slice(0, 6).map((job, index) => {
                     const style = getJobStyle(job.post_type);
@@ -496,9 +718,7 @@ export default function AgentJobsModal({
                         type="button"
                         onClick={() => setSelectedJobId(job.id)}
                         className={`group relative z-10 flex w-full max-w-[205px] min-w-0 items-center gap-3 rounded-[15px] border bg-[#11111e]/95 p-3 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-[#191929] hover:shadow-[0_8px_28px_rgba(0,0,0,.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/60 ${positionClasses[index]}`}
-                        style={{
-                          borderColor: style.border,
-                        }}
+                        style={{ borderColor: style.border }}
                       >
                         <div
                           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg transition group-hover:scale-105"
@@ -514,12 +734,14 @@ export default function AgentJobsModal({
                           <h4 className="truncate text-[12px] font-semibold leading-5 text-white/90">
                             {job.job_name}
                           </h4>
+
                           <p className="mt-0.5 truncate text-[10px] text-white/40">
                             {style.label}
                           </p>
+
                           <p
-                            className="mt-1.5 text-[10px] font-medium transition group-hover:opacity-100"
-                            style={{ color: style.accent, opacity: 0.8 }}
+                            className="mt-1.5 text-[10px] font-medium opacity-80 transition group-hover:opacity-100"
+                            style={{ color: style.accent }}
                           >
                             რედაქტირება ↗
                           </p>
@@ -528,12 +750,12 @@ export default function AgentJobsModal({
                     );
                   })}
 
-                  {/* Central agent card */}
+                  {/* Central agent */}
                   <div className="relative z-20 col-start-2 row-start-2 flex w-full max-w-[220px] items-center justify-center">
                     <div className="pointer-events-none absolute -inset-4 rounded-[28px] bg-gradient-to-br from-amber-300/[0.10] to-violet-400/[0.12] blur-xl" />
 
                     <div className="relative w-full rounded-[19px] border border-amber-200/25 bg-gradient-to-b from-[#24202a] to-[#11111b] p-4 text-center shadow-[0_12px_45px_rgba(0,0,0,.35)]">
-                      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[14px] border border-amber-200/20 bg-amber-200/[0.10] text-2xl shadow-inner shadow-amber-200/[0.04]">
+                      <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-[14px] border border-amber-200/20 bg-amber-200/[0.10] text-2xl">
                         ☀️
                       </div>
 
@@ -541,7 +763,7 @@ export default function AgentJobsModal({
                         CENTRAL AGENT
                       </p>
 
-                      <h4 className="mt-1.5 break-words text-[12px] font-bold uppercase leading-5 tracking-wide text-white sm:text-[13px]">
+                      <h4 className="mt-1.5 break-words text-[12px] font-bold uppercase leading-5 tracking-wide text-white">
                         {agentName}
                       </h4>
 
@@ -555,7 +777,6 @@ export default function AgentJobsModal({
                   </div>
                 </div>
 
-                {/* Footer label */}
                 <div className="pointer-events-none absolute bottom-2 left-0 right-0 text-center">
                   <span className="rounded-full border border-white/[0.05] bg-[#090912]/80 px-3 py-1 text-[9px] tracking-wide text-white/25">
                     AGENT WORKFLOW · SINGLE SOURCE OF TRUTH
@@ -563,7 +784,7 @@ export default function AgentJobsModal({
                 </div>
               </div>
 
-              {/* Mobile layout: compact central agent + small task cards */}
+              {/* Mobile layout */}
               <div className="md:hidden">
                 <div className="relative mb-4 overflow-hidden rounded-2xl border border-amber-200/20 bg-gradient-to-br from-[#24202a] to-[#11111b] p-4">
                   <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-200/[0.07] blur-3xl" />
@@ -577,6 +798,7 @@ export default function AgentJobsModal({
                       <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-200/65">
                         CENTRAL AGENT
                       </p>
+
                       <h4 className="mt-1 break-words text-sm font-bold uppercase text-white">
                         {agentName}
                       </h4>
@@ -592,6 +814,7 @@ export default function AgentJobsModal({
                   <h4 className="text-xs font-medium text-white/75">
                     დავალებები
                   </h4>
+
                   <span className="text-[10px] text-white/35">
                     აირჩიე რედაქტირებისთვის
                   </span>
@@ -623,6 +846,7 @@ export default function AgentJobsModal({
                           <p className="truncate text-xs font-semibold text-white/90">
                             {job.job_name}
                           </p>
+
                           <p className="mt-1 truncate text-[10px] text-white/40">
                             {style.label}
                           </p>
@@ -639,8 +863,8 @@ export default function AgentJobsModal({
 
               {agentJobs.length > 6 && (
                 <p className="mt-3 text-center text-[11px] text-amber-200/70">
-                  შენიშვნა: ცენტრალურ სქემაზე ნაჩვენებია პირველი 6 დავალება.
-                  დანარჩენი დავალებები მობილურ განლაგებაში ჩანს.
+                  ცენტრალურ სქემაზე ნაჩვენებია პირველი 6 დავალება.
+                  ყველა დავალება ხელმისაწვდომია მობილურ განლაგებაში.
                 </p>
               )}
             </div>
@@ -650,17 +874,30 @@ export default function AgentJobsModal({
         {/* Footer */}
         <footer className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-t border-white/[0.07] px-4 py-3 sm:px-7">
           <div className="flex min-w-0 items-center gap-2 text-[10px] text-white/35 sm:text-xs">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300/80" />
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                loadError
+                  ? "bg-rose-300"
+                  : isLoading
+                    ? "animate-pulse bg-amber-300"
+                    : "bg-emerald-300/80"
+              }`}
+            />
+
             <span className="truncate">
-              {isEditing
-                ? "ცვლილებები ინახება ავტომატურად"
-                : "აგენტისა და დავალებების კავშირი"}
+              {loadError
+                ? "ჩატვირთვის შეცდომა"
+                : isLoading
+                  ? "იტვირთება..."
+                  : isEditing
+                    ? "ცვლილებები ინახება ველიდან გამოსვლისას"
+                    : "აგენტისა და დავალებების კავშირი"}
             </span>
           </div>
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={closeModal}
             className="shrink-0 rounded-xl border border-white/[0.09] bg-white/[0.04] px-4 py-2 text-xs font-medium text-white/70 transition hover:bg-white/[0.09] hover:text-white"
           >
             დახურვა
