@@ -29,7 +29,7 @@ export default function AgentJobsModal({
 
   useEffect(() => {
     if (isOpen && agentType) {
-      setSelectedJobId(null); // Reset selection when modal opens
+      setSelectedJobId(null);
       loadAgentJobs();
     }
   }, [isOpen, agentType]);
@@ -72,39 +72,38 @@ export default function AgentJobsModal({
 
   const selectedJob = agentJobs.find(j => j.id === selectedJobId);
 
-  // Helper to get icon/color based on post_type for visual distinction
   const getJobStyle = (postType: string) => {
     switch (postType) {
-      case 'daily_energy': return { icon: '🌅', color: 'border-[#f6c177]/30 bg-[#f6c177]/5 hover:bg-[#f6c177]/10' };
-      case 'daily_horoscope_12_signs': return { icon: '♈', color: 'border-[#a78bfa]/30 bg-[#a78bfa]/5 hover:bg-[#a78bfa]/10' };
-      case 'daily_horoscope_single': return { icon: '⭐', color: 'border-[#60a5fa]/30 bg-[#60a5fa]/5 hover:bg-[#60a5fa]/10' };
-      case 'daily_tarot_card': return { icon: '🃏', color: 'border-[#f472b6]/30 bg-[#f472b6]/5 hover:bg-[#f472b6]/10' };
-      case 'morning_question': return { icon: '🌄', color: 'border-[#5fd6a4]/30 bg-[#5fd6a4]/5 hover:bg-[#5fd6a4]/10' };
-      case 'evening_reflection': return { icon: '🌙', color: 'border-[#8d79ff]/30 bg-[#8d79ff]/5 hover:bg-[#8d79ff]/10' };
-      default: return { icon: '📋', color: 'border-[var(--line)] bg-black/20 hover:bg-black/30' };
+      case 'daily_energy': return { icon: '', color: 'from-amber-400/20 to-orange-500/20', borderColor: 'border-amber-400/40', glow: 'shadow-amber-400/20' };
+      case 'daily_horoscope_12_signs': return { icon: '♈', color: 'from-violet-400/20 to-purple-500/20', borderColor: 'border-violet-400/40', glow: 'shadow-violet-400/20' };
+      case 'daily_horoscope_single': return { icon: '⭐', color: 'from-blue-400/20 to-cyan-500/20', borderColor: 'border-blue-400/40', glow: 'shadow-blue-400/20' };
+      case 'daily_tarot_card': return { icon: '', color: 'from-pink-400/20 to-rose-500/20', borderColor: 'border-pink-400/40', glow: 'shadow-pink-400/20' };
+      case 'morning_question': return { icon: '🌄', color: 'from-emerald-400/20 to-teal-500/20', borderColor: 'border-emerald-400/40', glow: 'shadow-emerald-400/20' };
+      case 'evening_reflection': return { icon: '🌙', color: 'from-indigo-400/20 to-purple-600/20', borderColor: 'border-indigo-400/40', glow: 'shadow-indigo-400/20' };
+      default: return { icon: '📋', color: 'from-gray-400/20 to-gray-500/20', borderColor: 'border-gray-400/40', glow: 'shadow-gray-400/20' };
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md" onClick={onClose}>
       <div 
-        className="w-full max-w-5xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)]/98 p-6 sm:p-8 shadow-[0_35px_100px_rgba(0,0,0,.6)]" 
+        className="w-full max-w-6xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)]/98 p-8 shadow-[0_35px_100px_rgba(0,0,0,.6)]" 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--amber)]/20 text-[var(--amber)] text-xl">
-              {selectedJobId ? '✏️' : '💼'}
+              {selectedJobId ? '✏️' : '🔗'}
             </div>
             <div>
               <h3 className="text-lg font-semibold text-[var(--moon)]">
-                {selectedJobId ? 'დავალების რედაქტირება' : `Agent Jobs: ${agentType.replace(/_/g, ' ').toUpperCase()}`}
+                {selectedJobId ? 'დავალების რედაქტირება' : 'Agent Jobs Schema'}
               </h3>
               <p className="text-xs text-[var(--mute)]">
-                {selectedJobId ? 'შეცვალე ინსტრუქციები (შენახვა ავტომატურია)' : 'აირჩიე დავალება სქემიდან რედაქტირებისთვის'}
+                {selectedJobId ? 'შეცვალე ინსტრუქციები' : `Single source of truth - ${agentType.replace(/_/g, ' ').toUpperCase()}`}
               </p>
             </div>
           </div>
@@ -115,13 +114,13 @@ export default function AgentJobsModal({
 
         {/* Content */}
         {isLoading ? (
-          <div className="flex h-64 items-center justify-center">
+          <div className="flex h-96 items-center justify-center">
             <p className="text-[var(--mute)] animate-pulse">იტვირთება...</p>
           </div>
         ) : agentJobs.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center text-center">
+          <div className="flex h-96 flex-col items-center justify-center text-center">
             <p className="text-[var(--mute)] mb-2">დავალებები ვერ მოიძებნა.</p>
-            <p className="text-xs text-[var(--mute)]/60">გთხოვთ, ჯერ შექმნათ ისინი Supabase-ში.</p>
+            <p className="text-xs text-[var(--mute)]/60">გთხოვთ, ერ შექმნათ ისინი Supabase-ში.</p>
           </div>
         ) : selectedJobId && selectedJob ? (
           // ✅ DETAIL VIEW (Editor)
@@ -172,7 +171,7 @@ export default function AgentJobsModal({
 
                 <div>
                   <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--ok)]">
-                    🎨 ფოტოს გენერაციის ლოგიკა (Image Prompt Logic)
+                     ფოტოს გენერაციის ლოგიკა (Image Prompt Logic)
                   </label>
                   <textarea
                     value={selectedJob.image_prompt_logic || ''}
@@ -182,7 +181,7 @@ export default function AgentJobsModal({
                     }}
                     onBlur={(e) => saveJob(selectedJob.id, 'image_prompt_logic', e.target.value)}
                     className="w-full rounded-xl border border-[var(--line-2)] bg-black/30 px-4 py-3 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--ok)]/70 focus:bg-black/40 focus:ring-2 focus:ring-[var(--ok)]/10 min-h-[160px] resize-y font-mono"
-                    placeholder="ზუსტი ინსტრუქცია AI-სთვის, როგორ შეადგინოს ფოტოს პრომპტი ამ კონკრეტული პოსტისთვის..."
+                    placeholder="ზუსტი ინსტრუქცია AI-სთვის, როგორ შეადგინოს ფოტოს პრომპტი..."
                   />
                   <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--mute)]">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -193,49 +192,165 @@ export default function AgentJobsModal({
             </div>
           </div>
         ) : (
-          // ✅ GRID VIEW (Schema)
-          <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-            {/* Central Agent Banner */}
-            <div className="relative overflow-hidden rounded-2xl border border-[var(--amber)]/30 bg-gradient-to-br from-[var(--amber)]/10 to-black/40 p-6 text-center">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDIwOSwxMzgsMC4xKSIvPjwvc3ZnPg==')] opacity-30"></div>
-              <div className="relative z-10">
-                <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--amber)]/20 text-4xl shadow-lg shadow-[var(--amber)]/10">
-                  ☀️
+          // ✅ SCHEMA VIEW (Hub & Spoke Design)
+          <div className="relative min-h-[600px] animate-in fade-in zoom-in-95 duration-500">
+            {/* SVG Connection Lines Layer */}
+            <svg className="absolute inset-0 h-full w-full pointer-events-none" style={{ zIndex: 0 }}>
+              <defs>
+                <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(192, 181, 255, 0.3)" />
+                  <stop offset="100%" stopColor="rgba(255, 209, 138, 0.3)" />
+                </linearGradient>
+              </defs>
+              {/* Connection lines from center to each job card */}
+              {agentJobs.map((job, index) => {
+                const angle = (index * 60) * (Math.PI / 180);
+                const radius = 280;
+                const startX = 300;
+                const startY = 100;
+                const endX = startX + Math.cos(angle) * radius;
+                const endY = startY + Math.sin(angle) * radius;
+                
+                return (
+                  <g key={`line-${job.id}`}>
+                    <line
+                      x1={startX}
+                      y1={startY + 80}
+                      x2={endX}
+                      y2={endY + 40}
+                      stroke="url(#lineGradient)"
+                      strokeWidth="2"
+                      strokeDasharray="5,5"
+                      className="animate-pulse"
+                    />
+                    {/* Animated dot traveling along the line */}
+                    <circle r="3" fill="rgba(192, 181, 255, 0.6)">
+                      <animateMotion
+                        dur="2s"
+                        repeatCount="indefinite"
+                        path={`M${startX},${startY + 80} L${endX},${endY + 40}`}
+                      />
+                    </circle>
+                  </g>
+                );
+              })}
+            </svg>
+
+            {/* Central Agent Hub */}
+            <div className="absolute left-1/2 top-[60px] -translate-x-1/2" style={{ zIndex: 10 }}>
+              <div className="relative">
+                {/* Glow effect */}
+                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-[var(--amber)]/20 to-[var(--violet)]/20 blur-xl"></div>
+                
+                {/* Main Hub Card */}
+                <div className="relative overflow-hidden rounded-2xl border-2 border-[var(--amber)]/40 bg-gradient-to-br from-[var(--amber)]/10 to-black/60 p-8 text-center shadow-2xl shadow-[var(--amber)]/20">
+                  <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-[var(--amber)]/20 text-5xl shadow-lg">
+                    ☀️
+                  </div>
+                  <h4 className="text-2xl font-bold text-[var(--moon)]">{agentType.replace(/_/g, ' ').toUpperCase()}</h4>
+                  <p className="mt-2 text-sm text-[var(--mute)] max-w-xs">
+                    Single Source of Truth
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2 text-xs text-[var(--amber)]">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--amber)]"></span>
+                    {agentJobs.length} Active Jobs
+                  </div>
                 </div>
-                <h4 className="text-xl font-bold text-[var(--moon)]">{agentType.replace(/_/g, ' ').toUpperCase()} AGENT</h4>
-                <p className="mt-2 text-sm text-[var(--mute)] max-w-md mx-auto">
-                  ქვემოთ მოცემულია 6 დავალება, რომელსაც ეს აგენტი ასრულებს. დააკლიკე ნებისმიერ ბანერს ინსტრუქციების სანახავად და რედაქტირებისთვის.
-                </p>
               </div>
             </div>
 
-            {/* 6 Job Banners Grid */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {agentJobs.map((job) => {
-                const style = getJobStyle(job.post_type);
-                return (
-                  <button
-                    key={job.id}
-                    onClick={() => setSelectedJobId(job.id)}
-                    className={`group relative flex flex-col items-start gap-3 rounded-2xl border p-5 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${style.color} border-[var(--line)]`}
-                  >
-                    <div className="flex w-full items-center justify-between">
-                      <span className="text-3xl transition-transform duration-300 group-hover:scale-110">{style.icon}</span>
-                      <svg className="h-5 w-5 text-[var(--mute)] opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                    </div>
-                    <div>
-                      <h5 className="font-bold text-[var(--moon)] group-hover:text-[var(--amber)] transition-colors">{job.job_name}</h5>
-                      <span className="mt-2 inline-block rounded-md bg-black/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--mute)] border border-[var(--line)]">
-                        {job.post_type}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+            {/* Job Cards positioned around the hub */}
+            <div className="relative h-full" style={{ zIndex: 10 }}>
+              {/* Top Row */}
+              <div className="absolute left-0 top-0 w-1/3">
+                {agentJobs[0] && (
+                  <JobCard 
+                    job={agentJobs[0]} 
+                    style={getJobStyle(agentJobs[0].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[0].id)}
+                  />
+                )}
+              </div>
+              <div className="absolute right-0 top-0 w-1/3">
+                {agentJobs[1] && (
+                  <JobCard 
+                    job={agentJobs[1]} 
+                    style={getJobStyle(agentJobs[1].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[1].id)}
+                  />
+                )}
+              </div>
+
+              {/* Middle Row */}
+              <div className="absolute left-0 top-1/2 w-1/3 -translate-y-1/2">
+                {agentJobs[2] && (
+                  <JobCard 
+                    job={agentJobs[2]} 
+                    style={getJobStyle(agentJobs[2].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[2].id)}
+                  />
+                )}
+              </div>
+              <div className="absolute right-0 top-1/2 w-1/3 -translate-y-1/2">
+                {agentJobs[3] && (
+                  <JobCard 
+                    job={agentJobs[3]} 
+                    style={getJobStyle(agentJobs[3].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[3].id)}
+                  />
+                )}
+              </div>
+
+              {/* Bottom Row */}
+              <div className="absolute bottom-0 left-1/4 w-1/3">
+                {agentJobs[4] && (
+                  <JobCard 
+                    job={agentJobs[4]} 
+                    style={getJobStyle(agentJobs[4].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[4].id)}
+                  />
+                )}
+              </div>
+              <div className="absolute bottom-0 right-1/4 w-1/3">
+                {agentJobs[5] && (
+                  <JobCard 
+                    job={agentJobs[5]} 
+                    style={getJobStyle(agentJobs[5].post_type)}
+                    onClick={() => setSelectedJobId(agentJobs[5].id)}
+                  />
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+// Job Card Component
+function JobCard({ job, style, onClick }: { job: any; style: any; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative w-full overflow-hidden rounded-2xl border-2 ${style.borderColor} bg-gradient-to-br ${style.color} p-6 text-left shadow-lg ${style.glow} transition-all duration-300 hover:-translate-y-2 hover:scale-105 hover:shadow-xl`}
+    >
+      <div className="relative z-10">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+          {style.icon}
+        </div>
+        <h5 className="font-bold text-[var(--moon)] group-hover:text-white transition-colors">
+          {job.job_name}
+        </h5>
+        <span className="mt-2 inline-block rounded-md bg-black/40 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--mute)] border border-[var(--line)]">
+          {job.post_type}
+        </span>
+      </div>
+      
+      {/* Hover glow effect */}
+      <div className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+      </div>
+    </button>
   );
 }
