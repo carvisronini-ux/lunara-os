@@ -59,18 +59,27 @@ export async function testCredentialAction(credentialId: string) {
         
         const allModels = data.data || [];
         
-        // ვფილტრავთ მხოლოდ ტექსტურ/ჩატ მოდელებს (Llama, Gemma, Mixtral, Qwen)
+        // ✅ განახლებული ფილტრი: ვტოვებთ მხოლოდ ჩატისთვის განკუთვნილ მოდელებს და ვრიცხავთ "guard", "whisper" და სხვა არა-ჩატ მოდელებს
         const textModels = allModels
-          .filter((m: any) => m.id.includes('llama') || m.id.includes('gemma') || m.id.includes('mixtral') || m.id.includes('qwen'))
+          .filter((m: any) => {
+            const id = m.id.toLowerCase();
+            // ვრიცხავთ მოდელებს, რომლებიც არ არის განკუთვნილი ტექსტის გენერაციისთვის
+            if (id.includes('guard') || id.includes('whisper') || id.includes('distil') || id.includes('vision')) {
+              return false;
+            }
+            // ვტოვებთ მხოლოდ ცნობილ LLM მოდელებს
+            return id.includes('llama') || id.includes('gemma') || id.includes('mixtral') || id.includes('qwen');
+          })
           .map((m: any) => m.id);
 
         addLog('INFO', `ნაპოვნია ${textModels.length} ტექსტური გენერაციის მოდელი.`);
         
-        // ✅ ჭკვიანი არჩევანი: ჯერ ვეძებთ 8b-instant-ს (აქვს ყველაზე მაღალი TPM ლიმიტი და არ აგდებს 413 შეცდომას), 
-        // თუ არაა, ვიღებთ 70b-versatile-ს, თუ ისიც არაა - პირველს სიაში.
-        let recommended = textModels.find((m: string) => m.includes('llama-3.1-8b-instant')) || 
-                          textModels.find((m: string) => m.includes('llama-3.3-70b-versatile')) || 
-                          textModels[0] || 'llama-3.3-70b-versatile';
+        // ✅ ჭკვიანი არჩევანი: ვეძებთ კონკრეტულად სტაბილურ და მაღალი ლიმიტის მქონე მოდელებს
+        let recommended = textModels.find((m: string) => m.includes('llama-3.1-8b-instant') || m.includes('llama3-8b-8192')) || 
+                          textModels.find((m: string) => m.includes('llama-3.3-70b-versatile') || m.includes('llama3-70b-8192')) || 
+                          textModels.find((m: string) => m.includes('mixtral')) ||
+                          textModels.find((m: string) => m.includes('gemma')) ||
+                          'llama3-8b-8192'; // უსაფრთხო fallback
 
         addLog('INFO', `სისტემამ ავტომატურად აირჩია რეკომენდებული მოდელი: ${recommended} (ოპტიმიზირებულია მაღალი ლიმიტისთვის)`);
         addLog('INFO', 'ვინახავ რეკომენდებულ მოდელს მეტამონაცემებში...');
