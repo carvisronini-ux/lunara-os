@@ -52,7 +52,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(246,189,96,.30)",
         label: "დღის ენერგია",
       };
-
     case "daily_horoscope_12_signs":
       return {
         icon: "♈",
@@ -61,7 +60,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(185,162,255,.30)",
         label: "12 ნიშნის ჰოროსკოპი",
       };
-
     case "daily_horoscope_single":
       return {
         icon: "✦",
@@ -70,7 +68,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(125,203,255,.30)",
         label: "ერთი ნიშნის ჰოროსკოპი",
       };
-
     case "daily_tarot_card":
       return {
         icon: "✧",
@@ -79,7 +76,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(243,166,213,.30)",
         label: "ტაროს ბარათი",
       };
-
     case "morning_question":
       return {
         icon: "🌅",
@@ -88,7 +84,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(117,217,176,.30)",
         label: "დილის კითხვა",
       };
-
     case "evening_reflection":
       return {
         icon: "🌙",
@@ -97,7 +92,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(185,184,255,.30)",
         label: "საღამოს რეფლექსია",
       };
-
     case "weekly_start_message":
       return {
         icon: "✦",
@@ -106,7 +100,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(132,185,255,.30)",
         label: "კვირის დასაწყისი",
       };
-
     case "monthly_start_themes":
       return {
         icon: "🌌",
@@ -115,7 +108,6 @@ const getJobStyle = (postType: string): JobStyle => {
         border: "rgba(208,167,255,.30)",
         label: "თვის თემები",
       };
-
     default:
       return {
         icon: "✧",
@@ -147,6 +139,7 @@ export default function AgentJobsModal({
   const [agentJobs, setAgentJobs] = useState<AgentJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [isSavingJob, setIsSavingJob] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false); // ✅ ახალი: წარმატებული შენახვის სტატუსი
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -166,7 +159,6 @@ export default function AgentJobsModal({
 
   const loadAgentJobs = useCallback(async () => {
     const requestId = ++requestIdRef.current;
-
     setIsLoading(true);
     setLoadError(null);
 
@@ -181,41 +173,21 @@ export default function AgentJobsModal({
 
       if (error) {
         console.error("[AgentJobsModal] Supabase error:", error);
-
-        setLoadError(
-          `დავალებების ჩატვირთვა ვერ მოხერხდა: ${error.message}`
-        );
-
-        onLogRef.current(
-          `❌ ${agentType}-ის დავალებების ჩატვირთვის შეცდომა: ${error.message}`
-        );
-
+        setLoadError(`დავალებების ჩატვირთვა ვერ მოხერხდა: ${error.message}`);
+        onLogRef.current(`❌ ${agentType}-ის დავალებების ჩატვირთვის შეცდომა: ${error.message}`);
         return;
       }
 
       const jobs = (data || []) as AgentJob[];
-
       setAgentJobs(jobs);
       setSelectedJobId(null);
-
-      onLogRef.current(
-        `✅ ${agentType}-ის დავალებები ჩაიტვირთა (${jobs.length})`
-      );
+      onLogRef.current(`✅ ${agentType}-ის დავალებები ჩაიტვირთა (${jobs.length})`);
     } catch (error) {
       if (requestId !== requestIdRef.current) return;
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "უცნობი ქსელური შეცდომა";
-
+      const message = error instanceof Error ? error.message : "უცნობი ქსელური შეცდომა";
       console.error("[AgentJobsModal] Unexpected error:", error);
-
       setLoadError(`მოულოდნელი შეცდომა: ${message}`);
-
-      onLogRef.current(
-        `❌ დავალებების ჩატვირთვის შეცდომა: ${message}`
-      );
+      onLogRef.current(`❌ დავალებების ჩატვირთვის შეცდომა: ${message}`);
     } finally {
       if (requestId === requestIdRef.current) {
         setIsLoading(false);
@@ -225,26 +197,20 @@ export default function AgentJobsModal({
 
   useEffect(() => {
     if (!isOpen || !agentType) return;
-
     void loadAgentJobs();
-
     return () => {
       requestIdRef.current += 1;
     };
   }, [isOpen, agentType, loadAgentJobs]);
 
   const saveJob = useCallback(
-    async (
-      jobId: string,
-      field: EditableField,
-      value: string
-    ) => {
+    async (jobId: string, field: EditableField, value: string) => {
       const saveKey = `${jobId}:${field}`;
-
       if (savingRef.current.has(saveKey)) return;
 
       savingRef.current.add(saveKey);
       setIsSavingJob(jobId);
+      setSaveSuccess(false);
 
       try {
         const { error } = await supabase
@@ -254,42 +220,29 @@ export default function AgentJobsModal({
 
         if (error) {
           console.error("[AgentJobsModal] Save error:", error);
-
-          onLogRef.current(
-            `❌ დავალების შენახვის შეცდომა: ${error.message}`
-          );
-
+          onLogRef.current(`❌ დავალების შენახვის შეცდომა: ${error.message}`);
           return;
         }
 
         setAgentJobs((previous) =>
           previous.map((job) =>
-            job.id === jobId
-              ? { ...job, [field]: value }
-              : job
+            job.id === jobId ? { ...job, [field]: value } : job
           )
         );
 
-        onLogRef.current(
-          `✅ "${field === "description" ? "აღწერა" : "ფოტოს გენერაციის ლოგიკა"}" შენახულია`
-        );
+        onLogRef.current(`✅ "${field === "description" ? "აღწერა" : "ფოტოს გენერაციის ლოგიკა"}" წარმატებით შეინახა ბაზაში!`);
+        
+        // ✅ ვაჩვენებთ წარმატების შეტყობინებას 2.5 წამით
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "უცნობი შეცდომა";
-
+        const message = error instanceof Error ? error.message : "უცნობი შეცდომა";
         console.error("[AgentJobsModal] Save exception:", error);
-
-        onLogRef.current(
-          `❌ დავალების შენახვის შეცდომა: ${message}`
-        );
+        onLogRef.current(`❌ დავალების შენახვის შეცდომა: ${message}`);
       } finally {
         savingRef.current.delete(saveKey);
-
-        setIsSavingJob((current) =>
-          current === jobId ? null : current
-        );
+        setIsSavingJob((current) => (current === jobId ? null : current));
       }
     },
     []
@@ -302,7 +255,6 @@ export default function AgentJobsModal({
     }
 
     setIsCreatingJob(true);
-
     try {
       const { data, error } = await supabase
         .from("agent_jobs")
@@ -348,7 +300,6 @@ export default function AgentJobsModal({
 
   useEffect(() => {
     if (!isOpen) return;
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         if (selectedJobId) {
@@ -358,9 +309,7 @@ export default function AgentJobsModal({
         }
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
-
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -421,15 +370,7 @@ export default function AgentJobsModal({
             aria-label="დახურვა"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.03] text-white/50 transition hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
           >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
@@ -442,25 +383,17 @@ export default function AgentJobsModal({
                 <div className="absolute inset-0 animate-spin rounded-full border-2 border-violet-300/15 border-t-violet-300" />
                 <span className="text-lg text-violet-200">✧</span>
               </div>
-
               <p className="text-sm text-white/65">დავალებები იტვირთება...</p>
-
               <p className="text-xs text-white/30">Supabase-თან კავშირი</p>
             </div>
           ) : loadError ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center px-4 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-300/15 bg-rose-400/[0.08] text-2xl text-rose-300">
-                !
-              </div>
-
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-300/15 bg-rose-400/[0.08] text-2xl text-rose-300">!</div>
               <h3 className="mt-4 text-base font-semibold text-white">ჩატვირთვა ვერ მოხერხდა</h3>
-
               <p className="mt-2 max-w-md break-words text-sm leading-6 text-white/50">{loadError}</p>
-
               <p className="mt-2 max-w-md text-xs leading-5 text-white/35">
                 შეამოწმე Supabase-ის გარემოს ცვლადები, ცხრილის არსებობა და წვდომის (RLS) პოლიტიკა.
               </p>
-
               <button
                 type="button"
                 onClick={() => void loadAgentJobs()}
@@ -471,16 +404,11 @@ export default function AgentJobsModal({
             </div>
           ) : agentJobs.length === 0 && !showCreateForm ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-3xl text-white/50">
-                ✧
-              </div>
-
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-3xl text-white/50">✧</div>
               <h3 className="text-base font-semibold text-white/85">დავალებები ვერ მოიძებნა</h3>
-
               <p className="mt-2 max-w-sm text-sm leading-6 text-white/40">
                 ამ აგენტისთვის `agent_jobs` ცხრილში ჩანაწერები არ დაბრუნებულა.
               </p>
-
               <div className="mt-5 flex gap-3">
                 <button
                   type="button"
@@ -489,7 +417,6 @@ export default function AgentJobsModal({
                 >
                   ხელახლა ჩატვირთვა
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(true)}
@@ -503,19 +430,13 @@ export default function AgentJobsModal({
             <div className="mx-auto max-w-4xl">
               <button
                 type="button"
-                onClick={() => setSelectedJobId(null)}
+                onClick={() => {
+                  setSelectedJobId(null);
+                  setSaveSuccess(false);
+                }}
                 className="mb-5 inline-flex items-center gap-2 rounded-lg py-2 pr-3 text-sm text-violet-300 transition hover:text-violet-200"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m15 18-6-6 6-6M9 12h12" />
                 </svg>
                 სქემაზე დაბრუნება
@@ -537,43 +458,34 @@ export default function AgentJobsModal({
                     <h3 className="break-words text-lg font-semibold text-white sm:text-xl">
                       {selectedJob.job_name}
                     </h3>
-
                     <p className="mt-1 break-words text-xs text-white/40">{selectedJob.post_type}</p>
                   </div>
 
                   {isSavingJob === selectedJob.id && (
                     <span className="flex shrink-0 items-center gap-2 text-xs text-emerald-300">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
-                      ინახება
+                      ინახება...
                     </span>
                   )}
                 </div>
 
                 <div className="space-y-6">
                   <div>
-                    <label
-                      htmlFor="agent-job-description"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="agent-job-description" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✎</span>
                       დავალების აღწერა
                     </label>
-
                     <p className="mb-3 text-xs leading-5 text-white/40">
                       განსაზღვრე, რა უნდა გააკეთოს აგენტმა ამ დავალების შესრულებისას.
                     </p>
-
                     <textarea
                       id="agent-job-description"
                       value={selectedJob.description || ""}
                       onChange={(event) => {
                         const value = event.target.value;
-
                         setAgentJobs((previous) =>
                           previous.map((job) =>
-                            job.id === selectedJob.id
-                              ? { ...job, description: value }
-                              : job
+                            job.id === selectedJob.id ? { ...job, description: value } : job
                           )
                         );
                       }}
@@ -583,29 +495,21 @@ export default function AgentJobsModal({
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="agent-job-image-logic"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="agent-job-image-logic" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✧</span>
                       ფოტოს გენერაციის ლოგიკა
                     </label>
-
                     <p className="mb-3 text-xs leading-5 text-white/40">
                       ინსტრუქცია, რომლითაც AI შექმნის პოსტისთვის ვიზუალურ პრომპტს.
                     </p>
-
                     <textarea
                       id="agent-job-image-logic"
                       value={selectedJob.image_prompt_logic || ""}
                       onChange={(event) => {
                         const value = event.target.value;
-
                         setAgentJobs((previous) =>
                           previous.map((job) =>
-                            job.id === selectedJob.id
-                              ? { ...job, image_prompt_logic: value }
-                              : job
+                            job.id === selectedJob.id ? { ...job, image_prompt_logic: value } : job
                           )
                         );
                       }}
@@ -617,12 +521,16 @@ export default function AgentJobsModal({
                   <div className="flex gap-3 border-t border-white/[0.07] pt-5">
                     <button
                       type="button"
-                      onClick={() => setSelectedJobId(null)}
+                      onClick={() => {
+                        setSelectedJobId(null);
+                        setSaveSuccess(false);
+                      }}
                       className="flex-1 rounded-xl border border-white/[0.09] bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/[0.09] hover:text-white"
                     >
                       გაუქმება
                     </button>
 
+                    {/* ✅ განახლებული შენახვის ღილაკი ვიზუალური დადასტურებით */}
                     <button
                       type="button"
                       onClick={() => {
@@ -633,10 +541,18 @@ export default function AgentJobsModal({
                           void saveJob(selectedJobId, "image_prompt_logic", job.image_prompt_logic || "");
                         }
                       }}
-                      disabled={isSavingJob === selectedJobId}
-                      className="flex-1 rounded-xl border border-emerald-300/20 bg-emerald-400/[0.12] px-4 py-3 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/[0.2] disabled:opacity-50"
+                      disabled={isSavingJob === selectedJobId || saveSuccess}
+                      className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium transition ${
+                        saveSuccess
+                          ? "border-emerald-500/30 bg-emerald-500/20 text-emerald-200"
+                          : "border-emerald-300/20 bg-emerald-400/[0.12] text-emerald-100 hover:bg-emerald-400/[0.2]"
+                      } disabled:opacity-50`}
                     >
-                      {isSavingJob === selectedJobId ? "ინახება..." : " შენახვა"}
+                      {isSavingJob === selectedJobId
+                        ? "ინახება..."
+                        : saveSuccess
+                        ? "✅ წარმატებით შეინახა!"
+                        : "💾 შენახვა"}
                     </button>
                   </div>
                 </div>
@@ -646,19 +562,13 @@ export default function AgentJobsModal({
             <div className="mx-auto max-w-4xl">
               <button
                 type="button"
-                onClick={() => setShowCreateForm(false)}
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setSaveSuccess(false);
+                }}
                 className="mb-5 inline-flex items-center gap-2 rounded-lg py-2 pr-3 text-sm text-violet-300 transition hover:text-violet-200"
               >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m15 18-6-6 6-6M9 12h12" />
                 </svg>
                 სქემაზე დაბრუნება
@@ -666,10 +576,7 @@ export default function AgentJobsModal({
 
               <div className="rounded-2xl border border-white/[0.09] bg-white/[0.025] p-4 sm:p-6">
                 <div className="mb-6 flex items-start gap-3 border-b border-white/[0.07] pb-5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-400/[0.12] text-2xl text-violet-200">
-                    +
-                  </div>
-
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-400/[0.12] text-2xl text-violet-200">+</div>
                   <div className="min-w-0 flex-1">
                     <h3 className="break-words text-lg font-semibold text-white sm:text-xl">ახალი დავალების შექმნა</h3>
                     <p className="mt-1 break-words text-xs text-white/40">შეავსე ყველა საჭირო ველი</p>
@@ -678,14 +585,10 @@ export default function AgentJobsModal({
 
                 <div className="space-y-6">
                   <div>
-                    <label
-                      htmlFor="new-job-name"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="new-job-name" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✎</span>
                       დავალების სახელი *
                     </label>
-
                     <input
                       id="new-job-name"
                       type="text"
@@ -697,14 +600,10 @@ export default function AgentJobsModal({
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="new-job-post-type"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="new-job-post-type" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✧</span>
                       პოსტის ტიპი *
                     </label>
-
                     <select
                       id="new-job-post-type"
                       value={newJobPostType}
@@ -720,14 +619,10 @@ export default function AgentJobsModal({
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="new-job-description"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="new-job-description" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✎</span>
                       დავალების აღწერა
                     </label>
-
                     <textarea
                       id="new-job-description"
                       value={newJobDescription}
@@ -738,14 +633,10 @@ export default function AgentJobsModal({
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="new-job-image-logic"
-                      className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85"
-                    >
+                    <label htmlFor="new-job-image-logic" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✧</span>
                       ფოტოს გენერაციის ლოგიკა
                     </label>
-
                     <textarea
                       id="new-job-image-logic"
                       value={newJobImageLogic}
@@ -758,7 +649,10 @@ export default function AgentJobsModal({
                   <div className="flex gap-3 border-t border-white/[0.07] pt-5">
                     <button
                       type="button"
-                      onClick={() => setShowCreateForm(false)}
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setSaveSuccess(false);
+                      }}
                       className="flex-1 rounded-xl border border-white/[0.09] bg-white/[0.04] px-4 py-3 text-sm font-medium text-white/70 transition hover:bg-white/[0.09] hover:text-white"
                     >
                       გაუქმება
@@ -781,7 +675,6 @@ export default function AgentJobsModal({
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
                 <div>
                   <h3 className="text-sm font-medium text-white/85">სამუშაოების რუკა</h3>
-
                   <p className="mt-1 text-[11px] text-white/35">
                     აირჩიე დავალება მისი ინსტრუქციების სანახავად.
                   </p>
@@ -812,7 +705,10 @@ export default function AgentJobsModal({
                     <button
                       key={job.id}
                       type="button"
-                      onClick={() => setSelectedJobId(job.id)}
+                      onClick={() => {
+                        setSelectedJobId(job.id);
+                        setSaveSuccess(false);
+                      }}
                       className="group relative flex min-w-0 items-center gap-3 rounded-xl border bg-[#11111e]/95 p-3 text-left transition duration-200 hover:-translate-y-0.5 hover:bg-[#191929] hover:shadow-[0_8px_28px_rgba(0,0,0,.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/60"
                       style={{ borderColor: style.border }}
                     >
