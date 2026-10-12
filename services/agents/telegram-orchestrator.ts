@@ -428,8 +428,10 @@ export class TelegramOrchestrator {
         caption = generatedContent.caption;
         imagePrompt = generatedContent.image_prompt || '';
 
+        // ✅ გასწორებულია: ჰაშთაგები ერთ ხაზზე, space-ით გამოყოფილი
         const hashtags = generatedContent.hashtags || [];
-        const fullCaption = [caption, ...hashtags].filter(Boolean).join('\n\n');
+        const hashtagsLine = hashtags.join(' ');
+        const fullCaption = hashtagsLine ? `${caption}\n\n${hashtagsLine}` : caption;
         caption = fullCaption;
 
         addLog(`Content generated successfully. Caption length: ${caption.length} characters.`);
