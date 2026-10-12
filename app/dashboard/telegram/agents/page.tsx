@@ -410,7 +410,8 @@ export default function TelegramAgentsPage() {
 
   return (
     <div className="agents-root min-h-screen">
-      <style>{STYLES}</style>
+      {/* ✅ გამოსწორებულია ჰიდრატაციის შეცდომა */}
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ink)]/80 backdrop-blur-xl shadow-[0_10px_35px_rgba(0,0,0,.16)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-8">
