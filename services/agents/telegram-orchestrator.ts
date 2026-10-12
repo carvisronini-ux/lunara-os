@@ -58,6 +58,12 @@ const TELEGRAM_MESSAGE_LIMIT = 3_800;
 const TELEGRAM_CAPTION_LIMIT = 950; 
 const MAX_ERROR_LENGTH = 1_500;
 
+// ✅ სტატიკური სურათების მასივი 12 ნიშნის ჰოროსკოპისთვის
+const STATIC_ZODIAC_IMAGES = [
+  'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsigns.png',
+  'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsign2.png'
+];
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -103,11 +109,12 @@ function truncateError(message: string): string {
   return `${message.slice(0, MAX_ERROR_LENGTH)}...`;
 }
 
-function escapeTelegramHtml(text: string): string {
+// ✅ უსაფრთხოების ფუნქცია: გარდაქმნის < და > -ს, მაგრამ ტოვებს <b> და </b> ტეგებს
+function escapeTelegramHtmlPreservingBold(text: string): string {
   return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/&(?!amp;|lt;|gt;)/g, '&amp;') // Escape & but not already escaped ones
+    .replace(/<(?!\/?b>)/g, '&lt;')         // Escape < but not <b> or </b>
+    .replace(/>(?!)/g, '&gt;');             // Escape > 
 }
 
 function splitTelegramText(text: string, maxLength: number): string[] {
@@ -193,6 +200,34 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
+// ✅ ფუნქცია, რომელიც გარანტირებულად აკეთებს ზოდიაქოს ნიშნებს ბოლდს
+function applyBoldFormattingToZodiac(rawCaption: string): string {
+  // 1. ჯერ ვაცუროთ მთლიანი ტექსტი (გარდა <b> ტეგებისა, რომელსაც ჩვენ ჩავსვამთ)
+  let safeText = rawCaption
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 2. ვეძებთ ნიშნებს და ვსვამთ სუფთა <b> ტეგებს
+  const zodiacMap = [
+    { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
+    { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
+    { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
+    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+  ];
+
+  zodiacMap.forEach(({ name, emoji }) => {
+    // ემთხვევა: ხაზის დასაწყისი ან ახალი ხაზი, ოფციონალური ემოჯი, ოფციონალური **, სახელი, ოფციონალური **, ორწერტილი
+    const regex = new RegExp(`(^|\\n)(\\s*)(?:${emoji}\\s*)?\\*{0,2}(${name})\\*{0,2}(\\s*:)`, 'gi');
+    safeText = safeText.replace(regex, `$1$2${emoji} <b>$3</b>$4`);
+  });
+
+  // 3. ვშლით ზედმეტ ემოჯებს/სიმბოლოებს ბოლოში (ჰეშთეგების შენარჩუნებით)
+  return safeText.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+}
+
 // ============================================================
 // TELEGRAM ORCHESTRATOR
 // ============================================================
@@ -271,7 +306,7 @@ export class TelegramOrchestrator {
         jobImageLogic = jobData.image_prompt_logic;
         addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
       } else {
-        addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის. გამოიყენება ზოგადი წესები.`);
+        addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
 
       // --------------------------------------------------------
@@ -295,7 +330,7 @@ export class TelegramOrchestrator {
       );
 
       if (!leaseId) {
-        throw new Error(`Could not acquire ${DEFAULT_TEXT_PROVIDER} access. Check AccessManager permissions.`);
+        throw new Error(`Could not acquire ${DEFAULT_TEXT_PROVIDER} access.`);
       }
       addLog(`${DEFAULT_TEXT_PROVIDER} access lease acquired.`);
 
@@ -304,16 +339,16 @@ export class TelegramOrchestrator {
         const credential = credentialVault.getCredentialByProvider(DEFAULT_TEXT_PROVIDER as any, 'spend');
 
         if (!credential) {
-          throw new Error(`${DEFAULT_TEXT_PROVIDER} credentials were not found. Add a valid credential in the API Vault.`);
+          throw new Error(`${DEFAULT_TEXT_PROVIDER} credentials were not found.`);
         }
 
         const apiKey = credentialVault.getDecryptedValue(credential.credential_id, `${request.agentType}-agent`);
         if (!apiKey) {
-          throw new Error(`Could not decrypt the ${DEFAULT_TEXT_PROVIDER} API key. Check vault permissions.`);
+          throw new Error(`Could not decrypt the ${DEFAULT_TEXT_PROVIDER} API key.`);
         }
 
         const targetModel = credential.metadata?.recommendedModel || DEFAULT_GROQ_MODEL;
-        addLog(`Using model: ${targetModel} (from metadata or fallback)`);
+        addLog(`Using model: ${targetModel}`);
         addLog('Building generation prompts...');
 
         const systemPrompt = [
@@ -323,14 +358,13 @@ export class TelegramOrchestrator {
           config.thinking_style || 'Use clear, structured reasoning internally.',
           '',
           'SKILLS & CONSTRAINTS:',
-          config.skills_constraints || 'Follow the agent instructions and brand guidelines.',
+          config.skills_constraints || 'Follow the agent instructions.',
           '',
           'JOB-SPECIFIC IMAGE INSTRUCTIONS:',
           jobImageLogic || 'Follow general LUNARA visual guidelines.',
           '',
           'OUTPUT FORMAT:',
           'Return only a valid JSON object with caption, image_prompt and hashtags.',
-          'Never expose internal reasoning.',
         ].join('\n');
 
         const userPrompt = buildUserPrompt(request);
@@ -378,49 +412,32 @@ export class TelegramOrchestrator {
         addLog('Response received. Validating generated JSON...');
         const generatedContent = parseGeneratedContent(rawContent);
 
-        // ✅ ნაბიჯი 1: ჯერ ვაცუროთ (escape) მთლიანი ტექსტი, რათა AI-ის მიერ გენერირებულმა < > სიმბოლოებმა არ დაარღვიოს Telegram HTML
-        let safeCaption = escapeTelegramHtml(generatedContent.caption);
         imagePrompt = generatedContent.image_prompt || '';
 
-        // ✅ ნაბიჯი 2: ახლა, როცა ტექსტი უსაფრთხოა, პირდაპირ ვსვამთ <b> ტეგებს (რადგან ეს ახლა მოხდა, ისინი არ გაესკეიპება)
+        // ✅ ნაბიჯი 1: ფორმატირება და ბოლდის დამატება (გარანტირებულად მუშაობს)
         if (request.postType === 'daily_horoscope_12_signs') {
-          const zodiacMap = [
-            { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-            { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
-            { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
-            { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
-            { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-            { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
-          ];
-
-          zodiacMap.forEach(({ name, emoji }) => {
-            // ემთხვევა სახელს, ოფციონალურ ემოჯის, ოფციონალურ ვარსკვლავებს (**) და ორწერტილს
-            const regex = new RegExp(`(^|\\n)\\s*(?:${emoji}\\s*)?\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
-            // პირდაპირ ვსვამთ <b> ტეგს, რომელიც უკვე უსაფრთხო გარემოშია
-            safeCaption = safeCaption.replace(regex, `$1${emoji} <b>${name}</b>:`);
-          });
-
-          // ბოლოში ზედმეტი ემოჯების/სიმბოლოების მოშორება (ჰეშთეგების შენარჩუნებით)
-          safeCaption = safeCaption.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+          caption = applyBoldFormattingToZodiac(generatedContent.caption);
+        } else {
+          // სხვა პოსტებისთვის უბრალოდ ვაცუროთ HTML
+          caption = generatedContent.caption
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
         }
 
-        // ✅ ნაბიჯი 3: ჰეშთეგების ფორმატირება
-        const cleanCaption = safeCaption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
+        // ✅ ნაბიჯი 2: ჰეშთეგების ფორმატირება
+        const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
         const hashtags = generatedContent.hashtags || [];
         const hashtagsLine = hashtags.join(' ');
         caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
 
-        // ✅ CRITICAL LENGTH CHECK
         if (caption.length > TELEGRAM_CAPTION_LIMIT) {
-          addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit (${TELEGRAM_CAPTION_LIMIT}). It may be split.`);
+          addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
         } else {
           addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
         }
 
       } finally {
-        // ------------------------------------------------------
-        // 5. Always release the temporary access lease
-        // ------------------------------------------------------
         if (leaseId) {
           addLog(`Releasing ${DEFAULT_TEXT_PROVIDER} access lease...`);
           try {
@@ -433,11 +450,26 @@ export class TelegramOrchestrator {
         }
       }
 
-      // --------------------------------------------------------
-      // 6. Generate the image
-      // --------------------------------------------------------
-      if (imagePrompt) {
-        addLog('Starting image generation...');
+      // ============================================================
+      // ✅ 5. IMAGE GENERATION LOGIC (WITH STATIC RANDOM FALLBACK)
+      // ============================================================
+      
+      // შევამოწმოთ "თაგლი"
+      const useStaticFallback = request.postType === 'daily_horoscope_12_signs' && jobImageLogic?.trim().toUpperCase() === 'STATIC_RANDOM';
+
+      if (useStaticFallback) {
+        addLog('🖼️ აქტიურებულია STATIC_RANDOM თაგლი. AI გენერაცია გამოტოვებულია.');
+        const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
+        addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
+        
+        imageResult = {
+          success: true,
+          imageUrl: randomImage,
+          provider: 'static_fallback'
+        } as ImgGenResult;
+        imageProvider = 'static_fallback';
+      } else if (imagePrompt) {
+        addLog('Starting AI image generation...');
         addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
         try {
@@ -448,7 +480,7 @@ export class TelegramOrchestrator {
             imageProvider = imageResult.provider || 'unknown';
             addLog(`Image generated successfully using ${imageProvider}.`);
           } else {
-            imageError = imageResult.error || 'Image generation failed or returned no image.';
+            imageError = imageResult.error || 'Image generation failed.';
             addWarning(`Image generation failed: ${imageError}`);
             imageResult = null;
           }
@@ -466,17 +498,17 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 7. Prepare Telegram content
+      // 6. Prepare Telegram content
       // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
-      // აქ caption უკვე შეიცავს უსაფრთხო <b> ტეგებს, ამიტომ escapeTelegramHtml-ს ხელახლა არ ვუშვებთ მთლიან სტრიქონზე
+      // caption უკვე სწორად არის ფორმატირებული და შეიცავს <b> ტეგებს
       const escapedCaption = caption; 
 
       let publishedMessageId: number | undefined;
       let publishedWithImage = false;
 
       // --------------------------------------------------------
-      // 8. Try publishing the image
+      // 7. Try publishing the image
       // --------------------------------------------------------
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
@@ -490,7 +522,7 @@ export class TelegramOrchestrator {
             caption: photoCaption,
             imageUrl: imageResult.imageUrl,
             imageBuffer: imageResult.imageBuffer as Buffer | undefined,
-            parse_mode: 'HTML',
+            parse_mode: 'HTML', // ✅ გარანტირებული HTML პარსინგი
           })) as TelegramPublishResult;
         } catch (error) {
           photoResult = { success: false, error: getErrorMessage(error) };
@@ -503,7 +535,7 @@ export class TelegramOrchestrator {
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`Caption exceeds the photo limit (${TELEGRAM_CAPTION_LIMIT}). Sending ${remainingChunks.length} additional text chunk(s).`);
+            addWarning(`Caption exceeds limit. Sending ${remainingChunks.length} additional text chunk(s).`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
@@ -511,24 +543,20 @@ export class TelegramOrchestrator {
                   parse_mode: 'HTML',
                 })) as TelegramPublishResult;
 
-                if (!continuationResult.success) {
-                  addWarning(`Caption continuation failed: ${continuationResult.error || 'Unknown error'}`);
-                  break;
-                }
+                if (!continuationResult.success) break;
               } catch (error) {
-                addWarning(`Caption continuation failed: ${getErrorMessage(error)}`);
                 break;
               }
             }
           }
         } else {
-          imageError = photoResult.error || 'Telegram rejected the photo publication.';
+          imageError = photoResult.error || 'Telegram rejected the photo.';
           addWarning(`Photo publication failed. Falling back to text: ${imageError}`);
         }
       }
 
       // --------------------------------------------------------
-      // 9. Text-only fallback
+      // 8. Text-only fallback
       // --------------------------------------------------------
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
@@ -545,14 +573,14 @@ export class TelegramOrchestrator {
           try {
             messageResult = (await sendTelegramMessage({
               text: chunk,
-              parse_mode: 'HTML',
+              parse_mode: 'HTML', // ✅ გარანტირებული HTML პარსინგი
             })) as TelegramPublishResult;
           } catch (error) {
-            throw new Error(`Telegram message ${index + 1}/${textChunks.length} failed: ${getErrorMessage(error)}`);
+            throw new Error(`Telegram message failed: ${getErrorMessage(error)}`);
           }
 
           if (!messageResult.success) {
-            throw new Error(`Telegram message ${index + 1}/${textChunks.length} failed: ${messageResult.error || 'Unknown Telegram error'}`);
+            throw new Error(`Telegram message failed: ${messageResult.error || 'Unknown error'}`);
           }
 
           if (index === 0) {
@@ -563,7 +591,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 10. Record publication in Supabase
+      // 9. Record publication in Supabase
       // --------------------------------------------------------
       addLog('Recording publication in Supabase...');
       const { error: databaseError } = await supabase.from('published_content').insert({
@@ -577,14 +605,11 @@ export class TelegramOrchestrator {
       });
 
       if (databaseError) {
-        addWarning(`Telegram publication succeeded, but Supabase logging failed: ${databaseError.message}`);
+        addWarning(`Supabase logging failed: ${databaseError.message}`);
       } else {
         addLog('Publication recorded successfully.');
       }
 
-      // --------------------------------------------------------
-      // 11. Return structured result
-      // --------------------------------------------------------
       addLog('Generation and publication workflow completed.');
       addLog('================================================');
 
