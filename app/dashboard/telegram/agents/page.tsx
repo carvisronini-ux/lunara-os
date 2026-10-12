@@ -66,8 +66,10 @@ const STYLES = `
 .agents-root .agent-card > div:nth-child(3) button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;border-radius:12px!important;padding:10px 13px!important;font-size:12px!important;font-weight:800!important;white-space:nowrap;transition:all .18s ease}
 .agents-root .agent-card > div:nth-child(3) button:first-child{background:rgba(255,255,255,.045)!important;border-color:var(--line-2)!important;color:#e7e5f7!important}
 .agents-root .agent-card > div:nth-child(3) button:first-child:hover{background:rgba(255,255,255,.09)!important}
-.agents-root .agent-card > div:nth-child(3) button:nth-child(2){background:rgba(160,144,255,.1)!important;border-color:rgba(192,181,255,.25)!important;color:#d0c8ff!important}
-.agents-root .agent-card > div:nth-child(3) button:nth-child(2):hover{background:rgba(160,144,255,.18)!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(2){background:rgba(255,209,138,.08)!important;border-color:rgba(255,209,138,.25)!important;color:#ffd18a!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(2):hover{background:rgba(255,209,138,.15)!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(3){background:rgba(160,144,255,.1)!important;border-color:rgba(192,181,255,.25)!important;color:#d0c8ff!important}
+.agents-root .agent-card > div:nth-child(3) button:nth-child(3):hover{background:rgba(160,144,255,.18)!important}
 .agents-root .agent-card > div:nth-child(3) button:last-child{background:linear-gradient(135deg,#c4b8ff,#8d79ff)!important;color:#111020!important;box-shadow:0 8px 20px rgba(141,121,255,.18)!important}
 .agents-root .agent-card > div:nth-child(3) button:last-child:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .agents-root .agent-card > div:nth-child(3) button:disabled{cursor:not-allowed;filter:grayscale(.2);transform:none}
@@ -194,12 +196,19 @@ export default function TelegramAgentsPage() {
   const [isChecking, setIsChecking] = useState(false);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
 
+  // Config Modal State
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configAgentType, setConfigAgentType] = useState<string>('');
   const [masterPrompt, setMasterPrompt] = useState('');
   const [thinkingStyle, setThinkingStyle] = useState('');
   const [skills, setSkills] = useState('');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // Jobs Modal State
+  const [showJobsModal, setShowJobsModal] = useState(false);
+  const [jobsAgentType, setJobsAgentType] = useState<string>('');
+  const [agentJobs, setAgentJobs] = useState<any[]>([]);
+  const [isSavingJob, setIsSavingJob] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -228,6 +237,7 @@ export default function TelegramAgentsPage() {
     });
   };
 
+  // --- CONFIG FUNCTIONS ---
   const loadAgentConfig = async (agentType: string) => {
     const { data, error } = await supabase
       .from('agent_config')
@@ -284,6 +294,49 @@ export default function TelegramAgentsPage() {
     setIsSavingConfig(false);
   };
 
+  // --- JOBS FUNCTIONS ---
+  const loadAgentJobs = async (agentType: string) => {
+    const { data, error } = await supabase
+      .from('agent_jobs')
+      .select('*')
+      .eq('agent_type', agentType)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error loading jobs:', error);
+      addAgentLog(`❌ დავალებების ჩატვირთვის შეცდომა: ${error.message}`);
+      return;
+    }
+    setAgentJobs(data || []);
+    addAgentLog(`✅ ${agentType}-ის დავალებები ჩაიტვირთა`);
+  };
+
+  const openJobsModal = async (agentType: string) => {
+    setJobsAgentType(agentType);
+    setShowJobsModal(true);
+    await loadAgentJobs(agentType);
+  };
+
+  const saveJob = async (jobId: string, field: string, value: string) => {
+    setIsSavingJob(jobId);
+    const jobToUpdate = agentJobs.find(j => j.id === jobId);
+    if (!jobToUpdate) return;
+
+    const { error } = await supabase
+      .from('agent_jobs')
+      .update({ [field]: value })
+      .eq('id', jobId);
+
+    if (error) {
+      addAgentLog(`❌ დავალების შენახვის შეცდომა: ${error.message}`);
+    } else {
+      setAgentJobs(prev => prev.map(j => j.id === jobId ? { ...j, [field]: value } : j));
+      addAgentLog(`✅ დავალება წარმატებით შეინახა!`);
+    }
+    setIsSavingJob(null);
+  };
+
+  // --- AGENT CONTROL FUNCTIONS ---
   const toggleAgent = (type: string) => {
     setAgents(prev => {
       const newAgents = prev.map(agent =>
@@ -324,9 +377,7 @@ export default function TelegramAgentsPage() {
         return;
       }
 
-      // ✅ "Run Now" ღილაკისთვის ვიღებთ პირველსავე აქტიურ წესს (დროის შეზღუდვის გარეშე), რათა დაუყოვნებლივ ვატესტოთ
       const nextRule = rules[0];
-
       addAgentLog(`🎯 წესი ნაპოვნია: ${nextRule.content_theme || nextRule.post_type} (მყისიერი გაშვება)`);
       addAgentLog(`🧠 იტვირთება ${agentType} კონფიგურაცია...`);
 
@@ -361,14 +412,12 @@ export default function TelegramAgentsPage() {
       addAgentLog(`✅ კონტენტი წარმატებით შეიქმნა!`);
       addAgentLog(`📝 Caption სიგრძე: ${result.caption?.length || 0} სიმბოლო`);
       
-      // ✅ დეტალური ლოგების გამოტანა სერვერიდან ფრონტენდზე
       if (result.generationLogs && result.generationLogs.length > 0) {
         result.generationLogs.slice().reverse().forEach((log: string) => {
           addAgentLog(log);
         });
       }
 
-      // საბოლოო შეჯამება
       if (result.hasImagePrompt) {
         if (result.imageProvider && result.imageProvider !== 'none') {
           addAgentLog(`🎉 საბოლოო შედეგი: სურათი წარმატებით შეიქმნა (${result.imageProvider})`);
@@ -484,6 +533,15 @@ export default function TelegramAgentsPage() {
                   {Icons.eye}
                   View Profile
                 </button>
+                
+                {/* ✅ ახალი JOBS ღილაკი */}
+                <button
+                  onClick={() => openJobsModal(agent.type)}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--amber)]/25 bg-[var(--amber)]/[.08] px-4 py-2.5 text-sm font-semibold text-[var(--amber)] transition-colors hover:bg-[var(--amber)]/15 sm:flex-none"
+                >
+                  💼 Jobs
+                </button>
+
                 <button
                   onClick={() => openConfigModal(agent.type)}
                   className="flex items-center gap-2 rounded-xl border border-[var(--violet)]/25 bg-[var(--violet)]/[.09] px-4 py-2.5 text-sm font-semibold text-[var(--violet)] transition-colors hover:bg-[var(--violet)]/20 sm:flex-none"
@@ -503,7 +561,6 @@ export default function TelegramAgentsPage() {
           ))}
         </div>
 
-        {/* ✅ განახლებული Live Execution Logs პანელი Copy ღილაკით */}
         <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold flex items-center gap-2">
@@ -533,6 +590,7 @@ export default function TelegramAgentsPage() {
         </div>
       </main>
 
+      {/* ✅ CONFIG MODAL */}
       {showConfigModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowConfigModal(false)}>
           <div className="w-full max-w-3xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)]/98 p-5 sm:p-7 shadow-[0_35px_100px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
@@ -553,65 +611,107 @@ export default function TelegramAgentsPage() {
 
             <div className="space-y-5 max-h-[68vh] overflow-y-auto pr-2 custom-scrollbar">
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--violet)]">
-                  🧠 Master Prompt
-                </label>
-                <textarea
-                  value={masterPrompt}
-                  onChange={(e) => setMasterPrompt(e.target.value)}
-                  placeholder="მაგალითად: შენ ხარ Lunara-ს Daily Anchor ექსპერტი..."
-                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[150px] resize-y"
-                />
-                <p className="mt-1 text-xs text-[var(--mute)]">
-                  ეს არის აგენტის მთავარი პიროვნება, როლი და საბოლოო მიზანი.
-                </p>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--violet)]">🧠 Master Prompt</label>
+                <textarea value={masterPrompt} onChange={(e) => setMasterPrompt(e.target.value)} placeholder="მაგალითად: შენ ხარ Lunara-ს Daily Anchor ექსპერტი..." className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[150px] resize-y" />
+                <p className="mt-1 text-xs text-[var(--mute)]">ეს არის აგენტის მთავარი პიროვნება, როლი და საბოლოო მიზანი.</p>
               </div>
-
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--amber)]">
-                  🧠 Thinking Style
-                </label>
-                <textarea
-                  value={thinkingStyle}
-                  onChange={(e) => setThinkingStyle(e.target.value)}
-                  placeholder="მაგალითად: იფიქრე ნაბიჯ-ნაბიჯ..."
-                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
-                />
-                <p className="mt-1 text-xs text-[var(--mute)]">
-                  როგორ უნდა მიუდგეს აგენტი ამოცანას (Chain of Thought, ტონალობა, სტილი).
-                </p>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--amber)]">🧠 Thinking Style</label>
+                <textarea value={thinkingStyle} onChange={(e) => setThinkingStyle(e.target.value)} placeholder="მაგალითად: იფიქრე ნაბიჯ-ნაბიჯ..." className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y" />
+                <p className="mt-1 text-xs text-[var(--mute)]">როგორ უნდა მიუდგეს აგენტი ამოცანას (Chain of Thought, ტონალობა, სტილი).</p>
               </div>
-
               <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ok)]">
-                  🛡️ Skills & Constraints
-                </label>
-                <textarea
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  placeholder="მაგალითად: არასდროს გამოიყენო სიტყვები 'გარანტირებული'..."
-                  className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y"
-                />
-                <p className="mt-1 text-xs text-[var(--mute)]">
-                  მკაცრი წესები, რისი გაკეთება შეუძლია და რისი კატეგორიულად არა.
-                </p>
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ok)]">🛡️ Skills & Constraints</label>
+                <textarea value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="მაგალითად: არასდროს გამოიყენო სიტყვები 'გარანტირებული'..." className="w-full rounded-2xl border border-[var(--line-2)] bg-black/20 px-4 py-3.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--violet)]/70 focus:bg-black/25 focus:ring-4 focus:ring-[var(--violet)]/5 min-h-[125px] resize-y" />
+                <p className="mt-1 text-xs text-[var(--mute)]">მკაცრი წესები, რისი გაკეთება შეუძლია და რისი კატეგორიულად არა.</p>
               </div>
             </div>
 
             <div className="mt-6 flex gap-3 border-t border-[var(--line)] pt-4">
-              <button
-                onClick={() => setShowConfigModal(false)}
-                className="flex-1 rounded-xl border border-[var(--line-2)] bg-white/[.025] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveAgentConfig}
-                disabled={isSavingConfig}
-                className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] py-3 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.2)] transition-opacity hover:opacity-90 disabled:opacity-50"
-              >
+              <button onClick={() => setShowConfigModal(false)} className="flex-1 rounded-xl border border-[var(--line-2)] bg-white/[.025] py-3 text-sm font-semibold transition-colors hover:bg-white/5">Cancel</button>
+              <button onClick={saveAgentConfig} disabled={isSavingConfig} className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] py-3 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.2)] transition-opacity hover:opacity-90 disabled:opacity-50">
                 {isSavingConfig ? 'Saving...' : 'Save Configuration'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ JOBS MODAL */}
+      {showJobsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md" onClick={() => setShowJobsModal(false)}>
+          <div className="w-full max-w-4xl rounded-3xl border border-[var(--line-2)] bg-[var(--ink-2)]/98 p-5 sm:p-7 shadow-[0_35px_100px_rgba(0,0,0,.55)]" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--amber)]/20 text-[var(--amber)] text-xl">💼</div>
+                <div>
+                  <h3 className="text-lg font-semibold">Agent Jobs: {jobsAgentType.replace(/_/g, ' ').toUpperCase()}</h3>
+                  <p className="text-xs text-[var(--mute)]">მართე კონკრეტული დავალებები და ფოტოს გენერაციის ლოგიკა</p>
+                </div>
+              </div>
+              <button onClick={() => setShowJobsModal(false)} className="rounded-full p-2 text-[var(--mute)] transition-colors hover:bg-white/5 hover:text-[var(--moon)]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar">
+              {agentJobs.length === 0 ? (
+                <p className="text-center text-[var(--mute)] py-8">დავალებები ვერ მოიძებნა. გთხოვთ, ჯერ შექმნათ ისინი Supabase-ში.</p>
+              ) : (
+                agentJobs.map((job) => (
+                  <div key={job.id} className="rounded-2xl border border-[var(--line)] bg-black/20 p-5 transition-all hover:border-[var(--amber)]/30">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-base font-bold text-[var(--moon)]">{job.job_name}</h4>
+                        <span className="inline-block mt-1.5 rounded-md bg-[var(--violet)]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--violet)] border border-[var(--violet)]/20">
+                          {job.post_type}
+                        </span>
+                      </div>
+                      {isSavingJob === job.id && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ok)] animate-pulse">Saving...</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mute)]">
+                          📝 დავალების აღწერა (Description)
+                        </label>
+                        <textarea
+                          value={job.description || ''}
+                          onChange={(e) => {
+                            const updatedJobs = agentJobs.map(j => j.id === job.id ? {...j, description: e.target.value} : j);
+                            setAgentJobs(updatedJobs);
+                          }}
+                          onBlur={(e) => saveJob(job.id, 'description', e.target.value)}
+                          className="w-full rounded-xl border border-[var(--line-2)] bg-black/30 px-3 py-2.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--amber)]/70 focus:bg-black/40 focus:ring-2 focus:ring-[var(--amber)]/10 min-h-[80px] resize-y"
+                          placeholder="აღწერე რა უნდა გააკეთოს ამ დავალების დროს..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--ok)]">
+                          🎨 ფოტოს გენერაციის ლოგიკა (Image Prompt Logic)
+                        </label>
+                        <textarea
+                          value={job.image_prompt_logic || ''}
+                          onChange={(e) => {
+                            const updatedJobs = agentJobs.map(j => j.id === job.id ? {...j, image_prompt_logic: e.target.value} : j);
+                            setAgentJobs(updatedJobs);
+                          }}
+                          onBlur={(e) => saveJob(job.id, 'image_prompt_logic', e.target.value)}
+                          className="w-full rounded-xl border border-[var(--line-2)] bg-black/30 px-3 py-2.5 text-sm outline-none transition-all placeholder:text-[var(--mute)]/60 focus:border-[var(--ok)]/70 focus:bg-black/40 focus:ring-2 focus:ring-[var(--ok)]/10 min-h-[100px] resize-y font-mono"
+                          placeholder="ზუსტი ინსტრუქცია AI-სთვის, როგორ შეადგინოს ფოტოს პრომპტი ამ კონკრეტული პოსტისთვის..."
+                        />
+                        <p className="mt-1.5 flex items-center gap-1.5 text-[10px] text-[var(--mute)]">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                          შენახვა ხდება ავტომატურად, როცა ველიდან გახვალ (Blur).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
