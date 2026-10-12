@@ -335,7 +335,7 @@ export default function TelegramAgentsPage() {
         .order('priority', { ascending: true });
 
       if (error || !rules || rules.length === 0) {
-        addAgentLog(`⚠️ ${agentType}-ისთვის აქტიური წესი ვერ მოიძებნა.`);
+        addAgentLog(`⚠️ ${agentType}-ისთვის აქტიური წესი ვერ მოიძებნა. (ყველა დაპოსტილია ან გათიშული)`);
         setIsChecking(false);
         return;
       }
@@ -395,6 +395,19 @@ export default function TelegramAgentsPage() {
 
       addAgentLog(`📤 Telegram-ში გაიგზავნა! Message ID: ${result.messageId}`);
       addAgentLog(`🎉 ${agentName}-მა წარმატებით დაასრულა ციკლი!`);
+
+      // ✅ ახალი: დაპოსტებული განრიგის გათიშვა
+      addAgentLog(`🔄 განრიგი "${nextRule.content_theme || nextRule.post_type}" ხდება არააქტიური...`);
+      const { error: updateError } = await supabase
+        .from('telegram_schedule')
+        .update({ is_active: false })
+        .eq('id', nextRule.id);
+
+      if (updateError) {
+        addAgentLog(`⚠️ განრიგის გათიშვის შეცდომა: ${updateError.message}`);
+      } else {
+        addAgentLog(`✅ განრიგი წარმატებით გაითიშა. შემდეგი გაშვებისას შემდეგი აქტიური წესი შესრულდება.`);
+      }
 
       setAgents(prev => prev.map(a => a.type === agentType ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
 
