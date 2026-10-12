@@ -255,7 +255,7 @@ export class TelegramOrchestrator {
       addLog('Agent configuration loaded successfully.');
 
       // --------------------------------------------------------
-      // 2. Load Job-Specific Instructions (NEW!)
+      // 2. Load Job-Specific Instructions
       // --------------------------------------------------------
       addLog('Loading job-specific instructions from agent_jobs...');
       let jobImageLogic = '';
@@ -316,12 +316,10 @@ export class TelegramOrchestrator {
           throw new Error(`Could not decrypt the ${DEFAULT_TEXT_PROVIDER} API key. Check vault permissions.`);
         }
 
-        // ✅ DYNAMIC MODEL SELECTION: Use recommendedModel from metadata, fallback to default
         const targetModel = credential.metadata?.recommendedModel || DEFAULT_GROQ_MODEL;
         addLog(`Using model: ${targetModel} (from metadata or fallback)`);
         addLog('Building generation prompts...');
 
-        // ✅ SYSTEM PROMPT: 100% driven by database configuration + JOB INSTRUCTIONS
         const systemPrompt = [
           config.master_prompt,
           '',
@@ -339,7 +337,6 @@ export class TelegramOrchestrator {
           'Never expose internal reasoning.',
         ].join('\n');
 
-        // ✅ USER PROMPT: Only dynamic request parameters
         const userPrompt = buildUserPrompt(request);
         
         addLog('Sending content-generation request...');
@@ -387,6 +384,27 @@ export class TelegramOrchestrator {
 
         caption = generatedContent.caption;
         imagePrompt = generatedContent.image_prompt || '';
+
+        // ✅ AUTO-FORMAT: Ensure zodiac signs have emojis and bold formatting
+        if (request.postType === 'daily_horoscope_12_signs') {
+          const zodiacMap = [
+            { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+            { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+            { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
+            { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
+            { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
+            { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+          ];
+
+          zodiacMap.forEach(({ name, emoji }) => {
+            // Match the sign name followed by a colon, with optional existing emoji or asterisks
+            const regex = new RegExp(`(^|\\n)\\s*(?:${emoji}\\s*)?\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
+            caption = caption.replace(regex, `$1${emoji} **${name}**:`);
+          });
+
+          // Remove trailing emojis or random symbols at the very end of the caption (preserve hashtags)
+          caption = caption.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+        }
 
         // ✅ HASHTAG DEDUPLICATION & FORMATTING
         const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
