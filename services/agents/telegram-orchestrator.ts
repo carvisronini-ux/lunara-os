@@ -358,7 +358,7 @@ export class TelegramOrchestrator {
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
               ],
-              temperature: 0.7
+              temperature: 0.3
             }),
             signal: controller.signal,
           });
