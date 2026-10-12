@@ -1,12 +1,7 @@
 // /home/carvisronini-ux/lunara-os/components/agent-jobs-modal.tsx
 "use client";
 
-import {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -21,6 +16,7 @@ interface AgentJob {
   post_type: string;
   description?: string | null;
   image_prompt_logic?: string | null;
+  use_ai_image?: boolean | null; // ✅ ახალი ველი
   created_at?: string;
   [key: string]: unknown;
 }
@@ -32,7 +28,7 @@ interface AgentJobsModalProps {
   onLog: (msg: string) => void;
 }
 
-type EditableField = "description" | "image_prompt_logic";
+type EditableField = "description" | "image_prompt_logic" | "use_ai_image"; // ✅ განახლებული ტიპი
 
 interface JobStyle {
   icon: string;
@@ -45,77 +41,23 @@ interface JobStyle {
 const getJobStyle = (postType: string): JobStyle => {
   switch (postType) {
     case "daily_energy":
-      return {
-        icon: "☀️",
-        accent: "#F6BD60",
-        soft: "rgba(246,189,96,.12)",
-        border: "rgba(246,189,96,.30)",
-        label: "დღის ენერგია",
-      };
+      return { icon: "☀️", accent: "#F6BD60", soft: "rgba(246,189,96,.12)", border: "rgba(246,189,96,.30)", label: "დღის ენერგია" };
     case "daily_horoscope_12_signs":
-      return {
-        icon: "♈",
-        accent: "#B9A2FF",
-        soft: "rgba(185,162,255,.12)",
-        border: "rgba(185,162,255,.30)",
-        label: "12 ნიშნის ჰოროსკოპი",
-      };
+      return { icon: "♈", accent: "#B9A2FF", soft: "rgba(185,162,255,.12)", border: "rgba(185,162,255,.30)", label: "12 ნიშნის ჰოროსკოპი" };
     case "daily_horoscope_single":
-      return {
-        icon: "✦",
-        accent: "#7DCBFF",
-        soft: "rgba(125,203,255,.12)",
-        border: "rgba(125,203,255,.30)",
-        label: "ერთი ნიშნის ჰოროსკოპი",
-      };
+      return { icon: "✦", accent: "#7DCBFF", soft: "rgba(125,203,255,.12)", border: "rgba(125,203,255,.30)", label: "ერთი ნიშნის ჰოროსკოპი" };
     case "daily_tarot_card":
-      return {
-        icon: "✧",
-        accent: "#F3A6D5",
-        soft: "rgba(243,166,213,.12)",
-        border: "rgba(243,166,213,.30)",
-        label: "ტაროს ბარათი",
-      };
+      return { icon: "✧", accent: "#F3A6D5", soft: "rgba(243,166,213,.12)", border: "rgba(243,166,213,.30)", label: "ტაროს ბარათი" };
     case "morning_question":
-      return {
-        icon: "🌅",
-        accent: "#75D9B0",
-        soft: "rgba(117,217,176,.12)",
-        border: "rgba(117,217,176,.30)",
-        label: "დილის კითხვა",
-      };
+      return { icon: "🌅", accent: "#75D9B0", soft: "rgba(117,217,176,.12)", border: "rgba(117,217,176,.30)", label: "დილის კითხვა" };
     case "evening_reflection":
-      return {
-        icon: "🌙",
-        accent: "#B9B8FF",
-        soft: "rgba(185,184,255,.12)",
-        border: "rgba(185,184,255,.30)",
-        label: "საღამოს რეფლექსია",
-      };
+      return { icon: "🌙", accent: "#B9B8FF", soft: "rgba(185,184,255,.12)", border: "rgba(185,184,255,.30)", label: "საღამოს რეფლექსია" };
     case "weekly_start_message":
-      return {
-        icon: "✦",
-        accent: "#84B9FF",
-        soft: "rgba(132,185,255,.12)",
-        border: "rgba(132,185,255,.30)",
-        label: "კვირის დასაწყისი",
-      };
+      return { icon: "✦", accent: "#84B9FF", soft: "rgba(132,185,255,.12)", border: "rgba(132,185,255,.30)", label: "კვირის დასაწყისი" };
     case "monthly_start_themes":
-      return {
-        icon: "🌌",
-        accent: "#D0A7FF",
-        soft: "rgba(208,167,255,.12)",
-        border: "rgba(208,167,255,.30)",
-        label: "თვის თემები",
-      };
+      return { icon: "🌌", accent: "#D0A7FF", soft: "rgba(208,167,255,.12)", border: "rgba(208,167,255,.30)", label: "თვის თემები" };
     default:
-      return {
-        icon: "✧",
-        accent: "#C5C9D8",
-        soft: "rgba(197,201,216,.10)",
-        border: "rgba(197,201,216,.25)",
-        label: postType.replace(/_/g, " "),
-      };
+      return { icon: "✧", accent: "#C5C9D8", soft: "rgba(197,201,216,.10)", border: "rgba(197,201,216,.25)", label: postType.replace(/_/g, " ") };
   }
 };
 
@@ -130,23 +72,21 @@ const POST_TYPE_OPTIONS = [
   { value: "monthly_start_themes", label: "თვის თემები" },
 ];
 
-export default function AgentJobsModal({
-  agentType,
-  isOpen,
-  onClose,
-  onLog,
-}: AgentJobsModalProps) {
+export default function AgentJobsModal({ agentType, isOpen, onClose, onLog }: AgentJobsModalProps) {
   const [agentJobs, setAgentJobs] = useState<AgentJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [isSavingJob, setIsSavingJob] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false); // ✅ ახალი: წარმატებული შენახვის სტატუსი
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  
+  // Create form states
   const [newJobName, setNewJobName] = useState("");
   const [newJobPostType, setNewJobPostType] = useState("daily_energy");
   const [newJobDescription, setNewJobDescription] = useState("");
   const [newJobImageLogic, setNewJobImageLogic] = useState("");
+  const [newJobUseAiImage, setNewJobUseAiImage] = useState(true); // ✅ ახალი
   const [isCreatingJob, setIsCreatingJob] = useState(false);
 
   const onLogRef = useRef(onLog);
@@ -204,7 +144,7 @@ export default function AgentJobsModal({
   }, [isOpen, agentType, loadAgentJobs]);
 
   const saveJob = useCallback(
-    async (jobId: string, field: EditableField, value: string) => {
+    async (jobId: string, field: EditableField, value: string | boolean) => { // ✅ განახლებული ტიპი
       const saveKey = `${jobId}:${field}`;
       if (savingRef.current.has(saveKey)) return;
 
@@ -230,9 +170,9 @@ export default function AgentJobsModal({
           )
         );
 
-        onLogRef.current(`✅ "${field === "description" ? "აღწერა" : "ფოტოს გენერაციის ლოგიკა"}" წარმატებით შეინახა ბაზაში!`);
+        const fieldName = field === "description" ? "აღწერა" : field === "image_prompt_logic" ? "ფოტოს გენერაციის ლოგიკა" : "AI ფოტოს გენერაცია";
+        onLogRef.current(`✅ "${fieldName}" წარმატებით შეინახა ბაზაში!`);
         
-        // ✅ ვაჩვენებთ წარმატების შეტყობინებას 2.5 წამით
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 2500);
 
@@ -264,6 +204,7 @@ export default function AgentJobsModal({
           post_type: newJobPostType,
           description: newJobDescription.trim() || null,
           image_prompt_logic: newJobImageLogic.trim() || null,
+          use_ai_image: newJobUseAiImage, // ✅ ახალი
         })
         .select()
         .single();
@@ -281,6 +222,7 @@ export default function AgentJobsModal({
       setNewJobPostType("daily_energy");
       setNewJobDescription("");
       setNewJobImageLogic("");
+      setNewJobUseAiImage(true); // ✅ რესეტი
       setShowCreateForm(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "უცნობი შეცდომა";
@@ -289,7 +231,7 @@ export default function AgentJobsModal({
     } finally {
       setIsCreatingJob(false);
     }
-  }, [agentType, newJobName, newJobPostType, newJobDescription, newJobImageLogic]);
+  }, [agentType, newJobName, newJobPostType, newJobDescription, newJobImageLogic, newJobUseAiImage]);
 
   const selectedJob = agentJobs.find((job) => job.id === selectedJobId);
   const isEditing = Boolean(selectedJob);
@@ -489,12 +431,32 @@ export default function AgentJobsModal({
                           )
                         );
                       }}
+                      onBlur={(event) => void saveJob(selectedJob.id, "description", event.target.value)}
                       className="min-h-[140px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#080811]/80 px-4 py-3.5 text-sm leading-6 text-white/85 outline-none transition placeholder:text-white/25 focus:border-violet-300/40 focus:ring-2 focus:ring-violet-300/[0.07]"
                       placeholder="აღწერე დავალების მიზანი და შესრულების წესები..."
                     />
                   </div>
 
-                  <div>
+                  {/* ✅ ახალი: AI ფოტოს გენერაციის ჩართვა/გამორთვის ღილაკი */}
+                  <div className="flex items-center justify-between rounded-xl border border-white/[0.09] bg-[#080811]/80 p-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-white/85">AI ფოტოს გენერაცია</h4>
+                      <p className="text-xs text-white/40">თუ გამორთულია, სისტემა ავტომატურად გამოიყენებს სარეზერვო სტატიკურ სურათს.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void saveJob(selectedJob.id, "use_ai_image", !(selectedJob.use_ai_image ?? true))}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                        (selectedJob.use_ai_image ?? true) ? "bg-emerald-500" : "bg-gray-600"
+                      }`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                        (selectedJob.use_ai_image ?? true) ? "translate-x-6" : "translate-x-1"
+                      }`} />
+                    </button>
+                  </div>
+
+                  <div className={(selectedJob.use_ai_image ?? true) ? "opacity-100" : "opacity-40 pointer-events-none transition-opacity"}>
                     <label htmlFor="agent-job-image-logic" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✧</span>
                       ფოტოს გენერაციის ლოგიკა
@@ -513,6 +475,7 @@ export default function AgentJobsModal({
                           )
                         );
                       }}
+                      onBlur={(event) => void saveJob(selectedJob.id, "image_prompt_logic", event.target.value)}
                       className="min-h-[180px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#080811]/80 px-4 py-3.5 font-mono text-[13px] leading-6 text-emerald-100/80 outline-none transition placeholder:text-white/25 focus:border-emerald-300/40 focus:ring-2 focus:ring-emerald-300/[0.06]"
                       placeholder="მიუთითე ვიზუალური სტილი, კომპოზიცია, განათება და სხვა მოთხოვნები..."
                     />
@@ -530,7 +493,6 @@ export default function AgentJobsModal({
                       გაუქმება
                     </button>
 
-                    {/* ✅ განახლებული შენახვის ღილაკი ვიზუალური დადასტურებით */}
                     <button
                       type="button"
                       onClick={() => {
@@ -539,6 +501,7 @@ export default function AgentJobsModal({
                         if (job) {
                           void saveJob(selectedJobId, "description", job.description || "");
                           void saveJob(selectedJobId, "image_prompt_logic", job.image_prompt_logic || "");
+                          void saveJob(selectedJobId, "use_ai_image", job.use_ai_image ?? true);
                         }
                       }}
                       disabled={isSavingJob === selectedJobId || saveSuccess}
@@ -618,21 +581,26 @@ export default function AgentJobsModal({
                     </select>
                   </div>
 
-                  <div>
-                    <label htmlFor="new-job-description" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
-                      <span className="text-base">✎</span>
-                      დავალების აღწერა
-                    </label>
-                    <textarea
-                      id="new-job-description"
-                      value={newJobDescription}
-                      onChange={(event) => setNewJobDescription(event.target.value)}
-                      className="min-h-[120px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#080811]/80 px-4 py-3.5 text-sm leading-6 text-white/85 outline-none transition placeholder:text-white/25 focus:border-violet-300/40 focus:ring-2 focus:ring-violet-300/[0.07]"
-                      placeholder="აღწერე დავალების მიზანი და შესრულების წესები..."
-                    />
+                  {/* ✅ ახალი: შექმნის ფორმაშიც Toggle */}
+                  <div className="flex items-center justify-between rounded-xl border border-white/[0.09] bg-[#080811]/80 p-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-white/85">AI ფოტოს გენერაცია</h4>
+                      <p className="text-xs text-white/40">ჩართულია ნაგულისხმევად.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewJobUseAiImage(!newJobUseAiImage)}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                        newJobUseAiImage ? "bg-emerald-500" : "bg-gray-600"
+                      }`}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                        newJobUseAiImage ? "translate-x-6" : "translate-x-1"
+                      }`} />
+                    </button>
                   </div>
 
-                  <div>
+                  <div className={newJobUseAiImage ? "opacity-100" : "opacity-40 pointer-events-none transition-opacity"}>
                     <label htmlFor="new-job-image-logic" className="mb-2.5 flex items-center gap-2 text-sm font-medium text-white/85">
                       <span className="text-base">✧</span>
                       ფოტოს გენერაციის ლოგიკა
