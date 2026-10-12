@@ -185,7 +185,7 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 }
 
 /**
- * ✅ განახლებული: მკაცრი ლიმიტებით და კონტექსტზე მორგებული ფოტოს პრომპტის ფორმულით
+ * ✅ იდეალური პრომპტი: მკაცრი ლიმიტებით და კონტექსტზე მორგებული ფოტოს ფორმულით
  */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
