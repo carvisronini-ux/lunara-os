@@ -358,7 +358,7 @@ export class TelegramOrchestrator {
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
               ],
-              temperature: 0.3
+              temperature: 0.3 // ✅ შემცირებულია ზუსტი ფორმატირებისთვის
             }),
             signal: controller.signal,
           });
@@ -401,6 +401,9 @@ export class TelegramOrchestrator {
             const regex = new RegExp(`(^|\\n)\\s*(?:${emoji}\\s*)?\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
             caption = caption.replace(regex, `$1${emoji} **${name}**:`);
           });
+
+          // ✅ ახალი ხაზი: Markdown ბოლდის (**text**) HTML ბოლდში (<b>text</b>) გადაყვანა Telegram-ისთვის
+          caption = caption.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
           // Remove trailing emojis or random symbols at the very end of the caption (preserve hashtags)
           caption = caption.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
