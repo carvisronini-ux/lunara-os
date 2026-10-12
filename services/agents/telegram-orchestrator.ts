@@ -49,13 +49,13 @@ interface TelegramPublishResult {
 // CONSTANTS
 // ============================================================
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEFAULT_TEXT_PROVIDER = 'groq'; // Fallback provider name
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
 const TELEGRAM_MESSAGE_LIMIT = 3_800;
-const TELEGRAM_CAPTION_LIMIT = 950;
+const TELEGRAM_CAPTION_LIMIT = 950; // Safe limit for photo captions (hard limit is 1024)
 const MAX_ERROR_LENGTH = 1_500;
 
 // ============================================================
@@ -115,9 +115,7 @@ function splitTelegramText(text: string, maxLength: number): string[] {
     return [];
   }
 
-  const tokens =
-    text.match(/&(?:amp|lt|gt|quot|#39);|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
-
+  const tokens = text.match(/&(?:amp|lt|gt|quot|#39);|[\uD800-\uDBFF][\uDC00-\uDFFF]|[\s\S]/g) ?? [];
   const chunks: string[] = [];
   let current = '';
 
@@ -184,44 +182,18 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 }
 
 /**
- * ✅ განახლებული: მკაცრი აკრძალვა ჰაშთაგების caption-ში ჩაწერაზე
+ * ✅ მხოლოდ დინამიური პარამეტრების გადაცემა.
+ * ყველა სტატიკური წესი, სტილი და შეზღუდვა მოდის Supabase-დან (systemPrompt).
  */
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
-Task: Create a high-quality Telegram post for the Lunara astrology brand.
+Request Parameters:
+- Agent Type: ${request.agentType}
+- Post Type: ${request.postType}
+- Content Theme: ${request.contentTheme || 'Automatic (choose an appropriate theme)'}
+- Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
-Category: ${request.agentType}
-Post type: ${request.postType}
-Theme: ${request.contentTheme || 'Choose an appropriate theme for this category'}
-Zodiac sign: ${request.zodiacSign || 'General / All signs'}
-
-CONTENT REQUIREMENTS (STRICT):
-- STRICT LENGTH LIMIT: Maximum 800 characters for the caption text (hashtags will be added automatically, bringing total to ~850).
-- If listing all 12 zodiac signs, use ONLY 1 short, punchy sentence per sign.
-- Tone: Engaging, empathetic, mystical, natural-sounding.
-- Avoid repetitive, generic AI language, guaranteed predictions, or high-stakes promises.
-- Include a clear, natural call to action at the end.
-- CRITICAL: Do NOT include any hashtags inside the "caption" field. They will be added automatically by the system.
-
-IMAGE PROMPT REQUIREMENTS (STRICT & CONTEXT-AWARE):
-1. FIRST, analyze the core theme of the caption you are generating. 
-2. SECOND, translate THAT SPECIFIC THEME into a visual description. (e.g., If the post is about all 12 zodiac signs, describe a cosmic wheel with 12 subtle symbols. If it's about tarot, describe a mystical card).
-3. THIRD, construct the "image_prompt" using EXACTLY this structure:
-"[Specific Subject related to post theme], [Background/Setting], [Lighting & Atmosphere], [Art Style/Medium]. NO text, NO typography, NO logos, NO watermarks, NO letters."
-
-EXAMPLES OF PERFECT IMAGE PROMPTS:
-- For a 12-sign post: "A beautiful cosmic wheel featuring subtle, elegant, glowing symbols of all 12 zodiac signs, deep purple velvet night sky background, soft milky white and gold ethereal glow, dark luxury editorial photography, 8k, highly detailed, photorealistic. NO text, NO letters."
-- For a Tarot post: "A single, glowing, ornate tarot card floating in a mystical void, deep midnight blue background, cinematic lighting, dark luxury aesthetic, 8k resolution. NO text, NO writing on the card."
-
-OUTPUT REQUIREMENTS:
-Return ONLY a valid JSON object. Do not include Markdown fences or explanations.
-{
-  "caption": "The complete post text WITHOUT ANY HASHTAGS (max 800 chars)",
-  "image_prompt": "Detailed English prompt following the strict, context-aware formula above",
-  "hashtags": ["#LUNARA", "#RelevantHashtag1", "#RelevantHashtag2"]
-}
-
-Ensure that all JSON strings are properly escaped.
+Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
@@ -262,6 +234,9 @@ export class TelegramOrchestrator {
         throw new Error('Both agentType and postType are required.');
       }
 
+      // --------------------------------------------------------
+      // 1. Load agent configuration from Supabase
+      // --------------------------------------------------------
       addLog('Loading agent configuration from Supabase...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
@@ -278,14 +253,21 @@ export class TelegramOrchestrator {
       }
 
       addLog('Agent configuration loaded successfully.');
+
+      // --------------------------------------------------------
+      // 2. Wait for Credential Vault
+      // --------------------------------------------------------
       addLog('Waiting for CredentialVault initialization...');
       await credentialVault.ready;
       addLog('CredentialVault is ready.');
 
-      addLog('Requesting temporary Groq access lease...');
+      // --------------------------------------------------------
+      // 3. Acquire temporary access lease for Text Generation
+      // --------------------------------------------------------
+      addLog(`Requesting temporary access lease for ${DEFAULT_TEXT_PROVIDER}...`);
       leaseId = accessManager.requestAccess(
         `${request.agentType}-agent`,
-        'groq',
+        DEFAULT_TEXT_PROVIDER,
         'spend',
         `Generate Telegram content for ${request.postType}`,
         null,
@@ -293,27 +275,29 @@ export class TelegramOrchestrator {
       );
 
       if (!leaseId) {
-        throw new Error('Could not acquire Groq access. Check AccessManager permissions and logs.');
+        throw new Error(`Could not acquire ${DEFAULT_TEXT_PROVIDER} access. Check AccessManager permissions.`);
       }
-      addLog('Groq access lease acquired.');
+      addLog(`${DEFAULT_TEXT_PROVIDER} access lease acquired.`);
 
       try {
-        addLog('Retrieving Groq credentials from the vault...');
-        const credential = credentialVault.getCredentialByProvider('groq', 'spend');
+        addLog(`Retrieving ${DEFAULT_TEXT_PROVIDER} credentials from the vault...`);
+        const credential = credentialVault.getCredentialByProvider(DEFAULT_TEXT_PROVIDER as any, 'spend');
 
         if (!credential) {
-          throw new Error('Groq credentials were not found. Add a valid credential in the API Vault.');
+          throw new Error(`${DEFAULT_TEXT_PROVIDER} credentials were not found. Add a valid credential in the API Vault.`);
         }
 
         const apiKey = credentialVault.getDecryptedValue(credential.credential_id, `${request.agentType}-agent`);
         if (!apiKey) {
-          throw new Error('Could not decrypt the Groq API key. Check vault permissions.');
+          throw new Error(`Could not decrypt the ${DEFAULT_TEXT_PROVIDER} API key. Check vault permissions.`);
         }
 
+        // ✅ DYNAMIC MODEL SELECTION: Use recommendedModel from metadata, fallback to default
         const targetModel = credential.metadata?.recommendedModel || DEFAULT_GROQ_MODEL;
-        addLog(`Using Groq model: ${targetModel}`);
+        addLog(`Using model: ${targetModel} (from metadata or fallback)`);
         addLog('Building generation prompts...');
 
+        // ✅ SYSTEM PROMPT: 100% driven by database configuration
         const systemPrompt = [
           config.master_prompt,
           '',
@@ -328,15 +312,17 @@ export class TelegramOrchestrator {
           'Never expose internal reasoning.',
         ].join('\n');
 
+        // ✅ USER PROMPT: Only dynamic request parameters
         const userPrompt = buildUserPrompt(request);
-        addLog('Sending content-generation request to Groq...');
+        
+        addLog('Sending content-generation request...');
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
         let response: Response;
         try {
-          response = await fetch(GROQ_API_URL, {
+          response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${apiKey}`,
@@ -354,57 +340,68 @@ export class TelegramOrchestrator {
           });
         } catch (error) {
           if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error(`Groq request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
+            throw new Error(`Request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
           }
-          throw new Error(`Could not connect to Groq: ${getErrorMessage(error)}`);
+          throw new Error(`Could not connect to provider: ${getErrorMessage(error)}`);
         } finally {
           clearTimeout(timeoutId);
         }
 
         if (!response.ok) {
           const errorText = truncateError(await response.text().catch(() => 'No response body'));
-          throw new Error(`Groq API returned HTTP ${response.status}: ${errorText}`);
+          throw new Error(`API returned HTTP ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
         const rawContent = data?.choices?.[0]?.message?.content;
 
-        addLog('Groq response received. Validating generated JSON...');
+        addLog('Response received. Validating generated JSON...');
         const generatedContent = parseGeneratedContent(rawContent);
 
         caption = generatedContent.caption;
         imagePrompt = generatedContent.image_prompt || '';
 
-        // ✅ გასწორებულია: ჰაშთაგების დუბლირების თავიდან აცილება
-        // 1. ვშლით ნებისმიერ ჰაშთაგს, რომელიც AI-მ შემთხვევით ჩაწერა caption-ის ბოლოში
+        // ✅ HASHTAG DEDUPLICATION & FORMATTING
+        // 1. Remove any hashtags the AI might have accidentally placed at the end of the caption
         const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
         
-        // 2. ვაერთიანებთ სისტემურ ჰაშთაგებს ერთ ხაზზე
+        // 2. Join system hashtags into a single line
         const hashtags = generatedContent.hashtags || [];
         const hashtagsLine = hashtags.join(' ');
         
-        // 3. ვაწყობთ საბოლოო ტექსტს
+        // 3. Assemble final caption
         const fullCaption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
         caption = fullCaption;
 
-        addLog(`Content generated successfully. Caption length: ${caption.length} characters.`);
+        // ✅ CRITICAL LENGTH CHECK
+        if (caption.length > TELEGRAM_CAPTION_LIMIT) {
+          addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit (${TELEGRAM_CAPTION_LIMIT}). It may be split.`);
+        } else {
+          addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
+        }
 
       } finally {
+        // ------------------------------------------------------
+        // 4. Always release the temporary access lease
+        // ------------------------------------------------------
         if (leaseId) {
-          addLog('Releasing Groq access lease...');
+          addLog(`Releasing ${DEFAULT_TEXT_PROVIDER} access lease...`);
           try {
             accessManager.revokeLease(leaseId, 'system_cleanup');
-            addLog('Groq access lease released.');
+            addLog('Access lease released.');
           } catch (leaseError) {
-            addWarning(`Could not explicitly revoke the Groq lease: ${getErrorMessage(leaseError)}`);
+            addWarning(`Could not explicitly revoke the lease: ${getErrorMessage(leaseError)}`);
           }
           leaseId = null;
         }
       }
 
+      // --------------------------------------------------------
+      // 5. Generate the image
+      // --------------------------------------------------------
       if (imagePrompt) {
         addLog('Starting image generation...');
-        addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}`);
+        addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
         try {
           const result = await imageGenerator.generateImage(imagePrompt, request.agentType);
@@ -431,12 +428,18 @@ export class TelegramOrchestrator {
         addWarning('No image_prompt was generated. Publishing text only.');
       }
 
+      // --------------------------------------------------------
+      // 6. Prepare Telegram content
+      // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
       const escapedCaption = escapeTelegramHtml(caption);
 
       let publishedMessageId: number | undefined;
       let publishedWithImage = false;
 
+      // --------------------------------------------------------
+      // 7. Try publishing the image
+      // --------------------------------------------------------
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
@@ -486,6 +489,9 @@ export class TelegramOrchestrator {
         }
       }
 
+      // --------------------------------------------------------
+      // 8. Text-only fallback
+      // --------------------------------------------------------
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
         const textChunks = splitTelegramText(escapedCaption, TELEGRAM_MESSAGE_LIMIT);
@@ -518,6 +524,9 @@ export class TelegramOrchestrator {
         }
       }
 
+      // --------------------------------------------------------
+      // 9. Record publication in Supabase
+      // --------------------------------------------------------
       addLog('Recording publication in Supabase...');
       const { error: databaseError } = await supabase.from('published_content').insert({
         agent_type: request.agentType,
@@ -535,6 +544,9 @@ export class TelegramOrchestrator {
         addLog('Publication recorded successfully.');
       }
 
+      // --------------------------------------------------------
+      // 10. Return structured result
+      // --------------------------------------------------------
       addLog('Generation and publication workflow completed.');
       addLog('================================================');
 
