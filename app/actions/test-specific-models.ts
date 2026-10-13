@@ -52,29 +52,26 @@ export async function testSpecificModelsAction(
         headers['Authorization'] = `Bearer ${apiKey}`;
         headers['X-Wait-For-Model'] = 'true';
         
-        // ✅ პირველად ვცადოთ ახალი Router
-        endpoint = `https://router.huggingface.co/hf-inference/models/${encodedModelName}`;
-        
+        let endpointToTry = `https://router.huggingface.co/hf-inference/models/${encodedModelName}`;
         let response: Response;
         let usedFallback = false;
         
         try {
-          response = await fetch(endpoint, {
+          response = await fetch(endpointToTry, {
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
             signal: AbortSignal.timeout(30000)
           });
           
-          // ✅ თუ Router აბრუნებს 400 "not supported", ვცადოთ ძველი endpoint
           if (response.status === 400) {
             const errData = await response.json().catch(() => ({}));
             if (errData.error?.includes('not supported')) {
               addLog(`⚠️ ${modelName} არ არის ხელმისაწვდომი Router-ზე. ვცდილობ ძველ endpoint-ს...`);
               usedFallback = true;
-              endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
+              endpointToTry = `https://api-inference.huggingface.co/models/${encodedModelName}`;
               
-              response = await fetch(endpoint, {
+              response = await fetch(endpointToTry, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(requestBody),
@@ -83,13 +80,12 @@ export async function testSpecificModelsAction(
             }
           }
         } catch (fetchError: any) {
-          // ✅ თუ Router-ზე DNS ან ქსელური შეცდომაა, ვცადოთ ძველი endpoint
           if (fetchError.message.includes('ENOTFOUND') || fetchError.message.includes('fetch failed')) {
             addLog(`⚠️ ${modelName} Router-ზე ქსელური შეცდომა. ვცდილობ ძველ endpoint-ს...`);
             usedFallback = true;
-            endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
+            endpointToTry = `https://api-inference.huggingface.co/models/${encodedModelName}`;
             
-            response = await fetch(endpoint, {
+            response = await fetch(endpointToTry, {
               method: 'POST',
               headers,
               body: JSON.stringify(requestBody),
@@ -114,7 +110,8 @@ export async function testSpecificModelsAction(
             if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
               isValid = true;
             } else {
-              const data = await response.json();
+              // ✅ აქ გავასწორეთ შეცდომა: უბრალოდ ვთვლით ვალიდურად, თუ JSON-ია და არა სურათი
+              await response.json(); 
               isValid = true;
             }
           }
@@ -128,8 +125,6 @@ export async function testSpecificModelsAction(
           }
         } else {
           const errText = await response.text();
-          
-          // ✅ თუ ორივე endpoint-ი ვერ მუშაობს, ეს ნიშნავს რომ მოდელი არ არის ხელმისაწვდომი უფასო დონეზე
           if (response.status === 400 && errText.includes('not supported')) {
             addLog(`❌ ${modelName} არ არის ხელმისაწვდომი HF-ის უფასო API-ზე`);
             results.push({ model: modelName, passed: false, latency, error: 'Not available on free tier' });
@@ -143,11 +138,11 @@ export async function testSpecificModelsAction(
         }
         
         await new Promise(resolve => setTimeout(resolve, 1000));
-        continue; // HF-ისთვის უკვე დავამუშავეთ, გადავიდეთ შემდეგ მოდელზე
+        continue;
       }
       
       // ============================================
-      // CLOUDFLARE - სპეციფიკური ლოგიკა
+      // CLOUDFLARE
       // ============================================
       if (provider === 'cloudflare') {
         const accountId = meta.accountId;
@@ -159,39 +154,28 @@ export async function testSpecificModelsAction(
 
         if (testType === 'text') {
           endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
-          requestBody = { 
-            messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }],
-            max_tokens: 10
-          };
+          requestBody = { messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }], max_tokens: 10 };
           headers['Authorization'] = `Bearer ${apiKey}`;
         } else {
           endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
-          requestBody = { 
-            prompt: 'A beautiful cosmic landscape with stars and moon, high quality digital art'
-          };
+          requestBody = { prompt: 'A beautiful cosmic landscape with stars and moon, high quality digital art' };
           headers['Authorization'] = `Bearer ${apiKey}`;
         }
       }
       // ============================================
-      // GEMINI - სპეციფიკური ლოგიკა
+      // GEMINI
       // ============================================
       else if (provider === 'gemini' || provider === 'google') {
         if (testType === 'text') {
           endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-          requestBody = {
-            contents: [{ parts: [{ text: 'დაწერე მხოლოდ სიტყვა: YES' }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
-          };
+          requestBody = { contents: [{ parts: [{ text: 'დაწერე მხოლოდ სიტყვა: YES' }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 10 } };
         } else {
           endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
-          requestBody = {
-            instances: [{ prompt: 'A beautiful cosmic landscape' }],
-            parameters: { sampleCount: 1 }
-          };
+          requestBody = { instances: [{ prompt: 'A beautiful cosmic landscape' }], parameters: { sampleCount: 1 } };
         }
       }
       // ============================================
-      // სხვა პროვაიდერები - სტანდარტული ლოგიკა
+      // სხვა პროვაიდერები (OpenAI, Groq, Mistral, DeepSeek)
       // ============================================
       else {
         let base = meta.baseUrl;
@@ -205,21 +189,11 @@ export async function testSpecificModelsAction(
 
         if (testType === 'text') {
           endpoint = `${base}${meta.chatEndpoint || '/chat/completions'}`;
-          requestBody = {
-            model: modelName,
-            messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }],
-            temperature: 0.1,
-            max_tokens: 10
-          };
+          requestBody = { model: modelName, messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }], temperature: 0.1, max_tokens: 10 };
           headers['Authorization'] = `Bearer ${apiKey}`;
         } else {
           endpoint = `${base}${meta.imageEndpoint || '/images/generations'}`;
-          requestBody = { 
-            model: modelName, 
-            prompt: 'A beautiful cosmic landscape with stars and moon',
-            size: '512x512',
-            n: 1
-          };
+          requestBody = { model: modelName, prompt: 'A beautiful cosmic landscape with stars and moon', size: '512x512', n: 1 };
           headers['Authorization'] = `Bearer ${apiKey}`;
         }
       }
@@ -229,23 +203,13 @@ export async function testSpecificModelsAction(
       let isTimeout = false;
       
       try {
-        response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(timeout)
-        });
+        response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeout) });
       } catch (fetchError: any) {
         if (fetchError.name === 'TimeoutError' || fetchError.message.includes('timeout')) {
           isTimeout = true;
-          addLog(`️ ${modelName} - პირველი ცდა: timeout. ვცდილობ მეორედ...`);
+          addLog(`⏱️ ${modelName} - პირველი ცდა: timeout. ვცდილობ მეორედ...`);
           try {
-            response = await fetch(endpoint, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(requestBody),
-              signal: AbortSignal.timeout(timeout * 1.5)
-            });
+            response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(requestBody), signal: AbortSignal.timeout(timeout * 1.5) });
           } catch (retryError: any) {
             const latency = Date.now() - startTime;
             addLog(`⚠️ ${modelName} - მეორე ცდაც timeout: ${retryError.message}`);
@@ -266,12 +230,21 @@ export async function testSpecificModelsAction(
         if (testType === 'text') {
           const data = await response.json();
           
-          if (provider === 'cloudflare') {
+          // ✅ გაუმჯობესებული ვალიდაცია: ვამოწმებთ data.error-საც, რადგან ზოგი API 200-ში აბრუნებს შეცდომას
+          if (data.error) {
+            isValid = false;
+            addLog(`⚠️ ${modelName} დააბრუნა შეცდომა 200 OK პასუხში: ${data.error.message || 'Unknown'}`);
+          } else if (provider === 'cloudflare') {
             isValid = data.result?.response?.length > 0;
           } else if (provider === 'gemini' || provider === 'google') {
             isValid = data.candidates?.[0]?.content?.parts?.[0]?.text?.length > 0;
           } else {
-            isValid = data.choices?.[0]?.message?.content?.length > 0;
+            isValid = data.choices?.[0]?.message?.content?.length > 0 || data.choices?.[0]?.delta?.content?.length > 0;
+            
+            // ✅ თუ მაინც არ არის ვალიდური, ვბეჭდავთ პასუხის ფრაგმენტს დიაგნოსტიკისთვის
+            if (!isValid) {
+               addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი. პასუხი: ${JSON.stringify(data).substring(0, 150)}`);
+            }
           }
         } else {
           if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
@@ -294,7 +267,11 @@ export async function testSpecificModelsAction(
           
           results.push({ model: modelName, passed: true, latency, response: 'Success' });
         } else {
-          addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
+          if (testType === 'text' && provider !== 'cloudflare' && provider !== 'gemini' && provider !== 'google') {
+            // ლოგი უკვე დაიბეჭდა ზემოთ
+          } else {
+            addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
+          }
           results.push({ model: modelName, passed: false, latency, error: 'Invalid response format' });
         }
       } else {
