@@ -50,7 +50,7 @@ export async function testCredentialAction(credentialId: string) {
     let isCloudflare = false;
 
     // ============================================================
-    // ჭკვიანი მარშრუტიზაცია: ვიცნობთ გამონაკლისებს, დანარჩენისთვის ვიყენებთ სტანდარტს
+    // ჭკვიანი მარშრუტიზაცია
     // ============================================================
     if (providerLower === 'cloudflare') {
       const accountId = meta.accountId;
@@ -64,7 +64,7 @@ export async function testCredentialAction(credentialId: string) {
       modelsUrl = 'https://api.groq.com/openai/v1/models';
       chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
     } else {
-      // ნაგულისხმევი OpenAI-კომპატიბილური სტრუქტურა (მუშაობს OpenAI, DeepSeek, Mistral, Together და ა.შ.-ზე)
+      // ნაგულისხმევი OpenAI-კომპატიბილური სტრუქტურა
       const base = meta.baseUrl || `https://api.${providerLower}.com/v1`;
       modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
       chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
@@ -83,27 +83,38 @@ export async function testCredentialAction(credentialId: string) {
 
     addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
 
-    if (!modelsResponse.ok) {
-      if (providerLower !== 'cloudflare' && providerLower !== 'groq') {
-         addLog('INFO', 'შენიშვნა: თუ ეს პროვაიდერი არ იყენებს სტანდარტულ OpenAI /v1/models ენდპოინტს, გთხოვთ, Metadata-ში (JSON) მიუთითოთ სწორი "baseUrl" და "modelsEndpoint".');
+    let modelsData = null;
+    if (modelsResponse.ok) {
+      modelsData = await modelsResponse.json();
+      addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
+    } else {
+      // ✅ ჭკვიანი Fallback Cloudflare-ისთვის, თუ API 404-ს აბრუნებს
+      if (isCloudflare && modelsResponse.status === 404) {
+        addLog('INFO', 'Cloudflare-ის მოდელების სიის API დააბრუნა 404 (შესაძლოა Account ID არასწორია ან არ არის აქტივირებული). ვიყენებთ ცნობილი პოპულარული მოდელების სიას...');
+        validChatModels = [
+          '@cf/meta/llama-3.1-8b-instruct',
+          '@cf/meta/llama-3.1-70b-instruct',
+          '@cf/qwen/qwen1.5-14b-chat-awq',
+          '@cf/mistral/mistral-7b-instruct-v0.1',
+          '@cf/black-forest-labs/flux-1-schnell'
+        ];
+      } else {
+        const errorData = await modelsResponse.json().catch(() => ({}));
+        throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || errorData.messages?.[0] || modelsResponse.statusText}`);
       }
-      const errorData = await modelsResponse.json().catch(() => ({}));
-      throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || errorData.messages?.[0] || modelsResponse.statusText}`);
     }
 
-    const data = await modelsResponse.json();
-    addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
-
-    // დინამიური პარსინგი სხვადასხვა პროვაიდერისთვის
-    const allModels = isCloudflare ? (data.result || []) : (data.data || data.models || []);
-    
-    validChatModels = allModels
-      .filter((m: any) => {
-        const id = (m.id || m.name || '').toLowerCase();
-        const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard');
-        return !isSpecialized && id.length > 0;
-      })
-      .map((m: any) => m.id || m.name);
+    // თუ მოდელების სია API-დან მივიღეთ, გავფილტროთ ის
+    if (modelsData) {
+      const allModels = isCloudflare ? (modelsData.result || []) : (modelsData.data || modelsData.models || []);
+      validChatModels = allModels
+        .filter((m: any) => {
+          const id = (m.id || m.name || '').toLowerCase();
+          const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard');
+          return !isSpecialized && id.length > 0;
+        })
+        .map((m: any) => m.id || m.name);
+    }
 
     addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური ტექსტური მოდელი. ვამოწმებ ყველას...`);
 
