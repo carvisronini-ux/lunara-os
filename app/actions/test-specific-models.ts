@@ -22,33 +22,54 @@ export async function testSpecificModelsAction(
   const results: any[] = [];
   const provider = cred.provider.toLowerCase();
   
-  // Mistral-ისთვის (შემდეგში სხვა პროვაიდერებიც აქ დაემატება იგივე ლოგიკით)
+  // Endpoint-ის განსაზღვრა პროვაიდერის მიხედვით
   let endpoint = 'https://api.mistral.ai/v1/chat/completions';
-  if (provider === 'mistral' && testType === 'image') {
-    // თუ მეტამონაცემებში სხვა ენდპოინტია მითითებული, მას გამოვიყენებთ
-    endpoint = cred.metadata?.baseUrl 
-      ? `${cred.metadata.baseUrl}${cred.metadata.imageEndpoint || '/images/generations'}` 
-      : 'https://api.mistral.ai/v1/images/generations';
+  if (provider === 'groq') {
+    endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  } else if (provider === 'openai') {
+    endpoint = 'https://api.openai.com/v1/chat/completions';
+  } else if (provider === 'deepseek') {
+    endpoint = 'https://api.deepseek.com/v1/chat/completions';
+  } else if (provider === 'cloudflare') {
+    const accountId = cred.metadata?.accountId;
+    if (accountId) {
+      endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
+    }
+  } else if (provider !== 'mistral') {
+    const base = cred.metadata?.baseUrl || `https://api.${provider}.com/v1`;
+    endpoint = `${base}${cred.metadata?.chatEndpoint || '/chat/completions'}`;
   }
 
   addLog(`იწყება ${testType === 'text' ? 'ტექსტის' : 'ფოტოს'} ტესტირება ${modelNames.length} მოდელზე...`);
 
-  // თანმიმდევრული ტესტირება (Rate Limit-ის თავიდან ასაცილებლად)
   for (const modelName of modelNames) {
     addLog(`ვამოწმებ: ${modelName}...`);
     const startTime = Date.now();
     
     try {
       let requestBody: any;
+      let currentEndpoint = endpoint;
+
       if (testType === 'text') {
-        requestBody = {
-          model: modelName,
-          messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }],
-          temperature: 0.1,
-          max_tokens: 10
-        };
+        if (provider === 'gemini' || provider === 'google') {
+          currentEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          requestBody = {
+            contents: [{ parts: [{ text: 'დაწერე მხოლოდ სიტყვა: YES' }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
+          };
+        } else if (provider === 'cloudflare') {
+          currentEndpoint = `${endpoint}${modelName}`;
+          requestBody = { messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }] };
+        } else {
+          requestBody = {
+            model: modelName,
+            messages: [{ role: 'user', content: 'დაწერე მხოლოდ სიტყვა: YES' }],
+            temperature: 0.1,
+            max_tokens: 10
+          };
+        }
       } else {
-        // ფოტოს გენერაციის სატესტო მოთხოვნა (მორგებული იქნება კონკრეტულ API-ზე)
+        // ფოტოს გენერაციის სატესტო მოთხოვნა
         requestBody = { 
           model: modelName, 
           prompt: "A beautiful test image, high quality",
@@ -56,12 +77,14 @@ export async function testSpecificModelsAction(
         };
       }
 
-      const response = await fetch(endpoint, {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (provider !== 'gemini' && provider !== 'google') {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
+      const response = await fetch(currentEndpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(15000) // 15 წამიანი ტაიმაუტი
       });
@@ -72,8 +95,8 @@ export async function testSpecificModelsAction(
         const data = await response.json();
         // მარტივი ვალიდაცია: მივიღეთ თუ არა მოსალოდნელი სტრუქტურა?
         const isValid = testType === 'text' 
-          ? (data.choices?.[0]?.message?.content?.length > 0)
-          : (data.data?.[0]?.url || data.data?.[0]?.b64_json || data.image);
+          ? (data.choices?.[0]?.message?.content?.length > 0 || data.candidates?.[0]?.content?.parts?.[0]?.text?.length > 0 || data.result?.response?.length > 0)
+          : (data.data?.[0]?.url || data.data?.[0]?.b64_json || data.image || data.result?.image);
 
         if (isValid) {
           addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
@@ -83,8 +106,9 @@ export async function testSpecificModelsAction(
           results.push({ model: modelName, passed: false, latency, error: 'Invalid response format' });
         }
       } else {
+        // ✅ აქ გავასწორეთ შეცდომა: errText ახლა გამოიყენება ლოგში
         const errText = await response.text();
-        addLog(`❌ ${modelName} ვერ მოხერხდა: HTTP ${response.status}`);
+        addLog(`❌ ${modelName} ვერ მოხერხდა: HTTP ${response.status} - ${errText.substring(0, 100)}`);
         results.push({ model: modelName, passed: false, latency, error: `HTTP ${response.status}` });
       }
     } catch (error: any) {
