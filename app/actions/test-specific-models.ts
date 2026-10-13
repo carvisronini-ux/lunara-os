@@ -35,33 +35,121 @@ export async function testSpecificModelsAction(
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
       // ============================================
-      // HUGGING FACE - სპეციფიკური ლოგიკა (განახლებული Router-ით)
+      // HUGGING FACE - Fallback ლოგიკით
       // ============================================
       if (provider === 'huggingface') {
         const encodedModelName = encodeURIComponent(modelName);
         
-        // ✅ ვიყენებთ ახალ, უფრო სტაბილურ Hugging Face Router-ს
-        const baseUrl = 'https://router.huggingface.co/hf-inference/models';
-        
         if (testType === 'text') {
-          endpoint = `${baseUrl}/${encodedModelName}`;
           requestBody = {
             inputs: "დაწერე მხოლოდ სიტყვა: YES",
             parameters: { max_new_tokens: 10, temperature: 0.1 }
           };
-          headers['Authorization'] = `Bearer ${apiKey}`;
-          headers['X-Wait-For-Model'] = 'true';
         } else {
-          endpoint = `${baseUrl}/${encodedModelName}`;
           requestBody = { inputs: "A beautiful cosmic landscape, high quality" };
-          headers['Authorization'] = `Bearer ${apiKey}`;
-          headers['X-Wait-For-Model'] = 'true';
         }
+        
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        headers['X-Wait-For-Model'] = 'true';
+        
+        // ✅ პირველად ვცადოთ ახალი Router
+        endpoint = `https://router.huggingface.co/hf-inference/models/${encodedModelName}`;
+        
+        let response: Response;
+        let usedFallback = false;
+        
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(30000)
+          });
+          
+          // ✅ თუ Router აბრუნებს 400 "not supported", ვცადოთ ძველი endpoint
+          if (response.status === 400) {
+            const errData = await response.json().catch(() => ({}));
+            if (errData.error?.includes('not supported')) {
+              addLog(`⚠️ ${modelName} არ არის ხელმისაწვდომი Router-ზე. ვცდილობ ძველ endpoint-ს...`);
+              usedFallback = true;
+              endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
+              
+              response = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(requestBody),
+                signal: AbortSignal.timeout(30000)
+              });
+            }
+          }
+        } catch (fetchError: any) {
+          // ✅ თუ Router-ზე DNS ან ქსელური შეცდომაა, ვცადოთ ძველი endpoint
+          if (fetchError.message.includes('ENOTFOUND') || fetchError.message.includes('fetch failed')) {
+            addLog(`⚠️ ${modelName} Router-ზე ქსელური შეცდომა. ვცდილობ ძველ endpoint-ს...`);
+            usedFallback = true;
+            endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
+            
+            response = await fetch(endpoint, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(requestBody),
+              signal: AbortSignal.timeout(30000)
+            });
+          } else {
+            throw fetchError;
+          }
+        }
+        
+        const latency = Date.now() - startTime;
+        
+        if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          let isValid = false;
+          
+          if (testType === 'text') {
+            const data = await response.json();
+            isValid = (Array.isArray(data) && data[0]?.generated_text?.length > 0) || 
+                      (data.choices?.[0]?.message?.content?.length > 0);
+          } else {
+            if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
+              isValid = true;
+            } else {
+              const data = await response.json();
+              isValid = true;
+            }
+          }
+          
+          if (isValid) {
+            addLog(`✅ ${modelName} წარმატებულია (${latency}ms)${usedFallback ? ' [ძველი endpoint]' : ''}`);
+            results.push({ model: modelName, passed: true, latency, response: 'Success' });
+          } else {
+            addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
+            results.push({ model: modelName, passed: false, latency, error: 'Invalid response format' });
+          }
+        } else {
+          const errText = await response.text();
+          
+          // ✅ თუ ორივე endpoint-ი ვერ მუშაობს, ეს ნიშნავს რომ მოდელი არ არის ხელმისაწვდომი უფასო დონეზე
+          if (response.status === 400 && errText.includes('not supported')) {
+            addLog(`❌ ${modelName} არ არის ხელმისაწვდომი HF-ის უფასო API-ზე`);
+            results.push({ model: modelName, passed: false, latency, error: 'Not available on free tier' });
+          } else if (response.status === 503) {
+            addLog(`⏳ ${modelName} იტვირთება (503). HF-ის უფასო API-ზე მოდელებს დრო სჭირდებათ.`);
+            results.push({ model: modelName, passed: false, latency, error: 'Model loading (503)' });
+          } else {
+            addLog(`❌ ${modelName} ვერ მოხერხდა: HTTP ${response.status} - ${errText.substring(0, 150)}`);
+            results.push({ model: modelName, passed: false, latency, error: `HTTP ${response.status}` });
+          }
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue; // HF-ისთვის უკვე დავამუშავეთ, გადავიდეთ შემდეგ მოდელზე
       }
+      
       // ============================================
       // CLOUDFLARE - სპეციფიკური ლოგიკა
       // ============================================
-      else if (provider === 'cloudflare') {
+      if (provider === 'cloudflare') {
         const accountId = meta.accountId;
         if (!accountId) {
           addLog(`❌ ${modelName}: Cloudflare accountId არ არის Metadata-ში`);
@@ -150,7 +238,7 @@ export async function testSpecificModelsAction(
       } catch (fetchError: any) {
         if (fetchError.name === 'TimeoutError' || fetchError.message.includes('timeout')) {
           isTimeout = true;
-          addLog(`⏱️ ${modelName} - პირველი ცდა: timeout. ვცდილობ მეორედ...`);
+          addLog(`️ ${modelName} - პირველი ცდა: timeout. ვცდილობ მეორედ...`);
           try {
             response = await fetch(endpoint, {
               method: 'POST',
@@ -178,10 +266,7 @@ export async function testSpecificModelsAction(
         if (testType === 'text') {
           const data = await response.json();
           
-          if (provider === 'huggingface') {
-            isValid = (Array.isArray(data) && data[0]?.generated_text?.length > 0) || 
-                      (data.choices?.[0]?.message?.content?.length > 0);
-          } else if (provider === 'cloudflare') {
+          if (provider === 'cloudflare') {
             isValid = data.result?.response?.length > 0;
           } else if (provider === 'gemini' || provider === 'google') {
             isValid = data.candidates?.[0]?.content?.parts?.[0]?.text?.length > 0;
@@ -193,9 +278,7 @@ export async function testSpecificModelsAction(
             isValid = true;
           } else {
             const data = await response.json();
-            if (provider === 'huggingface') {
-               isValid = true; 
-            } else if (provider === 'cloudflare') {
+            if (provider === 'cloudflare') {
               isValid = data.result?.image?.length > 0 || data.success === true;
             } else if (provider === 'gemini' || provider === 'google') {
               isValid = data.predictions?.[0]?.bytesBase64Encoded?.length > 0;
@@ -226,7 +309,7 @@ export async function testSpecificModelsAction(
       results.push({ model: modelName, passed: false, latency, error: errorMsg });
     }
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
 
   const sortedResults = results.sort((a, b) => {
