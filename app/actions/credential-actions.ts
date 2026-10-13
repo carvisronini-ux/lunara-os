@@ -4,42 +4,46 @@
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export async function testCredentialAction(credentialId: string) {
+  // ✅ ეს ლოგი 100%-ით გამოჩნდება სერვერის ტერმინალში, თუ ფუნქცია გამოიძახა
+  console.log("🚀 [SERVER] testCredentialAction გამოიძახა! ID:", credentialId);
+  
   const logs: string[] = [];
   
   const addLog = (type: 'INFO' | 'REQ' | 'RES' | 'SUCCESS' | 'ERROR', message: string) => {
     const timestamp = new Date().toLocaleTimeString('ka-GE', { hour12: false });
     logs.push(`[${timestamp}] [${type}] ${message}`);
+    console.log(`[SERVER LOG] ${type}: ${message}`); // ✅ დუბლირება ტერმინალში
   };
 
   addLog('INFO', 'ტესტირების პროცესის დაწყება...');
   
-  await credentialVault.ready;
-  addLog('INFO', 'CredentialVault ქეში წარმატებით ჩაიტვირთა.');
-  
-  const credentials = credentialVault.getMetadata();
-  const cred = credentials.find((c: any) => c.credential_id === credentialId);
-  
-  if (!cred) {
-    addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
-    return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
-  }
-
-  addLog('INFO', `პროვაიდერი: ${cred.provider.toUpperCase()} | სკოპი: ${cred.scope}`);
-
-  const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
-  if (!apiKey) {
-    addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
-    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: cred.provider, models: [], recommendedModel: '', modelTests: [], logs };
-  }
-  addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
-
-  const startTime = Date.now();
-  let validChatModels: string[] = [];
-  const modelTests: any[] = [];
-  
-  const testPrompt = "Write exactly one word: YES. Do not write anything else, no punctuation, no explanations.";
-
   try {
+    await credentialVault.ready;
+    addLog('INFO', 'CredentialVault ქეში წარმატებით ჩაიტვირთა.');
+    
+    const credentials = credentialVault.getMetadata();
+    const cred = credentials.find((c: any) => c.credential_id === credentialId);
+    
+    if (!cred) {
+      addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
+      return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
+    }
+
+    addLog('INFO', `პროვაიდერი: ${cred.provider.toUpperCase()} | სკოპი: ${cred.scope}`);
+
+    const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
+    if (!apiKey) {
+      addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
+      return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: cred.provider, models: [], recommendedModel: '', modelTests: [], logs };
+    }
+    addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
+
+    const startTime = Date.now();
+    let validChatModels: string[] = [];
+    const modelTests: any[] = [];
+    
+    const testPrompt = "Write exactly one word: YES. Do not write anything else, no punctuation, no explanations.";
+
     const meta = cred.metadata || {};
     const providerLower = cred.provider.toLowerCase();
     
@@ -50,9 +54,6 @@ export async function testCredentialAction(credentialId: string) {
     let isCloudflare = false;
     let isGemini = false;
 
-    // ============================================================
-    // ჭკვიანი მარშრუტიზაცია
-    // ============================================================
     if (providerLower === 'cloudflare') {
       const accountId = meta.accountId;
       if (!accountId) throw new Error("Cloudflare-სთვის Metadata-ში აუცილებელია 'accountId'.");
@@ -84,14 +85,17 @@ export async function testCredentialAction(credentialId: string) {
 
     let modelsResponse;
     try {
+      console.log("[SERVER] ვგზავნი fetch მოთხოვნას მოდელების სიაზე...");
       modelsResponse = await fetch(modelsUrl, {
         method: 'GET',
-        headers: isGemini ? { 'Content-Type': 'application/json' } : { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' }
+        headers: isGemini ? { 'Content-Type': 'application/json' } : { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' },
+        // ✅ დავამატოთ timeout, რომ fetch არ "ჩაიკიდოს" სამუდამოდ
+        signal: AbortSignal.timeout(10000) 
       });
+      console.log("[SERVER] მიღებულია პასუხი მოდელების სიაზე:", modelsResponse.status);
     } catch (networkError: any) {
       addLog('ERROR', `ქსელური შეცდომა: ${networkError.message}`);
-      addLog('INFO', '💡 გამოსავალი: შეამოწმეთ Metadata-ში "baseUrl".');
-      throw new Error(`Network fetch failed.`);
+      throw new Error(`Network fetch failed: ${networkError.message}`);
     }
 
     addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
@@ -133,6 +137,7 @@ export async function testCredentialAction(credentialId: string) {
     if (validChatModels.length > 0) {
       addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური მოდელი. ვამოწმებ...`);
 
+      // ✅ დავამატოთ AbortSignal timeout თითოეულ chat მოთხოვნაზე, რომ არ ჩაიკიდოს
       const testPromises = validChatModels.map(async (modelId: string) => {
         const testStartTime = Date.now();
         try {
@@ -141,39 +146,37 @@ export async function testCredentialAction(credentialId: string) {
             testRes = await fetch(`${chatUrl}${modelId}`, {
               method: 'POST',
               headers: { 'Authorization': authHeaderValue, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ messages: [{ role: 'user', content: testPrompt }] })
+              body: JSON.stringify({ messages: [{ role: 'user', content: testPrompt }] }),
+              signal: AbortSignal.timeout(15000)
             });
           } else if (isGemini) {
             testRes = await fetch(`${chatUrl}${modelId}:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 10 } })
+              body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 10 } }),
+              signal: AbortSignal.timeout(15000)
             });
           } else {
             testRes = await fetch(chatUrl, {
               method: 'POST',
               headers: { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: testPrompt }], temperature: 0.1, max_tokens: 10 })
+              body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: testPrompt }], temperature: 0.1, max_tokens: 10 }),
+              signal: AbortSignal.timeout(15000)
             });
           }
           
           if (testRes.ok) {
             const testData = await testRes.json();
             let content = '';
-            
-            if (isCloudflare) {
-              content = testData.result?.response?.trim() || '';
-            } else if (isGemini) {
-              content = testData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-            } else {
-              // ✅ განახლებული ლოგიკა: თუ content ცარიელია, ვნახულობთ რა დააბრუნა API-მ რეალურად
+            if (isCloudflare) content = testData.result?.response?.trim() || '';
+            else if (isGemini) content = testData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+            else {
               if (testData.choices && testData.choices.length > 0 && testData.choices[0].message) {
                 content = testData.choices[0].message.content?.trim() || '';
               } else if (testData.error) {
                 content = `API Error: ${testData.error.message || JSON.stringify(testData.error)}`;
               } else {
-                // თუ სტრუქტურა სრულიად განსხვავებულია, ვაჩვენებთ პირველ 150 სიმბოლოს
-                content = `Unexpected format: ${JSON.stringify(testData).substring(0, 150)}`;
+                content = `Unexpected format: ${JSON.stringify(testData).substring(0, 100)}`;
               }
             }
             
@@ -184,14 +187,16 @@ export async function testCredentialAction(credentialId: string) {
             return { model: modelId, response: `HTTP ${testRes.status}: ${errData.error?.message || testRes.statusText}`, passed: false, latency: Date.now() - testStartTime };
           }
         } catch (e: any) {
-          return { model: modelId, response: e.message, passed: false, latency: Date.now() - testStartTime };
+          return { model: modelId, response: `Timeout/Error: ${e.message}`, passed: false, latency: Date.now() - testStartTime };
         }
       });
 
+      console.log("[SERVER] ვუშვებ Promise.all-ს ყველა მოდელის ტესტირებისთვის...");
       const results = await Promise.all(testPromises);
+      console.log("[SERVER] Promise.all დასრულდა. შედეგები:", results.length);
       modelTests.push(...results);
     } else {
-      addLog('INFO', 'ტექსტური მოდელები ვერ მოიძებნა. შესაძლოა ეს პროვაიდერი მხოლოდ Image Generation-ია.');
+      addLog('INFO', 'ტექსტური მოდელები ვერ მოიძებნა.');
     }
 
     modelTests.sort((a, b) => {
@@ -225,6 +230,7 @@ export async function testCredentialAction(credentialId: string) {
     };
 
   } catch (error: any) {
+    console.error("🔴 [SERVER] კრიტიკული შეცდომა testCredentialAction-ში:", error);
     addLog('ERROR', `შეცდომა: ${error.message}`);
     return {
       success: false,
