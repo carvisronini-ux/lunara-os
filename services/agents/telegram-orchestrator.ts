@@ -8,6 +8,7 @@ import {
   sendTelegramPhoto,
 } from '../distribution/telegram';
 import { imageGenerator, type ImageGenerationResult as ImgGenResult } from './image-generator';
+import { getBestAvailableModel, reclassifyModelToImage } from './model-router'; // ✅ ახალი იმპორტი
 
 // ============================================================
 // TYPES
@@ -361,139 +362,161 @@ export class TelegramOrchestrator {
         addLog(`🧠 AI-ს გადაეცა კონკრეტული ნიშანი: ${request.zodiacSign}`);
       }
 
-      // --------------------------------------------------------
-      // 5. Acquire temporary access lease for Text Generation
-      // --------------------------------------------------------
-      addLog(`Requesting temporary access lease for ${DEFAULT_TEXT_PROVIDER}...`);
-      leaseId = accessManager.requestAccess(
-        `${request.agentType}-agent`,
-        DEFAULT_TEXT_PROVIDER,
-        'spend',
-        `Generate Telegram content for ${request.postType}`,
-        null,
-        ACCESS_LEASE_DURATION_SECONDS
-      );
+      // ============================================================
+      // ✅ 5. DYNAMIC CHAT MODEL SELECTION & SELF-HEALING LOOP
+      // ============================================================
+      let chatModelInfo = await getBestAvailableModel('chat');
+      let chatAttempts = 0;
+      const maxChatAttempts = 3;
+      let textGenerationSuccess = false;
+      let generatedContent: GeneratedContent | null = null;
 
-      if (!leaseId) {
-        throw new Error(`Could not acquire ${DEFAULT_TEXT_PROVIDER} access.`);
-      }
-      addLog(`${DEFAULT_TEXT_PROVIDER} access lease acquired.`);
-
-      try {
-        addLog(`Retrieving ${DEFAULT_TEXT_PROVIDER} credentials from the vault...`);
-        const credential = credentialVault.getCredentialByProvider(DEFAULT_TEXT_PROVIDER as any, 'spend');
-
-        if (!credential) {
-          throw new Error(`${DEFAULT_TEXT_PROVIDER} credentials were not found.`);
+      while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
+        if (!chatModelInfo) {
+          throw new Error('No chat models available in the vault.');
         }
 
-        const apiKey = credentialVault.getDecryptedValue(credential.credential_id, `${request.agentType}-agent`);
-        if (!apiKey) {
-          throw new Error(`Could not decrypt the ${DEFAULT_TEXT_PROVIDER} API key.`);
+        addLog(`🔄 [ცდა ${chatAttempts + 1}/${maxChatAttempts}] ვცდილობთ ტექსტის გენერაციას: ${chatModelInfo.provider} -> ${chatModelInfo.modelName}`);
+
+        leaseId = accessManager.requestAccess(
+          `${request.agentType}-agent`,
+          chatModelInfo.provider as any,
+          'spend',
+          `Generate Telegram content for ${request.postType}`,
+          null,
+          ACCESS_LEASE_DURATION_SECONDS
+        );
+
+        if (!leaseId) {
+          addWarning(`Could not acquire lease for ${chatModelInfo.provider}. Trying next...`);
+          chatModelInfo = await getBestAvailableModel('chat', chatModelInfo.modelName);
+          chatAttempts++;
+          continue;
         }
 
-        const targetModel = credential.metadata?.recommendedModel || DEFAULT_GROQ_MODEL;
-        addLog(`Using model: ${targetModel}`);
-        addLog('Building generation prompts...');
-
-        const systemPrompt = [
-          config.master_prompt,
-          '',
-          'THINKING STYLE:',
-          config.thinking_style || 'Use clear, structured reasoning internally.',
-          '',
-          'SKILLS & CONSTRAINTS:',
-          config.skills_constraints || 'Follow the agent instructions.',
-          '',
-          'JOB-SPECIFIC IMAGE INSTRUCTIONS:',
-          jobImageLogic || 'Follow general LUNARA visual guidelines.',
-          '',
-          'OUTPUT FORMAT:',
-          'Return only a valid JSON object with caption, image_prompt and hashtags.',
-        ].join('\n');
-
-        const userPrompt = buildUserPrompt(request);
-        
-        addLog('Sending content-generation request...');
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
-
-        let response: Response;
         try {
-          response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: targetModel,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-              ],
-              temperature: 0.3
-            }),
-            signal: controller.signal,
-          });
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
-            throw new Error(`Request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
-          }
-          throw new Error(`Could not connect to provider: ${getErrorMessage(error)}`);
-        } finally {
-          clearTimeout(timeoutId);
-        }
+          const systemPrompt = [
+            config.master_prompt,
+            '',
+            'THINKING STYLE:',
+            config.thinking_style || 'Use clear, structured reasoning internally.',
+            '',
+            'SKILLS & CONSTRAINTS:',
+            config.skills_constraints || 'Follow the agent instructions.',
+            '',
+            'JOB-SPECIFIC IMAGE INSTRUCTIONS:',
+            jobImageLogic || 'Follow general LUNARA visual guidelines.',
+            '',
+            'OUTPUT FORMAT:',
+            'Return only a valid JSON object with caption, image_prompt and hashtags.',
+          ].join('\n');
 
-        if (!response.ok) {
-          const errorText = truncateError(await response.text().catch(() => 'No response body'));
-          throw new Error(`API returned HTTP ${response.status}: ${errorText}`);
-        }
+          const userPrompt = buildUserPrompt(request);
+          
+          addLog('Sending content-generation request...');
 
-        const data = await response.json();
-        const rawContent = data?.choices?.[0]?.message?.content;
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
-        addLog('Response received. Validating generated JSON...');
-        const generatedContent = parseGeneratedContent(rawContent);
+          // Dynamic endpoint construction based on provider
+          let chatEndpoint = `https://api.${chatModelInfo.provider}.com/v1/chat/completions`;
+          if (chatModelInfo.provider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+          else if (chatModelInfo.provider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
+          else if (chatModelInfo.provider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+          else if (chatModelInfo.provider === 'openai') chatEndpoint = 'https://api.openai.com/v1/chat/completions';
 
-        imagePrompt = generatedContent.image_prompt || '';
-
-        // ✅ ნაბიჯი 1: ფორმატირება და ბოლდის დამატება
-        if (request.postType === 'daily_horoscope_12_signs') {
-          caption = applyBoldFormattingToZodiac(generatedContent.caption);
-        } else if (request.postType === 'daily_horoscope_single') {
-          caption = applyBoldFormattingToSingleSign(generatedContent.caption);
-        } else {
-          caption = generatedContent.caption
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-        }
-
-        // ✅ ნაბიჯი 2: ჰეშთეგების ფორმატირება
-        const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
-        const hashtags = generatedContent.hashtags || [];
-        const hashtagsLine = hashtags.join(' ');
-        caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
-
-        if (caption.length > TELEGRAM_CAPTION_LIMIT) {
-          addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
-        } else {
-          addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
-        }
-
-      } finally {
-        if (leaseId) {
-          addLog(`Releasing ${DEFAULT_TEXT_PROVIDER} access lease...`);
+          let response: Response;
           try {
-            accessManager.revokeLease(leaseId, 'system_cleanup');
-            addLog('Access lease released.');
-          } catch (leaseError) {
-            addWarning(`Could not explicitly revoke the lease: ${getErrorMessage(leaseError)}`);
+            response = await fetch(chatEndpoint, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${chatModelInfo.apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: chatModelInfo.modelName,
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userPrompt },
+                ],
+                temperature: 0.3
+              }),
+              signal: controller.signal,
+            });
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              throw new Error(`Request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
+            }
+            throw new Error(`Could not connect to provider: ${getErrorMessage(error)}`);
+          } finally {
+            clearTimeout(timeoutId);
           }
-          leaseId = null;
+
+          if (!response.ok) {
+            const errorText = await response.text().catch(() => 'No response body');
+            const isNotAChatModelError = errorText.toLowerCase().includes('not supported') || 
+                                         errorText.toLowerCase().includes('image generation') || 
+                                         errorText.toLowerCase().includes('vision only') ||
+                                         errorText.toLowerCase().includes('invalid model');
+            
+            if (isNotAChatModelError) {
+              addLog(`⚠️ მოდელი "${chatModelInfo.modelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
+              await reclassifyModelToImage(chatModelInfo.credentialId, chatModelInfo.modelName);
+              chatModelInfo = await getBestAvailableModel('chat', chatModelInfo.modelName);
+              chatAttempts++;
+              continue; // ცადე შემდეგი მოდელი
+            }
+            throw new Error(`API returned HTTP ${response.status}: ${truncateError(errorText)}`);
+          }
+
+          const data = await response.json();
+          const rawContent = data?.choices?.[0]?.message?.content;
+
+          addLog('Response received. Validating generated JSON...');
+          generatedContent = parseGeneratedContent(rawContent);
+          textGenerationSuccess = true;
+
+        } finally {
+          if (leaseId) {
+            addLog(`Releasing ${chatModelInfo.provider} access lease...`);
+            try {
+              accessManager.revokeLease(leaseId, 'system_cleanup');
+              addLog('Access lease released.');
+            } catch (leaseError) {
+              addWarning(`Could not explicitly revoke the lease: ${getErrorMessage(leaseError)}`);
+            }
+            leaseId = null;
+          }
         }
+      }
+
+      if (!textGenerationSuccess || !generatedContent) {
+        throw new Error('All available chat models failed to generate content.');
+      }
+
+      // ✅ ნაბიჯი 1: ფორმატირება და ბოლდის დამატება
+      imagePrompt = generatedContent.image_prompt || '';
+      if (request.postType === 'daily_horoscope_12_signs') {
+        caption = applyBoldFormattingToZodiac(generatedContent.caption);
+      } else if (request.postType === 'daily_horoscope_single') {
+        caption = applyBoldFormattingToSingleSign(generatedContent.caption);
+      } else {
+        caption = generatedContent.caption
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
+
+      // ✅ ნაბიჯი 2: ჰეშთეგების ფორმატირება
+      const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
+      const hashtags = generatedContent.hashtags || [];
+      const hashtagsLine = hashtags.join(' ');
+      caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
+
+      if (caption.length > TELEGRAM_CAPTION_LIMIT) {
+        addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
+      } else {
+        addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
       }
 
       // ============================================================
