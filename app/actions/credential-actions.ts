@@ -37,29 +37,43 @@ export async function testCredentialAction(credentialId: string) {
   let validChatModels: string[] = [];
   const modelTests: any[] = [];
   
-  // მკაცრი ტესტის პრომპტი
   const testPrompt = "Write exactly one word: YES. Do not write anything else, no punctuation, no explanations.";
 
   try {
-    // ============================================================
-    // 100% დინამიური კონფიგურაციის ამოღება მეტამონაცემებიდან
-    // ============================================================
     const meta = cred.metadata || {};
     const providerLower = cred.provider.toLowerCase();
     
-    const baseUrl = meta.baseUrl || `https://api.${providerLower}.com/v1`;
-    const modelsEndpoint = meta.modelsEndpoint || '/models';
-    const chatEndpoint = meta.chatEndpoint || '/chat/completions';
-    
-    const authHeaderKey = meta.authHeaderKey || 'Authorization';
-    const authHeaderValue = meta.authHeaderPrefix 
-      ? `${meta.authHeaderPrefix} ${apiKey}` 
-      : `Bearer ${apiKey}`;
+    let modelsUrl = '';
+    let chatUrl = '';
+    let authHeaderKey = meta.authHeaderKey || 'Authorization';
+    let authHeaderValue = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ${apiKey}` : `Bearer ${apiKey}`;
+    let isCloudflare = false;
 
-    addLog('INFO', `ვითხოვ მოდელების სიას: ${baseUrl}${modelsEndpoint}`);
-    addLog('REQ', `GET ${baseUrl}${modelsEndpoint}`);
+    // ============================================================
+    // ჭკვიანი მარშრუტიზაცია: ვიცნობთ გამონაკლისებს, დანარჩენისთვის ვიყენებთ სტანდარტს
+    // ============================================================
+    if (providerLower === 'cloudflare') {
+      const accountId = meta.accountId;
+      if (!accountId) {
+        throw new Error("Cloudflare-სთვის Metadata-ში (JSON) აუცილებელია 'accountId'-ს მითითება. მაგალითად: {\"accountId\": \"შენი_ანგარიშის_ID\"}");
+      }
+      modelsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
+      chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
+      isCloudflare = true;
+    } else if (providerLower === 'groq') {
+      modelsUrl = 'https://api.groq.com/openai/v1/models';
+      chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    } else {
+      // ნაგულისხმევი OpenAI-კომპატიბილური სტრუქტურა (მუშაობს OpenAI, DeepSeek, Mistral, Together და ა.შ.-ზე)
+      const base = meta.baseUrl || `https://api.${providerLower}.com/v1`;
+      modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
+      chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
+    }
 
-    const modelsResponse = await fetch(`${baseUrl}${modelsEndpoint}`, {
+    addLog('INFO', `ვითხოვ მოდელების სიას: ${modelsUrl}`);
+    addLog('REQ', `GET ${modelsUrl}`);
+
+    const modelsResponse = await fetch(modelsUrl, {
       method: 'GET',
       headers: {
         [authHeaderKey]: authHeaderValue,
@@ -70,15 +84,18 @@ export async function testCredentialAction(credentialId: string) {
     addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
 
     if (!modelsResponse.ok) {
+      if (providerLower !== 'cloudflare' && providerLower !== 'groq') {
+         addLog('INFO', 'შენიშვნა: თუ ეს პროვაიდერი არ იყენებს სტანდარტულ OpenAI /v1/models ენდპოინტს, გთხოვთ, Metadata-ში (JSON) მიუთითოთ სწორი "baseUrl" და "modelsEndpoint".');
+      }
       const errorData = await modelsResponse.json().catch(() => ({}));
-      throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || modelsResponse.statusText}`);
+      throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || errorData.messages?.[0] || modelsResponse.statusText}`);
     }
 
     const data = await modelsResponse.json();
     addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
 
-    // მოდელების დინამიური ფილტრაცია (ვტოვებთ მხოლოდ ტექსტურ LLM-ებს)
-    const allModels = data.data || data.models || [];
+    // დინამიური პარსინგი სხვადასხვა პროვაიდერისთვის
+    const allModels = isCloudflare ? (data.result || []) : (data.data || data.models || []);
     
     validChatModels = allModels
       .filter((m: any) => {
@@ -90,28 +107,49 @@ export async function testCredentialAction(credentialId: string) {
 
     addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური ტექსტური მოდელი. ვამოწმებ ყველას...`);
 
-    // ✅ ახალი ლოგიკა: ვამოწმებთ ყველა ნაპოვნ მოდელს (არა მხოლოდ ტოპ 5-ს)
     const testPromises = validChatModels.map(async (modelId: string) => {
       const testStartTime = Date.now();
       try {
-        const testRes = await fetch(`${baseUrl}${chatEndpoint}`, {
-          method: 'POST',
-          headers: {
-            [authHeaderKey]: authHeaderValue,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: modelId,
-            messages: [{ role: 'user', content: testPrompt }],
-            temperature: 0.1,
-            max_tokens: 10
-          })
-        });
+        let testRes;
+        if (isCloudflare) {
+          // Cloudflare-ს აქვს განსხვავებული chat endpoint სტრუქტურა
+          testRes = await fetch(`${chatUrl}${modelId}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': authHeaderValue,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: testPrompt }]
+            })
+          });
+        } else {
+          // სტანდარტული OpenAI-კომპატიბილური chat endpoint
+          testRes = await fetch(chatUrl, {
+            method: 'POST',
+            headers: {
+              [authHeaderKey]: authHeaderValue,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages: [{ role: 'user', content: testPrompt }],
+              temperature: 0.1,
+              max_tokens: 10
+            })
+          });
+        }
         
         if (testRes.ok) {
           const testData = await testRes.json();
-          const content = testData.choices?.[0]?.message?.content?.trim() || 
-                          testData.content?.[0]?.text?.trim() || '';
+          
+          let content = '';
+          if (isCloudflare) {
+            content = testData.result?.response?.trim() || '';
+          } else {
+            content = testData.choices?.[0]?.message?.content?.trim() || 
+                      testData.content?.[0]?.text?.trim() || '';
+          }
           
           const passed = content.toUpperCase() === 'YES' || content.toUpperCase() === 'YES.';
           return { 
@@ -138,14 +176,10 @@ export async function testCredentialAction(credentialId: string) {
       }
     });
 
-    // ყველა მოდელის პარალელური ტესტირება
     const results = await Promise.all(testPromises);
     modelTests.push(...results);
 
-    // ============================================================
-    // შედეგების დამუშავება და შენახვა
-    // ============================================================
-    // დალაგება: ჯერ ისინი ვინც გაიარა ტესტი (passed: true), შემდეგ ლატენტობის (სისწრაფის) მიხედვით
+    // დალაგება: ჯერ ისინი ვინც გაიარა ტესტი, შემდეგ სისწრაფის მიხედვით
     modelTests.sort((a, b) => {
       if (a.passed && !b.passed) return -1;
       if (!a.passed && b.passed) return 1;
@@ -161,7 +195,7 @@ export async function testCredentialAction(credentialId: string) {
     await credentialVault.updateCredentialMetadata(credentialId, {
       models: validChatModels,
       recommendedModel: recommended,
-      modelTests: modelTests, // ✅ აქ არის ყველა მოდელის ტესტის შედეგი
+      modelTests: modelTests,
       testSuccess: true,
       testLatency: Date.now() - startTime
     });
@@ -170,9 +204,9 @@ export async function testCredentialAction(credentialId: string) {
     return {
       success: true,
       provider: cred.provider,
-      models: validChatModels, // ✅ ყველა მოდელის სია
+      models: validChatModels,
       recommendedModel: recommended,
-      modelTests: modelTests, // ✅ ყველა მოდელის ტესტის დეტალური ანგარიში
+      modelTests: modelTests,
       latency: Date.now() - startTime,
       logs
     };
