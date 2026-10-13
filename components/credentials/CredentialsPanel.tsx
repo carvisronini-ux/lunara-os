@@ -1,3 +1,4 @@
+// /home/carvisronini-ux/lunara-os/components/credentials/CredentialsPanel.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -34,7 +35,6 @@ export function CredentialsPanel() {
   
   const [testingId, setTestingId] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
-  // ✅ ახალი: ლოგების შესანახად თითოეული გასაღებისთვის
   const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
 
@@ -182,10 +182,9 @@ export function CredentialsPanel() {
     }
   };
 
-  // ✅ განახლებული: იღებს ლოგებს სერვერიდან და ინახავს სტეიტში
   const handleTestCredential = async (credentialId: string) => {
     setTestingId(credentialId);
-    setActiveLogs(prev => ({ ...prev, [credentialId]: [] })); // ლოგების გასუფთავება ტესტის დაწყებისას
+    setActiveLogs(prev => ({ ...prev, [credentialId]: [] }));
     
     try {
       const result = await testCredentialAction(credentialId);
@@ -545,7 +544,7 @@ export function CredentialsPanel() {
                       </div>
                     </div>
                     
-                    {/* ✅ ახალი: დეტალური ტერმინალის სტილის ლოგერი */}
+                    {/* დეტალური ტერმინალის სტილის ლოგერი */}
                     {logs.length > 0 && (
                       <div className="mt-3 rounded-lg bg-black/60 border border-white/10 p-3 font-mono text-[11px] space-y-1 max-h-48 overflow-y-auto custom-scrollbar shadow-inner">
                         {logs.map((log, i) => {
@@ -564,20 +563,70 @@ export function CredentialsPanel() {
                       </div>
                     )}
 
-                    {/* ტესტის საბოლოო შედეგის ბანერი (ლოგერის ქვემოთ) */}
+                    {/* ✅ ახალი: ტესტის საბოლოო შედეგის დეტალური ბანერი */}
                     {testResult && !isTesting && (
-                      <div className={`mt-3 rounded-lg border p-3 ${
+                      <div className={`mt-3 rounded-lg border p-4 ${
                         testResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
                       }`}>
                         {testResult.success ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-emerald-400 text-sm font-bold">✅ Test Successful</span>
-                            {testResult.recommendedModel && (
-                              <span className="text-xs text-slate-400">| Model: <span className="text-white font-mono">{testResult.recommendedModel}</span></span>
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-emerald-400 text-sm font-bold">✅ ტესტი წარმატებულია</span>
+                                {testResult.recommendedModel && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-black/40 px-2 py-1 text-xs text-slate-300">
+                                    🏆 რეკომენდებული: <span className="font-mono text-white">{testResult.recommendedModel}</span>
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-xs text-slate-500">
+                                ⏱️ ჯამური დრო: {testResult.latency}ms
+                              </span>
+                            </div>
+                            
+                            {/* მოდელების ტესტის შედეგების სია */}
+                            {testResult.modelTests && testResult.modelTests.length > 0 && (
+                              <div className="mt-2">
+                                <h4 className="mb-2 text-xs font-bold uppercase text-slate-400">
+                                  შემოწმებული მოდელები ({testResult.modelTests.length})
+                                </h4>
+                                <div className="max-h-64 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                                  {testResult.modelTests.map((test: any, idx: number) => (
+                                    <div 
+                                      key={idx} 
+                                      className={`flex items-start gap-3 rounded-md border p-2.5 text-xs ${
+                                        test.passed 
+                                          ? 'bg-emerald-500/5 border-emerald-500/20' 
+                                          : 'bg-red-500/5 border-red-500/20'
+                                      }`}
+                                    >
+                                      <div className="mt-0.5 shrink-0 text-lg">
+                                        {test.passed ? '✅' : '❌'}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="truncate font-mono font-bold text-white">
+                                            {test.model}
+                                          </span>
+                                          <span className="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[10px] text-slate-400">
+                                            {test.latency}ms
+                                          </span>
+                                        </div>
+                                        <div className="mt-1 break-all font-mono text-[11px]">
+                                          <span className="text-slate-500">პასუხი: </span>
+                                          <span className={test.passed ? 'text-emerald-300' : 'text-red-300'}>
+                                            "{test.response}"
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             )}
                           </div>
                         ) : (
-                          <div className="text-red-400 text-sm">❌ Test Failed: {testResult.error}</div>
+                          <div className="text-sm text-red-400">❌ ტესტი ვერ მოხერხდა: {testResult.error}</div>
                         )}
                       </div>
                     )}

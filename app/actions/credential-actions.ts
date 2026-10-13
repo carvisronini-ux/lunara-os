@@ -21,7 +21,7 @@ export async function testCredentialAction(credentialId: string) {
   
   if (!cred) {
     addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
-    return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', logs };
+    return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
   }
 
   addLog('INFO', `პროვაიდერი: ${cred.provider.toUpperCase()} | სკოპი: ${cred.scope}`);
@@ -29,148 +29,164 @@ export async function testCredentialAction(credentialId: string) {
   const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
   if (!apiKey) {
     addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
-    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: cred.provider, models: [], recommendedModel: '', logs };
+    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: cred.provider, models: [], recommendedModel: '', modelTests: [], logs };
   }
   addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
 
-  // ✅ 1. სპეციალური ტესტი Groq-სთვის (100% დინამიური შერჩევა, ჰარდკოდის გარეშე)
-  if (cred.provider.toLowerCase() === 'groq') {
-    const startTime = Date.now();
-    const modelsUrl = 'https://api.groq.com/openai/v1/models';
+  const startTime = Date.now();
+  let validChatModels: string[] = [];
+  const modelTests: any[] = [];
+  
+  // მკაცრი ტესტის პრომპტი
+  const testPrompt = "Write exactly one word: YES. Do not write anything else, no punctuation, no explanations.";
+
+  try {
+    // ============================================================
+    // 100% დინამიური კონფიგურაციის ამოღება მეტამონაცემებიდან
+    // ============================================================
+    const meta = cred.metadata || {};
+    const providerLower = cred.provider.toLowerCase();
     
-    addLog('INFO', 'ვამოწმებ Groq API-ს და ვითხოვ აქტუალურ მოდელების სიას...');
-    addLog('REQ', `GET ${modelsUrl}`);
+    const baseUrl = meta.baseUrl || `https://api.${providerLower}.com/v1`;
+    const modelsEndpoint = meta.modelsEndpoint || '/models';
+    const chatEndpoint = meta.chatEndpoint || '/chat/completions';
+    
+    const authHeaderKey = meta.authHeaderKey || 'Authorization';
+    const authHeaderValue = meta.authHeaderPrefix 
+      ? `${meta.authHeaderPrefix} ${apiKey}` 
+      : `Bearer ${apiKey}`;
 
-    try {
-      const response = await fetch(modelsUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    addLog('INFO', `ვითხოვ მოდელების სიას: ${baseUrl}${modelsEndpoint}`);
+    addLog('REQ', `GET ${baseUrl}${modelsEndpoint}`);
 
-      addLog('RES', `მიღებულია პასუხი: HTTP ${response.status} ${response.statusText}`);
+    const modelsResponse = await fetch(`${baseUrl}${modelsEndpoint}`, {
+      method: 'GET',
+      headers: {
+        [authHeaderKey]: authHeaderValue,
+        'Content-Type': 'application/json'
+      }
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        addLog('SUCCESS', 'Groq API გასაღები ვალიდურია.');
-        
-        const allModels = data.data || [];
-        
-        // ✅ დინამიური ფილტრი: ვტოვებთ მხოლოდ იმ მოდელებს, რომლებიც რეალურად არიან LLM (ჩატისთვის)
-        // და ვრიცხავთ სპეციალიზირებულს (guard, whisper, vision) ან გაუქმებულს.
-        const validChatModels = allModels
-          .filter((m: any) => {
-            const id = m.id.toLowerCase();
-            const isSpecialized = id.includes('guard') || id.includes('whisper') || id.includes('vision') || id.includes('distil');
-            const isLLM = id.includes('llama') || id.includes('gemma') || id.includes('mixtral') || id.includes('qwen') || id.includes('deepseek');
-            return !isSpecialized && isLLM;
+    addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
+
+    if (!modelsResponse.ok) {
+      const errorData = await modelsResponse.json().catch(() => ({}));
+      throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || modelsResponse.statusText}`);
+    }
+
+    const data = await modelsResponse.json();
+    addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
+
+    // მოდელების დინამიური ფილტრაცია (ვტოვებთ მხოლოდ ტექსტურ LLM-ებს)
+    const allModels = data.data || data.models || [];
+    
+    validChatModels = allModels
+      .filter((m: any) => {
+        const id = (m.id || m.name || '').toLowerCase();
+        const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard');
+        return !isSpecialized && id.length > 0;
+      })
+      .map((m: any) => m.id || m.name);
+
+    addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური ტექსტური მოდელი. ვამოწმებ ყველას...`);
+
+    // ✅ ახალი ლოგიკა: ვამოწმებთ ყველა ნაპოვნ მოდელს (არა მხოლოდ ტოპ 5-ს)
+    const testPromises = validChatModels.map(async (modelId: string) => {
+      const testStartTime = Date.now();
+      try {
+        const testRes = await fetch(`${baseUrl}${chatEndpoint}`, {
+          method: 'POST',
+          headers: {
+            [authHeaderKey]: authHeaderValue,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: modelId,
+            messages: [{ role: 'user', content: testPrompt }],
+            temperature: 0.1,
+            max_tokens: 10
           })
-          .map((m: any) => m.id);
-
-        addLog('INFO', `სისტემამ იპოვა ${validChatModels.length} აქტიური ენის მოდელი.`);
-        
-        // ✅ 100% დინამიური არჩევანი ჰარდკოდის გარეშე:
-        // 1. ვეძებთ ნებისმიერ Llama 3-ის ვერსიას (მიუხედავად იმისა, 3.1, 3.2 თუ 3.3 ჰქვია დღეს).
-        // 2. თუ არაა, ვეძებთ ნებისმიერ Gemma-ს.
-        // 3. თუ არაა, ვეძებთ ნებისმიერ Mixtral-ს.
-        // 4. თუ არც ესეა, ვიღებთ სიის პირველსავე ხელმისაწვდომ მოდელს (რაც API-მ პირველად დააბრუნა).
-        let recommended = validChatModels.find((m: string) => m.includes('llama-3')) || 
-                          validChatModels.find((m: string) => m.includes('gemma')) ||
-                          validChatModels.find((m: string) => m.includes('mixtral')) ||
-                          validChatModels[0];
-
-        addLog('INFO', `სისტემამ ავტომატურად აირჩია აქტუალური მოდელი: ${recommended}`);
-        addLog('INFO', 'ვინახავ რეკომენდებულ მოდელს მეტამონაცემებში...');
-        
-        await credentialVault.updateCredentialMetadata(credentialId, {
-          models: validChatModels,
-          recommendedModel: recommended,
-          testSuccess: true,
-          testLatency: Date.now() - startTime
         });
-        addLog('SUCCESS', 'მეტამონაცემები წარმატებით შეინახა ბაზაში.');
-
-        return {
-          success: true,
-          provider: cred.provider,
-          models: validChatModels,
-          recommendedModel: recommended,
-          latency: Date.now() - startTime,
-          logs
-        };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg = errorData.error?.message || response.statusText;
-        addLog('ERROR', `ვერიფიკაცია ვერ მოხერხდა: ${errorMsg}`);
         
-        return {
-          success: false,
-          provider: cred.provider,
-          models: [],
-          recommendedModel: '',
-          error: `Invalid API key (HTTP ${response.status}): ${errorMsg}`,
-          logs
+        if (testRes.ok) {
+          const testData = await testRes.json();
+          const content = testData.choices?.[0]?.message?.content?.trim() || 
+                          testData.content?.[0]?.text?.trim() || '';
+          
+          const passed = content.toUpperCase() === 'YES' || content.toUpperCase() === 'YES.';
+          return { 
+            model: modelId, 
+            response: content || '(ცარიელი პასუხი)', 
+            passed, 
+            latency: Date.now() - testStartTime 
+          };
+        } else {
+          return { 
+            model: modelId, 
+            response: `HTTP ${testRes.status}`, 
+            passed: false, 
+            latency: Date.now() - testStartTime 
+          };
+        }
+      } catch (e: any) {
+        return { 
+          model: modelId, 
+          response: e.message, 
+          passed: false, 
+          latency: Date.now() - testStartTime 
         };
       }
-    } catch (error: any) {
-      addLog('ERROR', `ქსელური შეცდომა: ${error.message}`);
-      return {
-        success: false,
-        provider: cred.provider,
-        models: [],
-        recommendedModel: '',
-        error: `Network error: ${error.message}`,
-        logs
-      };
-    }
-  }
+    });
 
-  // ✅ 2. სპეციალური ტესტი Cloudflare-ისთვის
-  if (cred.provider.toLowerCase() === 'cloudflare') {
-    const startTime = Date.now();
-    const testUrl = 'https://api.cloudflare.com/client/v4/user/tokens/verify';
-    addLog('INFO', 'ვამოწმებ Cloudflare API ტოკენის ვალიდურობას...');
+    // ყველა მოდელის პარალელური ტესტირება
+    const results = await Promise.all(testPromises);
+    modelTests.push(...results);
+
+    // ============================================================
+    // შედეგების დამუშავება და შენახვა
+    // ============================================================
+    // დალაგება: ჯერ ისინი ვინც გაიარა ტესტი (passed: true), შემდეგ ლატენტობის (სისწრაფის) მიხედვით
+    modelTests.sort((a, b) => {
+      if (a.passed && !b.passed) return -1;
+      if (!a.passed && b.passed) return 1;
+      return a.latency - b.latency;
+    });
+
+    const recommended = modelTests.find(m => m.passed)?.model || validChatModels[0];
+    const passedCount = modelTests.filter(m => m.passed).length;
     
-    try {
-      const response = await fetch(testUrl, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
-      });
+    addLog('SUCCESS', `ტესტირება დასრულდა! ${passedCount}/${modelTests.length} მოდელმა წარმატებით შეასრულა მკაცრი ინსტრუქცია.`);
+    addLog('INFO', 'ვინახავ ყველა მოდელს და ტესტის სრულ შედეგებს მეტამონაცემებში...');
+    
+    await credentialVault.updateCredentialMetadata(credentialId, {
+      models: validChatModels,
+      recommendedModel: recommended,
+      modelTests: modelTests, // ✅ აქ არის ყველა მოდელის ტესტის შედეგი
+      testSuccess: true,
+      testLatency: Date.now() - startTime
+    });
+    addLog('SUCCESS', 'მეტამონაცემები წარმატებით შეინახა ბაზაში.');
 
-      addLog('RES', `მიღებულია პასუხი: HTTP ${response.status} ${response.statusText}`);
+    return {
+      success: true,
+      provider: cred.provider,
+      models: validChatModels, // ✅ ყველა მოდელის სია
+      recommendedModel: recommended,
+      modelTests: modelTests, // ✅ ყველა მოდელის ტესტის დეტალური ანგარიში
+      latency: Date.now() - startTime,
+      logs
+    };
 
-      if (response.ok) {
-        const data = await response.json();
-        addLog('SUCCESS', `ტოკენი ვალიდურია! სტატუსი: ${data.result?.status || 'Active'}`);
-        
-        const models = ['@cf/black-forest-labs/flux-1-schnell', '@cf/stabilityai/stable-diffusion-xl-base-1.0'];
-        const recommended = '@cf/black-forest-labs/flux-1-schnell';
-
-        await credentialVault.updateCredentialMetadata(credentialId, { models, recommendedModel: recommended, testSuccess: true, testLatency: Date.now() - startTime });
-        addLog('SUCCESS', 'მეტამონაცემები წარმატებით შეინახა ბაზაში.');
-
-        return { success: true, provider: cred.provider, models, recommendedModel: recommended, latency: Date.now() - startTime, logs };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        addLog('ERROR', `ვერიფიკაცია ვერ მოხერხდა: ${errorData.errors?.[0]?.message || response.statusText}`);
-        return { success: false, provider: cred.provider, models: [], recommendedModel: '', error: `Invalid API token`, logs };
-      }
-    } catch (error: any) {
-      addLog('ERROR', `ქსელური შეცდომა: ${error.message}`);
-      return { success: false, provider: cred.provider, models: [], recommendedModel: '', error: `Network error: ${error.message}`, logs };
-    }
+  } catch (error: any) {
+    addLog('ERROR', `შეცდომა: ${error.message}`);
+    return {
+      success: false,
+      provider: cred.provider,
+      models: [],
+      recommendedModel: '',
+      modelTests: [],
+      error: error.message,
+      logs
+    };
   }
-
-  // ✅ 3. სხვა პროვაიდერებისთვის (Fallback)
-  addLog('INFO', 'ამ პროვაიდერისთვის დეტალური ლოგერი ჯერ არ არის იმპლემენტირებული, მაგრამ გასაღები ვალიდურად მიიჩნევა.');
-  return {
-    success: true,
-    provider: cred.provider,
-    models: ['default-model'],
-    recommendedModel: 'default-model',
-    latency: 100,
-    logs
-  };
 }
