@@ -5,7 +5,6 @@ import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
 import { testCredentialAction } from '@/app/actions/credential-actions';
 import { testGenerationAction } from '@/app/actions/test-generation-action';
-import { auditChatModelsAction } from '@/app/actions/audit-chat-models';
 import type { PermissionScope } from '@/services/credentials/types';
 
 type AnyRecord = Record<string, any>;
@@ -98,8 +97,7 @@ export function CredentialsPanel() {
   const [editCredMetadata, setEditCredMetadata] = useState('');
   const [editCredValue, setEditCredValue] = useState('');
   const [testingId, setTestingId] = useState<string | null>(null);
-  const [auditingId, setAuditingId] = useState<string | null>(null);
-  const [testingBox, setTestingBox] = useState<{ credId: string; type: 'text' | 'image' } | null>(null); // ✅ ახალი State
+  const [testingBox, setTestingBox] = useState<{ credId: string; type: 'text' | 'image' } | null>(null);
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
@@ -220,19 +218,6 @@ export function CredentialsPanel() {
     } finally { setTestingId(null); }
   };
 
-  const handleAuditChat = async (credentialId: string) => {
-    setAuditingId(credentialId);
-    try {
-      const res = await auditChatModelsAction(credentialId);
-      if (res.success) await refreshData();
-      else alert(`Audit failed: ${res.error}`);
-    } catch (error: any) {
-      console.error('Audit error:', error);
-      alert(`Audit error: ${error.message}`);
-    } finally { setAuditingId(null); }
-  };
-
-  // ✅ ახალი ფუნქცია: კონკრეტული ყუთის მოდელების ტესტირება და დალაგება
   const handleTestSpecificBox = async (credentialId: string, models: string[], type: 'text' | 'image') => {
     setTestingBox({ credId: credentialId, type });
     setActiveLogs(prev => ({ ...prev, [credentialId]: [`[INFO] იწყება ${type === 'text' ? 'ტექსტის' : 'ფოტოს'} მოდელების ტესტირება...`] }));
@@ -341,7 +326,6 @@ export function CredentialsPanel() {
                 : <div className="space-y-3">{filteredCredentials.map((cred: any) => {
                   const testResult = testResults[cred.credential_id];
                   const isTesting = testingId === cred.credential_id;
-                  const isAuditing = auditingId === cred.credential_id;
                   const logs = activeLogs[cred.credential_id] || [];
                   const chatModels = Array.isArray(cred.metadata?.chatModels) ? cred.metadata.chatModels : [];
                   const imageModels = Array.isArray(cred.metadata?.imageModels) ? cred.metadata.imageModels : [];
@@ -359,10 +343,8 @@ export function CredentialsPanel() {
                             {cred.metadata?.application && <p className="mt-1.5 break-words text-[11px] text-violet-200/90">App / project: {String(cred.metadata.application)}</p>}
                             {cred.email && <p className="mt-1.5 break-all text-[11px] text-blue-300/90">✉ {cred.email}</p>}
                             
-                            {/* ✅ ახალი: ორი ლამაზი ყუთი მოდელებისთვის */}
                             {(chatModels.length > 0 || imageModels.length > 0) && (
                               <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                                {/* 💬 ყუთი 1: ტექსტის გენერაცია */}
                                 {chatModels.length > 0 && (
                                   <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
                                     <div className="mb-2 flex items-center justify-between">
@@ -403,7 +385,6 @@ export function CredentialsPanel() {
                                   </div>
                                 )}
 
-                                {/* 🎨 ყუთი 2: ფოტოს გენერაცია */}
                                 {imageModels.length > 0 && (
                                   <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.03] p-3">
                                     <div className="mb-2 flex items-center justify-between">
@@ -450,8 +431,7 @@ export function CredentialsPanel() {
                         <div className="flex flex-wrap gap-2 lg:max-w-[250px] lg:justify-end">
                           <button type="button" onClick={() => openEditModal(cred)} className={subtleButton} title="Edit credential"><Icon name="edit" className="h-3.5 w-3.5"/> Edit</button>
                           <button type="button" onClick={() => setShowDeleteConfirm(cred.credential_id)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-300/15 bg-red-300/[0.045] px-2.5 py-1.5 text-xs font-semibold text-red-300 transition hover:border-red-300/30 hover:bg-red-300/[0.09]" title="Delete credential"><Icon name="trash" className="h-3.5 w-3.5"/> Delete</button>
-                          <button type="button" onClick={() => handleAuditChat(cred.credential_id)} disabled={isAuditing || isTesting} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-cyan-300/15 bg-cyan-300/[0.045] px-2.5 py-1.5 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-300/[0.09] disabled:cursor-not-allowed disabled:opacity-40">{isAuditing ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-cyan-200 border-t-transparent"/> : <Icon name="activity" className="h-3.5 w-3.5"/>}{isAuditing ? 'Auditing…' : 'Audit chat'}</button>
-                          <button type="button" onClick={(e) => { e.preventDefault(); handleTestCredential(cred.credential_id); }} disabled={isTesting || isAuditing} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-300/15 bg-violet-300/[0.055] px-2.5 py-1.5 text-xs font-semibold text-violet-200 transition hover:bg-violet-300/[0.1] disabled:cursor-not-allowed disabled:opacity-40">{isTesting ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-200 border-t-transparent"/> : <Icon name="terminal" className="h-3.5 w-3.5"/>}{isTesting ? 'Testing…' : 'Test key'}</button>
+                          <button type="button" onClick={(e) => { e.preventDefault(); handleTestCredential(cred.credential_id); }} disabled={isTesting} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-300/15 bg-violet-300/[0.055] px-2.5 py-1.5 text-xs font-semibold text-violet-200 transition hover:bg-violet-300/[0.1] disabled:cursor-not-allowed disabled:opacity-40">{isTesting ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-200 border-t-transparent"/> : <Icon name="terminal" className="h-3.5 w-3.5"/>}{isTesting ? 'Testing…' : 'Test key'}</button>
                         </div>
                       </div>
                     </div>
