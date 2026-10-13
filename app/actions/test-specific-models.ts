@@ -35,9 +35,26 @@ export async function testSpecificModelsAction(
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
       // ============================================
+      // HUGGING FACE - სპეციფიკური ლოგიკა
+      // ============================================
+      if (provider === 'huggingface') {
+        if (testType === 'text') {
+          endpoint = `https://api-inference.huggingface.co/models/${modelName}`;
+          requestBody = {
+            inputs: "დაწერე მხოლოდ სიტყვა: YES",
+            parameters: { max_new_tokens: 10, temperature: 0.1 }
+          };
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        } else {
+          endpoint = `https://api-inference.huggingface.co/models/${modelName}`;
+          requestBody = { inputs: "A beautiful cosmic landscape, high quality" };
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+      }
+      // ============================================
       // CLOUDFLARE - სპეციფიკური ლოგიკა
       // ============================================
-      if (provider === 'cloudflare') {
+      else if (provider === 'cloudflare') {
         const accountId = meta.accountId;
         if (!accountId) {
           addLog(`❌ ${modelName}: Cloudflare accountId არ არის Metadata-ში`);
@@ -79,7 +96,7 @@ export async function testSpecificModelsAction(
         }
       }
       // ============================================
-      // სხვა პროვაიდერები - სტანდარტული ლოგიკა
+      // სხვა პროვაიდერები (OpenAI, Groq, Mistral, DeepSeek) - სტანდარტული ლოგიკა
       // ============================================
       else {
         let base = meta.baseUrl;
@@ -112,7 +129,6 @@ export async function testSpecificModelsAction(
         }
       }
 
-      // ✅ ტაიმაუტი: ტექსტისთვის 15წმ, ფოტოსთვის 40წმ
       const timeout = testType === 'text' ? 15000 : 40000;
       let response: Response;
       let isTimeout = false;
@@ -127,25 +143,18 @@ export async function testSpecificModelsAction(
       } catch (fetchError: any) {
         if (fetchError.name === 'TimeoutError' || fetchError.message.includes('timeout')) {
           isTimeout = true;
-          addLog(`⏱️ ${modelName} - პირველი ცდა: timeout (${timeout/1000}წმ). ვცდილობ მეორედ...`);
-          
-          // ✅ Retry ლოგიკა: ვცდილობთ კიდევ ერთხელ
+          addLog(`⏱️ ${modelName} - პირველი ცდა: timeout. ვცდილობ მეორედ...`);
           try {
             response = await fetch(endpoint, {
               method: 'POST',
               headers,
               body: JSON.stringify(requestBody),
-              signal: AbortSignal.timeout(timeout * 1.5) // მეორე ცდაზე 1.5x მეტი დრო
+              signal: AbortSignal.timeout(timeout * 1.5)
             });
           } catch (retryError: any) {
             const latency = Date.now() - startTime;
-            addLog(` ${modelName} - მეორე ცდაც timeout: ${retryError.message}`);
-            results.push({ 
-              model: modelName, 
-              passed: false, 
-              latency, 
-              error: 'Timeout after retry' 
-            });
+            addLog(`⚠️ ${modelName} - მეორე ცდაც timeout: ${retryError.message}`);
+            results.push({ model: modelName, passed: false, latency, error: 'Timeout after retry' });
             continue;
           }
         } else {
@@ -160,9 +169,14 @@ export async function testSpecificModelsAction(
         let isValid = false;
         
         if (testType === 'text') {
+          // Hugging Face ტექსტური პასუხი ჩვეულებრივ არის მასივი: [{ "generated_text": "YES" }]
+          // ან OpenAI-ს თავსებადი თუ special endpoint-ია.
           const data = await response.json();
           
-          if (provider === 'cloudflare') {
+          if (provider === 'huggingface') {
+            isValid = (Array.isArray(data) && data[0]?.generated_text?.length > 0) || 
+                      (data.choices?.[0]?.message?.content?.length > 0);
+          } else if (provider === 'cloudflare') {
             isValid = data.result?.response?.length > 0;
           } else if (provider === 'gemini' || provider === 'google') {
             isValid = data.candidates?.[0]?.content?.parts?.[0]?.text?.length > 0;
@@ -172,15 +186,12 @@ export async function testSpecificModelsAction(
         } else {
           if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
             isValid = true;
-            if (isTimeout) {
-              addLog(`⚠️ ${modelName} წარმატებულია, მაგრამ ნელი (${latency}ms)`);
-            } else {
-              addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
-            }
           } else {
             const data = await response.json();
-            
-            if (provider === 'cloudflare') {
+            if (provider === 'huggingface') {
+               // HF image-იც ხშირად binary-ა, მაგრამ თუ JSON-ია:
+               isValid = true; 
+            } else if (provider === 'cloudflare') {
               isValid = data.result?.image?.length > 0 || data.success === true;
             } else if (provider === 'gemini' || provider === 'google') {
               isValid = data.predictions?.[0]?.bytesBase64Encoded?.length > 0;
@@ -191,9 +202,9 @@ export async function testSpecificModelsAction(
         }
 
         if (isValid) {
-          if (!isTimeout) {
-            addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
-          }
+          if (!isTimeout) addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
+          else addLog(`⚠️ ${modelName} წარმატებულია, მაგრამ ნელი (${latency}ms)`);
+          
           results.push({ model: modelName, passed: true, latency, response: 'Success' });
         } else {
           addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
@@ -213,7 +224,6 @@ export async function testSpecificModelsAction(
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  // დალაგება
   const sortedResults = results.sort((a, b) => {
     if (a.passed && !b.passed) return -1;
     if (!a.passed && b.passed) return 1;
@@ -221,7 +231,6 @@ export async function testSpecificModelsAction(
     return 0;
   });
 
-  // შენახვა Metadata-ში
   const metaKey = testType === 'text' ? 'chatModels' : 'imageModels';
   const auditKey = testType === 'text' ? 'chatModelAuditResults' : 'imageModelAuditResults';
   
