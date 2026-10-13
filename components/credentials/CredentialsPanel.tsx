@@ -182,19 +182,38 @@ export function CredentialsPanel() {
     }
   };
 
+  // ✅ დეტალური დიაგნოსტიკური ლოგერით აღჭურვილი ფუნქცია
   const handleTestCredential = async (credentialId: string) => {
-    setTestingId(credentialId);
-    setActiveLogs(prev => ({ ...prev, [credentialId]: [] }));
+    console.log("🔵 [UI] Test ღილაკი დააჭირა! ID:", credentialId);
     
+    // 1. მყისიერი UI განახლება, რომ მომხმარებელმა დაინახოს რეაქცია
+    setTestingId(credentialId);
+    const initialLogs = ["[INFO] ტესტირების პროცესი დაიწყო UI-დან... შეამოწმეთ ბრაუზერის კონსოლი (F12) დეტალებისთვის."];
+    setActiveLogs(prev => ({ ...prev, [credentialId]: initialLogs }));
+    console.log("🟡 [UI] Testing state და Logs განახლდა.");
+
     try {
+      console.log("🟡 [UI] ვიძახებ testCredentialAction Server Action-ს...");
       const result = await testCredentialAction(credentialId);
+      console.log("🟢 [UI] მიღებულია პასუხი სერვერიდან:", result);
+      
       setTestResults(prev => ({ ...prev, [credentialId]: result }));
-      if (result.logs) {
+      
+      if (result.logs && Array.isArray(result.logs)) {
+        console.log("🟢 [UI] ვაახლებ UI-ს სერვერის ლოგებით:", result.logs);
         setActiveLogs(prev => ({ ...prev, [credentialId]: result.logs }));
+      } else {
+        console.warn("⚠️ [UI] სერვერმა ლოგები არ დააბრუნა.");
       }
-      refreshData();
-    } catch (error) {
+      
+      console.log("🟡 [UI] ვაახლებ მონაცემებს (refreshData)...");
+      await refreshData();
+      console.log("🟢 [UI] მონაცემები წარმატებით განახლდა.");
+      
+    } catch (error: any) {
+      console.error("🔴 [UI] კრიტიკული შეცდომა handleTestCredential-ში:", error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      
       setTestResults(prev => ({
         ...prev,
         [credentialId]: {
@@ -202,8 +221,11 @@ export function CredentialsPanel() {
           error: errorMsg
         }
       }));
-      setActiveLogs(prev => ({ ...prev, [credentialId]: [...(prev[credentialId] || []), `[ERROR] ${errorMsg}`] }));
+      
+      const errorLog = `[ERROR] ${errorMsg}`;
+      setActiveLogs(prev => ({ ...prev, [credentialId]: [...(prev[credentialId] || []), errorLog] }));
     } finally {
+      console.log("⚪ [UI] ვასუფთავებ testing state-ს:", credentialId);
       setTestingId(null);
     }
   };
@@ -534,8 +556,13 @@ export function CredentialsPanel() {
                             </button>
                           </>
                         )}
+                        {/* ✅ დეტალური ლოგერით აღჭურვილი ღილაკი */}
                         <button
-                          onClick={() => handleTestCredential(cred.credential_id)}
+                          onClick={(e) => {
+                            console.log("🖱️ [UI] ღილაკი დაკლიკდა. Credential ID:", cred.credential_id);
+                            e.preventDefault(); // თავიდან ავიცილოთ ნებისმიერი ფორმის შემთხვევითი გაგზავნა
+                            handleTestCredential(cred.credential_id);
+                          }}
                           disabled={isTesting}
                           className="rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
