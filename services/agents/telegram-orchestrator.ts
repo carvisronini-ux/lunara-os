@@ -374,11 +374,16 @@ export class TelegramOrchestrator {
           throw new Error('No chat models available in the vault.');
         }
 
-        addLog(`🔄 [ცდა ${chatAttempts + 1}/${maxChatAttempts}] ვცდილობთ ტექსტის გენერაციას: ${chatModelInfo.provider} -> ${chatModelInfo.modelName}`);
+        // ✅ შევინახოთ მნიშვნელობები ცალკე ცვლადებში, რათა TypeScript-მა არ იჩივლოს finally ბლოკში
+        const currentProvider = chatModelInfo.provider;
+        const currentModelName = chatModelInfo.modelName;
+        const currentCredentialId = chatModelInfo.credentialId;
+
+        addLog(`🔄 [ცდა ${chatAttempts + 1}/${maxChatAttempts}] ვცდილობთ ტექსტის გენერაციას: ${currentProvider} -> ${currentModelName}`);
 
         leaseId = accessManager.requestAccess(
           `${request.agentType}-agent`,
-          chatModelInfo.provider as any,
+          currentProvider as any,
           'spend',
           `Generate Telegram content for ${request.postType}`,
           null,
@@ -386,8 +391,8 @@ export class TelegramOrchestrator {
         );
 
         if (!leaseId) {
-          addWarning(`Could not acquire lease for ${chatModelInfo.provider}. Trying next...`);
-          chatModelInfo = await getBestAvailableModel('chat', chatModelInfo.modelName);
+          addWarning(`Could not acquire lease for ${currentProvider}. Trying next...`);
+          chatModelInfo = await getBestAvailableModel('chat', currentModelName);
           chatAttempts++;
           continue;
         }
@@ -416,12 +421,11 @@ export class TelegramOrchestrator {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
-          // Dynamic endpoint construction based on provider
-          let chatEndpoint = `https://api.${chatModelInfo.provider}.com/v1/chat/completions`;
-          if (chatModelInfo.provider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-          else if (chatModelInfo.provider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
-          else if (chatModelInfo.provider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
-          else if (chatModelInfo.provider === 'openai') chatEndpoint = 'https://api.openai.com/v1/chat/completions';
+          let chatEndpoint = `https://api.${currentProvider}.com/v1/chat/completions`;
+          if (currentProvider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+          else if (currentProvider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
+          else if (currentProvider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+          else if (currentProvider === 'openai') chatEndpoint = 'https://api.openai.com/v1/chat/completions';
 
           let response: Response;
           try {
@@ -432,7 +436,7 @@ export class TelegramOrchestrator {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: chatModelInfo.modelName,
+                model: currentModelName,
                 messages: [
                   { role: 'system', content: systemPrompt },
                   { role: 'user', content: userPrompt },
@@ -458,9 +462,9 @@ export class TelegramOrchestrator {
                                          errorText.toLowerCase().includes('invalid model');
             
             if (isNotAChatModelError) {
-              addLog(`⚠️ მოდელი "${chatModelInfo.modelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
-              await reclassifyModelToImage(chatModelInfo.credentialId, chatModelInfo.modelName);
-              chatModelInfo = await getBestAvailableModel('chat', chatModelInfo.modelName);
+              addLog(`⚠️ მოდელი "${currentModelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
+              await reclassifyModelToImage(currentCredentialId, currentModelName);
+              chatModelInfo = await getBestAvailableModel('chat', currentModelName);
               chatAttempts++;
               continue; // ცადე შემდეგი მოდელი
             }
@@ -476,7 +480,7 @@ export class TelegramOrchestrator {
 
         } finally {
           if (leaseId) {
-            addLog(`Releasing ${chatModelInfo.provider} access lease...`);
+            addLog(`Releasing ${currentProvider} access lease...`);
             try {
               accessManager.revokeLease(leaseId, 'system_cleanup');
               addLog('Access lease released.');
