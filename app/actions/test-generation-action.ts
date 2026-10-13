@@ -27,7 +27,7 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
       addLog(`✅ საცავიდან არჩეულია მოდელი: ${modelInfo.provider} -> ${modelInfo.modelName}`);
       
-      // 2. ვაგებთ Endpoint-ს ზუსტად ისე, როგორც Orchestrator-შია (რათა ლოგიკა იყოს იდენტური)
+      // 2. ვაგებთ Endpoint-ს ზუსტად ისე, როგორც Orchestrator-შია
       let chatEndpoint = `https://api.${modelInfo.provider}.com/v1/chat/completions`;
       if (modelInfo.provider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
       else if (modelInfo.provider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
@@ -69,11 +69,21 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
       if (!response.ok) {
         const errText = await response.text();
-        // თუ მოდელი ამბობს რომ ჩეთი არ შეუძლია, ავტომატურად გადაგვაქვს ის Image კატეგორიაში (თვითაღდგენა)
-        if (errText.toLowerCase().includes('not supported') || errText.toLowerCase().includes('image')) {
-          addLog(`⚠️ მოდელი "${modelInfo.modelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
+        const errLower = errText.toLowerCase();
+        
+        // ✅ თვითაღდგენის ლოგიკა: თუ მოდელი დაძველებულია (not_found) ან ჩეთი არ შეუძლია
+        if (errLower.includes('not supported') || errLower.includes('image') || errLower.includes('not_found') || errLower.includes('no longer available')) {
+          addLog(`⚠️ მოდელი "${modelInfo.modelName}" აღარ არის ხელმისაწვდომი ან არ არის ჩეთის მოდელი.`);
+          addLog(`🔄 სისტემა ავტომატურად შლის მას ჩეთის სიიდან და ინახავს განახლებას...`);
+          
           await reclassifyModelToImage(modelInfo.credentialId, modelInfo.modelName);
-          return { success: false, error: 'Model reclassified as Image. Please try again.', logs, reclassified: true };
+          
+          return { 
+            success: false, 
+            error: `მოდელი "${modelInfo.modelName}" დაზიანებულია/დაძველებულია და ავტომატურად ამოიშალა. გთხოვთ, ხელახლა დააჭიროთ "ტექსტის გენერაცია" ღილაკს, რათა სისტემამ შემდეგი ხელმისაწვდომი მოდელი სცადოს.`, 
+            logs, 
+            reclassified: true 
+          };
         }
         throw new Error(`API Error: ${response.status} - ${errText}`);
       }
@@ -100,7 +110,6 @@ export async function testGenerationAction(testType: 'text' | 'image') {
       
       addLog('📤 იწყება ფოტოს გენერაცია (იყენებს ზუსტად იგივე imageGenerator ლოგიკას, რასაც აგენტი)...');
       
-      // აქ პირდაპირ ვიძახებთ ჩვენს უკვე აგებულ და გამართულ კლასს
       const genResult = await imageGenerator.generateImage(testPrompt, 'test-panel');
       
       if (genResult.success && genResult.imageBuffer) {
