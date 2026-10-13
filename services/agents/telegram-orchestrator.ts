@@ -342,8 +342,27 @@ export class TelegramOrchestrator {
       await credentialVault.ready;
       addLog('CredentialVault is ready.');
 
+      // ============================================================
+      // ✅ 4. PRE-PROCESSING: Determine Zodiac Sign BEFORE Text Generation
+      // ============================================================
+      if (request.postType === 'daily_horoscope_single') {
+        const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
+        let targetSign = (request.zodiacSign || '').toLowerCase().trim();
+
+        if (!targetSign || !validSigns.includes(targetSign) || targetSign === 'general') {
+          targetSign = validSigns[Math.floor(Math.random() * validSigns.length)];
+          addLog(`⚠️ Zodiac sign missing/invalid in schedule. Randomly selected: ${targetSign}`);
+        } else {
+          addLog(`✅ Specific zodiac sign provided in schedule: ${targetSign}`);
+        }
+
+        // Update the request object so buildUserPrompt uses this specific sign!
+        request.zodiacSign = targetSign.charAt(0).toUpperCase() + targetSign.slice(1);
+        addLog(`🧠 AI-ს გადაეცა კონკრეტული ნიშანი: ${request.zodiacSign}`);
+      }
+
       // --------------------------------------------------------
-      // 4. Acquire temporary access lease for Text Generation
+      // 5. Acquire temporary access lease for Text Generation
       // --------------------------------------------------------
       addLog(`Requesting temporary access lease for ${DEFAULT_TEXT_PROVIDER}...`);
       leaseId = accessManager.requestAccess(
@@ -478,24 +497,14 @@ export class TelegramOrchestrator {
       }
 
       // ============================================================
-      // ✅ 5. IMAGE LOGIC (STATIC MAPPING FOR SINGLE SIGN)
+      // ✅ 6. IMAGE LOGIC (STATIC MAPPING FOR SINGLE SIGN)
       // ============================================================
       
       if (request.postType === 'daily_horoscope_single') {
-        // ✅ ლოგიკა Single Sign Horoscope-ისთვის (12 წინასწარ ატვირთული ფოტო)
-        const sign = (request.zodiacSign || '').toLowerCase().trim();
-        const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
-        
-        let fileName = 'aries'; // Default fallback
-        if (validSigns.includes(sign)) {
-          fileName = sign;
-        } else {
-          fileName = validSigns[Math.floor(Math.random() * validSigns.length)];
-          addLog(`⚠️ Invalid or missing zodiac sign (${request.zodiacSign}). Falling back to random: ${fileName}`);
-        }
-
-        const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${fileName}.png`;
-        addLog(`🖼️ Single Sign Horoscope: ვიყენებთ წინასწარ ატვირთულ ფოტოს: ${fileName}`);
+        // ნიშანი უკვე გარანტირებულად განსაზღვრულია და კაპიტალიზებულია ზემოთ (ნაბიჯი 4)
+        const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
+        const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
+        addLog(`🖼️ Single Sign Horoscope: ვიყენებთ წინასწარ ატვირთულ ფოტოს: ${sign}`);
         
         imageResult = {
           success: true,
@@ -548,7 +557,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 6. Prepare Telegram content
+      // 7. Prepare Telegram content
       // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
       const escapedCaption = caption; 
@@ -557,7 +566,7 @@ export class TelegramOrchestrator {
       let publishedWithImage = false;
 
       // --------------------------------------------------------
-      // 7. Try publishing the image
+      // 8. Try publishing the image
       // --------------------------------------------------------
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
@@ -605,7 +614,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 8. Text-only fallback
+      // 9. Text-only fallback
       // --------------------------------------------------------
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
@@ -640,7 +649,7 @@ export class TelegramOrchestrator {
       }
 
       // --------------------------------------------------------
-      // 9. Record publication in Supabase
+      // 10. Record publication in Supabase
       // --------------------------------------------------------
       addLog('Recording publication in Supabase...');
       const { error: databaseError } = await supabase.from('published_content').insert({
