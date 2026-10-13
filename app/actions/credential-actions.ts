@@ -7,7 +7,7 @@ export async function testCredentialAction(credentialId: string) {
   console.log("🚀 [SERVER] testCredentialAction გამოიძახა! ID:", credentialId);
   
   const logs: string[] = [];
-  let providerName = 'unknown'; // ✅ გამოცხადებულია გარეთ, რათა catch-შიც იყოს ხელმისაწვდომი
+  let providerName = 'unknown';
   
   const addLog = (type: 'INFO' | 'REQ' | 'RES' | 'SUCCESS' | 'ERROR', message: string) => {
     const timestamp = new Date().toLocaleTimeString('ka-GE', { hour12: false });
@@ -17,7 +17,6 @@ export async function testCredentialAction(credentialId: string) {
 
   addLog('INFO', 'ტესტირების პროცესის დაწყება...');
   
-  // ✅ ეს ნაწილი არის try-ს გარეთ, რათა ცვლადები გლობალურად იყოს ხელმისაწვდომი
   await credentialVault.ready;
   addLog('INFO', 'CredentialVault ქეში წარმატებით ჩაიტვირთა.');
   
@@ -26,7 +25,7 @@ export async function testCredentialAction(credentialId: string) {
   
   if (!cred) {
     addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
-    return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
+    return { success: false, error: 'Credential not found in cache', provider: 'unknown', chatModels: [], imageModels: [], recommendedModel: '', modelTests: [], logs };
   }
 
   providerName = cred.provider;
@@ -35,14 +34,14 @@ export async function testCredentialAction(credentialId: string) {
   const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
   if (!apiKey) {
     addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
-    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: providerName, models: [], recommendedModel: '', modelTests: [], logs };
+    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: providerName, chatModels: [], imageModels: [], recommendedModel: '', modelTests: [], logs };
   }
   addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
 
-  // ✅ ახლა ვიწყებთ try ბლოკს მხოლოდ იმ ნაწილისთვის, სადაც ქსელური მოთხოვნებია
   try {
     const startTime = Date.now();
-    let validChatModels: string[] = [];
+    let chatModels: string[] = [];
+    let imageModels: string[] = [];
     const modelTests: any[] = [];
     
     const testPrompt = "Write exactly one word: YES. Do not write anything else, no punctuation, no explanations.";
@@ -77,12 +76,10 @@ export async function testCredentialAction(credentialId: string) {
       isGemini = true;
     }
     else if (providerLower === 'mistral') {
-      // ✅ Mistral-ის სწორი დომენი (.ai და არა .com)
       modelsUrl = 'https://api.mistral.ai/v1/models';
       chatUrl = 'https://api.mistral.ai/v1/chat/completions';
     }
     else {
-      // ნაგულისხმევი ლოგიკა სხვა პროვაიდერებისთვის
       let base = meta.baseUrl;
       if (!base) {
         if (providerLower === 'kie') base = 'https://api.kie.ai/v1';
@@ -99,58 +96,77 @@ export async function testCredentialAction(credentialId: string) {
 
     let modelsResponse;
     try {
-      console.log("[SERVER] ვგზავნი fetch მოთხოვნას მოდელების სიაზე...");
       modelsResponse = await fetch(modelsUrl, {
         method: 'GET',
         headers: isGemini ? { 'Content-Type': 'application/json' } : { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000) // ✅ 10 წამიანი timeout, რომ არ ჩაიკიდოს
+        signal: AbortSignal.timeout(10000)
       });
-      console.log("[SERVER] მიღებულია პასუხი მოდელების სიაზე:", modelsResponse.status);
     } catch (networkError: any) {
       addLog('ERROR', `ქსელური შეცდომა: ${networkError.message}`);
-      throw new Error(`Network fetch failed: ${networkError.message}`);
+      // ✅ Fallback Huggingface და KIE-სთვის, თუ API არ მუშაობს
+      if (providerLower === 'huggingface') {
+        chatModels = ["meta-llama/Meta-Llama-3-8B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3"];
+        imageModels = ["stabilityai/stable-diffusion-xl-base-1.0", "black-forest-labs/FLUX.1-schnell"];
+        addLog('SUCCESS', 'გამოყენებულია Huggingface-ის ცნობილი მოდელების სია (Fallback).');
+      } else if (providerLower === 'kie') {
+        imageModels = meta.models || ["flux1-kontext", "flux-2/flex-text-to-image"];
+        addLog('SUCCESS', 'გამოყენებულია KIE AI-ის ცნობილი მოდელების სია (Fallback).');
+      } else {
+        throw new Error(`Network fetch failed: ${networkError.message}`);
+      }
     }
 
-    addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
-
-    let modelsData = null;
-    if (modelsResponse.ok) {
-      modelsData = await modelsResponse.json();
-      addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
-    } else {
-      if (isCloudflare && modelsResponse.status === 404) {
-        validChatModels = ['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3.1-70b-instruct', '@cf/qwen/qwen1.5-14b-chat-awq', '@cf/mistral/mistral-7b-instruct-v0.1'];
+    if (modelsResponse) {
+      addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
+      let modelsData = null;
+      
+      if (modelsResponse.ok) {
+        modelsData = await modelsResponse.json();
+        addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
+      } else if (isCloudflare && modelsResponse.status === 404) {
+        chatModels = ['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3.1-70b-instruct'];
+        imageModels = ['@cf/black-forest-labs/flux-1-schnell', '@cf/stabilityai/stable-diffusion-xl-base-1.0'];
       } else {
         const errorData = await modelsResponse.json().catch(() => ({}));
         throw new Error(`API ვალიდაცია ვერ მოხერხდა: ${errorData.error?.message || modelsResponse.statusText}`);
       }
+
+      if (modelsData) {
+        let allModels = [];
+        if (isCloudflare) allModels = modelsData.result || [];
+        else if (isGemini) {
+          allModels = (modelsData.models || []).map((m: any) => ({ 
+            id: m.name.replace('models/', ''), 
+            methods: m.supportedGenerationMethods || [] 
+          }));
+        } else {
+          allModels = (modelsData.data || modelsData.models || []).map((m: any) => ({ 
+            id: m.id || m.name 
+          }));
+        }
+
+        // ✅ კატეგორიზაციის ლოგიკა: Chat vs Image
+        allModels.forEach((m: any) => {
+          const id = (m.id || '').toLowerCase();
+          const methods = m.methods || [];
+          
+          if (id.includes('image') || id.includes('flux') || id.includes('diffusion') || id.includes('pixtral') || id.includes('kontext') || id.includes('draw') || id.includes('midjourney') || id.includes('sd-') || id.includes('stable')) {
+            imageModels.push(m.id);
+          } else if (isGemini && !methods.includes('generateContent')) {
+            // Skip non-text generation models for Gemini
+          } else if (!id.includes('embedding') && !id.includes('vision') && !id.includes('audio') && !id.includes('whisper') && !id.includes('guard') && id.length > 0) {
+            chatModels.push(m.id);
+          }
+        });
+      }
     }
 
-    if (modelsData) {
-      let allModels = [];
-      if (isCloudflare) allModels = modelsData.result || [];
-      else if (isGemini) {
-        allModels = (modelsData.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent') && !m.name.includes('embedding')).map((m: any) => m.name.replace('models/', ''));
-        validChatModels = allModels;
-      } else {
-        allModels = modelsData.data || modelsData.models || [];
-      }
-
-      if (!isGemini) {
-        validChatModels = allModels
-          .filter((m: any) => {
-            const id = (m.id || m.name || '').toLowerCase();
-            const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard') || id.includes('image') || id.includes('flux');
-            return !isSpecialized && id.length > 0;
-          })
-          .map((m: any) => m.id || m.name);
-      }
-    }
-
-    if (validChatModels.length > 0) {
-      addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური მოდელი. ვამოწმებ...`);
-
-      const testPromises = validChatModels.map(async (modelId: string) => {
+    // შევამოწმოთ მხოლოდ Chat მოდელები (Image მოდელები ჩატს ვერ უპასუხებენ)
+    const modelsToTest = chatModels.slice(0, 15); // მაქსიმუმ 15-ის ტესტირება სისწრაფისთვის
+    
+    if (modelsToTest.length > 0) {
+      addLog('INFO', `ვამოწმებ ${modelsToTest.length} Chat მოდელს...`);
+      const testPromises = modelsToTest.map(async (modelId: string) => {
         const testStartTime = Date.now();
         try {
           let testRes;
@@ -193,22 +209,22 @@ export async function testCredentialAction(credentialId: string) {
             }
             
             const passed = content.toUpperCase() === 'YES' || content.toUpperCase() === 'YES.';
-            return { model: modelId, response: content || '(სრულიად ცარიელი)', passed, latency: Date.now() - testStartTime };
+            return { model: modelId, response: content || '(ცარიელი)', passed, latency: Date.now() - testStartTime };
           } else {
             const errData = await testRes.json().catch(() => ({}));
             return { model: modelId, response: `HTTP ${testRes.status}: ${errData.error?.message || testRes.statusText}`, passed: false, latency: Date.now() - testStartTime };
           }
         } catch (e: any) {
-          return { model: modelId, response: `Timeout/Error: ${e.message}`, passed: false, latency: Date.now() - testStartTime };
+          return { model: modelId, response: `Error: ${e.message}`, passed: false, latency: Date.now() - testStartTime };
         }
       });
 
-      console.log("[SERVER] ვუშვებ Promise.all-ს ყველა მოდელის ტესტირებისთვის...");
+      console.log("[SERVER] ვუშვებ Promise.all-ს Chat მოდელების ტესტირებისთვის...");
       const results = await Promise.all(testPromises);
       console.log("[SERVER] Promise.all დასრულდა. შედეგები:", results.length);
       modelTests.push(...results);
     } else {
-      addLog('INFO', 'ტექსტური მოდელები ვერ მოიძებნა.');
+      addLog('INFO', 'ტექსტური (Chat) მოდელები ვერ მოიძებნა.');
     }
 
     modelTests.sort((a, b) => {
@@ -217,24 +233,26 @@ export async function testCredentialAction(credentialId: string) {
       return a.latency - b.latency;
     });
 
-    const recommended = modelTests.find(m => m.passed)?.model || validChatModels[0];
+    const recommended = modelTests.find(m => m.passed)?.model || chatModels[0] || imageModels[0];
     const passedCount = modelTests.filter(m => m.passed).length;
     
-    addLog('SUCCESS', `ტესტირება დასრულდა! ${passedCount}/${modelTests.length} მოდელმა შეასრულა ინსტრუქცია.`);
+    addLog('SUCCESS', `ტესტირება დასრულდა! ${passedCount}/${modelTests.length} Chat მოდელმა შეასრულა ინსტრუქცია.`);
     
     await credentialVault.updateCredentialMetadata(credentialId, {
-      models: validChatModels,
+      chatModels: chatModels.slice(0, 20), // შევინახოთ მაქს 20 მოდელი UI-სთვის
+      imageModels: imageModels.slice(0, 20),
       recommendedModel: recommended,
       modelTests: modelTests,
       testSuccess: true,
       testLatency: Date.now() - startTime
     });
-    addLog('SUCCESS', 'მეტამონაცემები შეინახა.');
+    addLog('SUCCESS', 'მეტამონაცემები (Chat/Image) შეინახა.');
 
     return {
       success: true,
       provider: providerName,
-      models: validChatModels,
+      chatModels: chatModels.slice(0, 20),
+      imageModels: imageModels.slice(0, 20),
       recommendedModel: recommended,
       modelTests: modelTests,
       latency: Date.now() - startTime,
@@ -246,8 +264,9 @@ export async function testCredentialAction(credentialId: string) {
     addLog('ERROR', `შეცდომა: ${error.message}`);
     return {
       success: false,
-      provider: providerName, // ✅ ახლა ეს მუშაობს, რადგან providerName გარეთაა განსაზღვრული
-      models: [],
+      provider: providerName,
+      chatModels: [],
+      imageModels: [],
       recommendedModel: '',
       modelTests: [],
       error: error.message,

@@ -186,7 +186,6 @@ export function CredentialsPanel() {
   const handleTestCredential = async (credentialId: string) => {
     console.log("🔵 [UI] Test ღილაკი დააჭირა! ID:", credentialId);
     
-    // 1. მყისიერი UI განახლება, რომ მომხმარებელმა დაინახოს რეაქცია
     setTestingId(credentialId);
     const initialLogs = ["[INFO] ტესტირების პროცესი დაიწყო UI-დან... შეამოწმეთ ბრაუზერის კონსოლი (F12) დეტალებისთვის."];
     setActiveLogs(prev => ({ ...prev, [credentialId]: initialLogs }));
@@ -526,9 +525,33 @@ export function CredentialsPanel() {
                             ✉️ {cred.email}
                           </div>
                         )}
-                        {cred.metadata && Object.keys(cred.metadata).length > 0 && (
-                          <div className="text-[10px] text-slate-500 mt-1 font-mono bg-black/20 p-2 rounded border border-white/5">
-                            Metadata: {JSON.stringify(cred.metadata).substring(0, 80)}...
+                        
+                        {/* ✅ განახლებული Metadata-ს გამოჩენა: Chat vs Image */}
+                        {cred.metadata && (
+                          <div className="mt-2 space-y-1">
+                            {cred.metadata.chatModels && cred.metadata.chatModels.length > 0 && (
+                              <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
+                                <span className="shrink-0 font-bold text-blue-400">💬 Chat:</span>
+                                <span className="font-mono break-all">
+                                  {cred.metadata.chatModels.slice(0, 4).join(', ')}
+                                  {cred.metadata.chatModels.length > 4 && ` +${cred.metadata.chatModels.length - 4} more`}
+                                </span>
+                              </div>
+                            )}
+                            {cred.metadata.imageModels && cred.metadata.imageModels.length > 0 && (
+                              <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
+                                <span className="shrink-0 font-bold text-purple-400">🎨 Image:</span>
+                                <span className="font-mono break-all">
+                                  {cred.metadata.imageModels.slice(0, 4).join(', ')}
+                                  {cred.metadata.imageModels.length > 4 && ` +${cred.metadata.imageModels.length - 4} more`}
+                                </span>
+                              </div>
+                            )}
+                            {!cred.metadata.chatModels && !cred.metadata.imageModels && (
+                              <div className="text-[10px] text-slate-500 font-mono bg-black/20 p-2 rounded border border-white/5">
+                                Metadata: {JSON.stringify(cred.metadata).substring(0, 80)}...
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -556,11 +579,10 @@ export function CredentialsPanel() {
                             </button>
                           </>
                         )}
-                        {/* ✅ დეტალური ლოგერით აღჭურვილი ღილაკი */}
                         <button
                           onClick={(e) => {
                             console.log("🖱️ [UI] ღილაკი დაკლიკდა. Credential ID:", cred.credential_id);
-                            e.preventDefault(); // თავიდან ავიცილოთ ნებისმიერი ფორმის შემთხვევითი გაგზავნა
+                            e.preventDefault();
                             handleTestCredential(cred.credential_id);
                           }}
                           disabled={isTesting}
@@ -590,7 +612,7 @@ export function CredentialsPanel() {
                       </div>
                     )}
 
-                    {/* ✅ ახალი: ტესტის საბოლოო შედეგის დეტალური ბანერი */}
+                    {/* ✅ ტესტის საბოლოო შედეგის დეტალური ბანერი */}
                     {testResult && !isTesting && (
                       <div className={`mt-3 rounded-lg border p-4 ${
                         testResult.success ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
@@ -611,7 +633,6 @@ export function CredentialsPanel() {
                               </span>
                             </div>
                             
-                            {/* მოდელების ტესტის შედეგების სია */}
                             {testResult.modelTests && testResult.modelTests.length > 0 && (
                               <div className="mt-2">
                                 <h4 className="mb-2 text-xs font-bold uppercase text-slate-400">
