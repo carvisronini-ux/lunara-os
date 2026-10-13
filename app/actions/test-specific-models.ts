@@ -38,17 +38,23 @@ export async function testSpecificModelsAction(
       // HUGGING FACE - სპეციფიკური ლოგიკა
       // ============================================
       if (provider === 'huggingface') {
+        // ✅ მოდელის სახელის ენკოდირება URL-ისთვის (მაგ. meta-llama%2FMeta-Llama-3-8B-Instruct)
+        const encodedModelName = encodeURIComponent(modelName);
+        
         if (testType === 'text') {
-          endpoint = `https://api-inference.huggingface.co/models/${modelName}`;
+          endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
           requestBody = {
             inputs: "დაწერე მხოლოდ სიტყვა: YES",
             parameters: { max_new_tokens: 10, temperature: 0.1 }
           };
           headers['Authorization'] = `Bearer ${apiKey}`;
+          // ✅ აუცილებელი ჰედერი უფასო დონისთვის, რომ მოდელის ჩატვირთვას დაელოდოს
+          headers['X-Wait-For-Model'] = 'true';
         } else {
-          endpoint = `https://api-inference.huggingface.co/models/${modelName}`;
+          endpoint = `https://api-inference.huggingface.co/models/${encodedModelName}`;
           requestBody = { inputs: "A beautiful cosmic landscape, high quality" };
           headers['Authorization'] = `Bearer ${apiKey}`;
+          headers['X-Wait-For-Model'] = 'true';
         }
       }
       // ============================================
@@ -96,7 +102,7 @@ export async function testSpecificModelsAction(
         }
       }
       // ============================================
-      // სხვა პროვაიდერები (OpenAI, Groq, Mistral, DeepSeek) - სტანდარტული ლოგიკა
+      // სხვა პროვაიდერები - სტანდარტული ლოგიკა
       // ============================================
       else {
         let base = meta.baseUrl;
@@ -129,7 +135,7 @@ export async function testSpecificModelsAction(
         }
       }
 
-      const timeout = testType === 'text' ? 15000 : 40000;
+      const timeout = testType === 'text' ? 30000 : 60000; // HF-ისთვის გავზარდეთ ტაიმაუტი
       let response: Response;
       let isTimeout = false;
       
@@ -169,11 +175,10 @@ export async function testSpecificModelsAction(
         let isValid = false;
         
         if (testType === 'text') {
-          // Hugging Face ტექსტური პასუხი ჩვეულებრივ არის მასივი: [{ "generated_text": "YES" }]
-          // ან OpenAI-ს თავსებადი თუ special endpoint-ია.
           const data = await response.json();
           
           if (provider === 'huggingface') {
+            // HF აბრუნებს მასივს: [{ "generated_text": "YES" }]
             isValid = (Array.isArray(data) && data[0]?.generated_text?.length > 0) || 
                       (data.choices?.[0]?.message?.content?.length > 0);
           } else if (provider === 'cloudflare') {
@@ -189,7 +194,6 @@ export async function testSpecificModelsAction(
           } else {
             const data = await response.json();
             if (provider === 'huggingface') {
-               // HF image-იც ხშირად binary-ა, მაგრამ თუ JSON-ია:
                isValid = true; 
             } else if (provider === 'cloudflare') {
               isValid = data.result?.image?.length > 0 || data.success === true;
@@ -217,11 +221,13 @@ export async function testSpecificModelsAction(
       }
     } catch (error: any) {
       const latency = Date.now() - startTime;
-      addLog(`💥 ${modelName} შეცდომა: ${error.message}`);
-      results.push({ model: modelName, passed: false, latency, error: error.message });
+      // ✅ დეტალური ლოგირება ქსელური შეცდომებისთვის
+      const errorMsg = error.cause ? `${error.message} (Cause: ${error.cause})` : error.message;
+      addLog(`💥 ${modelName} შეცდომა: ${errorMsg}`);
+      results.push({ model: modelName, passed: false, latency, error: errorMsg });
     }
     
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000)); // HF-ისთვის 1 წამიანი დაყოვნება
   }
 
   const sortedResults = results.sort((a, b) => {
