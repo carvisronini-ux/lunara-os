@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
 import { testCredentialAction } from '@/app/actions/credential-actions';
+import { testGenerationAction } from '@/app/actions/test-generation-action'; // ✅ ახალი იმპორტი
 import type { PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
@@ -16,7 +17,6 @@ export function CredentialsPanel() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
-  // Add Modal State
   const [newCredName, setNewCredName] = useState('');
   const [newCredProvider, setNewCredProvider] = useState<string>(''); 
   const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); 
@@ -24,7 +24,6 @@ export function CredentialsPanel() {
   const [newCredMetadata, setNewCredMetadata] = useState('');
   const [newCredValue, setNewCredValue] = useState('');
   
-  // Edit Modal State
   const [editCredId, setEditCredId] = useState<string | null>(null);
   const [editCredName, setEditCredName] = useState('');
   const [editCredProvider, setEditCredProvider] = useState('');
@@ -37,6 +36,14 @@ export function CredentialsPanel() {
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
+
+  // ✅ ახალი State სატესტო ბანერისთვის
+  const [genTestState, setGenTestState] = useState<{
+    isTesting: boolean;
+    type: 'text' | 'image' | null;
+    result: any;
+    logs: string[];
+  }>({ isTesting: false, type: null, result: null, logs: [] });
 
   useEffect(() => {
     const loadData = async () => {
@@ -182,7 +189,6 @@ export function CredentialsPanel() {
     }
   };
 
-  // ✅ დეტალური დიაგნოსტიკური ლოგერით აღჭურვილი ფუნქცია
   const handleTestCredential = async (credentialId: string) => {
     console.log("🔵 [UI] Test ღილაკი დააჭირა! ID:", credentialId);
     
@@ -226,6 +232,18 @@ export function CredentialsPanel() {
     } finally {
       console.log("⚪ [UI] ვასუფთავებ testing state-ს:", credentialId);
       setTestingId(null);
+    }
+  };
+
+  // ✅ ახალი ფუნქცია გენერაციის ტესტირებისთვის
+  const handleGenTest = async (type: 'text' | 'image') => {
+    setGenTestState({ isTesting: true, type, result: null, logs: ['[INFO] გენერაციის ტესტი დაიწყო...'] });
+    try {
+      const res = await testGenerationAction(type);
+      setGenTestState({ isTesting: false, type, result: res, logs: res.logs || [] });
+      if (res.success) await refreshData(); // განაახლე მეტამონაცემები თუ მოდელი გადაკლასიფიცირდა
+    } catch (e: any) {
+      setGenTestState({ isTesting: false, type, result: { success: false, error: e.message }, logs: [`[ERROR] ${e.message}`] });
     }
   };
 
@@ -682,11 +700,11 @@ export function CredentialsPanel() {
           </div>
         </div>
 
-        {/* Active Leases & Audit */}
+        {/* Right Column: Leases, Audit & NEW TEST BANNER */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
             <h3 className="text-lg font-bold text-white mb-4">Active Leases</h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto">
+            <div className="space-y-2 max-h-40 overflow-y-auto">
               {leases.map((lease: any) => (
                 <div key={lease.lease_id} className="text-xs border-l-2 border-blue-500 pl-3 py-1">
                   <div className="font-bold text-blue-400">{lease.agent_id}</div>
@@ -700,7 +718,7 @@ export function CredentialsPanel() {
 
           <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6">
             <h3 className="text-lg font-bold text-white mb-4">Audit Log</h3>
-            <div className="space-y-2 max-h-60 overflow-y-auto font-mono text-xs">
+            <div className="space-y-2 max-h-40 overflow-y-auto font-mono text-xs">
               {audit.map((log: any) => (
                 <div key={log.log_id} className="flex gap-2">
                   <span className="text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
@@ -713,6 +731,80 @@ export function CredentialsPanel() {
               {audit.length === 0 && <div className="text-xs text-slate-500">No audit logs yet.</div>}
             </div>
           </div>
+
+          {/* ✅ ახალი: სწრაფი გენერაციის ტესტის ბანერი */}
+          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-slate-900 to-slate-800 p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-white mb-2">🛠️ სისტემის სწრაფი ტესტირება</h3>
+            <p className="text-xs text-slate-400 mb-4">შეამოწმე, მუშაობს თუ არა დინამიური მოდელების მარშრუტიზაცია და "თვითაღდგენადი" ლოგიკა.</p>
+            
+            <div className="flex gap-3 mb-4">
+              <button 
+                onClick={() => handleGenTest('text')} 
+                disabled={genTestState.isTesting} 
+                className="flex-1 rounded-xl bg-blue-500/20 border border-blue-500/40 py-3 text-sm font-bold text-blue-400 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                💬 ტექსტის გენერაცია
+              </button>
+              <button 
+                onClick={() => handleGenTest('image')} 
+                disabled={genTestState.isTesting} 
+                className="flex-1 rounded-xl bg-purple-500/20 border border-purple-500/40 py-3 text-sm font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                🎨 ფოტოს გენერაცია
+              </button>
+            </div>
+
+            {genTestState.isTesting && (
+              <div className="flex items-center gap-2 text-blue-400 text-sm animate-pulse mb-4">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent"></div>
+                გენერაცია მიმდინარეობს...
+              </div>
+            )}
+
+            {genTestState.result && (
+              <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                {genTestState.result.success ? (
+                  genTestState.type === 'text' ? (
+                    <div className="bg-black/40 border border-emerald-500/30 rounded-lg p-4">
+                      <div className="text-xs text-emerald-400 font-bold mb-2 flex items-center gap-2">
+                        ✅ წარმატებული გენერაცია 
+                        <span className="text-slate-500 font-normal">({genTestState.result.provider} / {genTestState.result.modelName})</span>
+                      </div>
+                      <p className="text-slate-200 text-sm italic leading-relaxed">"{genTestState.result.result}"</p>
+                    </div>
+                  ) : (
+                    <div className="bg-black/40 border border-purple-500/30 rounded-lg p-4">
+                      <div className="text-xs text-purple-400 font-bold mb-2">✅ ფოტო წარმატებით შეიქმნა!</div>
+                      <img src={genTestState.result.result} alt="Generated Test" className="rounded-lg max-w-full h-auto border border-white/10 shadow-lg" />
+                    </div>
+                  )
+                ) : (
+                  <div className="bg-black/40 border border-red-500/30 rounded-lg p-4">
+                    <div className="text-xs text-red-400 font-bold mb-2">❌ გენერაცია ვერ მოხერხდა</div>
+                    <p className="text-slate-300 text-sm">{genTestState.result.error}</p>
+                    {genTestState.result.reclassified && (
+                      <p className="text-yellow-400 text-xs mt-2 flex items-center gap-1">
+                        ⚠️ მოდელი არასწორ კატეგორიაში იყო და ავტომატურად გადატანილია. სცადე თავიდან!
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {/* ტესტის ლოგები */}
+                <div className="rounded-lg bg-black/60 border border-white/10 p-3 font-mono text-[10px] space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                  {genTestState.logs.map((log, i) => {
+                    let color = 'text-slate-400';
+                    if (log.includes('✅')) color = 'text-emerald-400';
+                    if (log.includes('❌')) color = 'text-red-400';
+                    if (log.includes('⚠️')) color = 'text-yellow-400';
+                    if (log.includes('📤')) color = 'text-blue-400';
+                    return <div key={i} className={color}>{log}</div>;
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>
