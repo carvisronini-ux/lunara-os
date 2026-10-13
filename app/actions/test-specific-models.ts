@@ -53,7 +53,6 @@ export async function testSpecificModelsAction(
           };
           headers['Authorization'] = `Bearer ${apiKey}`;
         } else {
-          // ✅ Image generation for Cloudflare - მხოლოდ prompt!
           endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
           requestBody = { 
             prompt: 'A beautiful cosmic landscape with stars and moon, high quality digital art'
@@ -113,23 +112,54 @@ export async function testSpecificModelsAction(
         }
       }
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(20000)
-      });
+      // ✅ ტაიმაუტი: ტექსტისთვის 15წმ, ფოტოსთვის 40წმ
+      const timeout = testType === 'text' ? 15000 : 40000;
+      let response: Response;
+      let isTimeout = false;
+      
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(timeout)
+        });
+      } catch (fetchError: any) {
+        if (fetchError.name === 'TimeoutError' || fetchError.message.includes('timeout')) {
+          isTimeout = true;
+          addLog(`⏱️ ${modelName} - პირველი ცდა: timeout (${timeout/1000}წმ). ვცდილობ მეორედ...`);
+          
+          // ✅ Retry ლოგიკა: ვცდილობთ კიდევ ერთხელ
+          try {
+            response = await fetch(endpoint, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(requestBody),
+              signal: AbortSignal.timeout(timeout * 1.5) // მეორე ცდაზე 1.5x მეტი დრო
+            });
+          } catch (retryError: any) {
+            const latency = Date.now() - startTime;
+            addLog(` ${modelName} - მეორე ცდაც timeout: ${retryError.message}`);
+            results.push({ 
+              model: modelName, 
+              passed: false, 
+              latency, 
+              error: 'Timeout after retry' 
+            });
+            continue;
+          }
+        } else {
+          throw fetchError;
+        }
+      }
 
       const latency = Date.now() - startTime;
 
       if (response.ok) {
-        // ✅ შევამოწმოთ Content-Type header
         const contentType = response.headers.get('content-type') || '';
-        
         let isValid = false;
         
         if (testType === 'text') {
-          // Text validation - ყოველთვის JSON
           const data = await response.json();
           
           if (provider === 'cloudflare') {
@@ -140,29 +170,30 @@ export async function testSpecificModelsAction(
             isValid = data.choices?.[0]?.message?.content?.length > 0;
           }
         } else {
-          // ✅ Image validation - შეიძლება იყოს JSON ან binary
           if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
-            // Binary image (მაგ. Cloudflare Stable Diffusion)
             isValid = true;
-            addLog(`  📸 ${modelName} დააბრუნა binary image (${contentType})`);
+            if (isTimeout) {
+              addLog(`⚠️ ${modelName} წარმატებულია, მაგრამ ნელი (${latency}ms)`);
+            } else {
+              addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
+            }
           } else {
-            // JSON response
             const data = await response.json();
             
             if (provider === 'cloudflare') {
-              // Cloudflare Flux აბრუნებს JSON-ს
               isValid = data.result?.image?.length > 0 || data.success === true;
             } else if (provider === 'gemini' || provider === 'google') {
               isValid = data.predictions?.[0]?.bytesBase64Encoded?.length > 0;
             } else {
-              // OpenAI-style
               isValid = data.data?.[0]?.url || data.data?.[0]?.b64_json || data.images?.[0]?.url;
             }
           }
         }
 
         if (isValid) {
-          addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
+          if (!isTimeout) {
+            addLog(`✅ ${modelName} წარმატებულია (${latency}ms)`);
+          }
           results.push({ model: modelName, passed: true, latency, response: 'Success' });
         } else {
           addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
@@ -182,7 +213,7 @@ export async function testSpecificModelsAction(
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  //  დალაგება
+  // დალაგება
   const sortedResults = results.sort((a, b) => {
     if (a.passed && !b.passed) return -1;
     if (!a.passed && b.passed) return 1;
