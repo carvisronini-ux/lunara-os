@@ -23,15 +23,48 @@ export async function testGenerationAction(testType: 'text' | 'image') {
       const credentials = credentialVault.getMetadata().filter((c: any) => c.status === 'ACTIVE');
       let allChatModels: any[] = [];
 
-      // 1. დინამიურად ვაგროვებთ მოდელებს მხოლოდ მეტამონაცემების საფუძველზე (ნულოვანი Hardcoding)
+      // 1. ვაგროვებთ ყველა მოდელს საცავიდან
       for (const cred of credentials) {
         const meta = cred.metadata || {};
         if (meta.chatModels && Array.isArray(meta.chatModels) && meta.chatModels.length > 0) {
           const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(cred.credential_id);
           
-          // დინამიური მისამართის აგება მეტამონაცემებიდან
-          const base = meta.baseUrl || `https://api.${cred.provider.toLowerCase()}.com/v1`;
-          const chatEndpoint = `${base}${meta.chatEndpoint || '/chat/completions'}`;
+          // ✅ ვიყენებთ ზუსტად იგივე ლოგიკას, რაც credential-actions.ts-შია
+          const providerLower = cred.provider.toLowerCase();
+          let modelsUrl = '';
+          let chatUrl = '';
+          let isCloudflare = false;
+          let isGemini = false;
+
+          if (providerLower === 'cloudflare') {
+            const accountId = meta.accountId;
+            if (accountId) {
+              modelsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
+              chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
+              isCloudflare = true;
+            }
+          } else if (providerLower === 'groq') {
+            modelsUrl = 'https://api.groq.com/openai/v1/models';
+            chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
+          } else if (providerLower === 'gemini' || providerLower === 'google') {
+            modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+            chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
+            isGemini = true;
+          } else if (providerLower === 'mistral') {
+            modelsUrl = 'https://api.mistral.ai/v1/models';
+            chatUrl = 'https://api.mistral.ai/v1/chat/completions';
+          } else {
+            let base = meta.baseUrl;
+            if (!base) {
+              if (providerLower === 'kie') base = 'https://api.kie.ai/v1';
+              else if (providerLower === 'deepseek') base = 'https://api.deepseek.com/v1';
+              else if (providerLower === 'openai') base = 'https://api.openai.com/v1';
+              else base = `https://api.${providerLower}.com/v1`;
+            }
+            modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
+            chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
+          }
+
           const authHeaderKey = meta.authHeaderKey || 'Authorization';
           const authHeaderValue = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ${apiKey}` : `Bearer ${apiKey}`;
 
@@ -41,9 +74,11 @@ export async function testGenerationAction(testType: 'text' | 'image') {
               provider: cred.provider,
               credentialId: cred.credential_id,
               apiKey,
-              chatEndpoint,
+              chatUrl,
               authHeaderKey,
-              authHeaderValue
+              authHeaderValue,
+              isCloudflare,
+              isGemini
             });
           }
         }
@@ -56,31 +91,51 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
       addLog(`✅ [API VAULT] პასუხი მიღებულია. ნაპოვნია ${allChatModels.length} პოტენციური მოდელი. ვიწყებთ თანმიმდევრულ ტესტირებას...`);
 
-      // 2. ვცდილობთ თითოეულ მოდელს და ვაფიქსირებთ შედეგებს (არაფერს ვშლით ავტომატურად)
       const failedModels: any[] = [];
+      const testPrompt = "დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.";
       
+      // 2. ვცდილობთ თითოეულ მოდელს (ზუსტად იგივე ლოგიკით, რაც საცავის ტესტში)
       for (let i = 0; i < allChatModels.length; i++) {
         const model = allChatModels[i];
         addLog(`\n🔄 [TEST] ვცდილობ მოდელს [${i + 1}/${allChatModels.length}]: ${model.provider} -> ${model.modelName}`);
-        addLog(`📍 [INFO] Endpoint: ${model.chatEndpoint}`);
+        
+        let targetChatUrl = model.chatUrl;
+        if (model.isCloudflare) targetChatUrl = `${model.chatUrl}${model.modelName}`;
+        else if (model.isGemini) targetChatUrl = `${model.chatUrl}${model.modelName}:generateContent?key=${model.apiKey}`;
+
+        addLog(`📍 [INFO] Endpoint: ${targetChatUrl}`);
 
         try {
-          const requestBody = {
-            model: model.modelName,
-            messages: [{ role: 'user', content: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }],
-            temperature: 0.7,
-            max_tokens: 100
-          };
+          // ✅ ზუსტად იგივე Request აგება, რაც credential-actions.ts-შია
+          let requestBody: any;
+          let headers: Record<string, string>;
 
-          const headers: Record<string, string> = {
-            [model.authHeaderKey]: model.authHeaderValue,
-            'Content-Type': 'application/json'
-          };
+          if (model.isCloudflare) {
+            requestBody = { messages: [{ role: 'user', content: testPrompt }] };
+            headers = { 'Authorization': model.authHeaderValue, 'Content-Type': 'application/json' };
+          } else if (model.isGemini) {
+            requestBody = { 
+              contents: [{ parts: [{ text: testPrompt }] }], 
+              generationConfig: { temperature: 0.7, maxOutputTokens: 100 } 
+            };
+            headers = { 'Content-Type': 'application/json' };
+          } else {
+            requestBody = {
+              model: model.modelName,
+              messages: [{ role: 'user', content: testPrompt }],
+              temperature: 0.7,
+              max_tokens: 100
+            };
+            headers = {
+              [model.authHeaderKey]: model.authHeaderValue,
+              'Content-Type': 'application/json'
+            };
+          }
 
           addLog(`📤 [REQUEST] იგზავნება POST მოთხოვნა...`);
           addLog(`📦 [REQUEST] Payload: ${JSON.stringify(requestBody).substring(0, 150)}...`);
 
-          const response = await fetch(model.chatEndpoint, {
+          const response = await fetch(targetChatUrl, {
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody)
@@ -88,30 +143,35 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
           if (response.ok) {
             const data = await response.json();
-            // დინამიურად ვეძებთ პასუხს სხვადასხვა ფორმატში (OpenAI, Cloudflare, ა.შ.)
-            const text = data.choices?.[0]?.message?.content || data.result?.response || data.text || '';
             
-            if (text && text.trim().length > 0) {
+            // ✅ ზუსტად იგივე პასუხის პარსინგი, რაც საცავშია
+            let content = '';
+            if (model.isCloudflare) content = data.result?.response?.trim() || '';
+            else if (model.isGemini) content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+            else {
+              if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                content = data.choices[0].message.content?.trim() || '';
+              } else if (data.error) {
+                content = `API Error: ${data.error.message || JSON.stringify(data.error)}`;
+              }
+            }
+            
+            if (content && content.length > 0) {
               addLog(`✅ [SUCCESS] მოდელმა წარმატებით დააგენერირა ტექსტი!`);
-              addLog(`📝 [RESULT] პასუხი: "${text.trim().substring(0, 100)}..."`);
+              addLog(`📝 [RESULT] პასუხი: "${content.substring(0, 100)}..."`);
               return { 
                 success: true, 
                 type: 'text', 
-                result: text.trim(), 
+                result: content, 
                 modelName: model.modelName, 
                 provider: model.provider, 
                 logs 
               };
             } else {
-              addLog(`⚠️ [WARNING] მოდელმა დააბრუნა ცარიელი პასუხი.`);
-              failedModels.push({
-                model: model.modelName,
-                provider: model.provider,
-                reason: 'Empty response'
-              });
+              addLog(`⚠️ [WARNING] მოდელმა დააბრუნა ცარიელი ან არასწორი პასუხი.`);
+              failedModels.push({ model: model.modelName, provider: model.provider, reason: 'Empty or invalid response' });
             }
           } else {
-            // თუ ვერ მოხერხდა, ვიღებთ დეტალურ მიზეზს
             const errText = await response.text();
             addLog(`❌ [FAILURE] მოდელმა ვერ შეასრულა მოთხოვნა. HTTP სტატუსი: ${response.status}`);
             addLog(`📉 [FAILURE] მიზეზი: ${errText.substring(0, 300)}`);
@@ -128,12 +188,11 @@ export async function testGenerationAction(testType: 'text' | 'image') {
           failedModels.push({
             model: model.modelName,
             provider: model.provider,
-            reason: `Network error: ${error.message}`
+            reason: `Network/Config error: ${error.message}`
           });
         }
       }
 
-      // 3. თუ ყველა მოდელი ვერ იმუშავა, ვაბრუნებთ დეტალურ ანგარიშს (არაფერს ვშლით)
       addLog("\n🏁 [TEST] ტესტი დასრულდა. ვერცერთმა მოდელმა ვერ შეძლო ტექსტის გენერაცია.");
       addLog(`📊 [REPORT] წარუმატებელი მოდელები (${failedModels.length}):`);
       
@@ -143,10 +202,9 @@ export async function testGenerationAction(testType: 'text' | 'image') {
       });
       
       addLog("\n💡 [RECOMMENDATION] გთხოვთ, შეამოწმოთ ზემოთ მოცემული მიზეზები და გადაწყვიტოთ:");
-      addLog("   - თუ შეცდომა დროებითია (429, 503), სცადეთ ხელახლა რამდენიმე წუთში.");
-      addLog("   - თუ შეცდომა 404-ა, შეამოწმეთ Metadata-ში baseUrl და chatEndpoint.");
-      addLog("   - თუ შეცდომა 401/403-ა, შეამოწმეთ API გასაღების ვალიდურობა.");
-      addLog("   - თუ მოდელი ნამდვილად არ მუშაობს, შეგიძლიათ ხელით ამოშალოთ იგი საცავიდან.");
+      addLog("   - თუ შეცდომა 404/400-ა, დარწმუნდით, რომ Metadata-ში სწორად არის მითითებული 'baseUrl' და 'chatEndpoint'.");
+      addLog("   - თუ შეცდომა 401/403-ა, შეამოწმეთ API გასაღების ვალიდურობა ან ბალანსი.");
+      addLog("   - თუ მოდელი ნამდვილად არ მუშაობს, შეგიძლიათ ხელით ამოშალოთ იგი ან გადაიტანოთ საცავიდან.");
 
       return { 
         success: false, 
