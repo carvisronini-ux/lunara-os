@@ -25,21 +25,42 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
       addLog(`✅ არჩეულია მოდელი: ${modelInfo.provider} -> ${modelInfo.modelName}`);
       
+      // ✅ დინამიური Endpoint-ისა და Request-ის აგება პროვაიდერის მიხედვით
       let chatEndpoint = `https://api.${modelInfo.provider}.com/v1/chat/completions`;
-      if (modelInfo.provider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      else if (modelInfo.provider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
-      else if (modelInfo.provider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+      let requestBody: any = {
+        model: modelInfo.modelName,
+        messages: [{ role: 'user', content: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }],
+        temperature: 0.7,
+        max_tokens: 100
+      };
+      let headers: Record<string, string> = {
+        'Authorization': `Bearer ${modelInfo.apiKey}`,
+        'Content-Type': 'application/json'
+      };
+
+      if (modelInfo.provider === 'groq') {
+        chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+      } else if (modelInfo.provider === 'mistral') {
+        chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
+      } else if (modelInfo.provider === 'deepseek') {
+        chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
+      } else if (modelInfo.provider === 'openai') {
+        chatEndpoint = 'https://api.openai.com/v1/chat/completions';
+      } else if (modelInfo.provider === 'gemini' || modelInfo.provider === 'google') {
+        // ✅ Gemini-ს სპეციფიკური ლოგიკა
+        chatEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelInfo.modelName}:generateContent?key=${modelInfo.apiKey}`;
+        requestBody = {
+          contents: [{ parts: [{ text: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
+        };
+        headers = { 'Content-Type': 'application/json' }; // API key უკვე URL-შია
+      }
 
       addLog('📤 იგზავნება მოთხოვნა...');
       const response = await fetch(chatEndpoint, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${modelInfo.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: modelInfo.modelName,
-          messages: [{ role: 'user', content: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }],
-          temperature: 0.7,
-          max_tokens: 100
-        })
+        headers: headers,
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -53,7 +74,15 @@ export async function testGenerationAction(testType: 'text' | 'image') {
       }
 
       const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || 'No content generated';
+      
+      // ✅ პასუხის სწორი პარსინგი პროვაიდერის მიხედვით
+      let text = 'No content generated';
+      if (modelInfo.provider === 'gemini' || modelInfo.provider === 'google') {
+        text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No content generated';
+      } else {
+        text = data.choices?.[0]?.message?.content || 'No content generated';
+      }
+      
       addLog('✅ ტექსტი წარმატებით დაგენერირდა!');
       
       return { success: true, type: 'text', result: text, modelName: modelInfo.modelName, provider: modelInfo.provider, logs };
