@@ -53,13 +53,10 @@ export async function testSpecificModelsAction(
           };
           headers['Authorization'] = `Bearer ${apiKey}`;
         } else {
-          // Image generation for Cloudflare
+          // ✅ Image generation for Cloudflare - მხოლოდ prompt!
           endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${modelName}`;
           requestBody = { 
-            prompt: 'A beautiful cosmic landscape with stars and moon, high quality digital art',
-            width: 512,
-            height: 512,
-            num_steps: 4
+            prompt: 'A beautiful cosmic landscape with stars and moon, high quality digital art'
           };
           headers['Authorization'] = `Bearer ${apiKey}`;
         }
@@ -75,7 +72,6 @@ export async function testSpecificModelsAction(
             generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
           };
         } else {
-          // Gemini image generation (Imagen)
           endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:predict?key=${apiKey}`;
           requestBody = {
             instances: [{ prompt: 'A beautiful cosmic landscape' }],
@@ -84,7 +80,7 @@ export async function testSpecificModelsAction(
         }
       }
       // ============================================
-      // OPENAI / GROQ / MISTRAL / DEEPSEEK - სტანდარტული ლოგიკა
+      // სხვა პროვაიდერები - სტანდარტული ლოგიკა
       // ============================================
       else {
         let base = meta.baseUrl;
@@ -106,7 +102,6 @@ export async function testSpecificModelsAction(
           };
           headers['Authorization'] = `Bearer ${apiKey}`;
         } else {
-          // Image generation (OpenAI-style)
           endpoint = `${base}${meta.imageEndpoint || '/images/generations'}`;
           requestBody = { 
             model: modelName, 
@@ -122,19 +117,21 @@ export async function testSpecificModelsAction(
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(20000) // 20 წამიანი ტაიმაუტი ფოტოსთვის
+        signal: AbortSignal.timeout(20000)
       });
 
       const latency = Date.now() - startTime;
 
       if (response.ok) {
-        const data = await response.json();
+        // ✅ შევამოწმოთ Content-Type header
+        const contentType = response.headers.get('content-type') || '';
         
-        // ვალიდაცია პროვაიდერის მიხედვით
         let isValid = false;
         
         if (testType === 'text') {
-          // Text validation
+          // Text validation - ყოველთვის JSON
+          const data = await response.json();
+          
           if (provider === 'cloudflare') {
             isValid = data.result?.response?.length > 0;
           } else if (provider === 'gemini' || provider === 'google') {
@@ -143,13 +140,24 @@ export async function testSpecificModelsAction(
             isValid = data.choices?.[0]?.message?.content?.length > 0;
           }
         } else {
-          // Image validation
-          if (provider === 'cloudflare') {
-            isValid = data.result?.image?.length > 0; // Base64 image
-          } else if (provider === 'gemini' || provider === 'google') {
-            isValid = data.predictions?.[0]?.bytesBase64Encoded?.length > 0;
+          // ✅ Image validation - შეიძლება იყოს JSON ან binary
+          if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
+            // Binary image (მაგ. Cloudflare Stable Diffusion)
+            isValid = true;
+            addLog(`  📸 ${modelName} დააბრუნა binary image (${contentType})`);
           } else {
-            isValid = data.data?.[0]?.url || data.data?.[0]?.b64_json || data.images?.[0]?.url;
+            // JSON response
+            const data = await response.json();
+            
+            if (provider === 'cloudflare') {
+              // Cloudflare Flux აბრუნებს JSON-ს
+              isValid = data.result?.image?.length > 0 || data.success === true;
+            } else if (provider === 'gemini' || provider === 'google') {
+              isValid = data.predictions?.[0]?.bytesBase64Encoded?.length > 0;
+            } else {
+              // OpenAI-style
+              isValid = data.data?.[0]?.url || data.data?.[0]?.b64_json || data.images?.[0]?.url;
+            }
           }
         }
 
@@ -171,11 +179,10 @@ export async function testSpecificModelsAction(
       results.push({ model: modelName, passed: false, latency, error: error.message });
     }
     
-    // 500ms დაყოვნება (ფოტოს გენერაცია უფრო დიდხანს გრძელდება)
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  // 🏆 დალაგება: ჯერ წარმატებულები (სიჩქარის მიხედვით), შემდეგ წარუმატებლები
+  //  დალაგება
   const sortedResults = results.sort((a, b) => {
     if (a.passed && !b.passed) return -1;
     if (!a.passed && b.passed) return 1;
