@@ -55,9 +55,7 @@ export async function testCredentialAction(credentialId: string) {
     // ============================================================
     if (providerLower === 'cloudflare') {
       const accountId = meta.accountId;
-      if (!accountId) {
-        throw new Error("Cloudflare-სთვის Metadata-ში (JSON) აუცილებელია 'accountId'-ს მითითება.");
-      }
+      if (!accountId) throw new Error("Cloudflare-სთვის Metadata-ში აუცილებელია 'accountId'.");
       modelsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
       chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
       isCloudflare = true;
@@ -72,14 +70,10 @@ export async function testCredentialAction(credentialId: string) {
       isGemini = true;
     } 
     else {
-      // ✅ ჭკვიანი ნაგულისხმევი მისამართები ცნობილი პროვაიდერებისთვის
       let base = meta.baseUrl;
       if (!base) {
-        if (providerLower === 'kie') {
-          base = 'https://api.kie.ai/v1'; // KIE AI-ს სწორი დომენი
-        } else {
-          base = `https://api.${providerLower}.com/v1`;
-        }
+        if (providerLower === 'kie') base = 'https://api.kie.ai/v1';
+        else base = `https://api.${providerLower}.com/v1`;
       }
       modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
       chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
@@ -87,24 +81,17 @@ export async function testCredentialAction(credentialId: string) {
 
     const safeLogUrl = modelsUrl.replace(apiKey, '***');
     addLog('INFO', `ვითხოვ მოდელების სიას: ${safeLogUrl}`);
-    addLog('REQ', `GET ${safeLogUrl}`);
 
     let modelsResponse;
     try {
       modelsResponse = await fetch(modelsUrl, {
         method: 'GET',
-        headers: isGemini 
-          ? { 'Content-Type': 'application/json' }
-          : {
-              [authHeaderKey]: authHeaderValue,
-              'Content-Type': 'application/json'
-            }
+        headers: isGemini ? { 'Content-Type': 'application/json' } : { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' }
       });
     } catch (networkError: any) {
-      // ✅ ჭკვიანი დამუშავება "fetch failed" შეცდომისთვის
-      addLog('ERROR', `ქსელური შეცდომა: ვერ მივაღწიე მისამართს (${networkError.message}).`);
-      addLog('INFO', `💡 გამოსავალი: თუ ეს პროვაიდერი იყენებს განსხვავებულ მისამართს, გთხოვთ, "Edit" ღილაკზე დაჭერით, Metadata ველში (JSON) მიუთითოთ სწორი "baseUrl". მაგალითად: {"baseUrl": "https://api.სწორი-დომენი.ai/v1"}`);
-      throw new Error(`Network fetch failed. Please check the baseUrl in Metadata.`);
+      addLog('ERROR', `ქსელური შეცდომა: ${networkError.message}`);
+      addLog('INFO', '💡 გამოსავალი: შეამოწმეთ Metadata-ში "baseUrl".');
+      throw new Error(`Network fetch failed.`);
     }
 
     addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
@@ -115,27 +102,18 @@ export async function testCredentialAction(credentialId: string) {
       addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
     } else {
       if (isCloudflare && modelsResponse.status === 404) {
-        addLog('INFO', 'Cloudflare-ის მოდელების სიის API დააბრუნა 404. ვიყენებთ ცნობილი პოპულარული მოდელების სიას...');
-        validChatModels = [
-          '@cf/meta/llama-3.1-8b-instruct',
-          '@cf/meta/llama-3.1-70b-instruct',
-          '@cf/qwen/qwen1.5-14b-chat-awq',
-          '@cf/mistral/mistral-7b-instruct-v0.1'
-        ];
+        validChatModels = ['@cf/meta/llama-3.1-8b-instruct', '@cf/meta/llama-3.1-70b-instruct', '@cf/qwen/qwen1.5-14b-chat-awq', '@cf/mistral/mistral-7b-instruct-v0.1'];
       } else {
         const errorData = await modelsResponse.json().catch(() => ({}));
-        throw new Error(`API ვალიდაცია ვერ მოხერხდა (HTTP ${modelsResponse.status}): ${errorData.error?.message || modelsResponse.statusText}`);
+        throw new Error(`API ვალიდაცია ვერ მოხერხდა: ${errorData.error?.message || modelsResponse.statusText}`);
       }
     }
 
     if (modelsData) {
       let allModels = [];
-      if (isCloudflare) {
-        allModels = modelsData.result || [];
-      } else if (isGemini) {
-        allModels = (modelsData.models || [])
-          .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent') && !m.name.includes('embedding'))
-          .map((m: any) => m.name.replace('models/', ''));
+      if (isCloudflare) allModels = modelsData.result || [];
+      else if (isGemini) {
+        allModels = (modelsData.models || []).filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent') && !m.name.includes('embedding')).map((m: any) => m.name.replace('models/', ''));
         validChatModels = allModels;
       } else {
         allModels = modelsData.data || modelsData.models || [];
@@ -149,15 +127,6 @@ export async function testCredentialAction(credentialId: string) {
             return !isSpecialized && id.length > 0;
           })
           .map((m: any) => m.id || m.name);
-      }
-    }
-
-    // თუ მოდელები ვერ იპოვა (მაგ. მხოლოდ Image მოდელები აქვს პროვაიდერს), ვაჩვენებთ ინფორმაციას
-    if (validChatModels.length === 0) {
-      addLog('INFO', 'ტექსტური (Chat) მოდელები ვერ მოიძებნა. შესაძლოა ეს პროვაიდერი მხოლოდ Image Generation-ს ემსახურება.');
-      // მაინც ვცდილობთ Metadata-ში არსებული მოდელების ტესტირებას, თუ არის
-      if (meta.models && Array.isArray(meta.models)) {
-         validChatModels = meta.models.slice(0, 3); // მაქსიმუმ 3
       }
     }
 
@@ -178,10 +147,7 @@ export async function testCredentialAction(credentialId: string) {
             testRes = await fetch(`${chatUrl}${modelId}:generateContent?key=${apiKey}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: testPrompt }] }],
-                generationConfig: { temperature: 0.1, maxOutputTokens: 10 }
-              })
+              body: JSON.stringify({ contents: [{ parts: [{ text: testPrompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 10 } })
             });
           } else {
             testRes = await fetch(chatUrl, {
@@ -194,14 +160,28 @@ export async function testCredentialAction(credentialId: string) {
           if (testRes.ok) {
             const testData = await testRes.json();
             let content = '';
-            if (isCloudflare) content = testData.result?.response?.trim() || '';
-            else if (isGemini) content = testData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-            else content = testData.choices?.[0]?.message?.content?.trim() || '';
+            
+            if (isCloudflare) {
+              content = testData.result?.response?.trim() || '';
+            } else if (isGemini) {
+              content = testData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+            } else {
+              // ✅ განახლებული ლოგიკა: თუ content ცარიელია, ვნახულობთ რა დააბრუნა API-მ რეალურად
+              if (testData.choices && testData.choices.length > 0 && testData.choices[0].message) {
+                content = testData.choices[0].message.content?.trim() || '';
+              } else if (testData.error) {
+                content = `API Error: ${testData.error.message || JSON.stringify(testData.error)}`;
+              } else {
+                // თუ სტრუქტურა სრულიად განსხვავებულია, ვაჩვენებთ პირველ 150 სიმბოლოს
+                content = `Unexpected format: ${JSON.stringify(testData).substring(0, 150)}`;
+              }
+            }
             
             const passed = content.toUpperCase() === 'YES' || content.toUpperCase() === 'YES.';
-            return { model: modelId, response: content || '(ცარიელი)', passed, latency: Date.now() - testStartTime };
+            return { model: modelId, response: content || '(სრულიად ცარიელი)', passed, latency: Date.now() - testStartTime };
           } else {
-            return { model: modelId, response: `HTTP ${testRes.status}`, passed: false, latency: Date.now() - testStartTime };
+            const errData = await testRes.json().catch(() => ({}));
+            return { model: modelId, response: `HTTP ${testRes.status}: ${errData.error?.message || testRes.statusText}`, passed: false, latency: Date.now() - testStartTime };
           }
         } catch (e: any) {
           return { model: modelId, response: e.message, passed: false, latency: Date.now() - testStartTime };
@@ -210,6 +190,8 @@ export async function testCredentialAction(credentialId: string) {
 
       const results = await Promise.all(testPromises);
       modelTests.push(...results);
+    } else {
+      addLog('INFO', 'ტექსტური მოდელები ვერ მოიძებნა. შესაძლოა ეს პროვაიდერი მხოლოდ Image Generation-ია.');
     }
 
     modelTests.sort((a, b) => {
