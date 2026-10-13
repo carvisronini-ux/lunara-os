@@ -4,40 +4,43 @@
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export async function testCredentialAction(credentialId: string) {
-  // ✅ ეს ლოგი 100%-ით გამოჩნდება სერვერის ტერმინალში, თუ ფუნქცია გამოიძახა
   console.log("🚀 [SERVER] testCredentialAction გამოიძახა! ID:", credentialId);
   
   const logs: string[] = [];
+  let providerName = 'unknown'; // ✅ გამოცხადებულია გარეთ, რათა catch-შიც იყოს ხელმისაწვდომი
   
   const addLog = (type: 'INFO' | 'REQ' | 'RES' | 'SUCCESS' | 'ERROR', message: string) => {
     const timestamp = new Date().toLocaleTimeString('ka-GE', { hour12: false });
     logs.push(`[${timestamp}] [${type}] ${message}`);
-    console.log(`[SERVER LOG] ${type}: ${message}`); // ✅ დუბლირება ტერმინალში
+    console.log(`[SERVER LOG] ${type}: ${message}`);
   };
 
   addLog('INFO', 'ტესტირების პროცესის დაწყება...');
   
+  // ✅ ეს ნაწილი არის try-ს გარეთ, რათა ცვლადები გლობალურად იყოს ხელმისაწვდომი
+  await credentialVault.ready;
+  addLog('INFO', 'CredentialVault ქეში წარმატებით ჩაიტვირთა.');
+  
+  const credentials = credentialVault.getMetadata();
+  const cred = credentials.find((c: any) => c.credential_id === credentialId);
+  
+  if (!cred) {
+    addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
+    return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
+  }
+
+  providerName = cred.provider;
+  addLog('INFO', `პროვაიდერი: ${cred.provider.toUpperCase()} | სკოპი: ${cred.scope}`);
+
+  const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
+  if (!apiKey) {
+    addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
+    return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: providerName, models: [], recommendedModel: '', modelTests: [], logs };
+  }
+  addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
+
+  // ✅ ახლა ვიწყებთ try ბლოკს მხოლოდ იმ ნაწილისთვის, სადაც ქსელური მოთხოვნებია
   try {
-    await credentialVault.ready;
-    addLog('INFO', 'CredentialVault ქეში წარმატებით ჩაიტვირთა.');
-    
-    const credentials = credentialVault.getMetadata();
-    const cred = credentials.find((c: any) => c.credential_id === credentialId);
-    
-    if (!cred) {
-      addLog('ERROR', 'გასაღები ვერ მოიძებნა სისტემის ქეშში.');
-      return { success: false, error: 'Credential not found in cache', provider: 'unknown', models: [], recommendedModel: '', modelTests: [], logs };
-    }
-
-    addLog('INFO', `პროვაიდერი: ${cred.provider.toUpperCase()} | სკოპი: ${cred.scope}`);
-
-    const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(credentialId);
-    if (!apiKey) {
-      addLog('ERROR', 'გაშიფრული გასაღების წაკითხვა ვერ მოხერხდა ან გასაღები არ არის ACTIVE სტატუსში.');
-      return { success: false, error: 'Failed to retrieve API key or credential is not ACTIVE', provider: cred.provider, models: [], recommendedModel: '', modelTests: [], logs };
-    }
-    addLog('SUCCESS', 'API გასაღები წარმატებით გაშიფრა სისტემამ.');
-
     const startTime = Date.now();
     let validChatModels: string[] = [];
     const modelTests: any[] = [];
@@ -89,8 +92,7 @@ export async function testCredentialAction(credentialId: string) {
       modelsResponse = await fetch(modelsUrl, {
         method: 'GET',
         headers: isGemini ? { 'Content-Type': 'application/json' } : { [authHeaderKey]: authHeaderValue, 'Content-Type': 'application/json' },
-        // ✅ დავამატოთ timeout, რომ fetch არ "ჩაიკიდოს" სამუდამოდ
-        signal: AbortSignal.timeout(10000) 
+        signal: AbortSignal.timeout(10000) // ✅ 10 წამიანი timeout, რომ არ ჩაიკიდოს
       });
       console.log("[SERVER] მიღებულია პასუხი მოდელების სიაზე:", modelsResponse.status);
     } catch (networkError: any) {
@@ -137,7 +139,6 @@ export async function testCredentialAction(credentialId: string) {
     if (validChatModels.length > 0) {
       addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური მოდელი. ვამოწმებ...`);
 
-      // ✅ დავამატოთ AbortSignal timeout თითოეულ chat მოთხოვნაზე, რომ არ ჩაიკიდოს
       const testPromises = validChatModels.map(async (modelId: string) => {
         const testStartTime = Date.now();
         try {
@@ -221,7 +222,7 @@ export async function testCredentialAction(credentialId: string) {
 
     return {
       success: true,
-      provider: cred.provider,
+      provider: providerName,
       models: validChatModels,
       recommendedModel: recommended,
       modelTests: modelTests,
@@ -234,7 +235,7 @@ export async function testCredentialAction(credentialId: string) {
     addLog('ERROR', `შეცდომა: ${error.message}`);
     return {
       success: false,
-      provider: cred.provider,
+      provider: providerName, // ✅ ახლა ეს მუშაობს, რადგან providerName გარეთაა განსაზღვრული
       models: [],
       recommendedModel: '',
       modelTests: [],
