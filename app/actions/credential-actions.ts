@@ -158,6 +158,17 @@ export async function testCredentialAction(credentialId: string) {
             chatModels.push(m.id);
           }
         });
+
+        // ✅ KIE AI სპეციფიკური გამოსწორება:
+        // თუ ეს KIE-ა, ჩვენ ვიცით რომ მისი "gpt-" მოდელები chat-ში არ მუშაობენ (რაც ტესტმა დაადასტურა).
+        // ამიტომ, ჩვენ ვიყენებთ Metadata-ში არსებულ სიას Image მოდელებისთვის და Chat-ს ვასუფთავებთ.
+        if (providerLower === 'kie') {
+          if (meta.models && Array.isArray(meta.models) && meta.models.length > 0) {
+            imageModels = meta.models;
+            addLog('INFO', 'KIE AI: გამოყენებულია Metadata-ში მითითებული Image მოდელების სია.');
+          }
+          chatModels = []; // გავასუფთავოთ Chat მოდელები, რადგან ისინი არ მუშაობენ
+        }
       }
     }
 
@@ -224,7 +235,7 @@ export async function testCredentialAction(credentialId: string) {
       console.log("[SERVER] Promise.all დასრულდა. შედეგები:", results.length);
       modelTests.push(...results);
     } else {
-      addLog('INFO', 'ტექსტური (Chat) მოდელები ვერ მოიძებნა.');
+      addLog('INFO', 'ტექსტური (Chat) მოდელები ვერ მოიძებნა ან არ არის საჭირო ტესტირება.');
     }
 
     modelTests.sort((a, b) => {
