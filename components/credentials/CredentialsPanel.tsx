@@ -526,32 +526,29 @@ export function CredentialsPanel() {
                           </div>
                         )}
                         
-                        {/* ✅ განახლებული Metadata-ს გამოჩენა: Chat vs Image */}
+                        {/* ✅ 100%-ით საიმედო Metadata-ს გამოჩენა: ყოველთვის აჩვენებს ორივე კატეგორიას */}
                         {cred.metadata && (
-                          <div className="mt-2 space-y-1">
-                            {cred.metadata.chatModels && cred.metadata.chatModels.length > 0 && (
-                              <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
-                                <span className="shrink-0 font-bold text-blue-400">💬 Chat:</span>
-                                <span className="font-mono break-all">
-                                  {cred.metadata.chatModels.slice(0, 4).join(', ')}
-                                  {cred.metadata.chatModels.length > 4 && ` +${cred.metadata.chatModels.length - 4} more`}
-                                </span>
-                              </div>
-                            )}
-                            {cred.metadata.imageModels && cred.metadata.imageModels.length > 0 && (
-                              <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
-                                <span className="shrink-0 font-bold text-purple-400">🎨 Image:</span>
-                                <span className="font-mono break-all">
-                                  {cred.metadata.imageModels.slice(0, 4).join(', ')}
-                                  {cred.metadata.imageModels.length > 4 && ` +${cred.metadata.imageModels.length - 4} more`}
-                                </span>
-                              </div>
-                            )}
-                            {!cred.metadata.chatModels && !cred.metadata.imageModels && (
-                              <div className="text-[10px] text-slate-500 font-mono bg-black/20 p-2 rounded border border-white/5">
-                                Metadata: {JSON.stringify(cred.metadata).substring(0, 80)}...
-                              </div>
-                            )}
+                          <div className="mt-2 space-y-1.5">
+                            <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
+                              <span className="shrink-0 font-bold text-blue-400">💬 Chat:</span>
+                              <span className="font-mono break-all">
+                                {cred.metadata.chatModels && cred.metadata.chatModels.length > 0 ? (
+                                  <>{cred.metadata.chatModels.slice(0, 4).join(', ')}{cred.metadata.chatModels.length > 4 && ` +${cred.metadata.chatModels.length - 4} more`}</>
+                                ) : (
+                                  <span className="text-slate-600 italic">None / Not available</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
+                              <span className="shrink-0 font-bold text-purple-400">🎨 Image:</span>
+                              <span className="font-mono break-all">
+                                {cred.metadata.imageModels && cred.metadata.imageModels.length > 0 ? (
+                                  <>{cred.metadata.imageModels.slice(0, 4).join(', ')}{cred.metadata.imageModels.length > 4 && ` +${cred.metadata.imageModels.length - 4} more`}</>
+                                ) : (
+                                  <span className="text-slate-600 italic">None / Not available</span>
+                                )}
+                              </span>
+                            </div>
                           </div>
                         )}
                       </div>
