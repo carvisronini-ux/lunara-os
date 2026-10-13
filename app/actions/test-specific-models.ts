@@ -3,6 +3,12 @@
 
 import { credentialVault } from '@/services/credentials/credential-vault';
 
+const HF_CHAT_ENDPOINT = 'https://router.huggingface.co/v1/chat/completions';
+const HF_IMAGE_BASE = 'https://router.huggingface.co/hf-inference/models';
+
+const describeNetworkError = (e: any) =>
+  e?.cause ? `${e.message} (Cause: ${e.cause?.code || e.cause})` : (e?.message || String(e));
+
 export async function testSpecificModelsAction(
   credentialId: string, 
   modelNames: string[], 
@@ -21,6 +27,7 @@ export async function testSpecificModelsAction(
 
   const results: any[] = [];
   const provider = cred.provider.toLowerCase();
+  const isHuggingFace = provider === 'huggingface' || provider === 'hugging face' || provider === 'hf';
   const meta = cred.metadata || {};
   
   addLog(`იწყება ${testType === 'text' ? 'ტექსტის' : 'ფოტოს'} ტესტირება ${modelNames.length} მოდელზე...`);
@@ -35,110 +42,102 @@ export async function testSpecificModelsAction(
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
       // ============================================
-      // HUGGING FACE - Fallback ლოგიკით
+      // HUGGING FACE - Inference Providers Router
+      // ტექსტი: OpenAI-თავსებადი /v1/chat/completions
+      // ფოტო:   router.huggingface.co/hf-inference/models/{model}
+      // (ძველი api-inference.huggingface.co აღარ არსებობს)
       // ============================================
-      if (provider === 'huggingface') {
-        const encodedModelName = encodeURIComponent(modelName);
-        
+      if (isHuggingFace) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+
+        let hfEndpoint: string;
         if (testType === 'text') {
+          hfEndpoint = HF_CHAT_ENDPOINT;
           requestBody = {
-            inputs: "დაწერე მხოლოდ სიტყვა: YES",
-            parameters: { max_new_tokens: 10, temperature: 0.1 }
+            model: modelName,
+            messages: [{ role: 'user', content: 'Reply with only one word: YES' }],
+            max_tokens: 16,
+            temperature: 0.1,
           };
         } else {
-          requestBody = { inputs: "A beautiful cosmic landscape, high quality" };
+          hfEndpoint = `${HF_IMAGE_BASE}/${modelName.split('/').map(encodeURIComponent).join('/')}`;
+          requestBody = { inputs: 'A beautiful cosmic landscape, high quality' };
+          headers['X-Wait-For-Model'] = 'true';
         }
-        
-        headers['Authorization'] = `Bearer ${apiKey}`;
-        headers['X-Wait-For-Model'] = 'true';
-        
-        let endpointToTry = `https://router.huggingface.co/hf-inference/models/${encodedModelName}`;
-        let response: Response;
-        let usedFallback = false;
-        
+
+        let hfResponse: Response;
         try {
-          response = await fetch(endpointToTry, {
+          hfResponse = await fetch(hfEndpoint, {
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30000)
+            signal: AbortSignal.timeout(testType === 'text' ? 30000 : 60000),
           });
-          
-          if (response.status === 400) {
-            const errData = await response.json().catch(() => ({}));
-            if (errData.error?.includes('not supported')) {
-              addLog(`⚠️ ${modelName} არ არის ხელმისაწვდომი Router-ზე. ვცდილობ ძველ endpoint-ს...`);
-              usedFallback = true;
-              endpointToTry = `https://api-inference.huggingface.co/models/${encodedModelName}`;
-              
-              response = await fetch(endpointToTry, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(requestBody),
-                signal: AbortSignal.timeout(30000)
-              });
-            }
-          }
         } catch (fetchError: any) {
-          if (fetchError.message.includes('ENOTFOUND') || fetchError.message.includes('fetch failed')) {
-            addLog(`⚠️ ${modelName} Router-ზე ქსელური შეცდომა. ვცდილობ ძველ endpoint-ს...`);
-            usedFallback = true;
-            endpointToTry = `https://api-inference.huggingface.co/models/${encodedModelName}`;
-            
-            response = await fetch(endpointToTry, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(requestBody),
-              signal: AbortSignal.timeout(30000)
-            });
-          } else {
-            throw fetchError;
-          }
+          const msg = describeNetworkError(fetchError);
+          addLog(`💥 ${modelName} ქსელური შეცდომა: ${msg}`);
+          results.push({ model: modelName, passed: false, latency: Date.now() - startTime, error: `Network error: ${msg}` });
+          await new Promise(resolve => setTimeout(resolve, 500));
+          continue;
         }
-        
-        const latency = Date.now() - startTime;
-        
-        if (response.ok) {
-          const contentType = response.headers.get('content-type') || '';
+
+        const hfLatency = Date.now() - startTime;
+
+        if (hfResponse.ok) {
           let isValid = false;
-          
+
           if (testType === 'text') {
-            const data = await response.json();
-            isValid = (Array.isArray(data) && data[0]?.generated_text?.length > 0) || 
-                      (data.choices?.[0]?.message?.content?.length > 0);
+            const data = await hfResponse.json();
+            if (data?.error) {
+              addLog(`⚠️ ${modelName} დააბრუნა შეცდომა 200 OK პასუხში: ${data.error.message || JSON.stringify(data.error).substring(0, 150)}`);
+            } else {
+              isValid = data?.choices?.[0]?.message?.content?.length > 0;
+              if (!isValid) addLog(`⚠️ ${modelName} დააბრუნა ცარიელი/არასწორი ფორმატი. პასუხი: ${JSON.stringify(data).substring(0, 150)}`);
+            }
           } else {
+            const contentType = hfResponse.headers.get('content-type') || '';
             if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
               isValid = true;
             } else {
-              // ✅ აქ გავასწორეთ შეცდომა: უბრალოდ ვთვლით ვალიდურად, თუ JSON-ია და არა სურათი
-              await response.json(); 
-              isValid = true;
+              const data = await hfResponse.json();
+              isValid = !data?.error;
+              if (!isValid) addLog(`⚠️ ${modelName} დააბრუნა შეცდომა: ${JSON.stringify(data.error).substring(0, 150)}`);
             }
           }
-          
+
           if (isValid) {
-            addLog(`✅ ${modelName} წარმატებულია (${latency}ms)${usedFallback ? ' [ძველი endpoint]' : ''}`);
-            results.push({ model: modelName, passed: true, latency, response: 'Success' });
+            addLog(`✅ ${modelName} წარმატებულია (${hfLatency}ms)`);
+            results.push({ model: modelName, passed: true, latency: hfLatency, response: 'Success' });
           } else {
-            addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი`);
-            results.push({ model: modelName, passed: false, latency, error: 'Invalid response format' });
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Invalid response format' });
           }
         } else {
-          const errText = await response.text();
-          if (response.status === 400 && errText.includes('not supported')) {
-            addLog(`❌ ${modelName} არ არის ხელმისაწვდომი HF-ის უფასო API-ზე`);
-            results.push({ model: modelName, passed: false, latency, error: 'Not available on free tier' });
-          } else if (response.status === 503) {
-            addLog(`⏳ ${modelName} იტვირთება (503). HF-ის უფასო API-ზე მოდელებს დრო სჭირდებათ.`);
-            results.push({ model: modelName, passed: false, latency, error: 'Model loading (503)' });
+          const errText = await hfResponse.text();
+          const snippet = errText.substring(0, 150);
+
+          if (hfResponse.status === 400 || hfResponse.status === 404) {
+            addLog(`❌ ${modelName} არ არის ხელმისაწვდომი Router-ზე (HTTP ${hfResponse.status}). აირჩიე მოდელი, რომელსაც Inference Providers-ზე provider ემსახურება. ${snippet}`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Model not available on router' });
+          } else if (hfResponse.status === 401 || hfResponse.status === 403) {
+            addLog(`❌ ${modelName} ავტორიზაციის შეცდომა (${hfResponse.status}). შეამოწმე, რომ HF ტოკენს აქვს "Inference Providers" უფლება.`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Authorization failed' });
+          } else if (hfResponse.status === 402) {
+            addLog(`❌ ${modelName}: HF კრედიტები ამოიწურა ან provider ფასიანია (402).`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Payment required (402)' });
+          } else if (hfResponse.status === 429) {
+            addLog(`⏳ ${modelName}: მოთხოვნების ლიმიტი გადაჭარბებულია (429). სცადე მოგვიანებით.`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Rate limited (429)' });
+          } else if (hfResponse.status === 503) {
+            addLog(`⏳ ${modelName} იტვირთება (503). სცადე რამდენიმე წუთში.`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: 'Model loading (503)' });
           } else {
-            addLog(`❌ ${modelName} ვერ მოხერხდა: HTTP ${response.status} - ${errText.substring(0, 150)}`);
-            results.push({ model: modelName, passed: false, latency, error: `HTTP ${response.status}` });
+            addLog(`❌ ${modelName} ვერ მოხერხდა: HTTP ${hfResponse.status} - ${snippet}`);
+            results.push({ model: modelName, passed: false, latency: hfLatency, error: `HTTP ${hfResponse.status}` });
           }
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        continue;
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        continue; // HF დამუშავებულია, გადავდივართ შემდეგზე
       }
       
       // ============================================
@@ -230,7 +229,6 @@ export async function testSpecificModelsAction(
         if (testType === 'text') {
           const data = await response.json();
           
-          // ✅ გაუმჯობესებული ვალიდაცია: ვამოწმებთ data.error-საც, რადგან ზოგი API 200-ში აბრუნებს შეცდომას
           if (data.error) {
             isValid = false;
             addLog(`⚠️ ${modelName} დააბრუნა შეცდომა 200 OK პასუხში: ${data.error.message || 'Unknown'}`);
@@ -241,7 +239,6 @@ export async function testSpecificModelsAction(
           } else {
             isValid = data.choices?.[0]?.message?.content?.length > 0 || data.choices?.[0]?.delta?.content?.length > 0;
             
-            // ✅ თუ მაინც არ არის ვალიდური, ვბეჭდავთ პასუხის ფრაგმენტს დიაგნოსტიკისთვის
             if (!isValid) {
                addLog(`⚠️ ${modelName} დააბრუნა არასწორი ფორმატი. პასუხი: ${JSON.stringify(data).substring(0, 150)}`);
             }
@@ -281,7 +278,7 @@ export async function testSpecificModelsAction(
       }
     } catch (error: any) {
       const latency = Date.now() - startTime;
-      const errorMsg = error.cause ? `${error.message} (Cause: ${error.cause})` : error.message;
+      const errorMsg = describeNetworkError(error);
       addLog(`💥 ${modelName} შეცდომა: ${errorMsg}`);
       results.push({ model: modelName, passed: false, latency, error: errorMsg });
     }
@@ -296,15 +293,26 @@ export async function testSpecificModelsAction(
     return 0;
   });
 
+  const passedModels = sortedResults.filter(r => r.passed).map(r => r.model);
+
   const metaKey = testType === 'text' ? 'chatModels' : 'imageModels';
   const auditKey = testType === 'text' ? 'chatModelAuditResults' : 'imageModelAuditResults';
   
   const currentMeta = cred.metadata || {};
-  currentMeta[metaKey] = sortedResults.map(r => r.model);
+  // სამუშაო მოდელების სიაში მხოლოდ გავლილი მოდელები შედის.
+  // თუ არცერთი არ გავიდა, არსებული სია არ იშლება.
+  if (passedModels.length > 0) {
+    currentMeta[metaKey] = passedModels;
+  }
   currentMeta[auditKey] = sortedResults;
 
   await (credentialVault as any).updateCredentialMetadata(credentialId, currentMeta);
-  addLog(`ტესტი დასრულდა. მეტამონაცემები განახლდა დალაგებული სიით.`);
+
+  if (passedModels.length > 0) {
+    addLog(`ტესტი დასრულდა: ${passedModels.length}/${sortedResults.length} მოდელი გავიდა. სია განახლდა.`);
+  } else {
+    addLog(`ტესტი დასრულდა: არცერთი მოდელი არ გავიდა (0/${sortedResults.length}). სამუშაო მოდელების არსებული სია უცვლელია, განახლდა მხოლოდ აუდიტის შედეგები.`);
+  }
 
   return { success: true, results: sortedResults, logs };
 }
