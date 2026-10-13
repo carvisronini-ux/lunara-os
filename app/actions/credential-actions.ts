@@ -48,9 +48,10 @@ export async function testCredentialAction(credentialId: string) {
     let authHeaderKey = meta.authHeaderKey || 'Authorization';
     let authHeaderValue = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ${apiKey}` : `Bearer ${apiKey}`;
     let isCloudflare = false;
+    let isGemini = false;
 
     // ============================================================
-    // ჭკვიანი მარშრუტიზაცია
+    // ჭკვიანი მარშრუტიზაცია - ვიცნობთ ყველა მთავარ გამონაკლისს
     // ============================================================
     if (providerLower === 'cloudflare') {
       const accountId = meta.accountId;
@@ -60,25 +61,35 @@ export async function testCredentialAction(credentialId: string) {
       modelsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
       chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
       isCloudflare = true;
-    } else if (providerLower === 'groq') {
+    } 
+    else if (providerLower === 'groq') {
       modelsUrl = 'https://api.groq.com/openai/v1/models';
       chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    } else {
+    } 
+    else if (providerLower === 'gemini' || providerLower === 'google') {
+      // ✅ Gemini-ს სპეციალური სტრუქტურა: API key გადაეცემა query parameter-ით
+      modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+      chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/'; // ბაზა, modelId და :generateContent?key= დაემატება
+      isGemini = true;
+    } 
+    else {
       // ნაგულისხმევი OpenAI-კომპატიბილური სტრუქტურა
       const base = meta.baseUrl || `https://api.${providerLower}.com/v1`;
       modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
       chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
     }
 
-    addLog('INFO', `ვითხოვ მოდელების სიას: ${modelsUrl}`);
-    addLog('REQ', `GET ${modelsUrl}`);
+    addLog('INFO', `ვითხოვ მოდელების სიას: ${modelsUrl.replace(apiKey, '***')}`);
+    addLog('REQ', `GET ${modelsUrl.replace(apiKey, '***')}`);
 
     const modelsResponse = await fetch(modelsUrl, {
       method: 'GET',
-      headers: {
-        [authHeaderKey]: authHeaderValue,
-        'Content-Type': 'application/json'
-      }
+      headers: isGemini 
+        ? { 'Content-Type': 'application/json' } // Gemini-ს არ სჭირდება auth header
+        : {
+            [authHeaderKey]: authHeaderValue,
+            'Content-Type': 'application/json'
+          }
     });
 
     addLog('RES', `მიღებულია პასუხი: HTTP ${modelsResponse.status} ${modelsResponse.statusText}`);
@@ -88,15 +99,14 @@ export async function testCredentialAction(credentialId: string) {
       modelsData = await modelsResponse.json();
       addLog('SUCCESS', 'API გასაღები ვალიდურია. მოდელების სია მიღებულია.');
     } else {
-      // ✅ ჭკვიანი Fallback Cloudflare-ისთვის, თუ API 404-ს აბრუნებს
+      // ჭკვიანი Fallback Cloudflare-ისთვის
       if (isCloudflare && modelsResponse.status === 404) {
-        addLog('INFO', 'Cloudflare-ის მოდელების სიის API დააბრუნა 404 (შესაძლოა Account ID არასწორია ან არ არის აქტივირებული). ვიყენებთ ცნობილი პოპულარული მოდელების სიას...');
+        addLog('INFO', 'Cloudflare-ის მოდელების სიის API დააბრუნა 404. ვიყენებთ ცნობილი პოპულარული მოდელების სიას...');
         validChatModels = [
           '@cf/meta/llama-3.1-8b-instruct',
           '@cf/meta/llama-3.1-70b-instruct',
           '@cf/qwen/qwen1.5-14b-chat-awq',
-          '@cf/mistral/mistral-7b-instruct-v0.1',
-          '@cf/black-forest-labs/flux-1-schnell'
+          '@cf/mistral/mistral-7b-instruct-v0.1'
         ];
       } else {
         const errorData = await modelsResponse.json().catch(() => ({}));
@@ -104,16 +114,40 @@ export async function testCredentialAction(credentialId: string) {
       }
     }
 
-    // თუ მოდელების სია API-დან მივიღეთ, გავფილტროთ ის
+    // მოდელების დინამიური პარსინგი სხვადასხვა პროვაიდერისთვის
     if (modelsData) {
-      const allModels = isCloudflare ? (modelsData.result || []) : (modelsData.data || modelsData.models || []);
-      validChatModels = allModels
-        .filter((m: any) => {
-          const id = (m.id || m.name || '').toLowerCase();
-          const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard');
-          return !isSpecialized && id.length > 0;
-        })
-        .map((m: any) => m.id || m.name);
+      let allModels = [];
+      if (isCloudflare) {
+        allModels = modelsData.result || [];
+      } else if (isGemini) {
+        // Gemini-ს ფორმატი: { models: [{ name: "models/gemini-2.0-flash", supportedGenerationMethods: [...] }] }
+        allModels = (modelsData.models || [])
+          .filter((m: any) => {
+            const methods = m.supportedGenerationMethods || [];
+            return methods.includes('generateContent') && !m.name.includes('embedding');
+          })
+          .map((m: any) => m.name.replace('models/', ''));
+        validChatModels = allModels;
+      } else {
+        allModels = modelsData.data || modelsData.models || [];
+        validChatModels = allModels
+          .filter((m: any) => {
+            const id = (m.id || m.name || '').toLowerCase();
+            const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard') || id.includes('image');
+            return !isSpecialized && id.length > 0;
+          })
+          .map((m: any) => m.id || m.name);
+      }
+
+      if (!isGemini) {
+        validChatModels = allModels
+          .filter((m: any) => {
+            const id = (m.id || m.name || '').toLowerCase();
+            const isSpecialized = id.includes('embedding') || id.includes('vision') || id.includes('audio') || id.includes('whisper') || id.includes('guard');
+            return !isSpecialized && id.length > 0;
+          })
+          .map((m: any) => m.id || m.name);
+      }
     }
 
     addLog('INFO', `ნაპოვნია ${validChatModels.length} პოტენციური ტექსტური მოდელი. ვამოწმებ ყველას...`);
@@ -122,8 +156,8 @@ export async function testCredentialAction(credentialId: string) {
       const testStartTime = Date.now();
       try {
         let testRes;
+        
         if (isCloudflare) {
-          // Cloudflare-ს აქვს განსხვავებული chat endpoint სტრუქტურა
           testRes = await fetch(`${chatUrl}${modelId}`, {
             method: 'POST',
             headers: {
@@ -134,7 +168,24 @@ export async function testCredentialAction(credentialId: string) {
               messages: [{ role: 'user', content: testPrompt }]
             })
           });
-        } else {
+        } 
+        else if (isGemini) {
+          // Gemini-ს სპეციალური ფორმატი
+          testRes = await fetch(`${chatUrl}${modelId}:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: testPrompt }]
+              }],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 10
+              }
+            })
+          });
+        } 
+        else {
           // სტანდარტული OpenAI-კომპატიბილური chat endpoint
           testRes = await fetch(chatUrl, {
             method: 'POST',
@@ -157,6 +208,8 @@ export async function testCredentialAction(credentialId: string) {
           let content = '';
           if (isCloudflare) {
             content = testData.result?.response?.trim() || '';
+          } else if (isGemini) {
+            content = testData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
           } else {
             content = testData.choices?.[0]?.message?.content?.trim() || 
                       testData.content?.[0]?.text?.trim() || '';
