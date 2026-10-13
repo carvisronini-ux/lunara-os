@@ -2,7 +2,7 @@
 'use server';
 
 import { credentialVault } from '@/services/credentials/credential-vault';
-import { getBestAvailableModel, reclassifyModelToImage } from '@/services/agents/model-router';
+import { reclassifyModelToImage } from '@/services/agents/model-router';
 import { imageGenerator } from '@/services/agents/image-generator';
 
 export async function testGenerationAction(testType: 'text' | 'image') {
@@ -13,108 +13,120 @@ export async function testGenerationAction(testType: 'text' | 'image') {
   };
 
   await credentialVault.ready;
-  addLog(`იწყება ${testType === 'text' ? 'ტექსტის' : 'ფოტოს'} გენერაციის ტესტი საცავის მონაცემებით...`);
+  addLog(`იწყება ${testType === 'text' ? 'ტექსტის' : 'ფოტოს'} გენერაციის ტესტი...`);
 
   try {
     if (testType === 'text') {
-      // 1. ვიღებთ საუკეთესო ჩეთის მოდელს პირდაპირ ჩვენი საცავიდან/რაუტერიდან
-      const modelInfo = await getBestAvailableModel('chat');
-      
-      if (!modelInfo) {
+      const credentials = credentialVault.getMetadata().filter((c: any) => c.status === 'ACTIVE');
+      let allChatModels: any[] = [];
+
+      // 1. დინამიურად ვაგროვებთ ყველა ხელმისაწვდომ ჩეთის მოდელს საცავიდან
+      for (const cred of credentials) {
+        const meta = cred.metadata || {};
+        if (meta.chatModels && Array.isArray(meta.chatModels) && meta.chatModels.length > 0) {
+          const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(cred.credential_id);
+          
+          // ენდპოინტის აგება პირდაპირ მეტამონაცემებიდან (ზუსტად ისე, როგორც სისტემის სხვა ნაწილებში)
+          const base = meta.baseUrl || `https://api.${cred.provider.toLowerCase()}.com/v1`;
+          const chatEndpoint = `${base}${meta.chatEndpoint || '/chat/completions'}`;
+          const authHeaderKey = meta.authHeaderKey || 'Authorization';
+          const authHeaderValue = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ${apiKey}` : `Bearer ${apiKey}`;
+
+          for (const modelName of meta.chatModels) {
+            allChatModels.push({
+              modelName,
+              provider: cred.provider,
+              credentialId: cred.credential_id,
+              apiKey,
+              chatEndpoint,
+              authHeaderKey,
+              authHeaderValue
+            });
+          }
+        }
+      }
+
+      if (allChatModels.length === 0) {
         addLog('❌ საცავში ჩეთის მოდელები ვერ მოიძებნა.');
         return { success: false, error: 'No chat models available in the vault', logs };
       }
 
-      addLog(`✅ საცავიდან არჩეულია მოდელი: ${modelInfo.provider} -> ${modelInfo.modelName}`);
-      
-      // 2. ვაგებთ Endpoint-ს ზუსტად ისე, როგორც Orchestrator-შია
-      let chatEndpoint = `https://api.${modelInfo.provider}.com/v1/chat/completions`;
-      if (modelInfo.provider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-      else if (modelInfo.provider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
-      else if (modelInfo.provider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
-      else if (modelInfo.provider === 'openai') chatEndpoint = 'https://api.openai.com/v1/chat/completions';
-      else if (modelInfo.provider === 'gemini' || modelInfo.provider === 'google') {
-        chatEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelInfo.modelName}:generateContent?key=${modelInfo.apiKey}`;
-      }
+      addLog(`✅ საცავში ნაპოვნია ${allChatModels.length} პოტენციური ჩეთის მოდელი. ვცდილობთ თანმიმდევრობით...`);
 
-      // 3. ვაგებთ Request-ს პროვაიდერის მიხედვით
-      let requestBody: any;
-      let headers: Record<string, string>;
+      // 2. ვცდილობთ თითოეულ მოდელს, სანამ ერთი მაინც არ იმუშავებს (ავტომატური გადასვლა შემდეგზე)
+      for (let i = 0; i < allChatModels.length; i++) {
+        const model = allChatModels[i];
+        addLog(`🔄 [ცდა ${i + 1}/${allChatModels.length}] ვცდილობთ: ${model.provider} -> ${model.modelName}`);
 
-      if (modelInfo.provider === 'gemini' || modelInfo.provider === 'google') {
-        requestBody = {
-          contents: [{ parts: [{ text: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
-        };
-        headers = { 'Content-Type': 'application/json' };
-      } else {
-        requestBody = {
-          model: modelInfo.modelName,
-          messages: [{ role: 'user', content: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }],
-          temperature: 0.7,
-          max_tokens: 100
-        };
-        headers = {
-          'Authorization': `Bearer ${modelInfo.apiKey}`,
-          'Content-Type': 'application/json'
-        };
-      }
-
-      addLog('📤 იგზავნება მოთხოვნა არჩეულ პროვაიდერზე...');
-      const response = await fetch(chatEndpoint, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        const errLower = errText.toLowerCase();
-        
-        // ✅ თვითაღდგენის ლოგიკა: თუ მოდელი დაძველებულია (not_found) ან ჩეთი არ შეუძლია
-        if (errLower.includes('not supported') || errLower.includes('image') || errLower.includes('not_found') || errLower.includes('no longer available')) {
-          addLog(`⚠️ მოდელი "${modelInfo.modelName}" აღარ არის ხელმისაწვდომი ან არ არის ჩეთის მოდელი.`);
-          addLog(`🔄 სისტემა ავტომატურად შლის მას ჩეთის სიიდან და ინახავს განახლებას...`);
-          
-          await reclassifyModelToImage(modelInfo.credentialId, modelInfo.modelName);
-          
-          return { 
-            success: false, 
-            error: `მოდელი "${modelInfo.modelName}" დაზიანებულია/დაძველებულია და ავტომატურად ამოიშალა. გთხოვთ, ხელახლა დააჭიროთ "ტექსტის გენერაცია" ღილაკს, რათა სისტემამ შემდეგი ხელმისაწვდომი მოდელი სცადოს.`, 
-            logs, 
-            reclassified: true 
+        try {
+          const requestBody = {
+            model: model.modelName,
+            messages: [{ role: 'user', content: 'დაწერე მოკლე, 1-წინადადებიანი შთაგონებული ციტატა ვარსკვლავების შესახებ.' }],
+            temperature: 0.7,
+            max_tokens: 100
           };
+
+          const headers: Record<string, string> = {
+            [model.authHeaderKey]: model.authHeaderValue,
+            'Content-Type': 'application/json'
+          };
+
+          const response = await fetch(model.chatEndpoint, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // ვცდილობთ სხვადასხვა ფორმატიდან ამოვიღოთ პასუხი (OpenAI, Cloudflare, ა.შ.)
+            const text = data.choices?.[0]?.message?.content || data.result?.response || data.text || 'No content generated';
+            
+            if (text && text !== 'No content generated' && text.trim().length > 0) {
+              addLog(`✅ წარმატება! ტექსტი დაგენერირდა მოდელით: ${model.provider} -> ${model.modelName}`);
+              return { 
+                success: true, 
+                type: 'text', 
+                result: text.trim(), 
+                modelName: model.modelName, 
+                provider: model.provider, 
+                logs 
+              };
+            }
+          }
+
+          // თუ ვერ მოხერხდა, ვიგებთ მიზეზს
+          const errText = await response.text();
+          addLog(`⚠️ ვერ მოხერხდა (HTTP ${response.status}). მიზეზი: ${errText.substring(0, 150)}`);
+
+          // თუ შეცდომა მიუთითებს, რომ ეს მოდელი არ არის ჩეთისთვის (ან დაძველებულია), ავტომატურად გადაგვაქვს Image-ში
+          const errLower = errText.toLowerCase();
+          if (response.status === 404 || response.status === 403 || errLower.includes('not supported') || errLower.includes('image') || errLower.includes('no longer available') || errLower.includes('invalid model')) {
+            addLog(`🔄 მოდელი "${model.modelName}" ავტომატურად გადაგვაქვს Image კატეგორიაში, რადგან ჩეთზე უარს ამბობს.`);
+            await reclassifyModelToImage(model.credentialId, model.modelName);
+          }
+
+        } catch (error: any) {
+          addLog(`❌ კრიტიკული შეცდომა ${model.modelName}-ზე: ${error.message}`);
         }
-        throw new Error(`API Error: ${response.status} - ${errText}`);
       }
 
-      const data = await response.json();
-      
-      // 4. ვკითხულობთ პასუხს პროვაიდერის ფორმატის მიხედვით
-      let text = 'No content generated';
-      if (modelInfo.provider === 'gemini' || modelInfo.provider === 'google') {
-        text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No content generated';
-      } else {
-        text = data.choices?.[0]?.message?.content || 'No content generated';
-      }
-      
-      addLog('✅ ტექსტი წარმატებით დაგენერირდა საცავის მოდელით!');
-      return { success: true, type: 'text', result: text, modelName: modelInfo.modelName, provider: modelInfo.provider, logs };
+      addLog('❌ ვერცერთმა ჩეთის მოდელმა ვერ შეძლო ტექსტის გენერაცია.');
+      return { success: false, error: 'All chat models failed to generate text. Check vault metadata.', logs };
 
     } else {
       // ==========================================
-      // ფოტოს გენერაციის ტესტი
+      // ფოტოს გენერაციის ტესტი (დინამიური)
       // ==========================================
       addLog('🔍 საცავიდან იძებნება საუკეთესო ფოტოს გენერაციის მოდელი...');
       const testPrompt = "A beautiful, mystical cosmic landscape with glowing stars and a crescent moon, digital art, high quality, 8k resolution";
       
-      addLog('📤 იწყება ფოტოს გენერაცია (იყენებს ზუსტად იგივე imageGenerator ლოგიკას, რასაც აგენტი)...');
-      
+      addLog('📤 იწყება ფოტოს გენერაცია...');
       const genResult = await imageGenerator.generateImage(testPrompt, 'test-panel');
       
       if (genResult.success && genResult.imageBuffer) {
         const base64Image = `data:image/png;base64,${genResult.imageBuffer.toString('base64')}`;
-        addLog(`✅ ფოტო წარმატებით შეიქმნა მოდელით: ${genResult.provider || 'Unknown'}`);
+        addLog(`✅ ფოტო წარმატებით შეიქმნა!`);
         return { success: true, type: 'image', result: base64Image, logs: genResult.generationLogs || logs };
       } else {
         addLog(`❌ ფოტოს გენერაცია ვერ მოხერხდა: ${genResult.error}`);
