@@ -29,9 +29,8 @@ export async function testGenerationAction(testType: 'text' | 'image') {
         if (meta.chatModels && Array.isArray(meta.chatModels) && meta.chatModels.length > 0) {
           const apiKey = (credentialVault as any).getDecryptedValueForTesting?.(cred.credential_id);
           
-          // ✅ ვიყენებთ ზუსტად იგივე ლოგიკას, რაც credential-actions.ts-შია
+          // ✅ ვიყენებთ ზუსტად იგივე ლოგიკას, რაც credential-actions.ts-შია (მხოლოდ chatUrl-ისთვის)
           const providerLower = cred.provider.toLowerCase();
-          let modelsUrl = '';
           let chatUrl = '';
           let isCloudflare = false;
           let isGemini = false;
@@ -39,19 +38,15 @@ export async function testGenerationAction(testType: 'text' | 'image') {
           if (providerLower === 'cloudflare') {
             const accountId = meta.accountId;
             if (accountId) {
-              modelsUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models`;
               chatUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/`;
               isCloudflare = true;
             }
           } else if (providerLower === 'groq') {
-            modelsUrl = 'https://api.groq.com/openai/v1/models';
             chatUrl = 'https://api.groq.com/openai/v1/chat/completions';
           } else if (providerLower === 'gemini' || providerLower === 'google') {
-            modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
             chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
             isGemini = true;
           } else if (providerLower === 'mistral') {
-            modelsUrl = 'https://api.mistral.ai/v1/models';
             chatUrl = 'https://api.mistral.ai/v1/chat/completions';
           } else {
             let base = meta.baseUrl;
@@ -61,7 +56,6 @@ export async function testGenerationAction(testType: 'text' | 'image') {
               else if (providerLower === 'openai') base = 'https://api.openai.com/v1';
               else base = `https://api.${providerLower}.com/v1`;
             }
-            modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
             chatUrl = `${base}${meta.chatEndpoint || '/chat/completions'}`;
           }
 
