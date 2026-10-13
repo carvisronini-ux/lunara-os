@@ -99,6 +99,7 @@ export function CredentialsPanel() {
   const [editCredValue, setEditCredValue] = useState('');
   const [testingId, setTestingId] = useState<string | null>(null);
   const [auditingId, setAuditingId] = useState<string | null>(null);
+  const [testingBox, setTestingBox] = useState<{ credId: string; type: 'text' | 'image' } | null>(null); // ✅ ახალი State
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
@@ -231,6 +232,32 @@ export function CredentialsPanel() {
     } finally { setAuditingId(null); }
   };
 
+  // ✅ ახალი ფუნქცია: კონკრეტული ყუთის მოდელების ტესტირება და დალაგება
+  const handleTestSpecificBox = async (credentialId: string, models: string[], type: 'text' | 'image') => {
+    setTestingBox({ credId: credentialId, type });
+    setActiveLogs(prev => ({ ...prev, [credentialId]: [`[INFO] იწყება ${type === 'text' ? 'ტექსტის' : 'ფოტოს'} მოდელების ტესტირება...`] }));
+
+    try {
+      const { testSpecificModelsAction } = await import('@/app/actions/test-specific-models');
+      const res = await testSpecificModelsAction(credentialId, models, type);
+      
+      if (res.logs) {
+        setActiveLogs(prev => ({ ...prev, [credentialId]: [...(prev[credentialId] || []), ...res.logs] }));
+      }
+      
+      if (res.success) {
+        await refreshData();
+      } else {
+        alert(`ტესტი ვერ მოხერხდა: ${res.error}`);
+      }
+    } catch (error: any) {
+      console.error(`[UI] ${type} box test failed:`, error);
+      setActiveLogs(prev => ({ ...prev, [credentialId]: [...(prev[credentialId] || []), `[ERROR] ${error.message}`] }));
+    } finally {
+      setTestingBox(null);
+    }
+  };
+
   const handleGenTest = async (type: 'text' | 'image') => {
     setGenTestState({ isTesting: true, type, result: null, logs: ['[INFO] Generation test started...'] });
     try {
@@ -318,7 +345,9 @@ export function CredentialsPanel() {
                   const logs = activeLogs[cred.credential_id] || [];
                   const chatModels = Array.isArray(cred.metadata?.chatModels) ? cred.metadata.chatModels : [];
                   const imageModels = Array.isArray(cred.metadata?.imageModels) ? cred.metadata.imageModels : [];
-                  const auditResults = Array.isArray(cred.metadata?.chatModelAuditResults) ? cred.metadata.chatModelAuditResults : [];
+                  const chatAuditResults = Array.isArray(cred.metadata?.chatModelAuditResults) ? cred.metadata.chatModelAuditResults : [];
+                  const imageAuditResults = Array.isArray(cred.metadata?.imageModelAuditResults) ? cred.metadata.imageModelAuditResults : [];
+                  
                   return <article key={cred.credential_id} className="overflow-hidden rounded-xl border border-white/[0.08] bg-[#0b101c]/80 transition hover:border-white/[0.13]">
                     <div className="p-3.5 sm:p-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -329,10 +358,93 @@ export function CredentialsPanel() {
                             <p className="mt-1.5 break-words text-[11px] text-slate-400">{cred.provider} <span className="mx-1 text-slate-700">/</span> Scope: <span className="text-slate-300">{cred.scope}</span> <span className="mx-1 text-slate-700">/</span> Owner: <span className="text-slate-300">{cred.owner}</span></p>
                             {cred.metadata?.application && <p className="mt-1.5 break-words text-[11px] text-violet-200/90">App / project: {String(cred.metadata.application)}</p>}
                             {cred.email && <p className="mt-1.5 break-all text-[11px] text-blue-300/90">✉ {cred.email}</p>}
-                            {(chatModels.length > 0 || imageModels.length > 0) && <div className="mt-3 space-y-2.5">
-                              {chatModels.length > 0 && <div><div className="mb-1.5 flex flex-wrap items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-200">Chat models</span><span className="text-[10px] text-slate-500">{chatModels.length} models</span>{isAuditing && <span className="inline-flex items-center gap-1.5 text-[10px] text-cyan-300"><span className="h-2.5 w-2.5 animate-spin rounded-full border border-cyan-300 border-t-transparent"/>Auditing</span>}</div><div className="flex flex-wrap gap-1">{chatModels.map((modelName: string, idx: number) => { const modelResult = auditResults.find((r: any) => r.model === modelName); const passed = modelResult?.passed; const badge = !modelResult ? 'border-white/[0.10] bg-white/[0.035] text-slate-400' : passed ? 'border-emerald-300/20 bg-emerald-300/[0.07] text-emerald-200' : 'border-red-300/20 bg-red-300/[0.06] text-red-200'; return <span key={`${modelName}-${idx}`} title={modelResult ? (passed ? `Success (${modelResult.latency}ms)` : `Failed: ${modelResult.error}`) : 'Not audited yet'} className={`inline-flex max-w-full items-center gap-1.5 break-all rounded-lg border px-2 py-1 font-mono text-[10px] ${badge}`}><span className="break-all">{modelName}</span>{modelResult && <span>{passed ? '✓' : '×'}</span>}</span>; })}</div></div>}
-                              {imageModels.length > 0 && <div><div className="mb-2 flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-[0.12em] text-fuchsia-200">Image models</span><span className="text-[10px] text-slate-500">{imageModels.length} models</span></div><div className="flex flex-wrap gap-1">{imageModels.slice(0, 4).map((modelName: string, idx: number) => <span key={`${modelName}-${idx}`} className="max-w-full break-all rounded-lg border border-fuchsia-300/15 bg-fuchsia-300/[0.05] px-2 py-1 font-mono text-[10px] text-fuchsia-200">{modelName}</span>)}{imageModels.length > 4 && <span className="rounded-lg border border-white/[0.08] px-2 py-1 text-[10px] text-slate-500">+{imageModels.length - 4} more</span>}</div></div>}
-                            </div>}
+                            
+                            {/* ✅ ახალი: ორი ლამაზი ყუთი მოდელებისთვის */}
+                            {(chatModels.length > 0 || imageModels.length > 0) && (
+                              <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                {/* 💬 ყუთი 1: ტექსტის გენერაცია */}
+                                {chatModels.length > 0 && (
+                                  <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.03] p-3">
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-200">💬 Chat Models</span>
+                                        <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-[9px] text-cyan-300">{chatModels.length}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleTestSpecificBox(cred.credential_id, chatModels, 'text')}
+                                        disabled={testingBox?.credId === cred.credential_id && testingBox?.type === 'text'}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-2 py-1 text-[9px] font-semibold text-cyan-200 transition hover:bg-cyan-400/20 disabled:opacity-50"
+                                      >
+                                        {testingBox?.credId === cred.credential_id && testingBox?.type === 'text' ? (
+                                          <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-cyan-200 border-t-transparent" />
+                                        ) : (
+                                          <Icon name="activity" className="h-3 w-3" />
+                                        )}
+                                        Test
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {chatModels.map((modelName: string, idx: number) => {
+                                        const modelResult = chatAuditResults.find((r: any) => r.model === modelName);
+                                        const badgeClass = !modelResult 
+                                          ? 'border-white/[0.10] bg-white/[0.035] text-slate-400' 
+                                          : modelResult.passed 
+                                            ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200 shadow-[0_0_8px_rgba(16,185,129,0.1)]' 
+                                            : 'border-red-400/20 bg-red-400/5 text-red-300 opacity-70';
+                                        return (
+                                          <span key={`${modelName}-${idx}`} title={modelResult ? (modelResult.passed ? `Success (${modelResult.latency}ms)` : `Failed: ${modelResult.error}`) : 'Not tested yet'} className={`inline-flex max-w-full items-center gap-1.5 break-all rounded-lg border px-2 py-1 font-mono text-[10px] transition-all ${badgeClass}`}>
+                                            <span className="break-all">{modelName}</span>
+                                            {modelResult && <span className="text-xs">{modelResult.passed ? '✓' : '×'}</span>}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* 🎨 ყუთი 2: ფოტოს გენერაცია */}
+                                {imageModels.length > 0 && (
+                                  <div className="rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/[0.03] p-3">
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-fuchsia-200">🎨 Image Models</span>
+                                        <span className="rounded bg-fuchsia-500/10 px-1.5 py-0.5 text-[9px] text-fuchsia-300">{imageModels.length}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleTestSpecificBox(cred.credential_id, imageModels, 'image')}
+                                        disabled={testingBox?.credId === cred.credential_id && testingBox?.type === 'image'}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-400/30 bg-fuchsia-400/10 px-2 py-1 text-[9px] font-semibold text-fuchsia-200 transition hover:bg-fuchsia-400/20 disabled:opacity-50"
+                                      >
+                                        {testingBox?.credId === cred.credential_id && testingBox?.type === 'image' ? (
+                                          <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-fuchsia-200 border-t-transparent" />
+                                        ) : (
+                                          <Icon name="sparkles" className="h-3 w-3" />
+                                        )}
+                                        Test
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {imageModels.map((modelName: string, idx: number) => {
+                                        const modelResult = imageAuditResults.find((r: any) => r.model === modelName);
+                                        const badgeClass = !modelResult 
+                                          ? 'border-white/[0.10] bg-white/[0.035] text-slate-400' 
+                                          : modelResult.passed 
+                                            ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200 shadow-[0_0_8px_rgba(16,185,129,0.1)]' 
+                                            : 'border-red-400/20 bg-red-400/5 text-red-300 opacity-70';
+                                        return (
+                                          <span key={`${modelName}-${idx}`} title={modelResult ? (modelResult.passed ? `Success (${modelResult.latency}ms)` : `Failed: ${modelResult.error}`) : 'Not tested yet'} className={`inline-flex max-w-full items-center gap-1.5 break-all rounded-lg border px-2 py-1 font-mono text-[10px] transition-all ${badgeClass}`}>
+                                            <span className="break-all">{modelName}</span>
+                                            {modelResult && <span className="text-xs">{modelResult.passed ? '✓' : '×'}</span>}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 lg:max-w-[250px] lg:justify-end">
@@ -376,7 +488,7 @@ export function CredentialsPanel() {
               <div className="grid grid-cols-2 gap-1.5"><button type="button" onClick={() => handleGenTest('text')} disabled={genTestState.isTesting} className="flex items-center justify-center gap-2 rounded-xl border border-blue-300/15 bg-blue-300/[0.06] px-2.5 py-2 text-xs font-semibold text-blue-200 transition hover:bg-blue-300/[0.11] disabled:opacity-40"><span>✦</span>Text test</button><button type="button" onClick={() => handleGenTest('image')} disabled={genTestState.isTesting} className="flex items-center justify-center gap-2 rounded-xl border border-fuchsia-300/15 bg-fuchsia-300/[0.06] px-2.5 py-2 text-xs font-semibold text-fuchsia-200 transition hover:bg-fuchsia-300/[0.11] disabled:opacity-40"><span>▧</span>Image test</button></div>
               {genTestState.isTesting && <div className="mt-3 flex items-center gap-2 rounded-xl border border-blue-300/15 bg-blue-300/[0.04] p-3 text-xs text-blue-200"><span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-transparent"/>Generation is running…</div>}
               {genTestState.result && <div className="mt-3 space-y-2.5">
-                {genTestState.result.success ? genTestState.type === 'text' ? <div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.045] p-3.5"><div className="mb-1.5 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-emerald-200"><Icon name="check" className="h-3.5 w-3.5"/>Text generation succeeded<span className="font-normal text-slate-500">{genTestState.result.provider} / {genTestState.result.modelName}</span></div><p className="break-words text-xs leading-5 text-slate-200">“{genTestState.result.result}”</p></div> : <div className="rounded-xl border border-fuchsia-300/15 bg-fuchsia-300/[0.04] p-3.5"><div className="mb-2 text-[10px] font-semibold text-fuchsia-200">Image generation succeeded</div><img src={genTestState.result.result} alt="Generated test result" className="h-auto max-h-80 w-full rounded-lg border border-white/[0.08] object-contain"/></div> : <div className="rounded-xl border border-red-300/15 bg-red-300/[0.04] p-3.5"><div className="mb-1 flex items-center gap-2 text-xs font-semibold text-red-200"><Icon name="alert" className="h-4 w-4"/>Generation failed</div><p className="break-words text-[11px] leading-5 text-red-100/75">{genTestState.result.error}</p>{genTestState.result.reclassified && <p className="mt-2 text-[10px] leading-4 text-amber-200">Model category was corrected automatically. Please try again.</p>}</div>}
+                {genTestState.result.success ? genTestState.type === 'text' ? <div className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.045] p-3.5"><div className="mb-1.5 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-emerald-200"><Icon name="check" className="h-3.5 w-3.5"/>Text generation succeeded<span className="font-normal text-slate-500">{genTestState.result.provider} / {genTestState.result.modelName}</span></div><p className="break-words text-xs leading-5 text-slate-200">"{genTestState.result.result}"</p></div> : <div className="rounded-xl border border-fuchsia-300/15 bg-fuchsia-300/[0.04] p-3.5"><div className="mb-2 text-[10px] font-semibold text-fuchsia-200">Image generation succeeded</div><img src={genTestState.result.result} alt="Generated test result" className="h-auto max-h-80 w-full rounded-lg border border-white/[0.08] object-contain"/></div> : <div className="rounded-xl border border-red-300/15 bg-red-300/[0.04] p-3.5"><div className="mb-1 flex items-center gap-2 text-xs font-semibold text-red-200"><Icon name="alert" className="h-4 w-4"/>Generation failed</div><p className="break-words text-[11px] leading-5 text-red-100/75">{genTestState.result.error}</p>{genTestState.result.reclassified && <p className="mt-2 text-[10px] leading-4 text-amber-200">Model category was corrected automatically. Please try again.</p>}</div>}
                 {genTestState.logs.length > 0 && <div className="max-h-28 space-y-1 overflow-y-auto rounded-xl border border-white/[0.07] bg-black/30 p-3 font-mono text-[9px] leading-4">{genTestState.logs.map((log, i) => <div key={`${i}-${log.slice(0, 12)}`} className={log.includes('❌') || log.includes('[ERROR]') ? 'break-all text-red-300' : log.includes('✅') ? 'break-all text-emerald-300' : log.includes('⚠️') ? 'break-all text-amber-200' : log.includes('📤') ? 'break-all text-blue-300' : 'break-all text-slate-500'}>{log}</div>)}</div>}
               </div>}
             </PanelCard>
