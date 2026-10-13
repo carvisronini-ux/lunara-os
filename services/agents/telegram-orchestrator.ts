@@ -8,7 +8,7 @@ import {
   sendTelegramPhoto,
 } from '../distribution/telegram';
 import { imageGenerator, type ImageGenerationResult as ImgGenResult } from './image-generator';
-import { getBestAvailableModel, reclassifyModelToImage } from './model-router'; // ✅ ახალი იმპორტი
+import { getBestAvailableModel, reclassifyModelToImage } from './model-router';
 
 // ============================================================
 // TYPES
@@ -50,8 +50,6 @@ interface TelegramPublishResult {
 // CONSTANTS
 // ============================================================
 
-const DEFAULT_TEXT_PROVIDER = 'groq'; 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'; 
 const GROQ_TIMEOUT_MS = 60_000;
 const ACCESS_LEASE_DURATION_SECONDS = 120;
 
