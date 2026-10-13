@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { credentialVault } from '@/services/credentials/credential-vault';
 import { accessManager } from '@/services/credentials/access-manager';
 import { testCredentialAction } from '@/app/actions/credential-actions';
-import { testGenerationAction } from '@/app/actions/test-generation-action'; // ✅ ახალი იმპორტი
+import { testGenerationAction } from '@/app/actions/test-generation-action';
+import { auditChatModelsAction } from '@/app/actions/audit-chat-models'; // ✅ ახალი იმპორტი
 import type { PermissionScope } from '@/services/credentials/types';
 
 export function CredentialsPanel() {
@@ -17,6 +18,7 @@ export function CredentialsPanel() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   
+  // Add Modal State
   const [newCredName, setNewCredName] = useState('');
   const [newCredProvider, setNewCredProvider] = useState<string>(''); 
   const [newCredScope, setNewCredScope] = useState<PermissionScope>('spend'); 
@@ -24,6 +26,7 @@ export function CredentialsPanel() {
   const [newCredMetadata, setNewCredMetadata] = useState('');
   const [newCredValue, setNewCredValue] = useState('');
   
+  // Edit Modal State
   const [editCredId, setEditCredId] = useState<string | null>(null);
   const [editCredName, setEditCredName] = useState('');
   const [editCredProvider, setEditCredProvider] = useState('');
@@ -33,6 +36,7 @@ export function CredentialsPanel() {
   const [editCredValue, setEditCredValue] = useState('');
   
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [auditingId, setAuditingId] = useState<string | null>(null); // ✅ ახალი State აუდიტისთვის
   const [testResults, setTestResults] = useState<Record<string, any>>({});
   const [activeLogs, setActiveLogs] = useState<Record<string, string[]>>({});
   const [isVaultReady, setIsVaultReady] = useState(false);
@@ -232,6 +236,24 @@ export function CredentialsPanel() {
     } finally {
       console.log("⚪ [UI] ვასუფთავებ testing state-ს:", credentialId);
       setTestingId(null);
+    }
+  };
+
+  // ✅ ახალი ფუნქცია: Chat მოდელების სრული აუდიტი
+  const handleAuditChat = async (credentialId: string) => {
+    setAuditingId(credentialId);
+    try {
+      const res = await auditChatModelsAction(credentialId);
+      if (res.success) {
+        await refreshData(); // განაახლებს UI-ს ახალი chatModelAuditResults მონაცემებით
+      } else {
+        alert(`Audit failed: ${res.error}`);
+      }
+    } catch (error: any) {
+      console.error("Audit error:", error);
+      alert(`Audit error: ${error.message}`);
+    } finally {
+      setAuditingId(null);
     }
   };
 
@@ -528,12 +550,13 @@ export function CredentialsPanel() {
               credentials.map((cred: any) => {
                 const testResult = testResults[cred.credential_id];
                 const isTesting = testingId === cred.credential_id;
+                const isAuditing = auditingId === cred.credential_id; // ✅ ახალი ცვლადი
                 const logs = activeLogs[cred.credential_id] || [];
                 
                 return (
                   <div key={cred.credential_id} className="rounded-xl border border-white/5 bg-white/5 p-4">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
+                      <div className="flex-1">
                         <div className="font-bold text-white text-lg">{cred.name || cred.provider}</div>
                         <div className="text-xs text-slate-400 uppercase mt-1">
                           {cred.provider} • Scope: {cred.scope} • Owner: {cred.owner}
@@ -544,33 +567,74 @@ export function CredentialsPanel() {
                           </div>
                         )}
                         
-                        {/* ✅ 100%-ით საიმედო Metadata-ს გამოჩენა: ყოველთვის აჩვენებს ორივე კატეგორიას */}
+                        {/* ✅ განახლებული Chat/Image სია ბეიჯებით */}
                         {cred.metadata && (
-                          <div className="mt-2 space-y-1.5">
-                            <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
-                              <span className="shrink-0 font-bold text-blue-400">💬 Chat:</span>
-                              <span className="font-mono break-all">
-                                {cred.metadata.chatModels && cred.metadata.chatModels.length > 0 ? (
-                                  <>{cred.metadata.chatModels.slice(0, 4).join(', ')}{cred.metadata.chatModels.length > 4 && ` +${cred.metadata.chatModels.length - 4} more`}</>
-                                ) : (
-                                  <span className="text-slate-600 italic">None / Not available</span>
-                                )}
-                              </span>
-                            </div>
-                            <div className="text-[10px] text-slate-400 flex items-start gap-1.5">
-                              <span className="shrink-0 font-bold text-purple-400">🎨 Image:</span>
-                              <span className="font-mono break-all">
-                                {cred.metadata.imageModels && cred.metadata.imageModels.length > 0 ? (
-                                  <>{cred.metadata.imageModels.slice(0, 4).join(', ')}{cred.metadata.imageModels.length > 4 && ` +${cred.metadata.imageModels.length - 4} more`}</>
-                                ) : (
-                                  <span className="text-slate-600 italic">None / Not available</span>
-                                )}
-                              </span>
-                            </div>
+                          <div className="mt-3 space-y-3">
+                            {/* Chat Models */}
+                            {cred.metadata.chatModels && cred.metadata.chatModels.length > 0 && (
+                              <div>
+                                <div className="text-[10px] text-slate-400 font-bold mb-1.5 flex items-center gap-1.5">
+                                  <span className="text-blue-400">💬 Chat Models:</span>
+                                  {isAuditing && (
+                                    <span className="text-[9px] text-blue-400 animate-pulse flex items-center gap-1">
+                                      <span className="h-2 w-2 rounded-full bg-blue-400 animate-ping"></span>
+                                      Auditing...
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {cred.metadata.chatModels.map((modelName: string, idx: number) => {
+                                    const auditResults = cred.metadata.chatModelAuditResults || [];
+                                    const modelResult = auditResults.find((r: any) => r.model === modelName);
+                                    
+                                    let badgeClass = "bg-slate-800/50 text-slate-400 border-slate-700"; // Default (Not audited)
+                                    if (modelResult) {
+                                      if (modelResult.passed) {
+                                        badgeClass = "bg-emerald-900/20 text-emerald-400 border-emerald-500/60 shadow-[0_0_8px_rgba(16,185,129,0.15)]";
+                                      } else {
+                                        badgeClass = "bg-red-900/20 text-red-400 border-red-500/60 opacity-70";
+                                      }
+                                    }
+
+                                    return (
+                                      <span 
+                                        key={idx} 
+                                        className={`text-[10px] font-mono px-2 py-1 rounded border transition-all duration-300 flex items-center gap-1 ${badgeClass}`}
+                                        title={modelResult ? (modelResult.passed ? `Success (${modelResult.latency}ms)` : `Failed: ${modelResult.error}`) : "Not audited yet"}
+                                      >
+                                        {modelName}
+                                        {modelResult?.passed && <span className="text-[8px]">✅</span>}
+                                        {modelResult && !modelResult.passed && <span className="text-[8px]">❌</span>}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Image Models */}
+                            {cred.metadata.imageModels && cred.metadata.imageModels.length > 0 && (
+                              <div>
+                                <div className="text-[10px] text-slate-400 font-bold mb-1.5">
+                                  <span className="text-purple-400">🎨 Image Models:</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {cred.metadata.imageModels.slice(0, 4).map((modelName: string, idx: number) => (
+                                    <span key={idx} className="text-[10px] font-mono px-2 py-1 rounded bg-purple-900/20 text-purple-400 border border-purple-500/40">
+                                      {modelName}
+                                    </span>
+                                  ))}
+                                  {cred.metadata.imageModels.length > 4 && (
+                                    <span className="text-[10px] text-slate-500 px-2 py-1">+{cred.metadata.imageModels.length - 4} more</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+
+                      <div className="flex flex-col items-end gap-2">
                         <span className={`rounded-lg px-3 py-1 text-xs font-black ${
                           cred.status === 'ACTIVE' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
                         }`}>
@@ -594,17 +658,36 @@ export function CredentialsPanel() {
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={(e) => {
-                            console.log("🖱️ [UI] ღილაკი დაკლიკდა. Credential ID:", cred.credential_id);
-                            e.preventDefault();
-                            handleTestCredential(cred.credential_id);
-                          }}
-                          disabled={isTesting}
-                          className="rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isTesting ? '⏳ Testing...' : '🧪 Test'}
-                        </button>
+                        <div className="flex gap-2 mt-1">
+                          {/* ✅ ახალი Audit Chat ღილაკი */}
+                          <button
+                            onClick={() => handleAuditChat(cred.credential_id)}
+                            disabled={isAuditing || isTesting}
+                            className="rounded-lg bg-cyan-500/20 border border-cyan-500/40 px-3 py-1 text-xs font-bold text-cyan-400 hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            title="Test all chat models for this provider"
+                          >
+                            {isAuditing ? (
+                              <>
+                                <span className="h-3 w-3 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin"></span>
+                                Auditing...
+                              </>
+                            ) : (
+                              '🔍 Audit Chat'
+                            )}
+                          </button>
+                          
+                          <button
+                            onClick={(e) => {
+                              console.log("🖱️ [UI] ღილაკი დაკლიკდა. Credential ID:", cred.credential_id);
+                              e.preventDefault();
+                              handleTestCredential(cred.credential_id);
+                            }}
+                            disabled={isTesting || isAuditing}
+                            className="rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-400 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isTesting ? '⏳ Testing...' : '🧪 Test'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                     
