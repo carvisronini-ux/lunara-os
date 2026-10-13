@@ -2,7 +2,6 @@
 'use server';
 
 import { credentialVault } from '@/services/credentials/credential-vault';
-import { reclassifyModelToImage } from '@/services/agents/model-router';
 import { imageGenerator } from '@/services/agents/image-generator';
 
 export async function testGenerationAction(testType: 'text' | 'image') {
@@ -57,10 +56,13 @@ export async function testGenerationAction(testType: 'text' | 'image') {
 
       addLog(`✅ [API VAULT] პასუხი მიღებულია. ნაპოვნია ${allChatModels.length} პოტენციური მოდელი. ვიწყებთ თანმიმდევრულ ტესტირებას...`);
 
-      // 2. ავტომატური ციკლი და თვითაღდგენა (Self-Healing)
+      // 2. ვცდილობთ თითოეულ მოდელს და ვაფიქსირებთ შედეგებს (არაფერს ვშლით ავტომატურად)
+      const failedModels: any[] = [];
+      
       for (let i = 0; i < allChatModels.length; i++) {
         const model = allChatModels[i];
-        addLog(`🔄 [TEST] ვცდილობ მოდელს [${i + 1}/${allChatModels.length}]: ${model.provider} -> ${model.modelName}`);
+        addLog(`\n🔄 [TEST] ვცდილობ მოდელს [${i + 1}/${allChatModels.length}]: ${model.provider} -> ${model.modelName}`);
+        addLog(`📍 [INFO] Endpoint: ${model.chatEndpoint}`);
 
         try {
           const requestBody = {
@@ -75,7 +77,7 @@ export async function testGenerationAction(testType: 'text' | 'image') {
             'Content-Type': 'application/json'
           };
 
-          addLog(`📤 [REQUEST] იგზავნება POST მოთხოვნა მისამართზე: ${model.chatEndpoint}`);
+          addLog(`📤 [REQUEST] იგზავნება POST მოთხოვნა...`);
           addLog(`📦 [REQUEST] Payload: ${JSON.stringify(requestBody).substring(0, 150)}...`);
 
           const response = await fetch(model.chatEndpoint, {
@@ -100,30 +102,58 @@ export async function testGenerationAction(testType: 'text' | 'image') {
                 provider: model.provider, 
                 logs 
               };
+            } else {
+              addLog(`⚠️ [WARNING] მოდელმა დააბრუნა ცარიელი პასუხი.`);
+              failedModels.push({
+                model: model.modelName,
+                provider: model.provider,
+                reason: 'Empty response'
+              });
             }
-          }
-
-          // თუ ვერ მოხერხდა, ვიღებთ დეტალურ მიზეზს
-          const errText = await response.text();
-          addLog(`❌ [FAILURE] მოდელმა ვერ შეასრულა მოთხოვნა. HTTP სტატუსი: ${response.status}`);
-          addLog(`📉 [FAILURE] მიზეზი: ${errText.substring(0, 200)}`);
-
-          // 3. თვითაღდგენა (Self-Healing): ვინახავთ ბაზაში, რომ ეს მოდელი ვერ მუშაობს და გადაგვაქვს Image-ში
-          const errLower = errText.toLowerCase();
-          if (response.status === 404 || response.status === 403 || errLower.includes('not supported') || errLower.includes('image') || errLower.includes('no longer available') || errLower.includes('invalid model')) {
-            addLog(`🛠️ [SELF-HEALING] ვინახავ ჩანაწერს ბაზაში: მოდელი '${model.modelName}' ვერ მუშაობს ტექსტის გენერაციისთვის (მიზეზი: HTTP ${response.status}).`);
-            addLog(`🔄 [SELF-HEALING] ავტომატურად გადაგვაქვს '${model.modelName}' Image (ფოტოს) კატეგორიაში, რათა მომავალში აღარ შევცდეთ.`);
+          } else {
+            // თუ ვერ მოხერხდა, ვიღებთ დეტალურ მიზეზს
+            const errText = await response.text();
+            addLog(`❌ [FAILURE] მოდელმა ვერ შეასრულა მოთხოვნა. HTTP სტატუსი: ${response.status}`);
+            addLog(`📉 [FAILURE] მიზეზი: ${errText.substring(0, 300)}`);
             
-            await reclassifyModelToImage(model.credentialId, model.modelName);
+            failedModels.push({
+              model: model.modelName,
+              provider: model.provider,
+              reason: `HTTP ${response.status}: ${errText.substring(0, 200)}`
+            });
           }
 
         } catch (error: any) {
-          addLog(`💥 [CRITICAL] ქსელური ან სისტემური შეცდომა ${model.modelName}-ზე: ${error.message}`);
+          addLog(`💥 [CRITICAL] ქსელური ან სისტემური შეცდომა: ${error.message}`);
+          failedModels.push({
+            model: model.modelName,
+            provider: model.provider,
+            reason: `Network error: ${error.message}`
+          });
         }
       }
 
-      addLog("🏁 [TEST] ტესტი დასრულდა წარუმატებლად: ვერცერთმა ჩეთის მოდელმა ვერ შეძლო ტექსტის გენერაცია.");
-      return { success: false, error: 'All chat models failed. Check detailed logs.', logs };
+      // 3. თუ ყველა მოდელი ვერ იმუშავა, ვაბრუნებთ დეტალურ ანგარიშს (არაფერს ვშლით)
+      addLog("\n🏁 [TEST] ტესტი დასრულდა. ვერცერთმა მოდელმა ვერ შეძლო ტექსტის გენერაცია.");
+      addLog(`📊 [REPORT] წარუმატებელი მოდელები (${failedModels.length}):`);
+      
+      failedModels.forEach((fm, idx) => {
+        addLog(`  ${idx + 1}. ${fm.provider} -> ${fm.model}`);
+        addLog(`     მიზეზი: ${fm.reason}`);
+      });
+      
+      addLog("\n💡 [RECOMMENDATION] გთხოვთ, შეამოწმოთ ზემოთ მოცემული მიზეზები და გადაწყვიტოთ:");
+      addLog("   - თუ შეცდომა დროებითია (429, 503), სცადეთ ხელახლა რამდენიმე წუთში.");
+      addLog("   - თუ შეცდომა 404-ა, შეამოწმეთ Metadata-ში baseUrl და chatEndpoint.");
+      addLog("   - თუ შეცდომა 401/403-ა, შეამოწმეთ API გასაღების ვალიდურობა.");
+      addLog("   - თუ მოდელი ნამდვილად არ მუშაობს, შეგიძლიათ ხელით ამოშალოთ იგი საცავიდან.");
+
+      return { 
+        success: false, 
+        error: 'All chat models failed. Check detailed logs for reasons.', 
+        failedModels,
+        logs 
+      };
 
     } else {
       // ==========================================
