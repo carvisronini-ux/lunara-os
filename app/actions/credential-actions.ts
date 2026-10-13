@@ -57,6 +57,9 @@ export async function testCredentialAction(credentialId: string) {
     let isCloudflare = false;
     let isGemini = false;
 
+    // ============================================================
+    // ჭკვიანი მარშრუტიზაცია ცნობილი პროვაიდერებისთვის
+    // ============================================================
     if (providerLower === 'cloudflare') {
       const accountId = meta.accountId;
       if (!accountId) throw new Error("Cloudflare-სთვის Metadata-ში აუცილებელია 'accountId'.");
@@ -72,11 +75,19 @@ export async function testCredentialAction(credentialId: string) {
       modelsUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
       chatUrl = 'https://generativelanguage.googleapis.com/v1beta/models/';
       isGemini = true;
-    } 
+    }
+    else if (providerLower === 'mistral') {
+      // ✅ Mistral-ის სწორი დომენი (.ai და არა .com)
+      modelsUrl = 'https://api.mistral.ai/v1/models';
+      chatUrl = 'https://api.mistral.ai/v1/chat/completions';
+    }
     else {
+      // ნაგულისხმევი ლოგიკა სხვა პროვაიდერებისთვის
       let base = meta.baseUrl;
       if (!base) {
         if (providerLower === 'kie') base = 'https://api.kie.ai/v1';
+        else if (providerLower === 'deepseek') base = 'https://api.deepseek.com/v1';
+        else if (providerLower === 'openai') base = 'https://api.openai.com/v1';
         else base = `https://api.${providerLower}.com/v1`;
       }
       modelsUrl = `${base}${meta.modelsEndpoint || '/models'}`;
