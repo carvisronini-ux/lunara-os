@@ -132,7 +132,8 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-function parseGeneratedContent(rawContent: unknown): GeneratedContent {
+// ✅ განახლებული: დაემატა postType პარამეტრი და 12 ნიშნის მკაცრი ვალიდაცია
+function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
   }
@@ -166,6 +167,22 @@ function parseGeneratedContent(rawContent: unknown): GeneratedContent {
 
   if (data.hashtags !== undefined && !Array.isArray(data.hashtags)) {
     throw new Error('The AI returned an invalid hashtags field.');
+  }
+
+  // ✅ დამატებითი ვალიდაცია: 12 ნიშნის ჰოროსკოპი უნდა შეიცავდეს ყველა 12 ნიშანს
+  if (postType === 'daily_horoscope_12_signs') {
+    const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const caption = data.caption as string;
+    const missingSigns = zodiacSigns.filter(sign => !caption.includes(sign));
+    
+    if (missingSigns.length > 0) {
+      throw new Error(`The AI response is missing zodiac signs: ${missingSigns.join(', ')}. Caption must include all 12 signs.`);
+    }
+    
+    // ასევე ვამოწმებთ, რომ caption არ არის ძალიან მოკლე
+    if (caption.length < 300) {
+      throw new Error(`The AI response is too short (${caption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
+    }
   }
 
   const hashtags = Array.isArray(data.hashtags)
@@ -494,13 +511,17 @@ export class TelegramOrchestrator {
                                          errorLower.includes('vision only') ||
                                          errorLower.includes('invalid model');
                                          
-            // 2. შეცდომები, რომლებიც მიუთითებს ლიმიტის ან ბალანსის ამოწურვაზე
+            // 2. შეცდომები, რომლებიც მიუთითებს ლიმიტის, ბალანსის ან დროებითი პრობლემის შესახებ
             const isQuotaOrBalanceError = response.status === 402 || 
                                           response.status === 429 || 
+                                          response.status === 503 ||
+                                          response.status === 500 ||
                                           errorLower.includes('insufficient balance') ||
                                           errorLower.includes('quota exceeded') ||
                                           errorLower.includes('rate limit') ||
-                                          errorLower.includes('credit');
+                                          errorLower.includes('credit') ||
+                                          errorLower.includes('high demand') ||
+                                          errorLower.includes('unavailable');
 
             if (isNotAChatModelError) {
               addLog(`⚠️ მოდელი "${currentModelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
@@ -511,14 +532,14 @@ export class TelegramOrchestrator {
             }
             
             if (isQuotaOrBalanceError) {
-              addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი ან ბალანსი (HTTP ${response.status}). სისტემა ავტომატურად ცდის შემდეგ საუკეთესო მოდელს...`);
+              addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი/ბალანსი ან გადატვირთულია (HTTP ${response.status}). სისტემა ავტომატურად ცდის შემდეგ საუკეთესო მოდელს...`);
               // არ გადაგვაქვს Image-ში, უბრალოდ ვტოვებთ და ვცდილობთ შემდეგს
               chatModelInfo = await getBestAvailableModel('chat', currentModelName);
               chatAttempts++;
               continue; // ცადე შემდეგი მოდელი
             }
             
-            // თუ შეცდომა სხვა ტიპისაა (მაგ. 500, 404), მაშინ ვაგდებთ შეცდომას
+            // თუ შეცდომა სხვა ტიპისაა (მაგ. 404), მაშინ ვაგდებთ შეცდომას
             throw new Error(`API returned HTTP ${response.status}: ${truncateError(errorText)}`);
           }
 
@@ -542,7 +563,8 @@ export class TelegramOrchestrator {
             addLog(`⚠️ მოდელმა დააბრუნა ცარიელი პასუხი. სრული JSON: ${JSON.stringify(data).substring(0, 300)}`);
           }
 
-          generatedContent = parseGeneratedContent(rawContent);
+          // ✅ გადაეცა request.postType ვალიდაციის ფუნქციას
+          generatedContent = parseGeneratedContent(rawContent, request.postType);
           textGenerationSuccess = true;
 
         } finally {
@@ -606,7 +628,7 @@ export class TelegramOrchestrator {
         imageProvider = 'static_zodiac_sign';
       } 
       else if (!useAiImage) {
-        // ✅ თუ AI ფოტო გამორთულია ნებისმიერი დავალებისთვის (მაგ. Morning Question), ვტოვებთ ტექსტს
+        // ✅ თუ AI ფოტო გამორთულია ნებისმიერი დავალებისთვის, ვტოვებთ ტექსტს
         addLog('🖼️ AI ფოტოს გენერაცია გამორთულია ამ დავალებისთვის (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
         imageResult = null;
       } 
