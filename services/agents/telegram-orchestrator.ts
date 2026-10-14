@@ -421,28 +421,58 @@ export class TelegramOrchestrator {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
-          let chatEndpoint = `https://api.${currentProvider}.com/v1/chat/completions`;
-          if (currentProvider === 'groq') chatEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
-          else if (currentProvider === 'mistral') chatEndpoint = 'https://api.mistral.ai/v1/chat/completions';
-          else if (currentProvider === 'deepseek') chatEndpoint = 'https://api.deepseek.com/v1/chat/completions';
-          else if (currentProvider === 'openai') chatEndpoint = 'https://api.openai.com/v1/chat/completions';
+          // ✅ დინამიური Endpoint-ისა და Request Body-ს აგება საცავის Metadata-ს მიხედვით
+          const cred = credentialVault.getMetadata().find((c: any) => c.credential_id === currentCredentialId);
+          const meta = cred?.metadata || {};
+
+          let chatEndpoint = '';
+          let requestBody: any;
+          let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+          if (currentProvider === 'cloudflare') {
+            const accountId = meta.accountId;
+            if (!accountId) throw new Error('Cloudflare accountId not found in metadata');
+            chatEndpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${currentModelName}`;
+            requestBody = { 
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ] 
+            };
+            headers['Authorization'] = `Bearer ${chatModelInfo.apiKey}`;
+          } 
+          else if (currentProvider === 'gemini' || currentProvider === 'google') {
+            chatEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModelName}:generateContent?key=${chatModelInfo.apiKey}`;
+            requestBody = {
+              contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+              generationConfig: { temperature: 0.3 }
+            };
+          } 
+          else {
+            // სტანდარტული OpenAI-თავსებადი პროვაიდერები (Groq, Mistral, DeepSeek, OpenAI, ან ნებისმიერი custom baseUrl)
+            const base = meta.baseUrl || `https://api.${currentProvider}.com/v1`;
+            chatEndpoint = `${base}${meta.chatEndpoint || '/chat/completions'}`;
+            
+            const authKey = meta.authHeaderKey || 'Authorization';
+            const authPrefix = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ` : 'Bearer ';
+            headers[authKey] = `${authPrefix}${chatModelInfo.apiKey}`;
+            
+            requestBody = {
+              model: currentModelName,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: 0.3
+            };
+          }
 
           let response: Response;
           try {
             response = await fetch(chatEndpoint, {
               method: 'POST',
-              headers: {
-                Authorization: `Bearer ${chatModelInfo.apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: currentModelName,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: userPrompt },
-                ],
-                temperature: 0.3
-              }),
+              headers,
+              body: JSON.stringify(requestBody),
               signal: controller.signal,
             });
           } catch (error) {
