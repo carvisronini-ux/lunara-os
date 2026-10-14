@@ -57,7 +57,6 @@ const TELEGRAM_MESSAGE_LIMIT = 3_800;
 const TELEGRAM_CAPTION_LIMIT = 950; 
 const MAX_ERROR_LENGTH = 1_500;
 
-// ✅ სტატიკური სურათების მასივი 12 ნიშნის ჰოროსკოპისთვის (Fallback)
 const STATIC_ZODIAC_IMAGES = [
   'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsigns.png',
   'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsign2.png'
@@ -132,7 +131,6 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-// ✅ განახლებული: ემოჯებზე დაფუძნებული ვალიდაცია + ჰეშთეგების გარანტირებული # სიმბოლო
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -169,7 +167,6 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
-  // ✅ დამატებითი ვალიდაცია: 12 ნიშნის ჰოროსკოპი უნდა შეიცავდეს 12 ზოდიაქოს ემოჯს
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
@@ -179,13 +176,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
       throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
     }
     
-    // ასევე ვამოწმებთ, რომ caption არ არის ძალიან მოკლე
     if (caption.length < 300) {
       throw new Error(`The AI response is too short (${caption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
     }
   }
 
-  // ✅ გარანტირებულად ვამატებთ # სიმბოლოს, თუ AI-მ ის გამოტოვა
   const hashtags = Array.isArray(data.hashtags)
     ? data.hashtags
         .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
@@ -211,7 +206,6 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ განახლებული: ფუნქცია, რომელიც აკეთებს 12 ნიშნის ჰოროსკოპს ბოლდს და შლის გაორმაგებულ ემოჯებს ხაზის ბოლოში
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -227,12 +221,16 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
+  const lines = safeText.split('\n');
+  safeText = lines.map(line => {
+    const startsWithZodiacEmoji = line.trim().match(/^[♈♉♊♋♌♍♎♏♐♑♒♓]/);
+    if (startsWithZodiacEmoji) {
+      return line.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓](?=\s*$)/, '').trimEnd();
+    }
+    return line;
+  }).join('\n');
+
   zodiacMap.forEach(({ name, emoji }) => {
-    // 1. ჯერ ვშლით გაორმაგებულ ემოჯს ხაზის ბოლოში (მაგ: "♈ Aries: text ♈" -> "♈ Aries: text")
-    const regexRemoveTrailing = new RegExp(`(${emoji}\\s+${name}\\s*:[^\\n]*?)\\s*${emoji}\\s*(?=\\n|$)`, 'gmi');
-    safeText = safeText.replace(regexRemoveTrailing, '$1');
-    
-    // 2. შემდეგ ვაკეთებთ ბოლდს სტანდარტული ფორმატებისთვის
     const regex1 = new RegExp(`${emoji}\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
@@ -246,7 +244,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   return safeText.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
 }
 
-// ✅ ფუნქცია, რომელიც გარანტირებულად აკეთებს ერთი ნიშნის ჰოროსკოპს ბოლდს
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -313,9 +310,6 @@ export class TelegramOrchestrator {
         throw new Error('Both agentType and postType are required.');
       }
 
-      // --------------------------------------------------------
-      // 1. Load agent configuration from Supabase
-      // --------------------------------------------------------
       addLog('Loading agent configuration from Supabase...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
@@ -333,9 +327,6 @@ export class TelegramOrchestrator {
 
       addLog('Agent configuration loaded successfully.');
 
-      // --------------------------------------------------------
-      // 2. Load Job-Specific Instructions
-      // --------------------------------------------------------
       addLog('Loading job-specific instructions from agent_jobs...');
       let jobImageLogic = '';
       let useAiImage = true; 
@@ -359,16 +350,10 @@ export class TelegramOrchestrator {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
 
-      // --------------------------------------------------------
-      // 3. Wait for Credential Vault
-      // --------------------------------------------------------
       addLog('Waiting for CredentialVault initialization...');
       await credentialVault.ready;
       addLog('CredentialVault is ready.');
 
-      // ============================================================
-      // ✅ 4. PRE-PROCESSING: Determine Zodiac Sign BEFORE Text Generation
-      // ============================================================
       if (request.postType === 'daily_horoscope_single') {
         const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
         let targetSign = (request.zodiacSign || '').toLowerCase().trim();
@@ -380,7 +365,6 @@ export class TelegramOrchestrator {
           addLog(`✅ Specific zodiac sign provided in schedule: ${targetSign}`);
         }
 
-        // Update the request object so buildUserPrompt uses this specific sign!
         request.zodiacSign = targetSign.charAt(0).toUpperCase() + targetSign.slice(1);
         addLog(`🧠 AI-ს გადაეცა კონკრეტული ნიშანი: ${request.zodiacSign}`);
       }
@@ -393,6 +377,8 @@ export class TelegramOrchestrator {
       const maxChatAttempts = 3;
       let textGenerationSuccess = false;
       let generatedContent: GeneratedContent | null = null;
+
+      addLog(`🔍 DEBUG: Initial chatModelInfo is ${chatModelInfo ? chatModelInfo.modelName : 'NULL'}`);
 
       while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
         if (!chatModelInfo) {
@@ -421,7 +407,6 @@ export class TelegramOrchestrator {
           continue;
         }
 
-        // ✅ rawContent გამოცხადებულია try-ს გარეთ, რათა catch ბლოკმა შეძლოს მისი წაკითხვა DEBUG-ისთვის
         let rawContent: string | undefined;
 
         try {
@@ -521,22 +506,27 @@ export class TelegramOrchestrator {
             throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
-          // ✅ ეს ხაზი აგდებს შეცდომას, თუ ვალიდაცია ვერ გაივლის (მაგ. აკლია ემოჯები)
           generatedContent = parseGeneratedContent(rawContent, request.postType);
-          
-          // თუ აქამდე მოვედით, ყველაფერი წარმატებით გაიარა!
           textGenerationSuccess = true;
 
         } catch (error: any) {
-          // ✅ DEBUG: ვნახოთ ზუსტად რა დააბრუნა AI-მ ვალიდაციის ჩავარდნამდე
+          // ✅ აგრესიული დებაგინგი: ვაჩვენებთ ზუსტად რა მოხდა
+          addLog(`🔍 DEBUG CATCH: Error caught for ${currentModelName}. Message: ${error.message}`);
           if (rawContent) {
-            addLog(`🔍 DEBUG: AI-ის ნედლი პასუხი (პირველი 300 სიმბოლო): ${rawContent.substring(0, 300)}...`);
+            addLog(`🔍 DEBUG RAW: AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
+          } else {
+            addLog(`🔍 DEBUG RAW: rawContent is undefined or empty.`);
           }
           
-          addLog(`⚠️ მოდელმა "${currentModelName}" ვერ დააკმაყოფილა მოთხოვნა: ${error.message}. ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
-          chatModelInfo = await getBestAvailableModel('chat', currentModelName);
+          addLog(`⚠️ მოდელმა "${currentModelName}" ვერ დააკმაყოფილა მოთხოვნა. ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
+          
+          const nextModel = await getBestAvailableModel('chat', currentModelName);
+          if (!nextModel) {
+             addLog(`❌ DEBUG: No more models available in the vault after ${currentModelName}!`);
+          }
+          chatModelInfo = nextModel;
           chatAttempts++;
-          continue; // გადავდივართ ციკლის შემდეგ იტერაციაზე
+          continue;
         } finally {
           if (leaseId) {
             addLog(`Releasing ${currentProvider} access lease...`);
@@ -555,7 +545,6 @@ export class TelegramOrchestrator {
         throw new Error('All available chat models failed to generate content.');
       }
 
-      // ✅ ნაბიჯი 1: ფორმატირება და ბოლდის დამატება
       imagePrompt = generatedContent.image_prompt || '';
       if (request.postType === 'daily_horoscope_12_signs') {
         caption = applyBoldFormattingToZodiac(generatedContent.caption);
@@ -568,7 +557,6 @@ export class TelegramOrchestrator {
           .replace(/>/g, '&gt;');
       }
 
-      // ✅ ნაბიჯი 2: ჰეშთეგების ფორმატირება
       const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
       const hashtags = generatedContent.hashtags || [];
       const hashtagsLine = hashtags.join(' ');
@@ -580,10 +568,6 @@ export class TelegramOrchestrator {
         addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
       }
 
-      // ============================================================
-      // ✅ 6. IMAGE LOGIC (გამკაცრებული და აღდგენილი ლოგიკა)
-      // ============================================================
-      
       if (request.postType === 'daily_horoscope_single') {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
@@ -597,7 +581,6 @@ export class TelegramOrchestrator {
         imageProvider = 'static_zodiac_sign';
       } 
       else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
-        // ✅ ლოგიკა 12 Signs Horoscope-ისთვის (Toggle OFF) - იყენებს STATIC_ZODIAC_IMAGES-ს
         addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებთ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
         addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
@@ -610,13 +593,11 @@ export class TelegramOrchestrator {
         imageProvider = 'static_fallback';
       }
       else if (!useAiImage) {
-        // ✅ თუ AI ფოტო გამორთულია სხვა დავალებისთვის (მაგ. Morning Question), ვტოვებთ მხოლოდ ტექსტს
         addLog('🖼️ AI ფოტოს გენერაცია გამორთულია ამ დავალებისთვის (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
         imageResult = null;
       } 
       else if (imagePrompt) {
-        // ✅ ლოგიკა AI გენერაციისთვის (მხოლოდ მაშინ, თუ Toggle ON-ა)
-        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას..');
+        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას...');
         addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
         try {
@@ -644,18 +625,12 @@ export class TelegramOrchestrator {
         addWarning('No image_prompt was generated. Publishing text only.');
       }
 
-      // --------------------------------------------------------
-      // 7. Prepare Telegram content
-      // --------------------------------------------------------
       addLog('Preparing Telegram publication...');
       const escapedCaption = caption; 
 
       let publishedMessageId: number | undefined;
       let publishedWithImage = false;
 
-      // --------------------------------------------------------
-      // 8. Try publishing the image
-      // --------------------------------------------------------
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
@@ -701,9 +676,6 @@ export class TelegramOrchestrator {
         }
       }
 
-      // --------------------------------------------------------
-      // 9. Text-only fallback
-      // --------------------------------------------------------
       if (!publishedWithImage) {
         addLog('Publishing Telegram text message(s)...');
         const textChunks = splitTelegramText(escapedCaption, TELEGRAM_MESSAGE_LIMIT);
@@ -736,9 +708,6 @@ export class TelegramOrchestrator {
         }
       }
 
-      // --------------------------------------------------------
-      // 10. Record publication in Supabase
-      // --------------------------------------------------------
       addLog('Recording publication in Supabase...');
       const { error: databaseError } = await supabase.from('published_content').insert({
         agent_type: request.agentType,
