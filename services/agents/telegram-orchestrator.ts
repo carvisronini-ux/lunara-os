@@ -206,6 +206,7 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
+// ✅ საბოლოო, აბსოლუტურად საიმედო ვერსია: შლის გაორმაგებულ ემოჯებს ხაზის ბოლოში
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -221,15 +222,19 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
-  const lines = safeText.split('\n');
+  // ✅ ნაბიჯი 1: ვშლით გაორმაგებულ ემოჯებს ხაზის ბოლოში (ბევრად უფრო საიმედო Regex-ით)
+  // \r?\n უზრუნველყოფს, რომ Windows (\r\n) და Unix (\n) ახალი ხაზებიც სწორად დამუშავდეს
+  const lines = safeText.split(/\r?\n/);
   safeText = lines.map(line => {
-    const startsWithZodiacEmoji = line.trim().match(/^[♈♉♊♋♌♍♎♏♐♑♒♓]/);
-    if (startsWithZodiacEmoji) {
-      return line.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓](?=\s*$)/, '').trimEnd();
+    // თუ ხაზი იწყება ზოდიაქოს ემოჯით
+    if (/^[♈♉♊♋♌♍♎♏♐♑♒♓]/.test(line.trim())) {
+      // ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია (შესაძლო გამოტოვებული სივრცეებით)
+      return line.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\s*$/, '').trimEnd();
     }
     return line;
   }).join('\n');
 
+  // ✅ ნაბიჯი 2: ვაკეთებთ ბოლდს სტანდარტული ფორმატებისთვის
   zodiacMap.forEach(({ name, emoji }) => {
     const regex1 = new RegExp(`${emoji}\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
@@ -510,7 +515,6 @@ export class TelegramOrchestrator {
           textGenerationSuccess = true;
 
         } catch (error: any) {
-          // ✅ აგრესიული დებაგინგი: ვაჩვენებთ ზუსტად რა მოხდა
           addLog(`🔍 DEBUG CATCH: Error caught for ${currentModelName}. Message: ${error.message}`);
           if (rawContent) {
             addLog(`🔍 DEBUG RAW: AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
