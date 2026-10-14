@@ -206,12 +206,16 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ საბოლოო, აბსოლუტურად საიმედო ვერსია: შლის გაორმაგებულ ემოჯებს ხაზის ბოლოში
+// ✅ საბოლოო, მათემატიკურად უტყუარი ვერსია: აგრესიულად შლის ემოჯებს ხაზის ბოლოში
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+  // ✅ 1. აგრესიულად ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია.
+  // 'm' ფლაგი უზრუნველყოფს, რომ $ ემთხვეოდეს ხაზის ბოლოს და არა მთლიანი სტრიქონის ბოლოს.
+  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\s*$/gm, '');
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
@@ -222,31 +226,22 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
-  // ✅ ნაბიჯი 1: ვშლით გაორმაგებულ ემოჯებს ხაზის ბოლოში (ბევრად უფრო საიმედო Regex-ით)
-  // \r?\n უზრუნველყოფს, რომ Windows (\r\n) და Unix (\n) ახალი ხაზებიც სწორად დამუშავდეს
-  const lines = safeText.split(/\r?\n/);
-  safeText = lines.map(line => {
-    // თუ ხაზი იწყება ზოდიაქოს ემოჯით
-    if (/^[♈♉♊♋♌♍♎♏♐♑♒♓]/.test(line.trim())) {
-      // ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია (შესაძლო გამოტოვებული სივრცეებით)
-      return line.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\s*$/, '').trimEnd();
-    }
-    return line;
-  }).join('\n');
-
-  // ✅ ნაბიჯი 2: ვაკეთებთ ბოლდს სტანდარტული ფორმატებისთვის
+  // ✅ 2. ვაკეთებთ ბოლდს და ვრწმუნდებით, რომ ემოჯი არის მხოლოდ თავში
   zodiacMap.forEach(({ name, emoji }) => {
-    const regex1 = new RegExp(`${emoji}\\s+${name}\\s*:`, 'gi');
-    safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
+    // ფორმატი: "♈ Aries:" -> "♈ <b>Aries</b>:"
+    const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
+    safeText = safeText.replace(regex1, `$1 <b>${name}</b>:`);
     
+    // ფორმატი: "**Aries**:" -> "♈ <b>Aries</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
     
+    // ფორმატი: "Aries:" (ხაზის დასაწყისში) -> "♈ <b>Aries</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
   });
 
-  return safeText.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+  return safeText.trim();
 }
 
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
@@ -275,7 +270,7 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
   });
 
-  return safeText.replace(/(\s*[^\w\s#]+\s*)+$/, '').trim();
+  return safeText.trim();
 }
 
 // ============================================================
