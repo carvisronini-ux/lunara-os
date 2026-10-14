@@ -132,7 +132,7 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-// ✅ განახლებული: ემოჯებზე დაფუძნებული ვალიდაცია (ენისგან დამოუკიდებელი)
+// ✅ განახლებული: ემოჯებზე დაფუძნებული ვალიდაცია + ჰეშთეგების გარანტირებული # სიმბოლო
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -185,8 +185,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
+  // ✅ გარანტირებულად ვამატებთ # სიმბოლოს, თუ AI-მ ის გამოტოვა
   const hashtags = Array.isArray(data.hashtags)
-    ? data.hashtags.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    ? data.hashtags
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map(h => h.startsWith('#') ? h.trim() : `#${h.trim()}`)
     : [];
 
   return {
@@ -208,7 +211,7 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ ფუნქცია, რომელიც გარანტირებულად აკეთებს 12 ნიშნის ჰოროსკოპს ბოლდს
+// ✅ განახლებული: ფუნქცია, რომელიც აკეთებს 12 ნიშნის ჰოროსკოპს ბოლდს და შლის გაორმაგებულ ემოჯებს ხაზის ბოლოში
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -225,6 +228,11 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
+    // 1. ჯერ ვშლით გაორმაგებულ ემოჯს ხაზის ბოლოში (მაგ: "♈ Aries: text ♈" -> "♈ Aries: text")
+    const regexRemoveTrailing = new RegExp(`(${emoji}\\s+${name}\\s*:[^\\n]*?)\\s*${emoji}\\s*(?=\\n|$)`, 'gmi');
+    safeText = safeText.replace(regexRemoveTrailing, '$1');
+    
+    // 2. შემდეგ ვაკეთებთ ბოლდს სტანდარტული ფორმატებისთვის
     const regex1 = new RegExp(`${emoji}\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
