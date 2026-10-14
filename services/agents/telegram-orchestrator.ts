@@ -589,7 +589,7 @@ export class TelegramOrchestrator {
       }
 
       // ============================================================
-      // ✅ 6. IMAGE LOGIC (STATIC MAPPING FOR SINGLE SIGN)
+      // ✅ 6. IMAGE LOGIC (გამკაცრებული ლოგიკა)
       // ============================================================
       
       if (request.postType === 'daily_horoscope_single') {
@@ -605,21 +605,13 @@ export class TelegramOrchestrator {
         } as ImgGenResult;
         imageProvider = 'static_zodiac_sign';
       } 
-      else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
-        // ✅ ლოგიკა 12 Signs Horoscope-ისთვის (Toggle OFF)
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებთ სარეზერვო სტატიკურ სურათს.');
-        const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
-        addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
-        
-        imageResult = {
-          success: true,
-          imageUrl: randomImage,
-          provider: 'static_fallback'
-        } as ImgGenResult;
-        imageProvider = 'static_fallback';
+      else if (!useAiImage) {
+        // ✅ თუ AI ფოტო გამორთულია ნებისმიერი დავალებისთვის (მაგ. Morning Question), ვტოვებთ ტექსტს
+        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია ამ დავალებისთვის (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
+        imageResult = null;
       } 
       else if (imagePrompt) {
-        // ✅ ლოგიკა AI გენერაციისთვის (სხვა პოსტებისთვის ან როცა Toggle ON-ა)
+        // ✅ ლოგიკა AI გენერაციისთვის (მხოლოდ მაშინ, თუ Toggle ON-ა)
         addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას...');
         addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
