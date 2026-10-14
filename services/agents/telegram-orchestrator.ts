@@ -391,7 +391,6 @@ export class TelegramOrchestrator {
           throw new Error('No chat models available in the vault.');
         }
 
-        // ✅ შევინახოთ მნიშვნელობები ცალკე ცვლადებში, რათა TypeScript-მა არ იჩივლოს finally ბლოკში
         const currentProvider = chatModelInfo.provider;
         const currentModelName = chatModelInfo.modelName;
         const currentCredentialId = chatModelInfo.credentialId;
@@ -432,13 +431,11 @@ export class TelegramOrchestrator {
           ].join('\n');
 
           const userPrompt = buildUserPrompt(request);
-          
           addLog('Sending content-generation request...');
 
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
-          // ✅ დინამიური Endpoint-ისა და Request Body-ს აგება საცავის Metadata-ს მიხედვით
           const cred = credentialVault.getMetadata().find((c: any) => c.credential_id === currentCredentialId);
           const meta = cred?.metadata || {};
 
@@ -450,53 +447,28 @@ export class TelegramOrchestrator {
             const accountId = meta.accountId;
             if (!accountId) throw new Error('Cloudflare accountId not found in metadata');
             chatEndpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${currentModelName}`;
-            requestBody = { 
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-              ] 
-            };
+            requestBody = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] };
             headers['Authorization'] = `Bearer ${chatModelInfo.apiKey}`;
-          } 
-          else if (currentProvider === 'gemini' || currentProvider === 'google') {
+          } else if (currentProvider === 'gemini' || currentProvider === 'google') {
             chatEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModelName}:generateContent?key=${chatModelInfo.apiKey}`;
-            requestBody = {
-              contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
-              generationConfig: { temperature: 0.3 }
-            };
-          } 
-          else {
-            // სტანდარტული OpenAI-თავსებადი პროვაიდერები (Groq, Mistral, DeepSeek, OpenAI, ან ნებისმიერი custom baseUrl)
+            requestBody = { contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }], generationConfig: { temperature: 0.3 } };
+          } else {
             const base = meta.baseUrl || `https://api.${currentProvider}.com/v1`;
             chatEndpoint = `${base}${meta.chatEndpoint || '/chat/completions'}`;
-            
             const authKey = meta.authHeaderKey || 'Authorization';
             const authPrefix = meta.authHeaderPrefix ? `${meta.authHeaderPrefix} ` : 'Bearer ';
             headers[authKey] = `${authPrefix}${chatModelInfo.apiKey}`;
-            
-            requestBody = {
-              model: currentModelName,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-              ],
-              temperature: 0.3
-            };
+            requestBody = { model: currentModelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.3 };
           }
 
           let response: Response;
           try {
-            response = await fetch(chatEndpoint, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify(requestBody),
-              signal: controller.signal,
-            });
-          } catch (error) {
-            if (error instanceof Error && error.name === 'AbortError') {
+            response = await fetch(chatEndpoint, { method: 'POST', headers, body: JSON.stringify(requestBody), signal: controller.signal });
+          } catch (fetchError: any) {
+            if (fetchError instanceof Error && fetchError.name === 'AbortError') {
               throw new Error(`Request timed out after ${GROQ_TIMEOUT_MS / 1000} seconds.`);
             }
-            throw new Error(`Could not connect to provider: ${getErrorMessage(error)}`);
+            throw new Error(`Could not connect to provider: ${getErrorMessage(fetchError)}`);
           } finally {
             clearTimeout(timeoutId);
           }
@@ -505,44 +477,23 @@ export class TelegramOrchestrator {
             const errorText = await response.text().catch(() => 'No response body');
             const errorLower = errorText.toLowerCase();
             
-            // 1. შეცდომები, რომლებიც მიუთითებს, რომ ეს მოდელი ტექსტური არ არის
-            const isNotAChatModelError = errorLower.includes('not supported') || 
-                                         errorLower.includes('image generation') || 
-                                         errorLower.includes('vision only') ||
-                                         errorLower.includes('invalid model');
-                                         
-            // 2. შეცდომები, რომლებიც მიუთითებს ლიმიტის, ბალანსის ან დროებითი პრობლემის შესახებ
-            const isQuotaOrBalanceError = response.status === 402 || 
-                                          response.status === 429 || 
-                                          response.status === 503 ||
-                                          response.status === 500 ||
-                                          errorLower.includes('insufficient balance') ||
-                                          errorLower.includes('quota exceeded') ||
-                                          errorLower.includes('rate limit') ||
-                                          errorLower.includes('credit') ||
-                                          errorLower.includes('high demand') ||
-                                          errorLower.includes('unavailable');
+            const isNotAChatModelError = errorLower.includes('not supported') || errorLower.includes('image generation') || errorLower.includes('vision only') || errorLower.includes('invalid model');
+            const isQuotaOrBalanceError = response.status === 402 || response.status === 429 || response.status === 503 || response.status === 500 || errorLower.includes('insufficient balance') || errorLower.includes('quota exceeded') || errorLower.includes('rate limit') || errorLower.includes('credit') || errorLower.includes('high demand') || errorLower.includes('unavailable');
 
             if (isNotAChatModelError) {
               addLog(`⚠️ მოდელი "${currentModelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
               await reclassifyModelToImage(currentCredentialId, currentModelName);
-              chatModelInfo = await getBestAvailableModel('chat', currentModelName);
-              chatAttempts++;
-              continue; // ცადე შემდეგი მოდელი
+              throw new Error('Model reclassified, retrying next');
             }
             
             if (isQuotaOrBalanceError) {
-              addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი/ბალანსი ან გადატვირთულია (HTTP ${response.status}). სისტემა ავტომატურად ცდის შემდეგ საუკეთესო მოდელს...`);
-              chatModelInfo = await getBestAvailableModel('chat', currentModelName);
-              chatAttempts++;
-              continue; // ცადე შემდეგი მოდელი
+              addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი/ბალანსი ან გადატვირთულია (HTTP ${response.status}).`);
+              throw new Error('Quota/balance error, retrying next');
             }
             
-            // თუ შეცდომა სხვა ტიპისაა (მაგ. 404), მაშინ ვაგდებთ შეცდომას
             throw new Error(`API returned HTTP ${response.status}: ${truncateError(errorText)}`);
           }
 
-          // ✅ დინამიური პასუხის წაკითხვა პროვაიდერის მიხედვით
           const data = await response.json();
           let rawContent: string | undefined;
 
@@ -551,21 +502,27 @@ export class TelegramOrchestrator {
           } else if (currentProvider === 'gemini' || currentProvider === 'google') {
             rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           } else {
-            // სტანდარტული OpenAI-თავსებადი (Groq, Mistral, DeepSeek, OpenAI, და ა.შ.)
             rawContent = data?.choices?.[0]?.message?.content;
           }
 
           addLog('Response received. Validating generated JSON...');
           
-          // ✅ დიაგნოსტიკა: თუ პასუხი მაინც ცარიელია, ვნახოთ რა დააბრუნა API-მ
           if (!rawContent) {
-            addLog(`⚠️ მოდელმა დააბრუნა ცარიელი პასუხი. სრული JSON: ${JSON.stringify(data).substring(0, 300)}`);
+            throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
-          // ✅ გადაეცა request.postType ვალიდაციის ფუნქციას
+          // ✅ ეს ხაზი აგდებს შეცდომას, თუ ვალიდაცია ვერ გაივლის (მაგ. აკლია 12 ნიშანი)
           generatedContent = parseGeneratedContent(rawContent, request.postType);
+          
+          // თუ აქამდე მოვედით, ყველაფერი წარმატებით გაიარა!
           textGenerationSuccess = true;
 
+        } catch (error: any) {
+          // ✅ თუ რამე ჩაიშალა (მათ შორის ვალიდაცია), ვცდილობთ შემდეგ მოდელს!
+          addLog(`⚠️ მოდელმა "${currentModelName}" ვერ დააკმაყოფილა მოთხოვნა: ${error.message}. ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
+          chatModelInfo = await getBestAvailableModel('chat', currentModelName);
+          chatAttempts++;
+          continue; // გადავდივართ ციკლის შემდეგ იტერაციაზე
         } finally {
           if (leaseId) {
             addLog(`Releasing ${currentProvider} access lease...`);
