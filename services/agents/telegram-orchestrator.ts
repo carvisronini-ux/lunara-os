@@ -413,6 +413,9 @@ export class TelegramOrchestrator {
           continue;
         }
 
+        // ✅ rawContent გამოცხადებულია try-ს გარეთ, რათა catch ბლოკმა შეძლოს მისი წაკითხვა DEBUG-ისთვის
+        let rawContent: string | undefined;
+
         try {
           const systemPrompt = [
             config.master_prompt,
@@ -495,7 +498,6 @@ export class TelegramOrchestrator {
           }
 
           const data = await response.json();
-          let rawContent: string | undefined;
 
           if (currentProvider === 'cloudflare') {
             rawContent = data?.result?.response;
@@ -518,7 +520,11 @@ export class TelegramOrchestrator {
           textGenerationSuccess = true;
 
         } catch (error: any) {
-          // ✅ თუ რამე ჩაიშალა (მათ შორის ვალიდაცია), ვცდილობთ შემდეგ მოდელს!
+          // ✅ DEBUG: ვნახოთ ზუსტად რა დააბრუნა AI-მ ვალიდაციის ჩავარდნამდე
+          if (rawContent) {
+            addLog(`🔍 DEBUG: AI-ის ნედლი პასუხი (პირველი 300 სიმბოლო): ${rawContent.substring(0, 300)}...`);
+          }
+          
           addLog(`⚠️ მოდელმა "${currentModelName}" ვერ დააკმაყოფილა მოთხოვნა: ${error.message}. ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
           chatModelInfo = await getBestAvailableModel('chat', currentModelName);
           chatAttempts++;
