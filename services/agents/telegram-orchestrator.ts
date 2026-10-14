@@ -206,16 +206,16 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ საბოლოო, მათემატიკურად უტყუარი ვერსია: აგრესიულად შლის ემოჯებს ხაზის ბოლოში
+// ✅ საბოლოო, 100%-იანი გამოსავალი: შლის ემოჯს + უხილავ Variation Selector-ს (\uFE0F) ხაზის ბოლოში
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ 1. აგრესიულად ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია.
-  // 'm' ფლაგი უზრუნველყოფს, რომ $ ემთხვეოდეს ხაზის ბოლოს და არა მთლიანი სტრიქონის ბოლოს.
-  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\s*$/gm, '');
+  // ✅ 1. აგრესიულად ვშლით ნებისმიერ ზოდიაქოს ემოჯს, მის უხილავ ვარიაციულ სელექტორს (\uFE0F) და ნებისმიერ თეთრ სივრცეს ხაზის ბოლოში.
+  // \uFE0F? ნიშნავს, რომ უხილავი სიმბოლო შეიძლება იყოს ან არ იყოს.
+  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
@@ -226,7 +226,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
-  // ✅ 2. ვაკეთებთ ბოლდს და ვრწმუნდებით, რომ ემოჯი არის მხოლოდ თავში
+  // ✅ 2. ვაკეთებთ ბოლდს და ვრწმუნდებით, რომ ემოჯი რჩება მხოლოდ ხაზის დასაწყისში
   zodiacMap.forEach(({ name, emoji }) => {
     // ფორმატი: "♈ Aries:" -> "♈ <b>Aries</b>:"
     const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
