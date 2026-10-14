@@ -486,11 +486,22 @@ export class TelegramOrchestrator {
 
           if (!response.ok) {
             const errorText = await response.text().catch(() => 'No response body');
-            const isNotAChatModelError = errorText.toLowerCase().includes('not supported') || 
-                                         errorText.toLowerCase().includes('image generation') || 
-                                         errorText.toLowerCase().includes('vision only') ||
-                                         errorText.toLowerCase().includes('invalid model');
+            const errorLower = errorText.toLowerCase();
             
+            // 1. შეცდომები, რომლებიც მიუთითებს, რომ ეს მოდელი ტექსტური არ არის
+            const isNotAChatModelError = errorLower.includes('not supported') || 
+                                         errorLower.includes('image generation') || 
+                                         errorLower.includes('vision only') ||
+                                         errorLower.includes('invalid model');
+                                         
+            // 2. შეცდომები, რომლებიც მიუთითებს ლიმიტის ან ბალანსის ამოწურვაზე
+            const isQuotaOrBalanceError = response.status === 402 || 
+                                          response.status === 429 || 
+                                          errorLower.includes('insufficient balance') ||
+                                          errorLower.includes('quota exceeded') ||
+                                          errorLower.includes('rate limit') ||
+                                          errorLower.includes('credit');
+
             if (isNotAChatModelError) {
               addLog(`⚠️ მოდელი "${currentModelName}" არ არის ჩეთის მოდელი. სისტემა ავტომატურად ასწორებს მონაცემთა ბაზას...`);
               await reclassifyModelToImage(currentCredentialId, currentModelName);
@@ -498,6 +509,16 @@ export class TelegramOrchestrator {
               chatAttempts++;
               continue; // ცადე შემდეგი მოდელი
             }
+            
+            if (isQuotaOrBalanceError) {
+              addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი ან ბალანსი (HTTP ${response.status}). სისტემა ავტომატურად ცდის შემდეგ საუკეთესო მოდელს...`);
+              // არ გადაგვაქვს Image-ში, უბრალოდ ვტოვებთ და ვცდილობთ შემდეგს
+              chatModelInfo = await getBestAvailableModel('chat', currentModelName);
+              chatAttempts++;
+              continue; // ცადე შემდეგი მოდელი
+            }
+            
+            // თუ შეცდომა სხვა ტიპისაა (მაგ. 500, 404), მაშინ ვაგდებთ შეცდომას
             throw new Error(`API returned HTTP ${response.status}: ${truncateError(errorText)}`);
           }
 
