@@ -616,7 +616,7 @@ export class TelegramOrchestrator {
       } 
       else if (imagePrompt) {
         // ✅ ლოგიკა AI გენერაციისთვის (მხოლოდ მაშინ, თუ Toggle ON-ა)
-        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას...');
+        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას..');
         addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
 
         try {
