@@ -533,7 +533,6 @@ export class TelegramOrchestrator {
             
             if (isQuotaOrBalanceError) {
               addLog(`⚠️ მოდელზე "${currentModelName}" ამოიწურა ლიმიტი/ბალანსი ან გადატვირთულია (HTTP ${response.status}). სისტემა ავტომატურად ცდის შემდეგ საუკეთესო მოდელს...`);
-              // არ გადაგვაქვს Image-ში, უბრალოდ ვტოვებთ და ვცდილობთ შემდეგს
               chatModelInfo = await getBestAvailableModel('chat', currentModelName);
               chatAttempts++;
               continue; // ცადე შემდეგი მოდელი
@@ -611,11 +610,10 @@ export class TelegramOrchestrator {
       }
 
       // ============================================================
-      // ✅ 6. IMAGE LOGIC (გამკაცრებული ლოგიკა)
+      // ✅ 6. IMAGE LOGIC (გამკაცრებული და აღდგენილი ლოგიკა)
       // ============================================================
       
       if (request.postType === 'daily_horoscope_single') {
-        // ნიშანი უკვე გარანტირებულად განსაზღვრულია და კაპიტალიზებულია ზემოთ (ნაბიჯი 4)
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
         addLog(`🖼️ Single Sign Horoscope: ვიყენებთ წინასწარ ატვირთულ ფოტოს: ${sign}`);
@@ -627,8 +625,21 @@ export class TelegramOrchestrator {
         } as ImgGenResult;
         imageProvider = 'static_zodiac_sign';
       } 
+      else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
+        // ✅ ლოგიკა 12 Signs Horoscope-ისთვის (Toggle OFF) - იყენებს STATIC_ZODIAC_IMAGES-ს
+        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებთ სარეზერვო სტატიკურ სურათს.');
+        const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
+        addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
+        
+        imageResult = {
+          success: true,
+          imageUrl: randomImage,
+          provider: 'static_fallback'
+        } as ImgGenResult;
+        imageProvider = 'static_fallback';
+      }
       else if (!useAiImage) {
-        // ✅ თუ AI ფოტო გამორთულია ნებისმიერი დავალებისთვის, ვტოვებთ ტექსტს
+        // ✅ თუ AI ფოტო გამორთულია სხვა დავალებისთვის (მაგ. Morning Question), ვტოვებთ მხოლოდ ტექსტს
         addLog('🖼️ AI ფოტოს გენერაცია გამორთულია ამ დავალებისთვის (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
         imageResult = null;
       } 
