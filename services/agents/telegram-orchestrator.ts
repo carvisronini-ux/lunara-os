@@ -522,10 +522,26 @@ export class TelegramOrchestrator {
             throw new Error(`API returned HTTP ${response.status}: ${truncateError(errorText)}`);
           }
 
+          // ✅ დინამიური პასუხის წაკითხვა პროვაიდერის მიხედვით
           const data = await response.json();
-          const rawContent = data?.choices?.[0]?.message?.content;
+          let rawContent: string | undefined;
+
+          if (currentProvider === 'cloudflare') {
+            rawContent = data?.result?.response;
+          } else if (currentProvider === 'gemini' || currentProvider === 'google') {
+            rawContent = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          } else {
+            // სტანდარტული OpenAI-თავსებადი (Groq, Mistral, DeepSeek, OpenAI, და ა.შ.)
+            rawContent = data?.choices?.[0]?.message?.content;
+          }
 
           addLog('Response received. Validating generated JSON...');
+          
+          // ✅ დიაგნოსტიკა: თუ პასუხი მაინც ცარიელია, ვნახოთ რა დააბრუნა API-მ
+          if (!rawContent) {
+            addLog(`⚠️ მოდელმა დააბრუნა ცარიელი პასუხი. სრული JSON: ${JSON.stringify(data).substring(0, 300)}`);
+          }
+
           generatedContent = parseGeneratedContent(rawContent);
           textGenerationSuccess = true;
 
