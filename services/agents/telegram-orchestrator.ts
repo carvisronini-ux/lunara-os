@@ -132,7 +132,7 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-// ✅ განახლებული: დაემატა postType პარამეტრი და 12 ნიშნის მკაცრი ვალიდაცია
+// ✅ განახლებული: ემოჯებზე დაფუძნებული ვალიდაცია (ენისგან დამოუკიდებელი)
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -169,14 +169,14 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
-  // ✅ დამატებითი ვალიდაცია: 12 ნიშნის ჰოროსკოპი უნდა შეიცავდეს ყველა 12 ნიშანს
+  // ✅ დამატებითი ვალიდაცია: 12 ნიშნის ჰოროსკოპი უნდა შეიცავდეს 12 ზოდიაქოს ემოჯს
   if (postType === 'daily_horoscope_12_signs') {
-    const zodiacSigns = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
-    const missingSigns = zodiacSigns.filter(sign => !caption.includes(sign));
+    const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
     
-    if (missingSigns.length > 0) {
-      throw new Error(`The AI response is missing zodiac signs: ${missingSigns.join(', ')}. Caption must include all 12 signs.`);
+    if (missingEmojis.length > 0) {
+      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
     }
     
     // ასევე ვამოწმებთ, რომ caption არ არის ძალიან მოკლე
@@ -511,7 +511,7 @@ export class TelegramOrchestrator {
             throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
-          // ✅ ეს ხაზი აგდებს შეცდომას, თუ ვალიდაცია ვერ გაივლის (მაგ. აკლია 12 ნიშანი)
+          // ✅ ეს ხაზი აგდებს შეცდომას, თუ ვალიდაცია ვერ გაივლის (მაგ. აკლია ემოჯები)
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           
           // თუ აქამდე მოვედით, ყველაფერი წარმატებით გაიარა!
