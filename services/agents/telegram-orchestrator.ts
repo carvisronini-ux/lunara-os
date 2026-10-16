@@ -260,14 +260,21 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
+    // 1. ფორმატი: "♐ Sagittarius:" ან "♐ **Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
+    // 2. ფორმატი: "**Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
     
+    // 3. ფორმატი: "Sagittarius:" (ხაზის დასაწყისში) -> "♐ <b>Sagittarius</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
+    
+    // 4. ახალი: ფორმატი: "Sagittarius, " (მძიმით) -> "♐ <b>Sagittarius</b>: "
+    const regex4 = new RegExp(`(^|\\n)\\s*${name}\\s*,`, 'gi');
+    safeText = safeText.replace(regex4, `$1${emoji} <b>${name}</b>: `);
   });
 
   return safeText.trim();
@@ -493,7 +500,9 @@ export class TelegramOrchestrator {
             requestBody = { model: currentModelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.3 };
           }
 
-          addLog(`🔗 API Endpoint: ${chatEndpoint}`);
+          // ✅ უსაფრთხოებისთვის ვმალავთ API გასაღებს ლოგებში
+          const maskedEndpoint = chatEndpoint.replace(/key=[^&]+/, 'key=***');
+          addLog(`🔗 API Endpoint: ${maskedEndpoint}`);
           addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
           addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
 
@@ -555,7 +564,7 @@ export class TelegramOrchestrator {
             throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
-          addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო): ${rawContent.substring(0, 500)}...`);
+          addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო):\n${rawContent.substring(0, 500)}...`);
 
           // --------------------------------------------------------
           // 5.6 Validate Content
@@ -564,7 +573,7 @@ export class TelegramOrchestrator {
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           addLog('✅ ვალიდაცია წარმატებით გაიარა!');
           addLog(`📝 Caption Length: ${generatedContent.caption.length} characters`);
-          addLog(`📝 Hashtags Count: ${generatedContent.hashtags?.length || 0}`); // ✅ გამოსწორებულია აქ (ოფციონალური ჯაჭვი)
+          addLog(`📝 Hashtags Count: ${generatedContent.hashtags?.length || 0}`);
           
           textGenerationSuccess = true;
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
@@ -572,7 +581,7 @@ export class TelegramOrchestrator {
         } catch (error: any) {
           addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
           if (rawContent) {
-            addLog(`📝 AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
+            addLog(`📝 AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო):\n${rawContent.substring(0, 400)}...`);
           } else {
             addLog(`📝 rawContent is undefined or empty.`);
           }
@@ -611,21 +620,25 @@ export class TelegramOrchestrator {
       addLog('🎨 ნაბიჯი 6: ვაფორმატებ caption-ს...');
       addLog('================================================');
       
+      addLog(`📝 Raw Caption Preview: ${generatedContent.caption.substring(0, 150)}...`);
+      
       imagePrompt = generatedContent.image_prompt || '';
       
       if (request.postType === 'daily_horoscope_12_signs') {
-        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას...');
+        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას (ბოლდი + ემოჯების გასუფთავება)...');
         caption = applyBoldFormattingToZodiac(generatedContent.caption);
       } else if (request.postType === 'daily_horoscope_single') {
-        addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას...');
+        addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას (ბოლდი + ემოჯის დამატება/გასწორება)...');
         caption = applyBoldFormattingToSingleSign(generatedContent.caption);
       } else {
-        addLog('🎨 ვიყენებ სტანდარტულ ფორმატირებას...');
+        addLog('🎨 ვიყენებ სტანდარტულ HTML ექსკეიპ ფორმატირებას...');
         caption = generatedContent.caption
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;');
       }
+
+      addLog(`✅ ფორმატირებული Caption Preview: ${caption.substring(0, 150)}...`);
 
       const cleanCaption = caption.replace(/(?:\s*#\w+)+\s*$/, '').trim();
       const hashtags = generatedContent.hashtags || [];
@@ -633,7 +646,6 @@ export class TelegramOrchestrator {
       caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
 
       addLog(`📝 Final Caption Length: ${caption.length} characters`);
-      addLog(`📝 Final Caption Preview: ${caption.substring(0, 200)}...`);
 
       if (caption.length > TELEGRAM_CAPTION_LIMIT) {
         addWarning(`⚠️ CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
