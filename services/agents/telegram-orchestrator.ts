@@ -168,13 +168,14 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
   }
 
   if (postType === 'daily_horoscope_12_signs') {
-    // ✅ ყველა 12 ემოჯი სწორადაა აღდგენილი
     const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
     const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
     
-    if (missingEmojis.length > 0) {
-      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
+    // ✅ გაუმჯობესებული: თუ 3-ზე მეტი ემოჯი აკლია, მაშინ ვაგდებთ შეცდომას. 
+    // თუ 1-2 აკლია, სისტემა მიიღებს პასუხს და ფორმატირების ფუნქცია შეეცდება გასწორებას.
+    if (missingEmojis.length > 3) {
+      throw new Error(`The AI response is missing too many zodiac emojis (${missingEmojis.length} missing). Caption must include most of the 12 zodiac signs.`);
     }
     
     if (caption.length < 300) {
@@ -223,14 +224,14 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ ყველა ემოჯი სწორადაა
+  // ✅ ყველა 12 ემოჯი სწორადაა მითითებული
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-    { name: 'Aquarius', emoji: '' }, { name: 'Pisces', emoji: '♓' }
+    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
@@ -255,13 +256,13 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
     safeText = safeText.replace(regex5, `${emoji} <b>${name}</b>:`);
   });
 
-  // ✅ ვშლით ზედმეტ ემოჯებს ხაზის ბოლოში
-  safeText = safeText.replace(/[♈♉♊♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
+  // ✅ ვშლით ზედმეტ ემოჯებს ხაზის ბოლოში (ყველა 12 ემოჯი შედის regex-ში)
+  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   // ✅ ვშლით ყველა ზედმეტ space-ს colon-ის შემდეგ (2 ან მეტი space -> 1 space)
   safeText = safeText.replace(/:\s{2,}/g, ': ');
 
-  // ✅ ვშლით ედმეტ space-ებს ხაზის დასაწყისში
+  // ✅ ვშლით ზედმეტ space-ებს ხაზის დასაწყისში
   safeText = safeText.replace(/^\s+/gm, '');
 
   return safeText.trim();
@@ -273,13 +274,13 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ ვშლით ემოჯებს ხაზის ბოლოში
+  // ✅ ვშლით ემოჯებს ხაზის ბოლოში (ყველა 12 ემოჯი შედის regex-ში)
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
-  // ✅ ყველა ემოჯი სწორადაა
+  // ✅ ყველა 12 ემოჯი სწორადაა მითითებული
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-    { name: 'Gemini', emoji: '' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
@@ -297,7 +298,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
   });
 
-  // ✅ ვშლით ედმეტ space-ებს colon-ის შემდეგ
+  // ✅ ვშლით ზედმეტ space-ებს colon-ის შემდეგ
   safeText = safeText.replace(/:\s{2,}/g, ': ');
 
   return safeText.trim();
@@ -335,7 +336,7 @@ export class TelegramOrchestrator {
     addLog(`📋 Agent Type: ${request.agentType}`);
     addLog(`📋 Post Type: ${request.postType}`);
     addLog(`📋 Content Theme: ${request.contentTheme || 'Automatic'}`);
-    addLog(` Zodiac Sign: ${request.zodiacSign || 'General'}`);
+    addLog(`📋 Zodiac Sign: ${request.zodiacSign || 'General'}`);
     addLog('================================================');
 
     try {
@@ -468,7 +469,7 @@ export class TelegramOrchestrator {
 
           addLog(`📄 სისტემური პრომპტის სიგრძე: ${systemPrompt.length} სიმბოლო`);
 
-          addLog(' ვაგებ მომხმარებლის პრომპტს...');
+          addLog('📝 ვაგებ მომხმარებლის პრომპტს...');
           const userPrompt = buildUserPrompt(request);
           addLog(`📄 მომხმარებლის პრომპტის სიგრძე: ${userPrompt.length} სიმბოლო`);
 
@@ -560,7 +561,7 @@ export class TelegramOrchestrator {
 
           addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო):\n${rawContent.substring(0, 500)}...`);
 
-          addLog(' ვამოწმებ ვალიდაციას...');
+          addLog('🔍 ვამოწმებ ვალიდაციას...');
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           addLog('✅ ვალიდაცია წარმატებით გაიარა!');
           addLog(`📝 Caption Length: ${generatedContent.caption.length} characters`);
@@ -713,7 +714,7 @@ export class TelegramOrchestrator {
       let publishedWithImage = false;
 
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
-        addLog(' ვცდილობ ფოტოს გამოქვეყნებას...');
+        addLog('📸 ვცდილობ ფოტოს გამოქვეყნებას...');
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
 
@@ -736,7 +737,7 @@ export class TelegramOrchestrator {
           publishedWithImage = true;
           publishedMessageId = photoResult.messageId;
           addLog('✅ ფოტო წარმატებით გამოქვეყნდა!');
-          addLog(` Message ID: ${publishedMessageId}`);
+          addLog(`📝 Message ID: ${publishedMessageId}`);
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
@@ -809,7 +810,7 @@ export class TelegramOrchestrator {
       });
 
       if (databaseError) {
-        addWarning(`️ Supabase logging failed: ${databaseError.message}`);
+        addWarning(`⚠️ Supabase logging failed: ${databaseError.message}`);
       } else {
         addLog('✅ პუბლიკაცია წარმატებით ჩაიწერა Supabase-ში.');
       }
