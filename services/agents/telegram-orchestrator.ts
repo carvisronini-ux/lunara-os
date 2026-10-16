@@ -167,14 +167,13 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
-  // ✅ ვალიდაცია 12 ნიშნისთვის (მკაცრი, რადგან 12 ნიშანს ვერ გამოიცნობს კოდი)
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
     const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
     
     if (missingEmojis.length > 0) {
-      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ).`);
+      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
     }
     
     if (caption.length < 300) {
@@ -182,9 +181,6 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  // ✅ ვალიდაცია 1 ნიშნისთვის (მოხსნილია მკაცრი ემოჯის შემოწმება)
-  // ჩვენი ფორმატირების ფუნქცია (applyBoldFormattingToSingleSign) ავტომატურად დაამატებს ემოჯს და ბოლდს,
-  // თუ AI-მ დაწერა უბრალოდ "Sagittarius: ...". ამიტომ აქ მხოლოდ სიგრძეს ვამოწმებთ.
   if (postType === 'daily_horoscope_single') {
     const caption = data.caption as string;
     if (caption.length > 450) {
@@ -217,14 +213,13 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ 12 ნიშნის ფორმატირება
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  safeText = safeText.replace(/[♈♉♊♋♌♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
+  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
@@ -249,7 +244,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   return safeText.trim();
 }
 
-// ✅ 1 ნიშნის ფორმატირება (ავტომატურად ამატებს ემოჯს თუ აკლია)
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -258,7 +252,7 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-    { name: 'Gemini', emoji: '' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
@@ -266,7 +260,6 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    // ეს რეგექსი იღებს როგორც "♐ Sagittarius:", ისე "Sagittarius:" და აკეთებს ბოლდს + ემოჯს
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
@@ -308,16 +301,22 @@ export class TelegramOrchestrator {
     };
 
     addLog('================================================');
-    addLog(`Starting generation: ${request.agentType} / ${request.postType}`);
-    addLog(`Theme: ${request.contentTheme || 'Automatic'}`);
-    addLog(`Zodiac sign: ${request.zodiacSign || 'General'}`);
+    addLog('🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
+    addLog(`📋 Agent Type: ${request.agentType}`);
+    addLog(`📋 Post Type: ${request.postType}`);
+    addLog(` Content Theme: ${request.contentTheme || 'Automatic'}`);
+    addLog(`📋 Zodiac Sign: ${request.zodiacSign || 'General'}`);
+    addLog('================================================');
 
     try {
       if (!request.agentType?.trim() || !request.postType?.trim()) {
         throw new Error('Both agentType and postType are required.');
       }
 
-      addLog('Loading agent configuration from Supabase...');
+      // --------------------------------------------------------
+      // 1. Load agent configuration from Supabase
+      // --------------------------------------------------------
+      addLog('📥 ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('*')
@@ -332,9 +331,13 @@ export class TelegramOrchestrator {
         throw new Error(`Agent "${request.agentType}" has no master_prompt configured.`);
       }
 
-      addLog('Agent configuration loaded successfully.');
+      addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
+      addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
 
-      addLog('Loading job-specific instructions from agent_jobs...');
+      // --------------------------------------------------------
+      // 2. Load Job-Specific Instructions
+      // --------------------------------------------------------
+      addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს...');
       let jobImageLogic = '';
       let useAiImage = true; 
       
@@ -352,16 +355,25 @@ export class TelegramOrchestrator {
       if (jobData) {
         jobImageLogic = jobData.image_prompt_logic || '';
         useAiImage = jobData.use_ai_image ?? true;
-        addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType} (AI Image: ${useAiImage ? 'ON' : 'OFF'})`);
+        addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
+        addLog(`️ AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
+        addLog(`📝 Image Prompt Logic Length: ${jobImageLogic.length} characters`);
       } else {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
 
-      addLog('Waiting for CredentialVault initialization...');
+      // --------------------------------------------------------
+      // 3. Wait for Credential Vault
+      // --------------------------------------------------------
+      addLog(' ნაბიჯი 3: ველოდები CredentialVault-ის ინიციალიზაციას...');
       await credentialVault.ready;
-      addLog('CredentialVault is ready.');
+      addLog('✅ CredentialVault მზადაა.');
 
+      // --------------------------------------------------------
+      // 4. PRE-PROCESSING: Determine Zodiac Sign
+      // --------------------------------------------------------
       if (request.postType === 'daily_horoscope_single') {
+        addLog('🎯 ნაბიჯი 4: ვამოწმებ ზოდიაქოს ნიშანს...');
         const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
         let targetSign = (request.zodiacSign || '').toLowerCase().trim();
 
@@ -377,15 +389,16 @@ export class TelegramOrchestrator {
       }
 
       // ============================================================
-      // ✅ 5. DYNAMIC CHAT MODEL SELECTION & SELF-HEALING LOOP
+      // 5. DYNAMIC CHAT MODEL SELECTION & SELF-HEALING LOOP
       // ============================================================
+      addLog('🤖 ნაბიჯი 5: ვირჩევ საუკეთესო ჩეთ მოდელს...');
       let chatModelInfo = await getBestAvailableModel('chat');
+      addLog(`✅ საუკეთესო მოდელი: ${chatModelInfo?.modelName || 'NULL'} (${chatModelInfo?.provider || 'unknown'})`);
+      
       let chatAttempts = 0;
       const maxChatAttempts = 3;
       let textGenerationSuccess = false;
       let generatedContent: GeneratedContent | null = null;
-
-      addLog(`🔍 DEBUG: Initial chatModelInfo is ${chatModelInfo ? chatModelInfo.modelName : 'NULL'}`);
 
       while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
         if (!chatModelInfo) {
@@ -396,7 +409,9 @@ export class TelegramOrchestrator {
         const currentModelName = chatModelInfo.modelName;
         const currentCredentialId = chatModelInfo.credentialId;
 
-        addLog(`🔄 [ცდა ${chatAttempts + 1}/${maxChatAttempts}] ვცდილობთ ტექსტის გენერაციას: ${currentProvider} -> ${currentModelName}`);
+        addLog('================================================');
+        addLog(`🔄 ცდა ${chatAttempts + 1}/${maxChatAttempts}: ${currentProvider} -> ${currentModelName}`);
+        addLog('================================================');
 
         leaseId = accessManager.requestAccess(
           `${request.agentType}-agent`,
@@ -417,6 +432,10 @@ export class TelegramOrchestrator {
         let rawContent: string | undefined;
 
         try {
+          // --------------------------------------------------------
+          // 5.1 Build System Prompt
+          // --------------------------------------------------------
+          addLog('📝 ვაგებ სისტემურ პრომპტს...');
           const systemPrompt = [
             config.master_prompt,
             '',
@@ -433,9 +452,19 @@ export class TelegramOrchestrator {
             'Return only a valid JSON object with caption, image_prompt and hashtags.',
           ].join('\n');
 
-          const userPrompt = buildUserPrompt(request);
-          addLog('Sending content-generation request...');
+          addLog(`📄 სისტემური პრომპტის სიგრძე: ${systemPrompt.length} სიმბოლო`);
 
+          // --------------------------------------------------------
+          // 5.2 Build User Prompt
+          // --------------------------------------------------------
+          addLog('📝 ვაგებ მომხმარებლის პრომპტს...');
+          const userPrompt = buildUserPrompt(request);
+          addLog(`📄 მომხმარებლის პრომპტის სიგრძე: ${userPrompt.length} სიმბოლო`);
+
+          // --------------------------------------------------------
+          // 5.3 Build API Request
+          // --------------------------------------------------------
+          addLog('🌐 ვაგებ API მოთხოვნას...');
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
@@ -464,6 +493,13 @@ export class TelegramOrchestrator {
             requestBody = { model: currentModelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.3 };
           }
 
+          addLog(` API Endpoint: ${chatEndpoint}`);
+          addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
+          addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
+
+          // --------------------------------------------------------
+          // 5.4 Send Request
+          // --------------------------------------------------------
           let response: Response;
           try {
             response = await fetch(chatEndpoint, { method: 'POST', headers, body: JSON.stringify(requestBody), signal: controller.signal });
@@ -476,6 +512,11 @@ export class TelegramOrchestrator {
             clearTimeout(timeoutId);
           }
 
+          addLog(`📥 მივიღე პასუხი: HTTP ${response.status}`);
+
+          // --------------------------------------------------------
+          // 5.5 Handle Response
+          // --------------------------------------------------------
           if (!response.ok) {
             const errorText = await response.text().catch(() => 'No response body');
             const errorLower = errorText.toLowerCase();
@@ -498,6 +539,7 @@ export class TelegramOrchestrator {
           }
 
           const data = await response.json();
+          addLog(`📦 Response Size: ${JSON.stringify(data).length} bytes`);
 
           if (currentProvider === 'cloudflare') {
             rawContent = data?.result?.response;
@@ -507,38 +549,49 @@ export class TelegramOrchestrator {
             rawContent = data?.choices?.[0]?.message?.content;
           }
 
-          addLog('Response received. Validating generated JSON...');
+          addLog('✅ პასუხი მიღებულია. ვამოწმებ JSON-ს...');
           
           if (!rawContent) {
             throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
+          addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო): ${rawContent.substring(0, 500)}...`);
+
+          // --------------------------------------------------------
+          // 5.6 Validate Content
+          // --------------------------------------------------------
+          addLog(' ვამოწმებ ვალიდაციას...');
           generatedContent = parseGeneratedContent(rawContent, request.postType);
+          addLog('✅ ვალიდაცია წარმატებით გაიარა!');
+          addLog(` Caption Length: ${generatedContent.caption.length} characters`);
+          addLog(`📝 Hashtags Count: ${generatedContent.hashtags.length}`);
+          
           textGenerationSuccess = true;
+          addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
 
         } catch (error: any) {
-          addLog(` DEBUG CATCH: Error caught for ${currentModelName}. Message: ${error.message}`);
+          addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
           if (rawContent) {
-            addLog(` DEBUG RAW: AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
+            addLog(` AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
           } else {
-            addLog(`🔍 DEBUG RAW: rawContent is undefined or empty.`);
+            addLog(`📝 rawContent is undefined or empty.`);
           }
           
-          addLog(`⚠️ მოდელმა "${currentModelName}" ვერ დააკმაყოფილა მოთხოვნა. ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
+          addLog(`⚠️ ვცდილობთ შემდეგ საუკეთესო მოდელს...`);
           
           const nextModel = await getBestAvailableModel('chat', currentModelName);
           if (!nextModel) {
-             addLog(`❌ DEBUG: No more models available in the vault after ${currentModelName}!`);
+             addLog(`❌ აღარ არის ხელმისაწვდომი მოდელები!`);
           }
           chatModelInfo = nextModel;
           chatAttempts++;
           continue;
         } finally {
           if (leaseId) {
-            addLog(`Releasing ${currentProvider} access lease...`);
+            addLog(`🔓 ვათავისუფლებ ${currentProvider} access lease-ს...`);
             try {
               accessManager.revokeLease(leaseId, 'system_cleanup');
-              addLog('Access lease released.');
+              addLog('✅ Access lease გათავისუფლდა.');
             } catch (leaseError) {
               addWarning(`Could not explicitly revoke the lease: ${getErrorMessage(leaseError)}`);
             }
@@ -551,12 +604,23 @@ export class TelegramOrchestrator {
         throw new Error('All available chat models failed to generate content.');
       }
 
+      // ============================================================
+      // 6. Format Caption
+      // ============================================================
+      addLog('================================================');
+      addLog(' ნაბიჯი 6: ვაფორმატებ caption-ს...');
+      addLog('================================================');
+      
       imagePrompt = generatedContent.image_prompt || '';
+      
       if (request.postType === 'daily_horoscope_12_signs') {
+        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას...');
         caption = applyBoldFormattingToZodiac(generatedContent.caption);
       } else if (request.postType === 'daily_horoscope_single') {
+        addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას...');
         caption = applyBoldFormattingToSingleSign(generatedContent.caption);
       } else {
+        addLog('🎨 ვიყენებ სტანდარტულ ფორმატირებას...');
         caption = generatedContent.caption
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -568,16 +632,27 @@ export class TelegramOrchestrator {
       const hashtagsLine = hashtags.join(' ');
       caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
 
+      addLog(`📝 Final Caption Length: ${caption.length} characters`);
+      addLog(`📝 Final Caption Preview: ${caption.substring(0, 200)}...`);
+
       if (caption.length > TELEGRAM_CAPTION_LIMIT) {
-        addWarning(`CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
+        addWarning(`⚠️ CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
       } else {
-        addLog(`Content generated successfully. Final caption length: ${caption.length} characters.`);
+        addLog('✅ Caption სიგრძე ნორმაშია.');
       }
 
+      // ============================================================
+      // 7. Image Logic
+      // ============================================================
+      addLog('================================================');
+      addLog('🖼️ ნაბიჯი 7: ვამუშავებ ფოტოს ლოგიკას...');
+      addLog('================================================');
+      
       if (request.postType === 'daily_horoscope_single') {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
-        addLog(`🖼️ Single Sign Horoscope: ვიყენებთ წინასწარ ატვირთულ ფოტოს: ${sign}`);
+        addLog(`️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
+        addLog(`🖼️ Image URL: ${imageUrl}`);
         
         imageResult = {
           success: true,
@@ -587,7 +662,7 @@ export class TelegramOrchestrator {
         imageProvider = 'static_zodiac_sign';
       } 
       else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებთ სარეზერვო სტატიკურ სურათს.');
+        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
         addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
         
@@ -599,12 +674,12 @@ export class TelegramOrchestrator {
         imageProvider = 'static_fallback';
       }
       else if (!useAiImage) {
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია ამ დავალებისთვის (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
+        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
         imageResult = null;
       } 
       else if (imagePrompt) {
-        addLog('🤖 ვიწყებთ AI ფოტოს გენერაციას...');
-        addLog(`Image prompt preview: ${imagePrompt.slice(0, 120)}...`);
+        addLog('🤖 ვიწყებ AI ფოტოს გენერაციას...');
+        addLog(`📝 Image Prompt: ${imagePrompt.slice(0, 120)}...`);
 
         try {
           const result = await imageGenerator.generateImage(imagePrompt, request.agentType);
@@ -612,10 +687,10 @@ export class TelegramOrchestrator {
 
           if (imageResult.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
             imageProvider = imageResult.provider || 'unknown';
-            addLog(`Image generated successfully using ${imageProvider}.`);
+            addLog(`✅ ფოტო წარმატებით შეიქმნა: ${imageProvider}`);
           } else {
             imageError = imageResult.error || 'Image generation failed.';
-            addWarning(`Image generation failed: ${imageError}`);
+            addWarning(`⚠️ ფოტოს გენერაცია ვერ მოხერხდა: ${imageError}`);
             imageResult = null;
           }
 
@@ -624,24 +699,32 @@ export class TelegramOrchestrator {
           }
         } catch (error) {
           imageError = getErrorMessage(error);
-          addWarning(`Image generation threw an exception: ${imageError}`);
+          addWarning(`⚠️ ფოტოს გენერაციის შეცდომა: ${imageError}`);
           imageResult = null;
         }
       } else {
-        addWarning('No image_prompt was generated. Publishing text only.');
+        addWarning('⚠️ image_prompt არ არის. ვაგზავნით მხოლოდ ტექსტს.');
       }
 
-      addLog('Preparing Telegram publication...');
+      // ============================================================
+      // 8. Publish to Telegram
+      // ============================================================
+      addLog('================================================');
+      addLog('📤 ნაბიჯი 8: ვაქვეყნებ Telegram-ში...');
+      addLog('================================================');
+      
       const escapedCaption = caption; 
 
       let publishedMessageId: number | undefined;
       let publishedWithImage = false;
 
       if (imageResult?.success && (imageResult.imageUrl || imageResult.imageBuffer)) {
+        addLog('📸 ვცდილობ ფოტოს გამოქვეყნებას...');
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
 
-        addLog('Attempting to publish a photo to Telegram...');
+        addLog(`📸 Photo Caption Length: ${photoCaption.length} characters`);
+        
         let photoResult: TelegramPublishResult;
         
         try {
@@ -658,11 +741,12 @@ export class TelegramOrchestrator {
         if (photoResult.success) {
           publishedWithImage = true;
           publishedMessageId = photoResult.messageId;
-          addLog('Photo published successfully.');
+          addLog('✅ ფოტო წარმატებით გამოქვეყნდა!');
+          addLog(`📝 Message ID: ${publishedMessageId}`);
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`Caption exceeds limit. Sending ${remainingChunks.length} additional text chunk(s).`);
+            addWarning(`️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
@@ -678,17 +762,19 @@ export class TelegramOrchestrator {
           }
         } else {
           imageError = photoResult.error || 'Telegram rejected the photo.';
-          addWarning(`Photo publication failed. Falling back to text: ${imageError}`);
+          addWarning(`⚠️ ფოტოს პუბლიკაცია ვერ მოხერხდა. ვბრუნდებით ტექსტზე: ${imageError}`);
         }
       }
 
       if (!publishedWithImage) {
-        addLog('Publishing Telegram text message(s)...');
+        addLog('📝 ვაქვეყნებ მხოლოდ ტექსტს...');
         const textChunks = splitTelegramText(escapedCaption, TELEGRAM_MESSAGE_LIMIT);
 
         if (textChunks.length === 0) {
           throw new Error('The generated Telegram caption is empty.');
         }
+
+        addLog(` ტექსტური ნაწილების რაოდენობა: ${textChunks.length}`);
 
         for (let index = 0; index < textChunks.length; index++) {
           const chunk = textChunks[index];
@@ -710,11 +796,17 @@ export class TelegramOrchestrator {
           if (index === 0) {
             publishedMessageId = messageResult.messageId;
           }
-          addLog(`Text message ${index + 1}/${textChunks.length} published successfully.`);
+          addLog(`✅ ტექსტური ნაწილი ${index + 1}/${textChunks.length} წარმატებით გამოქვეყნდა.`);
         }
       }
 
-      addLog('Recording publication in Supabase...');
+      // ============================================================
+      // 9. Record in Supabase
+      // ============================================================
+      addLog('================================================');
+      addLog('💾 ნაბიჯი 9: ვინახავ Supabase-ში...');
+      addLog('================================================');
+      
       const { error: databaseError } = await supabase.from('published_content').insert({
         agent_type: request.agentType,
         post_type: request.postType,
@@ -726,12 +818,13 @@ export class TelegramOrchestrator {
       });
 
       if (databaseError) {
-        addWarning(`Supabase logging failed: ${databaseError.message}`);
+        addWarning(`⚠️ Supabase logging failed: ${databaseError.message}`);
       } else {
-        addLog('Publication recorded successfully.');
+        addLog('✅ პუბლიკაცია წარმატებით ჩაიწერა Supabase-ში.');
       }
 
-      addLog('Generation and publication workflow completed.');
+      addLog('================================================');
+      addLog('🎉 გენერაცია და პუბლიკაცია წარმატებით დასრულდა!');
       addLog('================================================');
 
       return {
@@ -748,6 +841,10 @@ export class TelegramOrchestrator {
 
     } catch (error) {
       const errorMessage = getErrorMessage(error);
+      addLog('================================================');
+      addLog(` გენერაცია/პუბლიკაცია ვერ მოხერხდა: ${errorMessage}`);
+      addLog('================================================');
+      
       logError('Generation/publication workflow failed.', {
         agentType: request.agentType,
         postType: request.postType,
