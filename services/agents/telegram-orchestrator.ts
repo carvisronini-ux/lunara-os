@@ -131,7 +131,7 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-// ✅ აქ არის მთავარი ცვლილება: Auto-Inject Logic
+// ✅ გასწორებული ვერსია: ვიყენებთ finalCaption ცვლადს TypeScript-ის შეცდომების თავიდან ასაცილებლად
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -168,9 +168,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
+  // ✅ ვიყენებთ ცალკე ცვლადს, რათა თავიდან ავიცილოთ 'unknown' ტიპის შეცდომა
+  let finalCaption = data.caption as string;
+
   // ✅ 12 ნიშნის ლოგიკა თვითაღდგენით (Auto-Inject)
   if (postType === 'daily_horoscope_12_signs') {
-    let caption = data.caption as string;
     const zodiacMap = [
       { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
       { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
@@ -181,11 +183,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     ];
 
     // 1. ვამოწმებთ რამდენი ემოჯი აკლია
-    const missingEmojis = zodiacMap.filter(z => !caption.includes(z.emoji));
+    const missingEmojis = zodiacMap.filter(z => !finalCaption.includes(z.emoji));
     
     // 2. თუ ემოჯები აკლია, ვცდილობთ მათ ჩაწერას სახელების მიხედვით
     if (missingEmojis.length > 0) {
-      let fixedCaption = caption;
+      let fixedCaption = finalCaption;
       let injectedCount = 0;
 
       missingEmojis.forEach(z => {
@@ -200,26 +202,24 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
 
       // თუ ჩავწერეთ ემოჯები, ვინახავთ გასწორებულ ვერსიას
       if (injectedCount > 0) {
-        caption = fixedCaption;
-        data.caption = caption; // ვაახლებთ მონაცემს
+        finalCaption = fixedCaption;
       }
     }
 
     // 3. საბოლოო შემოწმება: თუ მაინც ბევრი აკლია (3-ზე მეტი), ვაგდებთ შეცდომას
-    const finalMissing = zodiacMap.filter(z => !caption.includes(z.emoji));
+    const finalMissing = zodiacMap.filter(z => !finalCaption.includes(z.emoji));
     if (finalMissing.length > 3) {
       throw new Error(`The AI response is missing too many zodiac emojis (${finalMissing.length} missing) and auto-fix failed.`);
     }
     
-    if (caption.length < 300) {
-      throw new Error(`The AI response is too short (${caption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
+    if (finalCaption.length < 300) {
+      throw new Error(`The AI response is too short (${finalCaption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
     }
   }
 
   if (postType === 'daily_horoscope_single') {
-    const caption = data.caption as string;
-    if (caption.length > 450) {
-      throw new Error(`Single sign caption is too long (${caption.length} chars). Max 450 characters allowed.`);
+    if (finalCaption.length > 450) {
+      throw new Error(`Single sign caption is too long (${finalCaption.length} chars). Max 450 characters allowed.`);
     }
   }
 
@@ -230,7 +230,7 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     : [];
 
   return {
-    caption: data.caption.trim(),
+    caption: finalCaption.trim(),
     image_prompt: typeof data.image_prompt === 'string' ? data.image_prompt.trim() : undefined,
     hashtags,
   };
@@ -250,14 +250,12 @@ Generate the content strictly following the system instructions provided above. 
 `.trim();
 }
 
-// ✅ საბოლოო ვერსია: ყველა ემოჯი აღდგენილია + space-ების გასუფთავება
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ ყველა 12 ემოჯი სწორადაა მითითებული
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
@@ -268,34 +266,20 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    // 1. "♑ Capricorn:" ან "♑ **Capricorn**:" -> "♑ <b>Capricorn</b>:"
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
-    
-    // 2. "**Capricorn**:" -> "♑ <b>Capricorn</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
-    
-    // 3. "Capricorn:" (ხაზის დასაწყისში) -> "♑ <b>Capricorn</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
-    
-    // 4. "Capricorn, " (მძიმით) -> "♑ <b>Capricorn</b>: "
     const regex4 = new RegExp(`(^|\\n)\\s*${name}\\s*,`, 'gi');
     safeText = safeText.replace(regex4, `$1${emoji} <b>${name}</b>: `);
-    
-    // 5. "♑Capricorn:" (space-ის გარეშე) -> "♑ <b>Capricorn</b>:"
     const regex5 = new RegExp(`${emoji}${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex5, `${emoji} <b>${name}</b>:`);
   });
 
-  // ✅ ვშლით ზედმეტ ემოჯებს ხაზის ბოლოში (ყველა 12 ემოჯი შედის regex-ში)
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
-
-  // ✅ ვშლით ყველა ზედმეტ space-ს colon-ის შემდეგ (2 ან მეტი space -> 1 space)
   safeText = safeText.replace(/:\s{2,}/g, ': ');
-
-  // ✅ ვშლით ზედმეტ space-ებს ხაზის დასაწყისში
   safeText = safeText.replace(/^\s+/gm, '');
 
   return safeText.trim();
@@ -307,10 +291,8 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ ვშლით ემოჯებს ხაზის ბოლოში (ყველა 12 ემოჯი შედის regex-ში)
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
-  // ✅ ყველა 12 ემოჯი სწორადაა მითითებული
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
@@ -323,17 +305,13 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   zodiacMap.forEach(({ name, emoji }) => {
     const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `$1 <b>${name}</b>:`);
-    
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
-    
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
   });
 
-  // ✅ ვშლით ზედმეტ space-ებს colon-ის შემდეგ
   safeText = safeText.replace(/:\s{2,}/g, ': ');
-
   return safeText.trim();
 }
 
@@ -449,7 +427,6 @@ export class TelegramOrchestrator {
       let textGenerationSuccess = false;
       let generatedContent: GeneratedContent | null = null;
       
-      // ✅ ახალი: ვინახავთ ბოლო შეცდომას, რათა საბოლოო შეტყობინებაში გამოჩნდეს
       let lastError = 'Unknown error';
 
       while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
@@ -607,7 +584,6 @@ export class TelegramOrchestrator {
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
 
         } catch (error: any) {
-          // ✅ აქ ვინახავთ შეცდომის ტექსტს, რათა ბოლოს გამოჩნდეს
           lastError = error.message;
           
           addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
@@ -641,7 +617,6 @@ export class TelegramOrchestrator {
       }
 
       if (!textGenerationSuccess || !generatedContent) {
-        // ✅ აქ ვაგდებთ შეცდომას ბოლო დაფიქსირებული მიზეზით, რათა UI-ში გამოჩნდეს!
         throw new Error(`All available chat models failed. Last error: ${lastError}`);
       }
 
