@@ -244,6 +244,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   return safeText.trim();
 }
 
+// ✅ საბოლოო ვერსია: ასწორებს მძიმეს, ამატებს ბოლდს/ემოჯს და შლის ზედმეტ ემოჯს ხაზის ბოლოდან
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -260,22 +261,25 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    // 1. ფორმატი: "♐ Sagittarius:" ან "♐ **Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
+    // 1. "♐ Sagittarius:" ან "♐ **Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
-    // 2. ფორმატი: "**Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
+    // 2. "**Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
     
-    // 3. ფორმატი: "Sagittarius:" (ხაზის დასაწყისში) -> "♐ <b>Sagittarius</b>:"
+    // 3. "Sagittarius:" (ხაზის დასაწყისში) -> "♐ <b>Sagittarius</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
     
-    // 4. ახალი: ფორმატი: "Sagittarius, " (მძიმით) -> "♐ <b>Sagittarius</b>: "
+    // 4. "Sagittarius, " (მძიმით) -> "♐ <b>Sagittarius</b>: "
     const regex4 = new RegExp(`(^|\\n)\\s*${name}\\s*,`, 'gi');
     safeText = safeText.replace(regex4, `$1${emoji} <b>${name}</b>: `);
   });
+
+  // ✅ 5. ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია (თუ AI-მ იქაც ჩაამატა)
+  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   return safeText.trim();
 }
@@ -320,9 +324,6 @@ export class TelegramOrchestrator {
         throw new Error('Both agentType and postType are required.');
       }
 
-      // --------------------------------------------------------
-      // 1. Load agent configuration from Supabase
-      // --------------------------------------------------------
       addLog('📥 ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
@@ -341,9 +342,6 @@ export class TelegramOrchestrator {
       addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
       addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
 
-      // --------------------------------------------------------
-      // 2. Load Job-Specific Instructions
-      // --------------------------------------------------------
       addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს...');
       let jobImageLogic = '';
       let useAiImage = true; 
@@ -369,16 +367,10 @@ export class TelegramOrchestrator {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
 
-      // --------------------------------------------------------
-      // 3. Wait for Credential Vault
-      // --------------------------------------------------------
       addLog('⏳ ნაბიჯი 3: ველოდები CredentialVault-ის ინიციალიზაციას...');
       await credentialVault.ready;
       addLog('✅ CredentialVault მზადაა.');
 
-      // --------------------------------------------------------
-      // 4. PRE-PROCESSING: Determine Zodiac Sign
-      // --------------------------------------------------------
       if (request.postType === 'daily_horoscope_single') {
         addLog('🎯 ნაბიჯი 4: ვამოწმებ ზოდიაქოს ნიშანს...');
         const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
@@ -395,9 +387,6 @@ export class TelegramOrchestrator {
         addLog(`🧠 AI-ს გადაეცა კონკრეტული ნიშანი: ${request.zodiacSign}`);
       }
 
-      // ============================================================
-      // 5. DYNAMIC CHAT MODEL SELECTION & SELF-HEALING LOOP
-      // ============================================================
       addLog('🤖 ნაბიჯი 5: ვირჩევ საუკეთესო ჩეთ მოდელს...');
       let chatModelInfo = await getBestAvailableModel('chat');
       addLog(`✅ საუკეთესო მოდელი: ${chatModelInfo?.modelName || 'NULL'} (${chatModelInfo?.provider || 'unknown'})`);
@@ -439,9 +428,6 @@ export class TelegramOrchestrator {
         let rawContent: string | undefined;
 
         try {
-          // --------------------------------------------------------
-          // 5.1 Build System Prompt
-          // --------------------------------------------------------
           addLog('📝 ვაგებ სისტემურ პრომპტს...');
           const systemPrompt = [
             config.master_prompt,
@@ -461,16 +447,10 @@ export class TelegramOrchestrator {
 
           addLog(`📄 სისტემური პრომპტის სიგრძე: ${systemPrompt.length} სიმბოლო`);
 
-          // --------------------------------------------------------
-          // 5.2 Build User Prompt
-          // --------------------------------------------------------
           addLog('📝 ვაგებ მომხმარებლის პრომპტს...');
           const userPrompt = buildUserPrompt(request);
           addLog(`📄 მომხმარებლის პრომპტის სიგრძე: ${userPrompt.length} სიმბოლო`);
 
-          // --------------------------------------------------------
-          // 5.3 Build API Request
-          // --------------------------------------------------------
           addLog('🌐 ვაგებ API მოთხოვნას...');
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
@@ -500,15 +480,11 @@ export class TelegramOrchestrator {
             requestBody = { model: currentModelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.3 };
           }
 
-          // ✅ უსაფრთხოებისთვის ვმალავთ API გასაღებს ლოგებში
           const maskedEndpoint = chatEndpoint.replace(/key=[^&]+/, 'key=***');
           addLog(`🔗 API Endpoint: ${maskedEndpoint}`);
           addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
           addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
 
-          // --------------------------------------------------------
-          // 5.4 Send Request
-          // --------------------------------------------------------
           let response: Response;
           try {
             response = await fetch(chatEndpoint, { method: 'POST', headers, body: JSON.stringify(requestBody), signal: controller.signal });
@@ -523,9 +499,6 @@ export class TelegramOrchestrator {
 
           addLog(`📥 მივიღე პასუხი: HTTP ${response.status}`);
 
-          // --------------------------------------------------------
-          // 5.5 Handle Response
-          // --------------------------------------------------------
           if (!response.ok) {
             const errorText = await response.text().catch(() => 'No response body');
             const errorLower = errorText.toLowerCase();
@@ -566,9 +539,6 @@ export class TelegramOrchestrator {
 
           addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო):\n${rawContent.substring(0, 500)}...`);
 
-          // --------------------------------------------------------
-          // 5.6 Validate Content
-          // --------------------------------------------------------
           addLog('🔍 ვამოწმებ ვალიდაციას...');
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           addLog('✅ ვალიდაცია წარმატებით გაიარა!');
@@ -613,9 +583,6 @@ export class TelegramOrchestrator {
         throw new Error('All available chat models failed to generate content.');
       }
 
-      // ============================================================
-      // 6. Format Caption
-      // ============================================================
       addLog('================================================');
       addLog('🎨 ნაბიჯი 6: ვაფორმატებ caption-ს...');
       addLog('================================================');
@@ -653,9 +620,6 @@ export class TelegramOrchestrator {
         addLog('✅ Caption სიგრძე ნორმაშია.');
       }
 
-      // ============================================================
-      // 7. Image Logic
-      // ============================================================
       addLog('================================================');
       addLog('🖼️ ნაბიჯი 7: ვამუშავებ ფოტოს ლოგიკას...');
       addLog('================================================');
@@ -718,9 +682,6 @@ export class TelegramOrchestrator {
         addWarning('⚠️ image_prompt არ არის. ვაგზავნით მხოლოდ ტექსტს.');
       }
 
-      // ============================================================
-      // 8. Publish to Telegram
-      // ============================================================
       addLog('================================================');
       addLog('📤 ნაბიჯი 8: ვაქვეყნებ Telegram-ში...');
       addLog('================================================');
@@ -812,9 +773,6 @@ export class TelegramOrchestrator {
         }
       }
 
-      // ============================================================
-      // 9. Record in Supabase
-      // ============================================================
       addLog('================================================');
       addLog('💾 ნაბიჯი 9: ვინახავ Supabase-ში...');
       addLog('================================================');
