@@ -415,6 +415,9 @@ export class TelegramOrchestrator {
       const maxChatAttempts = 3;
       let textGenerationSuccess = false;
       let generatedContent: GeneratedContent | null = null;
+      
+      // ✅ ახალი: ვინახავთ ბოლო შეცდომას, რათა საბოლოო შეტყობინებაში გამოჩნდეს
+      let lastError = 'Unknown error';
 
       while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
         if (!chatModelInfo) {
@@ -571,6 +574,9 @@ export class TelegramOrchestrator {
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
 
         } catch (error: any) {
+          // ✅ აქ ვინახავთ შეცდომის ტექსტს, რათა ბოლოს გამოჩნდეს
+          lastError = error.message;
+          
           addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
           if (rawContent) {
             addLog(`📝 AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო):\n${rawContent.substring(0, 400)}...`);
@@ -602,7 +608,8 @@ export class TelegramOrchestrator {
       }
 
       if (!textGenerationSuccess || !generatedContent) {
-        throw new Error('All available chat models failed to generate content.');
+        // ✅ აქ ვაგდებთ შეცდომას ბოლო დაფიქსირებული მიზეზით, რათა UI-ში გამოჩნდეს!
+        throw new Error(`All available chat models failed. Last error: ${lastError}`);
       }
 
       addLog('================================================');
