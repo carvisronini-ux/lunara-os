@@ -167,6 +167,7 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
+  // ✅ ვალიდაცია 12 ნიშნისთვის
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
@@ -178,6 +179,27 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     
     if (caption.length < 300) {
       throw new Error(`The AI response is too short (${caption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
+    }
+  }
+
+  // ✅ ვალიდაცია 1 ნიშნისთვის (ახალი!)
+  if (postType === 'daily_horoscope_single') {
+    const caption = data.caption as string;
+    const zodiacEmojisRegex = /^[♈♉♊♋♌♍♎♏♐♑♒♓]/;
+    
+    // 1. უნდა იწყებოდეს ზოდიაქოს ემოჯით
+    if (!zodiacEmojisRegex.test(caption.trim())) {
+      throw new Error(`Single sign caption MUST start with a zodiac emoji (e.g., ♈ **Aries:**).`);
+    }
+    
+    // 2. უნდა შეიცავდეს ბოლდ ფორმატირებას (**)
+    if (!caption.includes('**')) {
+      throw new Error(`Single sign caption MUST include the sign name in bold (e.g., **Aries:**).`);
+    }
+
+    // 3. სიგრძის შეზღუდვა
+    if (caption.length > 400) {
+      throw new Error(`Single sign caption is too long (${caption.length} chars). Max 400 characters allowed.`);
     }
   }
 
@@ -214,7 +236,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     .replace(/>/g, '&gt;');
 
   // ✅ 1. აგრესიულად ვშლით ნებისმიერ ზოდიაქოს ემოჯს, მის უხილავ ვარიაციულ სელექტორს (\uFE0F) და ნებისმიერ თეთრ სივრცეს ხაზის ბოლოში.
-  // \uFE0F? ნიშნავს, რომ უხილავი სიმბოლო შეიძლება იყოს ან არ იყოს.
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   const zodiacMap = [
@@ -228,15 +249,12 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
 
   // ✅ 2. ვაკეთებთ ბოლდს და ვრწმუნდებით, რომ ემოჯი რჩება მხოლოდ ხაზის დასაწყისში
   zodiacMap.forEach(({ name, emoji }) => {
-    // ფორმატი: "♈ Aries:" -> "♈ <b>Aries</b>:"
     const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `$1 <b>${name}</b>:`);
     
-    // ფორმატი: "**Aries**:" -> "♈ <b>Aries</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
     
-    // ფორმატი: "Aries:" (ხაზის დასაწყისში) -> "♈ <b>Aries</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
   });
