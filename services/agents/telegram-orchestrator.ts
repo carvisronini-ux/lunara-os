@@ -167,14 +167,14 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
-  // ✅ ვალიდაცია 12 ნიშნისთვის
+  // ✅ ვალიდაცია 12 ნიშნისთვის (მკაცრი, რადგან 12 ნიშანს ვერ გამოიცნობს კოდი)
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
     const caption = data.caption as string;
     const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
     
     if (missingEmojis.length > 0) {
-      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
+      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ).`);
     }
     
     if (caption.length < 300) {
@@ -182,18 +182,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  // ✅ ვალიდაცია 1 ნიშნისთვის (გამარტივებული და საიმედო)
+  // ✅ ვალიდაცია 1 ნიშნისთვის (მოხსნილია მკაცრი ემოჯის შემოწმება)
+  // ჩვენი ფორმატირების ფუნქცია (applyBoldFormattingToSingleSign) ავტომატურად დაამატებს ემოჯს და ბოლდს,
+  // თუ AI-მ დაწერა უბრალოდ "Sagittarius: ...". ამიტომ აქ მხოლოდ სიგრძეს ვამოწმებთ.
   if (postType === 'daily_horoscope_single') {
     const caption = data.caption as string;
-    const trimmedCaption = caption.trim();
-    const zodiacEmojisRegex = /^[♈♉♊♋♌♍♎♏♐♑♒♓]/;
-    
-    // 1. უნდა იწყებოდეს ზოდიაქოს ემოჯით
-    if (!zodiacEmojisRegex.test(trimmedCaption)) {
-      throw new Error(`Single sign caption MUST start with a zodiac emoji. Got: "${trimmedCaption.substring(0, 30)}..."`);
-    }
-
-    // 2. სიგრძის შეზღუდვა
     if (caption.length > 450) {
       throw new Error(`Single sign caption is too long (${caption.length} chars). Max 450 characters allowed.`);
     }
@@ -224,19 +217,19 @@ Generate the content strictly following the system instructions provided above.
 `.trim();
 }
 
-// ✅ საბოლოო, 100%-იანი გამოსავალი: შლის ემოჯს + უხილავ Variation Selector-ს (\uFE0F) ხაზის ბოლოში
+// ✅ 12 ნიშნის ფორმატირება
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
+  safeText = safeText.replace(/[♈♉♊♋♌♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
-    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
+    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
@@ -256,6 +249,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   return safeText.trim();
 }
 
+// ✅ 1 ნიშნის ფორმატირება (ავტომატურად ამატებს ემოჯს თუ აკლია)
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -264,7 +258,7 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Gemini', emoji: '' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
@@ -272,7 +266,7 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    // ეს რეგექსი იღებს როგორც "♐ Sagittarius:", ისე "♐ **Sagittarius**:" და აკეთებს ბოლდს
+    // ეს რეგექსი იღებს როგორც "♐ Sagittarius:", ისე "Sagittarius:" და აკეთებს ბოლდს + ემოჯს
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
@@ -523,9 +517,9 @@ export class TelegramOrchestrator {
           textGenerationSuccess = true;
 
         } catch (error: any) {
-          addLog(`🔍 DEBUG CATCH: Error caught for ${currentModelName}. Message: ${error.message}`);
+          addLog(` DEBUG CATCH: Error caught for ${currentModelName}. Message: ${error.message}`);
           if (rawContent) {
-            addLog(`🔍 DEBUG RAW: AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
+            addLog(` DEBUG RAW: AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
           } else {
             addLog(`🔍 DEBUG RAW: rawContent is undefined or empty.`);
           }
