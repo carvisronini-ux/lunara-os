@@ -131,6 +131,7 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
+// ✅ აქ არის მთავარი ცვლილება: Auto-Inject Logic
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -167,15 +168,47 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
+  // ✅ 12 ნიშნის ლოგიკა თვითაღდგენით (Auto-Inject)
   if (postType === 'daily_horoscope_12_signs') {
-    const zodiacEmojis = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
-    const caption = data.caption as string;
-    const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
+    let caption = data.caption as string;
+    const zodiacMap = [
+      { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+      { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+      { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
+      { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
+      { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
+      { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+    ];
+
+    // 1. ვამოწმებთ რამდენი ემოჯი აკლია
+    const missingEmojis = zodiacMap.filter(z => !caption.includes(z.emoji));
     
-    // ✅ გაუმჯობესებული: თუ 3-ზე მეტი ემოჯი აკლია, მაშინ ვაგდებთ შეცდომას. 
-    // თუ 1-2 აკლია, სისტემა მიიღებს პასუხს და ფორმატირების ფუნქცია შეეცდება გასწორებას.
-    if (missingEmojis.length > 3) {
-      throw new Error(`The AI response is missing too many zodiac emojis (${missingEmojis.length} missing). Caption must include most of the 12 zodiac signs.`);
+    // 2. თუ ემოჯები აკლია, ვცდილობთ მათ ჩაწერას სახელების მიხედვით
+    if (missingEmojis.length > 0) {
+      let fixedCaption = caption;
+      let injectedCount = 0;
+
+      missingEmojis.forEach(z => {
+        // ვეძებთ სახელს (მაგ. "Aries:") და ვამატებთ ემოჯს თუ არ არის
+        const regex = new RegExp(`(^|\\n)\\s*${z.name}\\s*[:\\,]`, 'gi');
+        if (regex.test(fixedCaption)) {
+          // ვცვლით "Aries:" -> "♈ Aries:"
+          fixedCaption = fixedCaption.replace(new RegExp(`\\b${z.name}\\b`, 'g'), `${z.emoji} ${z.name}`);
+          injectedCount++;
+        }
+      });
+
+      // თუ ჩავწერეთ ემოჯები, ვინახავთ გასწორებულ ვერსიას
+      if (injectedCount > 0) {
+        caption = fixedCaption;
+        data.caption = caption; // ვაახლებთ მონაცემს
+      }
+    }
+
+    // 3. საბოლოო შემოწმება: თუ მაინც ბევრი აკლია (3-ზე მეტი), ვაგდებთ შეცდომას
+    const finalMissing = zodiacMap.filter(z => !caption.includes(z.emoji));
+    if (finalMissing.length > 3) {
+      throw new Error(`The AI response is missing too many zodiac emojis (${finalMissing.length} missing) and auto-fix failed.`);
     }
     
     if (caption.length < 300) {
