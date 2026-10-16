@@ -173,7 +173,7 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     const missingEmojis = zodiacEmojis.filter(emoji => !caption.includes(emoji));
     
     if (missingEmojis.length > 0) {
-      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ♓).`);
+      throw new Error(`The AI response is missing zodiac emojis. Caption must include all 12 zodiac signs (♈ to ).`);
     }
     
     if (caption.length < 300) {
@@ -201,15 +201,18 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
   };
 }
 
+// ✅ განახლებული: ავტომატურად აიძულებს AI-ს ინგლისურად წერას
 function buildUserPrompt(request: OrchestratorRequest): string {
   return `
+CRITICAL: YOU MUST RESPOND ONLY IN ENGLISH. DO NOT USE GEORGIAN OR ANY OTHER LANGUAGE.
+
 Request Parameters:
 - Agent Type: ${request.agentType}
 - Post Type: ${request.postType}
 - Content Theme: ${request.contentTheme || 'Automatic'}
 - Zodiac Sign: ${request.zodiacSign || 'General / All signs'}
 
-Generate the content strictly following the system instructions provided above.
+Generate the content strictly following the system instructions provided above. ALL OUTPUT MUST BE IN ENGLISH.
 `.trim();
 }
 
@@ -227,7 +230,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+    { name: 'Aquarius', emoji: '' }, { name: 'Pisces', emoji: '♓' }
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
@@ -244,7 +247,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   return safeText.trim();
 }
 
-// ✅ საბოლოო ვერსია: ასწორებს მძიმეს, ამატებს ბოლდს/ემოჯს და შლის ზედმეტ ემოჯს ხაზის ბოლოდან
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
     .replace(/&/g, '&amp;')
@@ -252,34 +254,29 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
     .replace(/>/g, '&gt;');
 
   const zodiacMap = [
-    { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+    { name: 'Aries', emoji: '' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '' }
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    // 1. "♐ Sagittarius:" ან "♐ **Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
-    // 2. "**Sagittarius**:" -> "♐ <b>Sagittarius</b>:"
     const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
     safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
     
-    // 3. "Sagittarius:" (ხაზის დასაწყისში) -> "♐ <b>Sagittarius</b>:"
     const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
     
-    // 4. "Sagittarius, " (მძიმით) -> "♐ <b>Sagittarius</b>: "
     const regex4 = new RegExp(`(^|\\n)\\s*${name}\\s*,`, 'gi');
     safeText = safeText.replace(regex4, `$1${emoji} <b>${name}</b>: `);
   });
 
-  // ✅ 5. ვშლით ნებისმიერ ზოდიაქოს ემოჯს, რომელიც ხაზის ბოლოშია (თუ AI-მ იქაც ჩაამატა)
-  safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
+  safeText = safeText.replace(/[♈♉♊♋♍♎♏♐♑♓]\uFE0F?\s*$/gm, '');
 
   return safeText.trim();
 }
@@ -312,7 +309,7 @@ export class TelegramOrchestrator {
     };
 
     addLog('================================================');
-    addLog('🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
+    addLog(' AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
     addLog(`📋 Agent Type: ${request.agentType}`);
     addLog(`📋 Post Type: ${request.postType}`);
     addLog(`📋 Content Theme: ${request.contentTheme || 'Automatic'}`);
@@ -378,7 +375,7 @@ export class TelegramOrchestrator {
 
         if (!targetSign || !validSigns.includes(targetSign) || targetSign === 'general') {
           targetSign = validSigns[Math.floor(Math.random() * validSigns.length)];
-          addLog(`⚠️ Zodiac sign missing/invalid in schedule. Randomly selected: ${targetSign}`);
+          addLog(`️ Zodiac sign missing/invalid in schedule. Randomly selected: ${targetSign}`);
         } else {
           addLog(`✅ Specific zodiac sign provided in schedule: ${targetSign}`);
         }
@@ -432,6 +429,8 @@ export class TelegramOrchestrator {
           const systemPrompt = [
             config.master_prompt,
             '',
+            'CRITICAL LANGUAGE RULE: ALL OUTPUT MUST BE STRICTLY IN ENGLISH. DO NOT USE GEORGIAN.',
+            '',
             'THINKING STYLE:',
             config.thinking_style || 'Use clear, structured reasoning internally.',
             '',
@@ -451,7 +450,7 @@ export class TelegramOrchestrator {
           const userPrompt = buildUserPrompt(request);
           addLog(`📄 მომხმარებლის პრომპტის სიგრძე: ${userPrompt.length} სიმბოლო`);
 
-          addLog('🌐 ვაგებ API მოთხოვნას...');
+          addLog(' ვაგებ API მოთხოვნას...');
           const controller = new AbortController();
           const timeoutId = setTimeout(() => { controller.abort(); }, GROQ_TIMEOUT_MS);
 
@@ -481,7 +480,7 @@ export class TelegramOrchestrator {
           }
 
           const maskedEndpoint = chatEndpoint.replace(/key=[^&]+/, 'key=***');
-          addLog(`🔗 API Endpoint: ${maskedEndpoint}`);
+          addLog(` API Endpoint: ${maskedEndpoint}`);
           addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
           addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
 
@@ -549,7 +548,7 @@ export class TelegramOrchestrator {
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
 
         } catch (error: any) {
-          addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
+          addLog(` შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
           if (rawContent) {
             addLog(`📝 AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო):\n${rawContent.substring(0, 400)}...`);
           } else {
@@ -567,7 +566,7 @@ export class TelegramOrchestrator {
           continue;
         } finally {
           if (leaseId) {
-            addLog(`🔓 ვათავისუფლებ ${currentProvider} access lease-ს...`);
+            addLog(` ვათავისუფლებ ${currentProvider} access lease-ს...`);
             try {
               accessManager.revokeLease(leaseId, 'system_cleanup');
               addLog('✅ Access lease გათავისუფლდა.');
@@ -627,7 +626,7 @@ export class TelegramOrchestrator {
       if (request.postType === 'daily_horoscope_single') {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
-        addLog(`🖼️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
+        addLog(`️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
         addLog(`🔗 Image URL: ${imageUrl}`);
         
         imageResult = {
@@ -650,7 +649,7 @@ export class TelegramOrchestrator {
         imageProvider = 'static_fallback';
       }
       else if (!useAiImage) {
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
+        addLog('️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვაგზავნით მხოლოდ ტექსტს.');
         imageResult = null;
       } 
       else if (imagePrompt) {
@@ -666,7 +665,7 @@ export class TelegramOrchestrator {
             addLog(`✅ ფოტო წარმატებით შეიქმნა: ${imageProvider}`);
           } else {
             imageError = imageResult.error || 'Image generation failed.';
-            addWarning(`⚠️ ფოტოს გენერაცია ვერ მოხერხდა: ${imageError}`);
+            addWarning(`️ ფოტოს გენერაცია ვერ მოხერხდა: ${imageError}`);
             imageResult = null;
           }
 
@@ -675,7 +674,7 @@ export class TelegramOrchestrator {
           }
         } catch (error) {
           imageError = getErrorMessage(error);
-          addWarning(`⚠️ ფოტოს გენერაციის შეცდომა: ${imageError}`);
+          addWarning(`️ ფოტოს გენერაციის შეცდომა: ${imageError}`);
           imageResult = null;
         }
       } else {
@@ -719,7 +718,7 @@ export class TelegramOrchestrator {
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`⚠️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
+            addWarning(`️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
@@ -794,7 +793,7 @@ export class TelegramOrchestrator {
       }
 
       addLog('================================================');
-      addLog('🎉 გენერაცია და პუბლიკაცია წარმატებით დასრულდა!');
+      addLog(' გენერაცია და პუბლიკაცია წარმატებით დასრულდა!');
       addLog('================================================');
 
       return {
