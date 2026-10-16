@@ -182,24 +182,20 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  // ✅ ვალიდაცია 1 ნიშნისთვის (ახალი!)
+  // ✅ ვალიდაცია 1 ნიშნისთვის (გამარტივებული და საიმედო)
   if (postType === 'daily_horoscope_single') {
     const caption = data.caption as string;
+    const trimmedCaption = caption.trim();
     const zodiacEmojisRegex = /^[♈♉♊♋♌♍♎♏♐♑♒♓]/;
     
     // 1. უნდა იწყებოდეს ზოდიაქოს ემოჯით
-    if (!zodiacEmojisRegex.test(caption.trim())) {
-      throw new Error(`Single sign caption MUST start with a zodiac emoji (e.g., ♈ **Aries:**).`);
-    }
-    
-    // 2. უნდა შეიცავდეს ბოლდ ფორმატირებას (**)
-    if (!caption.includes('**')) {
-      throw new Error(`Single sign caption MUST include the sign name in bold (e.g., **Aries:**).`);
+    if (!zodiacEmojisRegex.test(trimmedCaption)) {
+      throw new Error(`Single sign caption MUST start with a zodiac emoji. Got: "${trimmedCaption.substring(0, 30)}..."`);
     }
 
-    // 3. სიგრძის შეზღუდვა
-    if (caption.length > 400) {
-      throw new Error(`Single sign caption is too long (${caption.length} chars). Max 400 characters allowed.`);
+    // 2. სიგრძის შეზღუდვა
+    if (caption.length > 450) {
+      throw new Error(`Single sign caption is too long (${caption.length} chars). Max 450 characters allowed.`);
     }
   }
 
@@ -235,7 +231,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // ✅ 1. აგრესიულად ვშლით ნებისმიერ ზოდიაქოს ემოჯს, მის უხილავ ვარიაციულ სელექტორს (\uFE0F) და ნებისმიერ თეთრ სივრცეს ხაზის ბოლოში.
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
   const zodiacMap = [
@@ -247,7 +242,6 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
-  // ✅ 2. ვაკეთებთ ბოლდს და ვრწმუნდებით, რომ ემოჯი რჩება მხოლოდ ხაზის დასაწყისში
   zodiacMap.forEach(({ name, emoji }) => {
     const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `$1 <b>${name}</b>:`);
@@ -278,6 +272,7 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
+    // ეს რეგექსი იღებს როგორც "♐ Sagittarius:", ისე "♐ **Sagittarius**:" და აკეთებს ბოლდს
     const regex1 = new RegExp(`${emoji}\\s+\\*{0,2}${name}\\*{0,2}\\s*:`, 'gi');
     safeText = safeText.replace(regex1, `${emoji} <b>${name}</b>:`);
     
