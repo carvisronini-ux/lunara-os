@@ -224,7 +224,7 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
-    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '' },
+    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
@@ -304,7 +304,7 @@ export class TelegramOrchestrator {
     addLog('🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
     addLog(`📋 Agent Type: ${request.agentType}`);
     addLog(`📋 Post Type: ${request.postType}`);
-    addLog(` Content Theme: ${request.contentTheme || 'Automatic'}`);
+    addLog(`📋 Content Theme: ${request.contentTheme || 'Automatic'}`);
     addLog(`📋 Zodiac Sign: ${request.zodiacSign || 'General'}`);
     addLog('================================================');
 
@@ -356,7 +356,7 @@ export class TelegramOrchestrator {
         jobImageLogic = jobData.image_prompt_logic || '';
         useAiImage = jobData.use_ai_image ?? true;
         addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
-        addLog(`️ AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
+        addLog(`🔘 AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
         addLog(`📝 Image Prompt Logic Length: ${jobImageLogic.length} characters`);
       } else {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
@@ -365,7 +365,7 @@ export class TelegramOrchestrator {
       // --------------------------------------------------------
       // 3. Wait for Credential Vault
       // --------------------------------------------------------
-      addLog(' ნაბიჯი 3: ველოდები CredentialVault-ის ინიციალიზაციას...');
+      addLog('⏳ ნაბიჯი 3: ველოდები CredentialVault-ის ინიციალიზაციას...');
       await credentialVault.ready;
       addLog('✅ CredentialVault მზადაა.');
 
@@ -493,7 +493,7 @@ export class TelegramOrchestrator {
             requestBody = { model: currentModelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.3 };
           }
 
-          addLog(` API Endpoint: ${chatEndpoint}`);
+          addLog(`🔗 API Endpoint: ${chatEndpoint}`);
           addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
           addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
 
@@ -560,11 +560,11 @@ export class TelegramOrchestrator {
           // --------------------------------------------------------
           // 5.6 Validate Content
           // --------------------------------------------------------
-          addLog(' ვამოწმებ ვალიდაციას...');
+          addLog('🔍 ვამოწმებ ვალიდაციას...');
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           addLog('✅ ვალიდაცია წარმატებით გაიარა!');
-          addLog(` Caption Length: ${generatedContent.caption.length} characters`);
-          addLog(`📝 Hashtags Count: ${generatedContent.hashtags.length}`);
+          addLog(`📝 Caption Length: ${generatedContent.caption.length} characters`);
+          addLog(`📝 Hashtags Count: ${generatedContent.hashtags?.length || 0}`); // ✅ გამოსწორებულია აქ (ოფციონალური ჯაჭვი)
           
           textGenerationSuccess = true;
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
@@ -572,7 +572,7 @@ export class TelegramOrchestrator {
         } catch (error: any) {
           addLog(`❌ შეცდომა ${currentModelName}-ისთვის: ${error.message}`);
           if (rawContent) {
-            addLog(` AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
+            addLog(`📝 AI-ის ნედლი პასუხი (პირველი 400 სიმბოლო): ${rawContent.substring(0, 400)}...`);
           } else {
             addLog(`📝 rawContent is undefined or empty.`);
           }
@@ -608,7 +608,7 @@ export class TelegramOrchestrator {
       // 6. Format Caption
       // ============================================================
       addLog('================================================');
-      addLog(' ნაბიჯი 6: ვაფორმატებ caption-ს...');
+      addLog('🎨 ნაბიჯი 6: ვაფორმატებ caption-ს...');
       addLog('================================================');
       
       imagePrompt = generatedContent.image_prompt || '';
@@ -651,8 +651,8 @@ export class TelegramOrchestrator {
       if (request.postType === 'daily_horoscope_single') {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
-        addLog(`️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
-        addLog(`🖼️ Image URL: ${imageUrl}`);
+        addLog(`🖼️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
+        addLog(`🔗 Image URL: ${imageUrl}`);
         
         imageResult = {
           success: true,
@@ -746,7 +746,7 @@ export class TelegramOrchestrator {
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
+            addWarning(`⚠️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
@@ -774,7 +774,7 @@ export class TelegramOrchestrator {
           throw new Error('The generated Telegram caption is empty.');
         }
 
-        addLog(` ტექსტური ნაწილების რაოდენობა: ${textChunks.length}`);
+        addLog(`📦 ტექსტური ნაწილების რაოდენობა: ${textChunks.length}`);
 
         for (let index = 0; index < textChunks.length; index++) {
           const chunk = textChunks[index];
@@ -842,7 +842,7 @@ export class TelegramOrchestrator {
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       addLog('================================================');
-      addLog(` გენერაცია/პუბლიკაცია ვერ მოხერხდა: ${errorMessage}`);
+      addLog(`❌ გენერაცია/პუბლიკაცია ვერ მოხერხდა: ${errorMessage}`);
       addLog('================================================');
       
       logError('Generation/publication workflow failed.', {
