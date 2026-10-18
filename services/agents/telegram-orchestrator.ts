@@ -207,7 +207,7 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
       { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
       { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
       { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-      { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+      { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '' }
     ];
 
     // 1. ვამოწმებთ რამდენი ემოჯი აკლია
@@ -245,9 +245,16 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  if (postType === 'daily_horoscope_single' || postType === 'daily_tarot_card') {
+  if (postType === 'daily_horoscope_single') {
     if (finalCaption.length > 450) {
-      throw new Error(`Caption is too long (${finalCaption.length} chars). Max 450 characters allowed.`);
+      throw new Error(`Single sign caption is too long (${finalCaption.length} chars). Max 450 characters allowed.`);
+    }
+  }
+
+  // ✅ ტაროსთვის გავზარდეთ ლიმიტი 900 სიმბოლომდე
+  if (postType === 'daily_tarot_card') {
+    if (finalCaption.length > 900) {
+      throw new Error(`Tarot caption is too long (${finalCaption.length} chars). Max 900 characters allowed.`);
     }
   }
 
@@ -269,21 +276,30 @@ function buildUserPrompt(request: OrchestratorRequest, selectedTarotCard?: { nam
     return `
 CRITICAL: YOU MUST RESPOND ONLY IN ENGLISH. 
 
-You are LUNARA. Write a daily guidance message based SPECIFICALLY on the Tarot Card: ${selectedTarotCard.name}.
+You are LUNARA, a wise cosmic guide. Write a compelling, engaging daily guidance message based SPECIFICALLY on the Tarot Card: ${selectedTarotCard.name}.
 
 MANDATORY OUTPUT FORMAT: Return ONLY a valid JSON object. No markdown, no extra text.
 
 JSON STRUCTURE:
 {
-  "caption": "🃏 **${selectedTarotCard.name}**\\n\\n[1-2 short, mystical, and practical sentences in English explaining this card's guidance for today. Max 35 words].\\n\\n[One short, thought-provoking question in English ending with '?']",
+  "caption": "🃏 <b>${selectedTarotCard.name}</b>\\n\\n[2-3 engaging paragraphs in English. First paragraph: Explain the card's core meaning and energy in a relatable way. Second paragraph: Provide practical, actionable guidance for today - how can the user apply this card's wisdom? Third paragraph (optional): Add a deeper insight or warning. Total: 60-100 words].\\n\\n<b>Reflection Question:</b> [One thought-provoking question in English that encourages self-reflection]",
   "hashtags": ["#LUNARA", "#DailyTarot", "#${selectedTarotCard.name.replace(/\s+/g, '')}", "#TarotReading"]
 }
 
 STRICT RULES:
 1. LANGUAGE: 100% ENGLISH ONLY.
-2. FORMAT: Start exactly with: 🃏 **[Card Name]** followed by a blank line.
-3. LENGTH: Max 35 words for the insight. Total caption under 350 characters.
-4. HASHTAGS: Must be an array of strings starting with '#'.
+2. FORMAT: Start exactly with:  <b>[Card Name]</b> (use HTML bold tags, NOT asterisks)
+3. LENGTH: 60-100 words for the main text (not counting the question). Make it engaging, not generic.
+4. TONE: Mystical yet practical, empowering, insightful. Avoid clichés.
+5. CONTENT: Be specific to THIS card's meaning. Don't write generic advice.
+6. QUESTION: Make it personal and thought-provoking, not yes/no question.
+7. HASHTAGS: Must be an array of strings starting with '#'.
+
+EXAMPLE OUTPUT:
+{
+  "caption": "🃏 <b>The Emperor</b>\\n\\nStructure creates freedom today. This card reminds us that true power comes from establishing clear boundaries and taking command of chaos. When you build solid foundations with intention and authority, you transform raw plans into sustainable reality.\\n\\nTake charge of your environment. Set firm limits, create order from disorder, and lead with confidence. Your ability to establish structure now will support your long-term goals.\\n\\n<b>Reflection Question:</b> Where in your life do you need to establish firmer boundaries to create lasting freedom?",
+  "hashtags": ["#LUNARA", "#DailyTarot", "#TheEmperor", "#TarotReading"]
+}
 `.trim();
   }
 
@@ -308,10 +324,10 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Gemini', emoji: '' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
-    { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
-    { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
+    { name: 'Libra', emoji: '' }, { name: 'Scorpio', emoji: '♏' },
+    { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '' },
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
@@ -345,9 +361,9 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
 
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
-    { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
+    { name: 'Gemini', emoji: '' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
-    { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
+    { name: 'Libra', emoji: '' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
@@ -397,7 +413,7 @@ export class TelegramOrchestrator {
     addLog(`📋 Agent Type: ${request.agentType}`);
     addLog(`📋 Post Type: ${request.postType}`);
     addLog(`📋 Content Theme: ${request.contentTheme || 'Automatic'}`);
-    addLog(`📋 Zodiac Sign: ${request.zodiacSign || 'General'}`);
+    addLog(` Zodiac Sign: ${request.zodiacSign || 'General'}`);
     addLog('================================================');
 
     try {
@@ -405,7 +421,7 @@ export class TelegramOrchestrator {
         throw new Error('Both agentType and postType are required.');
       }
 
-      addLog('📥 ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
+      addLog(' ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('*')
@@ -423,7 +439,7 @@ export class TelegramOrchestrator {
       addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
       addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
 
-      addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს...');
+      addLog(' ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს...');
       let jobImageLogic = '';
       let useAiImage = true; 
       
@@ -443,7 +459,7 @@ export class TelegramOrchestrator {
         useAiImage = jobData.use_ai_image ?? true;
         addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
         addLog(`🔘 AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
-        addLog(`📝 Image Prompt Logic Length: ${jobImageLogic.length} characters`);
+        addLog(` Image Prompt Logic Length: ${jobImageLogic.length} characters`);
       } else {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
@@ -473,7 +489,7 @@ export class TelegramOrchestrator {
         addLog(`🧠 AI-ს გადაეცა კონკრეტული ნიშანი: ${request.zodiacSign}`);
       }
 
-      addLog('🤖 ნაბიჯი 5: ვირჩევ საუკეთესო ჩეთ მოდელს...');
+      addLog(' ნაბიჯი 5: ვირჩევ საუკეთესო ჩეთ მოდელს...');
       let chatModelInfo = await getBestAvailableModel('chat');
       addLog(`✅ საუკეთესო მოდელი: ${chatModelInfo?.modelName || 'NULL'} (${chatModelInfo?.provider || 'unknown'})`);
       
@@ -515,7 +531,7 @@ export class TelegramOrchestrator {
         let rawContent: string | undefined;
 
         try {
-          addLog('📝 ვაგებ სისტემურ პრომპტს...');
+          addLog(' ვაგებ სისტემურ პრომპტს...');
           const systemPrompt = [
             config.master_prompt,
             '',
@@ -571,8 +587,8 @@ export class TelegramOrchestrator {
 
           const maskedEndpoint = chatEndpoint.replace(/key=[^&]+/, 'key=***');
           addLog(`🔗 API Endpoint: ${maskedEndpoint}`);
-          addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
-          addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
+          addLog(` Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
+          addLog(' ვაგზავნი მოთხოვნას AI-ს...');
 
           let response: Response;
           try {
@@ -626,13 +642,13 @@ export class TelegramOrchestrator {
             throw new Error(`მოდელმა დააბრუნა ცარიელი პასუხი. JSON: ${JSON.stringify(data).substring(0, 150)}`);
           }
 
-          addLog(`📝 AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო):\n${rawContent.substring(0, 500)}...`);
+          addLog(` AI-ის ნედლი პასუხი (პირველი 500 სიმბოლო):\n${rawContent.substring(0, 500)}...`);
 
           addLog('🔍 ვამოწმებ ვალიდაციას...');
           generatedContent = parseGeneratedContent(rawContent, request.postType);
           addLog('✅ ვალიდაცია წარმატებით გაიარა!');
           addLog(`📝 Caption Length: ${generatedContent.caption.length} characters`);
-          addLog(`📝 Hashtags Count: ${generatedContent.hashtags?.length || 0}`);
+          addLog(` Hashtags Count: ${generatedContent.hashtags?.length || 0}`);
           
           textGenerationSuccess = true;
           addLog('✅ ტექსტის გენერაცია წარმატებით დასრულდა!');
@@ -683,13 +699,13 @@ export class TelegramOrchestrator {
       imagePrompt = generatedContent.image_prompt || '';
       
       if (request.postType === 'daily_horoscope_12_signs') {
-        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას...');
+        addLog(' ვიყენებ 12 ნიშნის ფორმატირებას...');
         caption = applyBoldFormattingToZodiac(generatedContent.caption);
       } else if (request.postType === 'daily_horoscope_single') {
         addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას...');
         caption = applyBoldFormattingToSingleSign(generatedContent.caption);
       } else if (request.postType === 'daily_tarot_card') {
-        addLog('🎨 ვიყენებ ტაროს სტანდარტულ ფორმატირებას...');
+        addLog('🎨 ვიყენებ ტაროს ფორმატირებას (HTML ბოლდით)...');
         caption = generatedContent.caption
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -724,7 +740,7 @@ export class TelegramOrchestrator {
       if (request.postType === 'daily_horoscope_single') {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
-        addLog(`🖼️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
+        addLog(`️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
         addLog(`🔗 Image URL: ${imageUrl}`);
         
         imageResult = {
@@ -736,7 +752,7 @@ export class TelegramOrchestrator {
       } 
       else if (request.postType === 'daily_tarot_card' && selectedTarotCard) {
         const imageUrl = `${CLOUDFLARE_R2_BASE_URL}/tarot/${selectedTarotCard.filename}`;
-        addLog(`🃏 ვიყენებ Cloudflare R2 სურათს: ${imageUrl}`);
+        addLog(` ვიყენებ Cloudflare R2 სურათს: ${imageUrl}`);
         imageResult = {
           success: true,
           imageUrl: imageUrl,
@@ -745,7 +761,7 @@ export class TelegramOrchestrator {
         imageProvider = 'cloudflare_r2_tarot';
       }
       else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
+        addLog('️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
         addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
         
@@ -803,7 +819,7 @@ export class TelegramOrchestrator {
         const captionChunks = splitTelegramText(escapedCaption, TELEGRAM_CAPTION_LIMIT);
         const photoCaption = captionChunks[0] || '';
 
-        addLog(`📸 Photo Caption Length: ${photoCaption.length} characters`);
+        addLog(` Photo Caption Length: ${photoCaption.length} characters`);
         
         let photoResult: TelegramPublishResult;
         
@@ -854,7 +870,7 @@ export class TelegramOrchestrator {
           throw new Error('The generated Telegram caption is empty.');
         }
 
-        addLog(`📦 ტექსტური ნაწილების რაოდენობა: ${textChunks.length}`);
+        addLog(` ტექსტური ნაწილების რაოდენობა: ${textChunks.length}`);
 
         for (let index = 0; index < textChunks.length; index++) {
           const chunk = textChunks[index];
@@ -895,7 +911,7 @@ export class TelegramOrchestrator {
       });
 
       if (databaseError) {
-        addWarning(`⚠️ Supabase logging failed: ${databaseError.message}`);
+        addWarning(`️ Supabase logging failed: ${databaseError.message}`);
       } else {
         addLog('✅ პუბლიკაცია წარმატებით ჩაიწერა Supabase-ში.');
       }
