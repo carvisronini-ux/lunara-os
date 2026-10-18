@@ -153,7 +153,7 @@ export async function GET(request: Request) {
         const lastPublishedStr = lastPublishedDate.toISOString().split('T')[0];
         
         if (lastPublishedStr === dateStr) {
-          logInfo(`✅ უკვე გამოქვეყნებული დღეს: ${post_type} (${scheduled_time})`);
+          logInfo(`✅ უკვე გამოქვეყნებული დღესა: ${post_type} (${scheduled_time})`);
           results.push({
             post_type,
             scheduled_time,
