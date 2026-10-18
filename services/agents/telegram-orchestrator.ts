@@ -198,12 +198,12 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
 
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacMap = [
-      { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+      { name: 'Aries', emoji: '' }, { name: 'Taurus', emoji: '♉' },
       { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
       { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
       { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
       { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-      { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+      { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '' }
     ];
 
     const missingEmojis = zodiacMap.filter(z => !finalCaption.includes(z.emoji));
@@ -234,7 +234,6 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
       throw new Error(`The AI response is too short (${finalCaption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
     }
 
-    // ✅ მკაცრი ლიმიტი, რათა ჰეშთეგებთან ერთად ეტეოდეს 950 სიმბოლოში და არ გაიყოს ცალკე პოსტად
     if (finalCaption.length > 800) {
       throw new Error(`The AI response is too long (${finalCaption.length} chars). For 12-sign horoscope, caption must be under 800 characters to fit in a single post with hashtags.`);
     }
@@ -276,7 +275,7 @@ MANDATORY OUTPUT FORMAT: Return ONLY a valid JSON object. No markdown, no extra 
 
 JSON STRUCTURE:
 {
-  "caption": "🃏 <b>${selectedTarotCard.name}</b>\\n\\n[2-3 engaging paragraphs in English. First paragraph: Explain the card's core meaning and energy in a relatable way. Second paragraph: Provide practical, actionable guidance for today - how can the user apply this card's wisdom? Third paragraph (optional): Add a deeper insight or warning. Total: 60-100 words].\\n\\n<b>Reflection Question:</b> [One thought-provoking question in English that encourages self-reflection]",
+  "caption": " <b>${selectedTarotCard.name}</b>\\n\\n[2-3 engaging paragraphs in English. First paragraph: Explain the card's core meaning and energy in a relatable way. Second paragraph: Provide practical, actionable guidance for today - how can the user apply this card's wisdom? Third paragraph (optional): Add a deeper insight or warning. Total: 60-100 words].\\n\\n<b>Reflection Question:</b> [One thought-provoking question in English that encourages self-reflection]",
   "hashtags": ["#LUNARA", "#DailyTarot", "#${selectedTarotCard.name.replace(/\s+/g, '')}", "#TarotReading"]
 }
 
@@ -310,25 +309,26 @@ Generate the content strictly following the system instructions provided above. 
 `.trim();
 }
 
-// ✅ უსაფრთხო და გამარტივებული ფორმატირება: ჯერ შლის **-ს, მერე ამატებს სუფთა HTML-ს
+// ✅ განახლებული: ამოწმებს, არის თუ არა ემოჯი უკვე სახელის წინ, რათა თავიდან აიცილოს დუბლირება
 function applyBoldFormattingToSingleSign(rawCaption: string): string {
   let safeText = rawCaption
-    .replace(/\*\*/g, '') // ვშლით ყველა არსებულ Markdown ბოლდს
+    .replace(/\*\*/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
   const zodiacMap = [
-    { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
+    { name: 'Aries', emoji: '' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
     { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
-    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
+    { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '' }
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    safeText = safeText.replace(new RegExp(`(^|\\n|\\s)${name}\\s*[:\\,]`, 'gi'), `$1${emoji} <b>${name}</b>:`);
+    // ეს რეგექსი პოულობს სახელს (თუნდაც ემოჯი იყოს მის წინ) და ანაცვლებს სტანდარტული ფორმატით
+    safeText = safeText.replace(new RegExp(`(^|\\n|\\s)(?:${emoji}\\s*)?${name}\\s*[:\\,]`, 'gi'), `$1${emoji} <b>${name}</b>:`);
   });
 
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
@@ -338,10 +338,10 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
   return safeText.trim();
 }
 
-// ✅ უსაფრთხო და გამარტივებული ფორმატირება: ჯერ შლის **-ს, მერე ამატებს სუფთა HTML-ს
+// ✅ განახლებული: ამოწმებს, არის თუ არა ემოჯი უკვე სახელის წინ, რათა თავიდან აიცილოს დუბლირება
 function applyBoldFormattingToZodiac(rawCaption: string): string {
   let safeText = rawCaption
-    .replace(/\*\*/g, '') // ვშლით ყველა არსებულ Markdown ბოლდს
+    .replace(/\*\*/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -351,14 +351,15 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
-    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '♍' },
+    { name: 'Leo', emoji: '♌' }, { name: 'Virgo', emoji: '' },
     { name: 'Libra', emoji: '♎' }, { name: 'Scorpio', emoji: '♏' },
     { name: 'Sagittarius', emoji: '♐' }, { name: 'Capricorn', emoji: '♑' },
     { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    safeText = safeText.replace(new RegExp(`(^|\\n|\\s)${name}\\s*[:\\,]`, 'gi'), `$1${emoji} <b>${name}</b>:`);
+    // ეს რეგექსი პოულობს სახელს (თუნდაც ემოჯი იყოს მის წინ) და ანაცვლებს სტანდარტული ფორმატით
+    safeText = safeText.replace(new RegExp(`(^|\\n|\\s)(?:${emoji}\\s*)?${name}\\s*[:\\,]`, 'gi'), `$1${emoji} <b>${name}</b>:`);
   });
 
   safeText = safeText.replace(/:\s{2,}/g, ': ');
@@ -393,9 +394,9 @@ export class TelegramOrchestrator {
     };
 
     addLog('================================================');
-    addLog('🚀 AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
+    addLog(' AI იწყებს კონტენტის გენერაციას და პუბლიკაციას...');
     addLog(`📋 Agent Type: ${request.agentType}`);
-    addLog(`📋 Post Type: ${request.postType}`);
+    addLog(` Post Type: ${request.postType}`);
     addLog(`📋 Content Theme: ${request.contentTheme || 'Automatic'}`);
     addLog(`📋 Zodiac Sign: ${request.zodiacSign || 'General'}`);
     addLog('================================================');
@@ -405,7 +406,7 @@ export class TelegramOrchestrator {
         throw new Error('Both agentType and postType are required.');
       }
 
-      addLog('📥 ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
+      addLog(' ნაბიჯი 1: ვიტვირთავ აგენტის კონფიგურაციას Supabase-იდან...');
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('*')
@@ -421,7 +422,7 @@ export class TelegramOrchestrator {
       }
 
       addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
-      addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
+      addLog(` Master Prompt Length: ${config.master_prompt.length} characters`);
 
       addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს (აღწერასაც!)...');
       let jobDescription = '';
@@ -565,7 +566,7 @@ export class TelegramOrchestrator {
           const maskedEndpoint = chatEndpoint.replace(/key=[^&]+/, 'key=***');
           addLog(`🔗 API Endpoint: ${maskedEndpoint}`);
           addLog(`📤 Request Body Size: ${JSON.stringify(requestBody).length} bytes`);
-          addLog('📤 ვაგზავნი მოთხოვნას AI-ს...');
+          addLog(' ვაგზავნი მოთხოვნას AI-ს...');
 
           let response: Response;
           try {
@@ -579,7 +580,7 @@ export class TelegramOrchestrator {
             clearTimeout(timeoutId);
           }
 
-          addLog(`📥 მივიღე პასუხი: HTTP ${response.status}`);
+          addLog(` მივიღე პასუხი: HTTP ${response.status}`);
 
           if (!response.ok) {
             const errorText = await response.text().catch(() => 'No response body');
@@ -699,7 +700,7 @@ export class TelegramOrchestrator {
       const hashtagsLine = hashtags.join(' ');
       caption = hashtagsLine ? `${cleanCaption}\n\n${hashtagsLine}` : cleanCaption;
 
-      addLog(`📝 Final Caption Length: ${caption.length} characters`);
+      addLog(` Final Caption Length: ${caption.length} characters`);
 
       if (caption.length > TELEGRAM_CAPTION_LIMIT) {
         addWarning(`⚠️ CRITICAL: Final caption length (${caption.length} chars) exceeds safe limit.`);
@@ -715,7 +716,7 @@ export class TelegramOrchestrator {
         const sign = (request.zodiacSign || 'Aries').toLowerCase().trim();
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/telegram/zodiacsigns/${sign}.png`;
         addLog(`🖼️ Single Sign Horoscope: ვიყენებ წინასწარ ატვირთულ ფოტოს: ${sign}`);
-        addLog(`🔗 Image URL: ${imageUrl}`);
+        addLog(` Image URL: ${imageUrl}`);
         
         imageResult = {
           success: true,
@@ -735,7 +736,7 @@ export class TelegramOrchestrator {
         imageProvider = 'cloudflare_r2_tarot';
       }
       else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
-        addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
+        addLog('️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
         addLog(`🎲 შემთხვევით შერჩეული სტატიკური სურათი: ${randomImage}`);
         
@@ -776,7 +777,7 @@ export class TelegramOrchestrator {
           imageResult = null;
         }
       } else {
-        addWarning('⚠️ image_prompt არ არის. ვაგზავნით მხოლოდ ტექსტს.');
+        addWarning('️ image_prompt არ არის. ვაგზავნით მხოლოდ ტექსტს.');
       }
 
       addLog('================================================');
@@ -816,7 +817,7 @@ export class TelegramOrchestrator {
 
           const remainingChunks = captionChunks.slice(1);
           if (remainingChunks.length > 0) {
-            addWarning(`⚠️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
+            addWarning(`️ Caption აღემატება ლიმიტს. ვაგზავნი ${remainingChunks.length} დამატებით ტექსტურ ნაწილს.`);
             for (const chunk of remainingChunks) {
               try {
                 const continuationResult = (await sendTelegramMessage({
