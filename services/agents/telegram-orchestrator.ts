@@ -439,13 +439,15 @@ export class TelegramOrchestrator {
       addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
       addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
 
-      addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს...');
+      // ✅ ნაბიჯი 2: ახლა ვკითხულობთ 'description'-საც!
+      addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს (აღწერასაც!)...');
+      let jobDescription = '';
       let jobImageLogic = '';
       let useAiImage = true; 
       
       const { data: jobData, error: jobError } = await supabase
         .from('agent_jobs')
-        .select('image_prompt_logic, use_ai_image')
+        .select('description, image_prompt_logic, use_ai_image')
         .eq('agent_type', request.agentType)
         .eq('post_type', request.postType)
         .single();
@@ -455,11 +457,12 @@ export class TelegramOrchestrator {
       }
 
       if (jobData) {
+        jobDescription = jobData.description || '';
         jobImageLogic = jobData.image_prompt_logic || '';
         useAiImage = jobData.use_ai_image ?? true;
         addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
         addLog(`🔘 AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
-        addLog(`📝 Image Prompt Logic Length: ${jobImageLogic.length} characters`);
+        addLog(`📝 Description Length: ${jobDescription.length} characters`);
       } else {
         addLog(`⚠️ დავალების ინსტრუქცია ვერ მოიძებნა ${request.postType}-ისთვის.`);
       }
@@ -532,19 +535,14 @@ export class TelegramOrchestrator {
 
         try {
           addLog('📝 ვაგებ სისტემურ პრომპტს...');
+          // ✅ აქ ვამატებთ jobDescription-ს სისტემურ პრომპტში, რათა AI-მ ზუსტად იცოდეს წესები!
           const systemPrompt = [
             config.master_prompt,
             '',
             'CRITICAL LANGUAGE RULE: ALL OUTPUT MUST BE STRICTLY IN ENGLISH. DO NOT USE GEORGIAN.',
             '',
-            'THINKING STYLE:',
-            config.thinking_style || 'Use clear, structured reasoning internally.',
-            '',
-            'SKILLS & CONSTRAINTS:',
-            config.skills_constraints || 'Follow the agent instructions.',
-            '',
-            'JOB-SPECIFIC IMAGE INSTRUCTIONS:',
-            jobImageLogic || 'Follow general LUNARA visual guidelines.',
+            'SPECIFIC JOB INSTRUCTIONS (FOLLOW THESE STRICTLY):',
+            jobDescription || 'Follow general LUNARA guidelines.',
             '',
             'OUTPUT FORMAT:',
             'Return only a valid JSON object with caption, image_prompt and hashtags.',
