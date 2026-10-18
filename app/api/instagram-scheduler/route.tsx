@@ -51,10 +51,9 @@ export async function GET() {
   logInfo(`🚀 დაიწყო შემოწმება. დრო: ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}`);
 
   try {
-    // 1. წავიკითხოთ დღევანდელი აქტიური განრიგი
     const { data: schedules, error: fetchError } = await supabase
       .from('content_schedule')
-      .select('time, content_type, zodiac_sign, content_theme, goal')
+      .select('time, content_type, zodiac_sign')
       .eq('is_active', true)
       .eq('day_of_week', dbDayOfWeek)
       .eq('content_type', 'post')
@@ -65,16 +64,14 @@ export async function GET() {
     const results = [];
 
     for (const schedule of schedules || []) {
-      // ✅ გამოსწორებულია: 'id' ამოღებულია, რადგან არ გამოიყენება და ბილდს აჩერებდა
-      const { time: scheduled_time, zodiac_sign, content_theme } = schedule;
+      // ✅ საბოლოო გამოსწორება: მხოლოდ ის ცვლადებია დატოვებული, რომლებიც რეალურად გამოიყენება
+      const { time: scheduled_time, zodiac_sign } = schedule;
 
-      // 2. დროის შემოწმება
       if (!isTimeInWindow(scheduled_time, hours, minutes)) {
         results.push({ post: scheduled_time, status: 'skipped', reason: 'Not in time window' });
         continue;
       }
 
-      // 3. დუბლიკატების შემოწმება (დღეს უკვე დაიპოსტა?)
       const { data: alreadyPublished } = await supabase
         .from('published_content')
         .select('id')
@@ -93,7 +90,6 @@ export async function GET() {
       logInfo(`📤 იწყება დამუშავება: ${scheduled_time} (${zodiac_sign || 'Random'})`);
 
       try {
-        // 4. AI ტექსტის გენერაცია
         const targetZodiac = zodiac_sign || 'ARIES'; 
         
         const { data: config } = await supabase
@@ -108,7 +104,6 @@ export async function GET() {
         const text2 = await generateHoroscopeText2(targetZodiac, text1, config);
         if (!text2) throw new Error('Text 2 generation failed');
 
-        // 5. სურათის გენერაცია სერვერზე (@vercel/og)
         logInfo('🎨 იქმნება სურათი სერვერზე...');
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.toLowerCase()}.png`;
         
@@ -139,7 +134,6 @@ export async function GET() {
         const imageBuffer = await imageResponse.arrayBuffer();
         const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
 
-        // 6. ატვირთვა Supabase Storage-ში
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('lunara-assets')
@@ -151,7 +145,6 @@ export async function GET() {
         const finalImageUrl = urlData.publicUrl;
         logInfo(`✅ სურათი აიტვირთა: ${finalImageUrl}`);
 
-        // 7. პუბლიკაცია
         const { data: profile, error: profileError } = await supabase
           .from('instagram_accounts')
           .select('instagram_user_id, instagram_access_token, username')
