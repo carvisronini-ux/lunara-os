@@ -62,7 +62,6 @@ const STATIC_ZODIAC_IMAGES = [
   'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsign2.png'
 ];
 
-// ✅ შენი Cloudflare R2 ბაზის URL
 const CLOUDFLARE_R2_BASE_URL = 'https://pub-8ab8b85d503246b9a786ae8d275f27f7.r2.dev'; 
 
 const TAROT_CARDS = [
@@ -159,7 +158,6 @@ function splitTelegramText(text: string, maxLength: number): string[] {
   return chunks;
 }
 
-// ✅ გასწორებული ვერსია: ვიყენებთ finalCaption ცვლადს TypeScript-ის შეცდომების თავიდან ასაცილებლად
 function parseGeneratedContent(rawContent: unknown, postType?: string): GeneratedContent {
   if (typeof rawContent !== 'string' || !rawContent.trim()) {
     throw new Error('The AI returned an empty response.');
@@ -196,10 +194,8 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     throw new Error('The AI returned an invalid hashtags field.');
   }
 
-  // ✅ ვიყენებთ ცალკე ცვლადს, რათა თავიდან ავიცილოთ 'unknown' ტიპის შეცდომა
   let finalCaption = data.caption as string;
 
-  // ✅ 12 ნიშნის ლოგიკა თვითაღდგენით (Auto-Inject)
   if (postType === 'daily_horoscope_12_signs') {
     const zodiacMap = [
       { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
@@ -210,31 +206,25 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
       { name: 'Aquarius', emoji: '♒' }, { name: 'Pisces', emoji: '♓' }
     ];
 
-    // 1. ვამოწმებთ რამდენი ემოჯი აკლია
     const missingEmojis = zodiacMap.filter(z => !finalCaption.includes(z.emoji));
     
-    // 2. თუ ემოჯები აკლია, ვცდილობთ მათ ჩაწერას სახელების მიხედვით
     if (missingEmojis.length > 0) {
       let fixedCaption = finalCaption;
       let injectedCount = 0;
 
       missingEmojis.forEach(z => {
-        // ვეძებთ სახელს (მაგ. "Aries:") და ვამატებთ ემოჯს თუ არ არის
         const regex = new RegExp(`(^|\\n)\\s*${z.name}\\s*[:\\,]`, 'gi');
         if (regex.test(fixedCaption)) {
-          // ვცვლით "Aries:" -> "♈ Aries:"
           fixedCaption = fixedCaption.replace(new RegExp(`\\b${z.name}\\b`, 'g'), `${z.emoji} ${z.name}`);
           injectedCount++;
         }
       });
 
-      // თუ ჩავწერეთ ემოჯები, ვინახავთ გასწორებულ ვერსიას
       if (injectedCount > 0) {
         finalCaption = fixedCaption;
       }
     }
 
-    // 3. საბოლოო შემოწმება: თუ მაინც ბევრი აკლია (3-ზე მეტი), ვაგდებთ შეცდომას
     const finalMissing = zodiacMap.filter(z => !finalCaption.includes(z.emoji));
     if (finalMissing.length > 3) {
       throw new Error(`The AI response is missing too many zodiac emojis (${finalMissing.length} missing) and auto-fix failed.`);
@@ -251,7 +241,6 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  // ✅ ტაროსთვის გავზარდეთ ლიმიტი 900 სიმბოლომდე
   if (postType === 'daily_tarot_card') {
     if (finalCaption.length > 900) {
       throw new Error(`Tarot caption is too long (${finalCaption.length} chars). Max 900 characters allowed.`);
@@ -439,10 +428,8 @@ export class TelegramOrchestrator {
       addLog('✅ აგენტის კონფიგურაცია წარმატებით ჩაიტვირთა.');
       addLog(`📝 Master Prompt Length: ${config.master_prompt.length} characters`);
 
-      // ✅ ნაბიჯი 2: ახლა ვკითხულობთ 'description'-საც!
       addLog('📥 ნაბიჯი 2: ვიტვირთავ დავალების სპეციფიკურ ინსტრუქციებს (აღწერასაც!)...');
       let jobDescription = '';
-      let jobImageLogic = '';
       let useAiImage = true; 
       
       const { data: jobData, error: jobError } = await supabase
@@ -458,7 +445,6 @@ export class TelegramOrchestrator {
 
       if (jobData) {
         jobDescription = jobData.description || '';
-        jobImageLogic = jobData.image_prompt_logic || '';
         useAiImage = jobData.use_ai_image ?? true;
         addLog(`✅ დავალების ინსტრუქცია წაიკითხა: ${request.postType}`);
         addLog(`🔘 AI Image Toggle: ${useAiImage ? 'ON' : 'OFF'}`);
@@ -471,7 +457,6 @@ export class TelegramOrchestrator {
       await credentialVault.ready;
       addLog('✅ CredentialVault მზადაა.');
 
-      // ✅ სპეციალური ლოგიკა ტაროსთვის: შემთხვევითი კარტის არჩევა
       let selectedTarotCard = null;
       if (request.postType === 'daily_tarot_card') {
         selectedTarotCard = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
@@ -535,7 +520,6 @@ export class TelegramOrchestrator {
 
         try {
           addLog('📝 ვაგებ სისტემურ პრომპტს...');
-          // ✅ აქ ვამატებთ jobDescription-ს სისტემურ პრომპტში, რათა AI-მ ზუსტად იცოდეს წესები!
           const systemPrompt = [
             config.master_prompt,
             '',
@@ -704,7 +688,6 @@ export class TelegramOrchestrator {
         caption = applyBoldFormattingToSingleSign(generatedContent.caption);
       } else if (request.postType === 'daily_tarot_card') {
         addLog('🎨 ვიყენებ ტაროს ფორმატირებას (HTML ბოლდით)...');
-        // ✅ აქ არის გამოსწორება: ვტოვებთ <b> ტეგებს უცვლელად, მხოლოდ &-ს ვცვლით უსაფრთხოებისთვის
         caption = generatedContent.caption.replace(/&/g, '&amp;');
       } else {
         addLog('🎨 ვიყენებ სტანდარტულ HTML ექსკეიპ ფორმატირებას...');
