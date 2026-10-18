@@ -7,6 +7,14 @@ import { telegramOrchestrator } from '@/services/agents/telegram-orchestrator';
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 
+// ჰედერები, რომლებიც კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას (Caching)
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+  'Surrogate-Control': 'no-store'
+};
+
 function logInfo(message: string, details?: unknown): void {
   console.info(`[Scheduler] ${message}`, details || '');
 }
@@ -79,7 +87,10 @@ export async function GET() {
 
     if (fetchError) {
       logError('❌ ვერ წაიკითხა განრიგები', fetchError);
-      return NextResponse.json({ success: false, error: 'Failed to fetch schedules' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Failed to fetch schedules' }, { 
+        status: 500,
+        headers: NO_CACHE_HEADERS 
+      });
     }
 
     logInfo(`📋 ნაპოვნია ${schedules?.length || 0} აქტიური განრიგი დღევანდელი დღისთვის`);
@@ -161,6 +172,7 @@ export async function GET() {
 
     logInfo(`🏁 Scheduler დასრულდა ${duration}ms-ში`, summary);
 
+    // ✅ დამატებულია NO_CACHE_HEADERS, რათა Vercel-მა პასუხი არ შეინახოს
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),
@@ -168,11 +180,16 @@ export async function GET() {
       results,
       summary,
       durationMs: duration,
+    }, {
+      headers: NO_CACHE_HEADERS
     });
 
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     logError('💥 კრიტიკული შეცდომა scheduler-ში', error);
-    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMessage }, { 
+      status: 500,
+      headers: NO_CACHE_HEADERS
+    });
   }
 }

@@ -13,9 +13,9 @@ jobs:
       - name: Call Telegram Scheduler
         run: |
           echo "🚀 Triggering Telegram scheduler at $(date)"
-          curl -f https://lunara-os.vercel.app/api/scheduler || echo "⚠️ Telegram scheduler returned an error, but continuing..."
+          curl -f "https://lunara-os.vercel.app/api/scheduler?t=$(date +%s)" || echo "⚠️ Telegram scheduler returned an error, but continuing..."
       
       - name: Call Instagram Scheduler
         run: |
           echo "🚀 Triggering Instagram scheduler at $(date)"
-          curl -f https://lunara-os.vercel.app/api/instagram-scheduler || echo "⚠️ Instagram scheduler returned an error, but continuing..."
+          curl -f "https://lunara-os.vercel.app/api/instagram-scheduler?t=$(date +%s)" || echo "⚠️ Instagram scheduler returned an error, but continuing..."
