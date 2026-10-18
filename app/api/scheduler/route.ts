@@ -1,3 +1,5 @@
+// /home/carvisronini-ux/lunara-os/app/api/scheduler/route.ts
+
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { telegramOrchestrator } from '@/services/agents/telegram-orchestrator';
@@ -6,19 +8,11 @@ const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 
 function logInfo(message: string, details?: unknown): void {
-  if (details !== undefined) {
-    console.info(`[Scheduler] ${message}`, details);
-    return;
-  }
-  console.info(`[Scheduler] ${message}`);
+  console.info(`[Scheduler] ${message}`, details || '');
 }
 
 function logError(message: string, details?: unknown): void {
-  if (details !== undefined) {
-    console.error(`[Scheduler] ${message}`, details);
-    return;
-  }
-  console.error(`[Scheduler] ${message}`);
+  console.error(`[Scheduler] ${message}`, details || '');
 }
 
 function getErrorMessage(error: unknown): string {
@@ -27,37 +21,33 @@ function getErrorMessage(error: unknown): string {
   return 'An unknown error occurred.';
 }
 
-function getCurrentGeorgiaTime(): { hours: number; minutes: number; dateStr: string } {
+// მივიღოთ მიმდინარე დრო საქართველოში და გარდავქმნათ UI-ს day_of_week ფორმატში
+function getCurrentGeorgiaTime() {
   const now = new Date();
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: GEORGIA_TIMEZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const parts = formatter.formatToParts(now);
-  const hours = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
-  const minutes = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
-  const year = parts.find(p => p.type === 'year')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const day = parts.find(p => p.type === 'day')?.value;
-  const dateStr = `${year}-${month}-${day}`;
-  return { hours, minutes, dateStr };
+  const georgiaTimeStr = now.toLocaleString('en-US', { timeZone: GEORGIA_TIMEZONE });
+  const georgiaDate = new Date(georgiaTimeStr);
+  
+  // JS getDay(): 0=კვირა, 1=ორშაბათი, ..., 6=შაბათი
+  // ჩვენი DB/UI: 0=ორშაბათი, 1=სამშაბათი, ..., 6=კვირა
+  const jsDay = georgiaDate.getDay();
+  const dbDayOfWeek = (jsDay + 6) % 7; 
+  
+  const hours = georgiaDate.getHours();
+  const minutes = georgiaDate.getMinutes();
+  const dateStr = georgiaDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  return { dbDayOfWeek, hours, minutes, dateStr, now };
 }
 
-function isTimeInWindow(
-  scheduledHour: number,
-  scheduledMinute: number,
-  currentHour: number,
-  currentMinute: number,
-  windowMinutes: number
-): boolean {
-  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute;
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
+function isTimeInWindow(schedTime: string, currentHours: number, currentMinutes: number, windowMinutes: number): boolean {
+  const [schedHourStr, schedMinuteStr] = schedTime.split(':');
+  const schedHour = parseInt(schedHourStr, 10);
+  const schedMinute = parseInt(schedMinuteStr, 10);
+  
+  const scheduledTotalMinutes = schedHour * 60 + schedMinute;
+  const currentTotalMinutes = currentHours * 60 + currentMinutes;
   const diff = currentTotalMinutes - scheduledTotalMinutes;
+  
   return diff >= 0 && diff <= windowMinutes;
 }
 
@@ -74,67 +64,75 @@ export async function GET() {
   logInfo('🚀 Scheduler დაიწყო...');
 
   try {
-    const { hours, minutes, dateStr } = getCurrentGeorgiaTime();
+    const { dbDayOfWeek, hours, minutes, dateStr, now } = getCurrentGeorgiaTime();
     const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    logInfo(`🕐 მიმდინარე დრო (საქართველო): ${currentTimeStr} (${dateStr})`);
+    
+    logInfo(`🕐 მიმდინარე დრო (საქართველო): ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}, თარიღი: ${dateStr}`);
 
+    // 1. წავიკითხოთ მხოლოდ დღევანდელი, აქტიური განრიგები
     const { data: schedules, error: fetchError } = await supabase
-      .from('schedules')
-      .select('*')
+      .from('telegram_schedule')
+      .select('id, day_of_week, time, post_type, content_category, zodiac_sign, content_theme, last_run_at, is_active')
       .eq('is_active', true)
-      .order('scheduled_time');
+      .eq('day_of_week', dbDayOfWeek)
+      .order('time', { ascending: true });
 
     if (fetchError) {
       logError('❌ ვერ წაიკითხა განრიგები', fetchError);
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch schedules', details: fetchError },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'Failed to fetch schedules' }, { status: 500 });
     }
 
-    logInfo(`📋 ნაპოვნია ${schedules?.length || 0} აქტიური განრიგი`);
+    logInfo(`📋 ნაპოვნია ${schedules?.length || 0} აქტიური განრიგი დღევანდელი დღისთვის`);
 
     for (const schedule of schedules || []) {
-      const { post_type, agent_type, scheduled_time, last_published_at, id } = schedule;
-      const [schedHourStr, schedMinuteStr] = scheduled_time.split(':');
-      const schedHour = parseInt(schedHourStr, 10);
-      const schedMinute = parseInt(schedMinuteStr, 10);
+      const { id, post_type, content_category, zodiac_sign, content_theme, time: scheduled_time, last_run_at } = schedule;
 
-      const isInWindow = isTimeInWindow(schedHour, schedMinute, hours, minutes, SCHEDULE_WINDOW_MINUTES);
+      // 2. შევამოწმოთ დროის ფანჯარა
+      const isInWindow = isTimeInWindow(scheduled_time, hours, minutes, SCHEDULE_WINDOW_MINUTES);
 
       if (!isInWindow) {
-        logInfo(`⏭️ გამოტოვებული: ${post_type} (${scheduled_time}) - არ არის დროში`);
         results.push({ post_type, scheduled_time, status: 'skipped', message: 'Not in time window' });
         continue;
       }
 
-      if (last_published_at) {
-        const lastPublishedDate = new Date(last_published_at);
-        const lastPublishedStr = lastPublishedDate.toISOString().split('T')[0];
-        if (lastPublishedStr === dateStr) {
-          logInfo(`✅ უკვე გამოქვეყნებული დღეს: ${post_type} (${scheduled_time})`);
+      // 3. შევამოწმოთ last_run_at (დუბლიკატების თავიდან აცილება)
+      if (last_run_at) {
+        const lastRunDate = new Date(last_run_at).toISOString().split('T')[0];
+        if (lastRunDate === dateStr) {
+          logInfo(`✅ უკვე გაგზავნილია დღეს: ${post_type} (${scheduled_time})`);
           results.push({ post_type, scheduled_time, status: 'skipped', message: 'Already published today' });
           continue;
         }
       }
 
+      // 4. დრო მოვიდა! ვაგზავნით პოსტს
       logInfo(`📤 ვაგზავნით: ${post_type} (${scheduled_time})`);
 
       try {
         const response = await telegramOrchestrator.generateAndPublish({
-          agentType: agent_type,
+          agentType: content_category || 'daily_anchor',
           postType: post_type,
+          contentTheme: content_theme || undefined,
+          zodiacSign: zodiac_sign || undefined,
         });
 
         if (response.success) {
           logInfo(`✅ წარმატებით გამოქვეყნდა: ${post_type}`, { messageId: response.messageId });
+          
+          // 5. განვაახლოთ last_run_at და published_at
           const { error: updateError } = await supabase
-            .from('schedules')
-            .update({ last_published_at: new Date().toISOString() })
+            .from('telegram_schedule')
+            .update({ 
+              last_run_at: now.toISOString(),
+              published_at: now.toISOString(),
+              status: 'published'
+            })
             .eq('id', id);
+
           if (updateError) {
-            logError(`⚠️ ვერ განახლდა last_published_at ${post_type}-ისთვის`, updateError);
+            logError(`⚠️ ვერ განახლდა last_run_at ${post_type}-ისთვის`, updateError);
           }
+
           results.push({
             post_type,
             scheduled_time,
@@ -154,31 +152,27 @@ export async function GET() {
     }
 
     const duration = Date.now() - startTime;
-    const publishedCount = results.filter(r => r.status === 'published').length;
-    const failedCount = results.filter(r => r.status === 'failed').length;
-    const skippedCount = results.filter(r => r.status === 'skipped').length;
+    const summary = {
+      total: results.length,
+      published: results.filter(r => r.status === 'published').length,
+      failed: results.filter(r => r.status === 'failed').length,
+      skipped: results.filter(r => r.status === 'skipped').length,
+    };
 
-    logInfo(`🏁 Scheduler დასრულდა ${duration}ms-ში`, {
-      published: publishedCount,
-      failed: failedCount,
-      skipped: skippedCount,
-    });
+    logInfo(`🏁 Scheduler დასრულდა ${duration}ms-ში`, summary);
 
     return NextResponse.json({
       success: true,
-      timestamp: new Date().toISOString(),
+      timestamp: now.toISOString(),
       georgiaTime: currentTimeStr,
       results,
-      summary: { total: results.length, published: publishedCount, failed: failedCount, skipped: skippedCount },
+      summary,
       durationMs: duration,
     });
 
   } catch (error) {
     const errorMessage = getErrorMessage(error);
-    logError(' კრიტიკული შეცდომა scheduler-ში', error);
-    return NextResponse.json(
-      { success: false, error: errorMessage, timestamp: new Date().toISOString() },
-      { status: 500 }
-    );
+    logError('💥 კრიტიკული შეცდომა scheduler-ში', error);
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
 }
