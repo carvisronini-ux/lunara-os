@@ -1,4 +1,4 @@
-// /home/carvisronini-ux/lunara-os/app/api/instagram-scheduler/route.ts
+// /home/carvisronini-ux/lunara-os/app/api/instagram-scheduler/route.tsx
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -54,10 +54,10 @@ export async function GET() {
     // 1. წავიკითხოთ დღევანდელი აქტიური განრიგი
     const { data: schedules, error: fetchError } = await supabase
       .from('content_schedule')
-      .select('id, day_of_week, time, content_type, zodiac_sign, content_theme, goal')
+      .select('time, content_type, zodiac_sign, content_theme, goal')
       .eq('is_active', true)
       .eq('day_of_week', dbDayOfWeek)
-      .eq('content_type', 'post') // ჯერ მხოლოდ პოსტებზე ფოკუსირება
+      .eq('content_type', 'post')
       .order('time', { ascending: true });
 
     if (fetchError) throw new Error(`განრიგის წაკითხვა ვერ მოხერხდა: ${fetchError.message}`);
@@ -65,7 +65,8 @@ export async function GET() {
     const results = [];
 
     for (const schedule of schedules || []) {
-      const { id, time: scheduled_time, zodiac_sign, content_theme } = schedule;
+      // ✅ გამოსწორებულია: 'id' ამოღებულია, რადგან არ გამოიყენება და ბილდს აჩერებდა
+      const { time: scheduled_time, zodiac_sign, content_theme } = schedule;
 
       // 2. დროის შემოწმება
       if (!isTimeInWindow(scheduled_time, hours, minutes)) {
@@ -93,9 +94,8 @@ export async function GET() {
 
       try {
         // 4. AI ტექსტის გენერაცია
-        const targetZodiac = zodiac_sign || 'ARIES'; // Fallback for random
+        const targetZodiac = zodiac_sign || 'ARIES'; 
         
-        // კონფიგურაციის წამოღება (როგორც ბრაუზერში)
         const { data: config } = await supabase
           .from('agent_config')
           .select('master_prompt, thinking_style, skills_constraints')
@@ -112,27 +112,22 @@ export async function GET() {
         logInfo('🎨 იქმნება სურათი სერვერზე...');
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.toLowerCase()}.png`;
         
-        // აქ ვიყენებთ @vercel/og-ს Canvas-ის ნაცვლად
         const imageResponse = new ImageResponse(
           (
             <div style={{ display: 'flex', flexDirection: 'column', width: '1080px', height: '1350px', backgroundColor: '#0f172a', position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
               <img src={imageUrl} style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
               <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }} />
               
-              {/* ლოგო */}
               <img src={DEFAULT_LOGO_URL} style={{ position: 'absolute', top: '30px', right: '30px', width: '100px', height: '100px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)' }} />
               
-              {/* ტექსტი 1 */}
               <div style={{ fontSize: 72, fontStyle: 'italic', color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '-100px', fontFamily: 'serif' }}>
                 {text1}
               </div>
               
-              {/* ტექსტი 2 */}
               <div style={{ fontSize: 48, color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '40px', fontFamily: 'serif', lineHeight: 1.4 }}>
                 {text2}
               </div>
 
-              {/* თარიღი */}
               <div style={{ position: 'absolute', bottom: '40px', fontSize: 32, fontStyle: 'italic', color: '#000000', fontFamily: 'serif' }}>
                 {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
@@ -146,7 +141,7 @@ export async function GET() {
 
         // 6. ატვირთვა Supabase Storage-ში
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
-        const { error: uploadError, data: uploadData } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('lunara-assets')
           .upload(`posts/${fileName}`, blob, { contentType: 'image/jpeg', upsert: false });
 
@@ -156,8 +151,7 @@ export async function GET() {
         const finalImageUrl = urlData.publicUrl;
         logInfo(`✅ სურათი აიტვირთა: ${finalImageUrl}`);
 
-        // 7. პუბლიკაცია (ზუსტად ისე, როგორც შენს publish/route.ts-შია)
-        // ვიღებთ კრედენშალებს (ავიღებთ პირველ აქტიურ პროფილს, ან შეგიძლია კონკრეტული username მიუთითო)
+        // 7. პუბლიკაცია
         const { data: profile, error: profileError } = await supabase
           .from('instagram_accounts')
           .select('instagram_user_id, instagram_access_token, username')
@@ -175,7 +169,6 @@ export async function GET() {
         if (publishResult.success) {
           logInfo(`🎉 წარმატებით დაიპოსტა! Post ID: ${publishResult.postId}`);
           
-          // 8. ჩაწერა ისტორიაში
           await supabase.from('published_content').insert({
             content_type: 'post',
             zodiac_sign: targetZodiac,
