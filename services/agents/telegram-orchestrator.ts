@@ -62,6 +62,34 @@ const STATIC_ZODIAC_IMAGES = [
   'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiacsign2.png'
 ];
 
+// ✅ შენი Cloudflare R2 ბაზის URL
+const CLOUDFLARE_R2_BASE_URL = 'https://pub-8ab8b85d503246b9a786ae8d275f27f7.r2.dev'; 
+
+const TAROT_CARDS = [
+  { name: 'The Fool', filename: 'the_fool.png', subtitle: 'BEGINNINGS • INNOCENCE • FREEDOM' },
+  { name: 'The Magician', filename: 'the_magician.png', subtitle: 'FOCUS • WILL • CREATION' },
+  { name: 'The High Priestess', filename: 'the_high_priestess.png', subtitle: 'INTUITION • MYSTERY • WISDOM' },
+  { name: 'The Empress', filename: 'the_empress.png', subtitle: 'ABUNDANCE • NATURE • FERTILITY' },
+  { name: 'The Emperor', filename: 'the_emperor.png', subtitle: 'AUTHORITY • STRUCTURE • POWER' },
+  { name: 'The Hierophant', filename: 'the_hierophant.png', subtitle: 'TRADITION • GUIDANCE • BELIEF' },
+  { name: 'The Lovers', filename: 'the_lovers.png', subtitle: 'UNION • CHOICE • HARMONY' },
+  { name: 'The Chariot', filename: 'the_chariot.png', subtitle: 'WILLPOWER • VICTORY • CONTROL' },
+  { name: 'Strength', filename: 'strength.png', subtitle: 'COURAGE • COMPASSION • INNER POWER' },
+  { name: 'The Hermit', filename: 'the_hermit.png', subtitle: 'SOLITUDE • REFLECTION • TRUTH' },
+  { name: 'Wheel of Fortune', filename: 'wheel_of_fortune.png', subtitle: 'CHANGE • CYCLES • DESTINY' },
+  { name: 'Justice', filename: 'justice.png', subtitle: 'FAIRNESS • TRUTH • LAW' },
+  { name: 'The Hanged Man', filename: 'the_hanged_man.png', subtitle: 'PAUSE • SURRENDER • NEW PERSPECTIVE' },
+  { name: 'Death', filename: 'death.png', subtitle: 'TRANSFORMATION • ENDINGS • REBIRTH' },
+  { name: 'Temperance', filename: 'temperance.png', subtitle: 'BALANCE • MODERATION • PATIENCE' },
+  { name: 'The Devil', filename: 'the_devil.png', subtitle: 'SHADOW • ATTACHMENT • RESTRICTION' },
+  { name: 'The Tower', filename: 'the_tower.png', subtitle: 'SUDDEN CHANGE • UPHEAVAL • AWAKENING' },
+  { name: 'The Star', filename: 'the_star.png', subtitle: 'HOPE • FAITH • PURPOSE' },
+  { name: 'The Moon', filename: 'the_moon.png', subtitle: 'INTUITION • ILLUSION • DREAMS' },
+  { name: 'The Sun', filename: 'the_sun.png', subtitle: 'JOY • SUCCESS • VITALITY' },
+  { name: 'Judgement', filename: 'judgement.png', subtitle: 'REBIRTH • INNER CALLING • ABSOLUTION' },
+  { name: 'The World', filename: 'the_world.png', subtitle: 'COMPLETION • INTEGRATION • ACCOMPLISHMENT' }
+];
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -217,9 +245,9 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     }
   }
 
-  if (postType === 'daily_horoscope_single') {
+  if (postType === 'daily_horoscope_single' || postType === 'daily_tarot_card') {
     if (finalCaption.length > 450) {
-      throw new Error(`Single sign caption is too long (${finalCaption.length} chars). Max 450 characters allowed.`);
+      throw new Error(`Caption is too long (${finalCaption.length} chars). Max 450 characters allowed.`);
     }
   }
 
@@ -236,7 +264,29 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
   };
 }
 
-function buildUserPrompt(request: OrchestratorRequest): string {
+function buildUserPrompt(request: OrchestratorRequest, selectedTarotCard?: { name: string, filename: string, subtitle: string }): string {
+  if (request.postType === 'daily_tarot_card' && selectedTarotCard) {
+    return `
+CRITICAL: YOU MUST RESPOND ONLY IN ENGLISH. 
+
+You are LUNARA. Write a daily guidance message based SPECIFICALLY on the Tarot Card: ${selectedTarotCard.name}.
+
+MANDATORY OUTPUT FORMAT: Return ONLY a valid JSON object. No markdown, no extra text.
+
+JSON STRUCTURE:
+{
+  "caption": "🃏 **${selectedTarotCard.name}**\\n\\n[1-2 short, mystical, and practical sentences in English explaining this card's guidance for today. Max 35 words].\\n\\n[One short, thought-provoking question in English ending with '?']",
+  "hashtags": ["#LUNARA", "#DailyTarot", "#${selectedTarotCard.name.replace(/\s+/g, '')}", "#TarotReading"]
+}
+
+STRICT RULES:
+1. LANGUAGE: 100% ENGLISH ONLY.
+2. FORMAT: Start exactly with: 🃏 **[Card Name]** followed by a blank line.
+3. LENGTH: Max 35 words for the insight. Total caption under 350 characters.
+4. HASHTAGS: Must be an array of strings starting with '#'.
+`.trim();
+  }
+
   return `
 CRITICAL: YOU MUST RESPOND ONLY IN ENGLISH. DO NOT USE GEORGIAN OR ANY OTHER LANGUAGE.
 
@@ -402,7 +452,12 @@ export class TelegramOrchestrator {
       await credentialVault.ready;
       addLog('✅ CredentialVault მზადაა.');
 
-      if (request.postType === 'daily_horoscope_single') {
+      // ✅ სპეციალური ლოგიკა ტაროსთვის: შემთხვევითი კარტის არჩევა
+      let selectedTarotCard = null;
+      if (request.postType === 'daily_tarot_card') {
+        selectedTarotCard = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
+        addLog(`🃏 ნაბიჯი 4: შემთხვევით არჩეული ტაროს კარტი: ${selectedTarotCard.name}`);
+      } else if (request.postType === 'daily_horoscope_single') {
         addLog('🎯 ნაბიჯი 4: ვამოწმებ ზოდიაქოს ნიშანს...');
         const validSigns = ['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces'];
         let targetSign = (request.zodiacSign || '').toLowerCase().trim();
@@ -426,7 +481,6 @@ export class TelegramOrchestrator {
       const maxChatAttempts = 3;
       let textGenerationSuccess = false;
       let generatedContent: GeneratedContent | null = null;
-      
       let lastError = 'Unknown error';
 
       while (chatAttempts < maxChatAttempts && !textGenerationSuccess) {
@@ -483,7 +537,7 @@ export class TelegramOrchestrator {
           addLog(`📄 სისტემური პრომპტის სიგრძე: ${systemPrompt.length} სიმბოლო`);
 
           addLog('📝 ვაგებ მომხმარებლის პრომპტს...');
-          const userPrompt = buildUserPrompt(request);
+          const userPrompt = buildUserPrompt(request, selectedTarotCard || undefined);
           addLog(`📄 მომხმარებლის პრომპტის სიგრძე: ${userPrompt.length} სიმბოლო`);
 
           addLog('🌐 ვაგებ API მოთხოვნას...');
@@ -634,6 +688,12 @@ export class TelegramOrchestrator {
       } else if (request.postType === 'daily_horoscope_single') {
         addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას...');
         caption = applyBoldFormattingToSingleSign(generatedContent.caption);
+      } else if (request.postType === 'daily_tarot_card') {
+        addLog('🎨 ვიყენებ ტაროს სტანდარტულ ფორმატირებას...');
+        caption = generatedContent.caption
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
       } else {
         addLog('🎨 ვიყენებ სტანდარტულ HTML ექსკეიპ ფორმატირებას...');
         caption = generatedContent.caption
@@ -674,6 +734,16 @@ export class TelegramOrchestrator {
         } as ImgGenResult;
         imageProvider = 'static_zodiac_sign';
       } 
+      else if (request.postType === 'daily_tarot_card' && selectedTarotCard) {
+        const imageUrl = `${CLOUDFLARE_R2_BASE_URL}/tarot/${selectedTarotCard.filename}`;
+        addLog(`🃏 ვიყენებ Cloudflare R2 სურათს: ${imageUrl}`);
+        imageResult = {
+          success: true,
+          imageUrl: imageUrl,
+          provider: 'cloudflare_r2_tarot'
+        } as ImgGenResult;
+        imageProvider = 'cloudflare_r2_tarot';
+      }
       else if (!useAiImage && request.postType === 'daily_horoscope_12_signs') {
         addLog('🖼️ AI ფოტოს გენერაცია გამორთულია (Toggle OFF). ვიყენებ სარეზერვო სტატიკურ სურათს.');
         const randomImage = STATIC_ZODIAC_IMAGES[Math.floor(Math.random() * STATIC_ZODIAC_IMAGES.length)];
