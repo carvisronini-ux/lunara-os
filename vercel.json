@@ -1,0 +1,12 @@
+{
+    "crons": [
+      {
+        "path": "/api/scheduler",
+        "schedule": "*/15 * * * *"
+      },
+      {
+        "path": "/api/instagram-scheduler",
+        "schedule": "*/15 * * * *"
+      }
+    ]
+  }
