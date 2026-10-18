@@ -1,0 +1,16 @@
+name: Scheduler
+
+on:
+  schedule:
+    # ყოველ 15 წუთში (0, 15, 30, 45 წუთზე)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # საშუალებას გვაძლევს ხელითაც გავუშვათ
+
+jobs:
+  trigger-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Scheduler Endpoint
+        run: |
+          echo "Triggering scheduler at $(date)"
+          curl -f https://lunara-os.vercel.app/api/scheduler || exit 1
