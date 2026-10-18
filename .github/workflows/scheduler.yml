@@ -1,16 +1,21 @@
-name: Scheduler
+name: Master Scheduler
 
 on:
   schedule:
     # ყოველ 15 წუთში (0, 15, 30, 45 წუთზე)
     - cron: '*/15 * * * *'
-  workflow_dispatch: # საშუალებას გვაძლევს ხელითაც გავუშვათ
+  workflow_dispatch: # საშუალებას გვაძლევს ხელითაც გავუშვათ ტესტისთვის
 
 jobs:
-  trigger-scheduler:
+  trigger-schedulers:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Scheduler Endpoint
+      - name: Call Telegram Scheduler
         run: |
-          echo "Triggering scheduler at $(date)"
-          curl -f https://lunara-os.vercel.app/api/scheduler || exit 1
+          echo "🚀 Triggering Telegram scheduler at $(date)"
+          curl -f https://lunara-os.vercel.app/api/scheduler || echo "⚠️ Telegram scheduler returned an error, but continuing..."
+      
+      - name: Call Instagram Scheduler
+        run: |
+          echo "🚀 Triggering Instagram scheduler at $(date)"
+          curl -f https://lunara-os.vercel.app/api/instagram-scheduler || echo "⚠️ Instagram scheduler returned an error, but continuing..."
