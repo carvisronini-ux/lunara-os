@@ -15,6 +15,14 @@ const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
+// ✅ დამატებულია: ჰედერები, რომლებიც კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას (Caching)
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0',
+  'Surrogate-Control': 'no-store'
+};
+
 function logInfo(message: string, details?: unknown) {
   console.info(`[IG Scheduler] ${message}`, details || '');
 }
@@ -64,7 +72,6 @@ export async function GET() {
     const results = [];
 
     for (const schedule of schedules || []) {
-      // ✅ საბოლოო გამოსწორება: მხოლოდ ის ცვლადებია დატოვებული, რომლებიც რეალურად გამოიყენება
       const { time: scheduled_time, zodiac_sign } = schedule;
 
       if (!isTimeInWindow(scheduled_time, hours, minutes)) {
@@ -196,17 +203,23 @@ export async function GET() {
       }
     }
 
+    // ✅ დამატებულია NO_CACHE_HEADERS, რათა Vercel-მა პასუხი არ შეინახოს
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),
       georgiaTime: currentTimeStr,
       results,
       durationMs: Date.now() - startTime
+    }, {
+      headers: NO_CACHE_HEADERS
     });
 
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     logError('💥 კრიტიკული შეცდომა სქედულერში', error);
-    return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
+    return NextResponse.json({ success: false, error: errorMsg }, { 
+      status: 500,
+      headers: NO_CACHE_HEADERS 
+    });
   }
 }
