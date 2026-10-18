@@ -233,6 +233,11 @@ function parseGeneratedContent(rawContent: unknown, postType?: string): Generate
     if (finalCaption.length < 300) {
       throw new Error(`The AI response is too short (${finalCaption.length} chars). For 12-sign horoscope, caption must be at least 300 characters.`);
     }
+
+    // ✅ ახალი: მკაცრი ლიმიტი, რათა ჰეშთეგებთან ერთად ეტეოდეს 950 სიმბოლოში და არ გაიყოს ცალკე პოსტად
+    if (finalCaption.length > 800) {
+      throw new Error(`The AI response is too long (${finalCaption.length} chars). For 12-sign horoscope, caption must be under 800 characters to fit in a single post with hashtags.`);
+    }
   }
 
   if (postType === 'daily_horoscope_single') {
@@ -341,13 +346,20 @@ function applyBoldFormattingToSingleSign(rawCaption: string): string {
 }
 
 function applyBoldFormattingToZodiac(rawCaption: string): string {
-  let safeText = rawCaption
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  // 1. ჯერ ვაქცევთ Markdown **bold**-ს HTML <b>bold</b>-ად
+  let text = rawCaption.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
+  // 2. ვაკეთებთ HTML ექსკეიპს, მაგრამ ვინარჩუნებთ <b> და </b> ტეგებს უცვლელად
+  const parts = text.split(/(<b>|<\/b>)/g);
+  let safeText = parts.map((part) => {
+    if (part === '<b>' || part === '</b>') return part;
+    return part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }).join('');
+
+  // 3. ვშლით ზედმეტ ემოჯებს ხაზის ბოლოში
   safeText = safeText.replace(/[♈♉♊♋♌♍♎♏♐♑♒♓]\uFE0F?\s*$/gm, '');
 
+  // 4. ვუზრუნველყოფთ, რომ ზოდიაქოს სახელები იყოს ბოლდში და ჰქონდეს ემოჯი
   const zodiacMap = [
     { name: 'Aries', emoji: '♈' }, { name: 'Taurus', emoji: '♉' },
     { name: 'Gemini', emoji: '♊' }, { name: 'Cancer', emoji: '♋' },
@@ -358,15 +370,13 @@ function applyBoldFormattingToZodiac(rawCaption: string): string {
   ];
 
   zodiacMap.forEach(({ name, emoji }) => {
-    const regex1 = new RegExp(`(${emoji})\\s+${name}\\s*:`, 'gi');
-    safeText = safeText.replace(regex1, `$1 <b>${name}</b>:`);
-    const regex2 = new RegExp(`\\*\\*${name}\\*\\*\\s*:`, 'gi');
-    safeText = safeText.replace(regex2, `${emoji} <b>${name}</b>:`);
-    const regex3 = new RegExp(`(^|\\n)\\s*${name}\\s*:`, 'gi');
-    safeText = safeText.replace(regex3, `$1${emoji} <b>${name}</b>:`);
+    // ეს Regex პოულობს სახელს (თუნდაც უკვე იყოს <b>-ში) და ანაცვლებს სტანდარტული ფორმატით
+    safeText = safeText.replace(new RegExp(`(<b>)?\\s*${name}\\s*(</b>)?\\s*:`, 'gi'), `${emoji} <b>${name}</b>:`);
   });
 
+  // 5. ვასწორებთ ორმაგ space-ებს ორობითი წერტილის შემდეგ
   safeText = safeText.replace(/:\s{2,}/g, ': ');
+  
   return safeText.trim();
 }
 
@@ -681,7 +691,7 @@ export class TelegramOrchestrator {
       imagePrompt = generatedContent.image_prompt || '';
       
       if (request.postType === 'daily_horoscope_12_signs') {
-        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას...');
+        addLog('🎨 ვიყენებ 12 ნიშნის ფორმატირებას (Markdown -> HTML)...');
         caption = applyBoldFormattingToZodiac(generatedContent.caption);
       } else if (request.postType === 'daily_horoscope_single') {
         addLog('🎨 ვიყენებ 1 ნიშნის ფორმატირებას...');
