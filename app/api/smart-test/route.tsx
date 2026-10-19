@@ -1,4 +1,4 @@
-// /home/carvisronini-ux/lunara-os/app/api/smart-test/route.ts
+// /home/carvisronini-ux/lunara-os/app/api/smart-test/route.tsx
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
@@ -29,20 +29,21 @@ function getCurrentGeorgiaTime() {
   const dbDayOfWeek = (jsDay + 6) % 7;
   const hours = georgiaDate.getHours();
   const minutes = georgiaDate.getMinutes();
-  const seconds = georgiaDate.getSeconds();
-  return { dbDayOfWeek, hours, minutes, seconds, now };
+  // ✅ წაშლილია seconds, რადგან არ გამოიყენება
+  return { dbDayOfWeek, hours, minutes, now };
 }
 
 function addMinutes(time: string, minutesToAdd: number): string {
-  const [h, m, s] = time.split(':').map(Number);
+  const [h, m] = time.split(':').map(Number);
   const totalMinutes = h * 60 + m + minutesToAdd;
   const newH = Math.floor(totalMinutes / 60) % 24;
   const newM = totalMinutes % 60;
-  return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}:${(s || 0).toString().padStart(2, '0')}`;
+  return `${newH.toString().padStart(2, '0')}:${newM.toString().padStart(2, '0')}`;
 }
 
 export async function GET() {
-  const { dbDayOfWeek, hours, minutes, seconds, now } = getCurrentGeorgiaTime();
+  // ✅ წაშლილია seconds დესტრუქტურიზაციიდან
+  const { dbDayOfWeek, hours, minutes, now } = getCurrentGeorgiaTime();
   const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   const testTimeStr = addMinutes(currentTimeStr, 10); // +10 წუთი
 
@@ -68,7 +69,6 @@ export async function GET() {
         timestamp: now.toISOString()
       });
     } else {
-      // შევცვალოთ დრო +10 წუთზე
       const { error: updateTimeError } = await supabase
         .from('telegram_schedule')
         .update({ time: testTimeStr, last_run_at: null })
@@ -82,7 +82,6 @@ export async function GET() {
           timestamp: now.toISOString()
         });
       } else {
-        // გავუშვათ პოსტი
         const response = await telegramOrchestrator.generateAndPublish({
           agentType: tgSchedule.content_category || 'daily_anchor',
           postType: tgSchedule.post_type,
@@ -143,7 +142,6 @@ export async function GET() {
         timestamp: now.toISOString()
       });
     } else {
-      // შევცვალოთ დრო +10 წუთზე
       const { error: updateTimeError } = await supabaseIG
         .from('content_schedule')
         .update({ time: testTimeStr })
