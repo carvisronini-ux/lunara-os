@@ -6,6 +6,9 @@ import { generateViralText1, generateHoroscopeText2 } from '@/lib/instagram/ai-g
 import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
 import { ImageResponse } from '@vercel/og';
 
+// ✅ ეს ხაზი კრძალავს Vercel-ის მიერ ამ endpoint-ის პასუხის ქეშირებას (Caching)
+export const dynamic = 'force-dynamic';
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
   process.env.SUPABASE_OS_SERVICE_ROLE_KEY!
@@ -15,7 +18,7 @@ const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
-// ✅ დამატებულია: ჰედერები, რომლებიც კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას (Caching)
+// ჰედერები, რომლებიც დამატებით კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
   'Pragma': 'no-cache',
@@ -203,7 +206,6 @@ export async function GET() {
       }
     }
 
-    // ✅ დამატებულია NO_CACHE_HEADERS, რათა Vercel-მა პასუხი არ შეინახოს
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),

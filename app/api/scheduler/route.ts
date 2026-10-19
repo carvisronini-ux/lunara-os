@@ -4,10 +4,13 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { telegramOrchestrator } from '@/services/agents/telegram-orchestrator';
 
+// ✅ ეს ხაზი კრძალავს Vercel-ის მიერ ამ endpoint-ის პასუხის ქეშირებას (Caching)
+export const dynamic = 'force-dynamic';
+
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 
-// ჰედერები, რომლებიც კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას (Caching)
+// ჰედერები, რომლებიც დამატებით კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
   'Pragma': 'no-cache',
@@ -172,7 +175,6 @@ export async function GET() {
 
     logInfo(`🏁 Scheduler დასრულდა ${duration}ms-ში`, summary);
 
-    // ✅ დამატებულია NO_CACHE_HEADERS, რათა Vercel-მა პასუხი არ შეინახოს
     return NextResponse.json({
       success: true,
       timestamp: now.toISOString(),
