@@ -64,22 +64,12 @@ function isTimeInWindow(schedTime: string, currentHours: number, currentMinutes:
 
 export async function GET() {
   const startTime = Date.now();
-  const results: Array<{
-    post_type: string;
-    scheduled_time: string;
-    status: 'published' | 'skipped' | 'failed';
-    message?: string;
-    messageId?: number;
-  }> = [];
-
-  logInfo('🚀 Scheduler დაიწყო...');
+  const { dbDayOfWeek, hours, minutes, dateStr, now } = getCurrentGeorgiaTime();
+  const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  
+  logInfo(`🚀 Scheduler დაიწყო. დრო: ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}`);
 
   try {
-    const { dbDayOfWeek, hours, minutes, dateStr, now } = getCurrentGeorgiaTime();
-    const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    
-    logInfo(`🕐 მიმდინარე დრო (საქართველო): ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}, თარიღი: ${dateStr}`);
-
     // 1. წავიკითხოთ მხოლოდ დღევანდელი, აქტიური განრიგები
     const { data: schedules, error: fetchError } = await supabase
       .from('telegram_schedule')
@@ -98,6 +88,9 @@ export async function GET() {
 
     logInfo(`📋 ნაპოვნია ${schedules?.length || 0} აქტიური განრიგი დღევანდელი დღისთვის`);
 
+    const results = [];
+    const logsToInsert = []; // ✅ აქ შევინახავთ ლოგებს ბაზაში ჩასაწერად
+
     for (const schedule of schedules || []) {
       const { id, post_type, content_category, zodiac_sign, content_theme, time: scheduled_time, last_run_at } = schedule;
 
@@ -106,6 +99,13 @@ export async function GET() {
 
       if (!isInWindow) {
         results.push({ post_type, scheduled_time, status: 'skipped', message: 'Not in time window' });
+        logsToInsert.push({ 
+          platform: 'telegram', 
+          post_type, 
+          scheduled_time, 
+          status: 'skipped', 
+          message: 'Not in time window' 
+        });
         continue;
       }
 
@@ -115,6 +115,13 @@ export async function GET() {
         if (lastRunDate === dateStr) {
           logInfo(`✅ უკვე გაგზავნილია დღეს: ${post_type} (${scheduled_time})`);
           results.push({ post_type, scheduled_time, status: 'skipped', message: 'Already published today' });
+          logsToInsert.push({ 
+            platform: 'telegram', 
+            post_type, 
+            scheduled_time, 
+            status: 'skipped', 
+            message: 'Already published today' 
+          });
           continue;
         }
       }
@@ -154,18 +161,46 @@ export async function GET() {
             message: response.caption?.substring(0, 100) || 'Success',
             messageId: response.messageId,
           });
+          logsToInsert.push({ 
+            platform: 'telegram', 
+            post_type, 
+            scheduled_time, 
+            status: 'published', 
+            message: `Success (ID: ${response.messageId})` 
+          });
         } else {
           logError(`❌ ვერ გამოქვეყნდა: ${post_type}`, response.error);
           results.push({ post_type, scheduled_time, status: 'failed', message: response.error || 'Unknown error' });
+          logsToInsert.push({ 
+            platform: 'telegram', 
+            post_type, 
+            scheduled_time, 
+            status: 'failed', 
+            message: response.error || 'Unknown error' 
+          });
         }
       } catch (error) {
         const errorMessage = getErrorMessage(error);
         logError(`❌ კრიტიკული შეცდომა ${post_type}-ისთვის`, error);
         results.push({ post_type, scheduled_time, status: 'failed', message: errorMessage });
+        logsToInsert.push({ 
+          platform: 'telegram', 
+          post_type, 
+          scheduled_time, 
+          status: 'failed', 
+          message: errorMessage 
+        });
       }
     }
 
-    const duration = Date.now() - startTime;
+    // ✅ ჭკვიანური ლოგების ბაზაში ჩაწერა ერთიანად (თუ არის რაიმე ჩასაწერი)
+    if (logsToInsert.length > 0) {
+      const durationMs = Date.now() - startTime;
+      const logsWithTime = logsToInsert.map(log => ({ ...log, execution_time_ms: durationMs }));
+      
+      await supabase.from('scheduler_logs').insert(logsWithTime);
+    }
+
     const summary = {
       total: results.length,
       published: results.filter(r => r.status === 'published').length,
@@ -173,7 +208,7 @@ export async function GET() {
       skipped: results.filter(r => r.status === 'skipped').length,
     };
 
-    logInfo(`🏁 Scheduler დასრულდა ${duration}ms-ში`, summary);
+    logInfo(`🏁 Scheduler დასრულდა ${Date.now() - startTime}ms-ში`, summary);
 
     return NextResponse.json({
       success: true,
@@ -181,7 +216,7 @@ export async function GET() {
       georgiaTime: currentTimeStr,
       results,
       summary,
-      durationMs: duration,
+      durationMs: Date.now() - startTime,
     }, {
       headers: NO_CACHE_HEADERS
     });
