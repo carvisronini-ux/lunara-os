@@ -198,7 +198,14 @@ export async function GET() {
       const durationMs = Date.now() - startTime;
       const logsWithTime = logsToInsert.map(log => ({ ...log, execution_time_ms: durationMs }));
       
-      await supabase.from('scheduler_logs').insert(logsWithTime);
+      // ✅ დამატებულია შეცდომის შემოწმება (error handling)
+      const { error: logError } = await supabase.from('scheduler_logs').insert(logsWithTime);
+      
+      if (logError) {
+        console.error('❌ ლოგების ბაზაში ჩაწერა ვერ მოხერხდა:', logError);
+      } else {
+        console.log('✅ ლოგები წარმატებით ჩაიწერა ბაზაში');
+      }
     }
 
     const summary = {
