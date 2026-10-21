@@ -61,9 +61,10 @@ export async function GET() {
   logInfo(`🚀 დაიწყო შემოწმება. დრო: ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}`);
 
   try {
+    // ✅ 'id' ამოღებულია select-იდან, რადგან არ გვჭირდება
     const { data: schedules, error: fetchError } = await supabase
       .from('content_schedule')
-      .select('id, time, content_type, zodiac_sign, is_active')
+      .select('time, content_type, zodiac_sign, is_active')
       .eq('is_active', true)
       .eq('day_of_week', dbDayOfWeek)
       .eq('content_type', 'post')
@@ -75,7 +76,8 @@ export async function GET() {
     const logsToInsert = []; // ✅ ლოგების შესანახად (ზუსტად ისე, როგორც ტელეგრამში)
 
     for (const schedule of schedules || []) {
-      const { id, time: scheduled_time, zodiac_sign } = schedule;
+      // ✅ 'id' ამოღებულია აქედანაც, რაც აგვარებს TypeScript-ის შეცდომას
+      const { time: scheduled_time, zodiac_sign } = schedule;
 
       // 1. დროის ფანჯრის შემოწმება
       if (!isTimeInWindow(scheduled_time, hours, minutes)) {
@@ -121,10 +123,6 @@ export async function GET() {
         logInfo('🎨 იქმნება სურათი სერვერზე (100% UI Canvas-ის იდენტური დიზაინი)...');
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.toLowerCase()}.png`;
         
-        // ✅ დიზაინი ზუსტად იმეორებს InstagramPanel.tsx-ის ლოგიკას:
-        // - ლოგო: 130px, top: 20px, right: 20px
-        // - გრადიენტი: 0.5 გამჭვირვალობით (არა 0.8)
-        // - თარიღი: 36px (არა 32px)
         const imageResponse = new ImageResponse(
           (
             <div style={{ display: 'flex', flexDirection: 'column', width: '1080px', height: '1350px', backgroundColor: '#0f172a', position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
