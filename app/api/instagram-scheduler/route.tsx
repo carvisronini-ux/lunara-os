@@ -13,7 +13,11 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
-const SCHEDULE_WINDOW_MINUTES = 15;
+
+// ✅ ერთადერთი ცვლილება: 15 შეცვლილია 25-ით. 
+// ეს ნიშნავს, რომ სისტემა "დაიჭერს" ნებისმიერ დროს (მაგ. 22:02), როცა 22:15-ზე გაიღვიძებს.
+const SCHEDULE_WINDOW_MINUTES = 25; 
+
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const NO_CACHE_HEADERS = {
@@ -155,7 +159,7 @@ export async function GET() {
       const zodiacSign = schedule.zodiac_sign as string | null;
       const targetZodiac = zodiacSign || 'ARIES';
 
-      // 1. დროის ფანჯრის შემოწმება
+      // 1. დროის ფანჯრის შემოწმება (ახლა 25 წუთია)
       if (!isTimeInWindow(scheduledTime, hours, minutes)) {
         results.push({ post: scheduledTime, status: 'skipped', reason: 'Not in time window' });
         logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time: scheduledTime, status: 'skipped', message: 'Not in time window' });
