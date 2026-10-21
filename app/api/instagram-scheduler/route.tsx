@@ -2,66 +2,154 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateViralText1, generateHoroscopeText2 } from '@/lib/instagram/ai-generator';
-import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
 import { ImageResponse } from '@vercel/og';
+import {
+  generateViralText1,
+  generateHoroscopeText2,
+} from '@/lib/instagram/ai-generator';
+import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
 
-// ✅ კრძალავს Vercel-ის მიერ ამ endpoint-ის პასუხის ქეშირებას
 export const dynamic = 'force-dynamic';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
-  process.env.SUPABASE_OS_SERVICE_ROLE_KEY!
-);
+export const runtime = 'nodejs';
 
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
-const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
+
+const DEFAULT_LOGO_URL =
+  'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-  'Surrogate-Control': 'no-store'
+  Pragma: 'no-cache',
+  Expires: '0',
+  'Surrogate-Control': 'no-store',
+};
+
+type SchedulerLog = {
+  platform: 'instagram';
+  post_type: 'post';
+  scheduled_time: string;
+  status: 'skipped' | 'published' | 'failed';
+  message: string;
+  execution_time_ms?: number;
 };
 
 function logInfo(message: string, details?: unknown) {
-  console.info(`[IG Scheduler] ${message}`, details || '');
+  console.info(`[IG Scheduler] ${message}`, details ?? '');
 }
 
 function logError(message: string, details?: unknown) {
-  console.error(`[IG Scheduler] ${message}`, details || '');
+  console.error(`[IG Scheduler] ${message}`, details ?? '');
 }
 
 function getCurrentGeorgiaTime() {
   const now = new Date();
-  const georgiaTimeStr = now.toLocaleString('en-US', { timeZone: GEORGIA_TIMEZONE });
-  const georgiaDate = new Date(georgiaTimeStr);
-  const jsDay = georgiaDate.getDay();
-  const dbDayOfWeek = (jsDay + 6) % 7; // 0=ორშაბათი ... 6=კვირა
-  const dateStr = georgiaDate.toISOString().split('T')[0];
-  const hours = georgiaDate.getHours();
-  const minutes = georgiaDate.getMinutes();
-  return { dbDayOfWeek, dateStr, hours, minutes, now };
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: GEORGIA_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    weekday: 'short',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hours = Number(getPart('hour'));
+  const minutes = Number(getPart('minute'));
+  const weekday = getPart('weekday');
+
+  const weekdayIndex: Record<string, number> = {
+    Mon: 0,
+    Tue: 1,
+    Wed: 2,
+    Thu: 3,
+    Fri: 4,
+    Sat: 5,
+    Sun: 6,
+  };
+
+  return {
+    dbDayOfWeek: weekdayIndex[weekday],
+    dateStr: `${year}-${month}-${day}`,
+    hours,
+    minutes,
+    now,
+  };
 }
 
-function isTimeInWindow(schedTime: string, currentHours: number, currentMinutes: number) {
-  const [schedHourStr, schedMinuteStr] = schedTime.split(':');
-  const scheduledTotalMinutes = parseInt(schedHourStr, 10) * 60 + parseInt(schedMinuteStr, 10);
+function isTimeInWindow(
+  scheduledTime: string,
+  currentHours: number,
+  currentMinutes: number,
+): boolean {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(scheduledTime);
+
+  if (!match) {
+    logError('არასწორი დაგეგმილი დრო', { scheduledTime });
+    return false;
+  }
+
+  const scheduledHours = Number(match[1]);
+  const scheduledMinutes = Number(match[2]);
+
+  const scheduledTotalMinutes = scheduledHours * 60 + scheduledMinutes;
   const currentTotalMinutes = currentHours * 60 + currentMinutes;
-  const diff = currentTotalMinutes - scheduledTotalMinutes;
-  return diff >= 0 && diff <= SCHEDULE_WINDOW_MINUTES;
+  const difference = currentTotalMinutes - scheduledTotalMinutes;
+
+  return difference >= 0 && difference <= SCHEDULE_WINDOW_MINUTES;
+}
+
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL;
+  const serviceRoleKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Supabase-ის გარემოს ცვლადები კონფიგურირებული არ არის');
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function getNextDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const nextDayDate = new Date(Date.UTC(year, month - 1, day + 1));
+
+  return [
+    nextDayDate.getUTCFullYear(),
+    String(nextDayDate.getUTCMonth() + 1).padStart(2, '0'),
+    String(nextDayDate.getUTCDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 export async function GET() {
   const startTime = Date.now();
-  const { dbDayOfWeek, dateStr, hours, minutes, now } = getCurrentGeorgiaTime();
-  const currentTimeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  
-  logInfo(`🚀 დაიწყო შემოწმება. დრო: ${currentTimeStr}, დღე (DB): ${dbDayOfWeek}`);
 
   try {
-    // ✅ 'id' ამოღებულია select-იდან, რადგან არ გვჭირდება
+    const supabase = getSupabaseClient();
+
+    const { dbDayOfWeek, dateStr, hours, minutes, now } = getCurrentGeorgiaTime();
+
+    if (dbDayOfWeek === undefined) {
+      throw new Error('საქართველოს დროის სარტყელში კვირის დღის განსაზღვრა ვერ მოხერხდა');
+    }
+
+    const currentTimeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+    logInfo(`შემოწმება დაიწყო. დრო: ${currentTimeStr}, დღე: ${dbDayOfWeek}`);
+
     const { data: schedules, error: fetchError } = await supabase
       .from('content_schedule')
       .select('time, content_type, zodiac_sign, is_active')
@@ -70,77 +158,202 @@ export async function GET() {
       .eq('content_type', 'post')
       .order('time', { ascending: true });
 
-    if (fetchError) throw new Error(`განრიგის წაკითხვა ვერ მოხერხდა: ${fetchError.message}`);
+    if (fetchError) {
+      throw new Error(`განრიგის წაკითხვა ვერ მოხერხდა: ${fetchError.message}`);
+    }
 
-    const results = [];
-    const logsToInsert = []; // ✅ ლოგების შესანახად (ზუსტად ისე, როგორც ტელეგრამში)
+    const results: Array<Record<string, unknown>> = [];
+    const logsToInsert: SchedulerLog[] = [];
 
-    for (const schedule of schedules || []) {
-      // ✅ 'id' ამოღებულია აქედანაც, რაც აგვარებს TypeScript-ის შეცდომას
-      const { time: scheduled_time, zodiac_sign } = schedule;
+    for (const schedule of schedules ?? []) {
+      const scheduledTime = schedule.time as string;
+      const zodiacSign = schedule.zodiac_sign as string | null;
+      const targetZodiac = zodiacSign || 'ARIES';
 
       // 1. დროის ფანჯრის შემოწმება
-      if (!isTimeInWindow(scheduled_time, hours, minutes)) {
-        results.push({ post: scheduled_time, status: 'skipped', reason: 'Not in time window' });
-        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'skipped', message: 'Not in time window' });
+      if (!isTimeInWindow(scheduledTime, hours, minutes)) {
+        results.push({ post: scheduledTime, status: 'skipped', reason: 'Not in time window' });
+        logsToInsert.push({
+          platform: 'instagram',
+          post_type: 'post',
+          scheduled_time: scheduledTime,
+          status: 'skipped',
+          message: 'Not in time window',
+        });
         continue;
       }
 
-      // 2. დუბლიკატის შემოწმება
-      const { data: alreadyPublished } = await supabase
+      // 2. დღიური დუბლიკატის შემოწმება (+04:00 ოფსეტით)
+      const dayStart = `${dateStr}T00:00:00+04:00`;
+      const nextDay = getNextDate(dateStr);
+      const dayEndExclusive = `${nextDay}T00:00:00+04:00`;
+
+      const { data: alreadyPublished, error: duplicateCheckError } = await supabase
         .from('published_content')
         .select('id')
         .eq('content_type', 'post')
-        .eq('zodiac_sign', zodiac_sign || 'RANDOM')
-        .gte('published_at', `${dateStr}T00:00:00`)
-        .lt('published_at', `${dateStr}T23:59:59`)
+        .eq('zodiac_sign', targetZodiac)
+        .not('instagram_post_id', 'is', null)
+        .gte('published_at', dayStart)
+        .lt('published_at', dayEndExclusive)
+        .limit(1)
         .maybeSingle();
 
+      if (duplicateCheckError) {
+        throw new Error(`დუბლიკატის შემოწმება ვერ მოხერხდა: ${duplicateCheckError.message}`);
+      }
+
       if (alreadyPublished) {
-        logInfo(`✅ უკვე დაიპოსტა დღეს: ${scheduled_time} (${zodiac_sign})`);
-        results.push({ post: scheduled_time, status: 'skipped', reason: 'Already published today' });
-        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'skipped', message: 'Already published today' });
+        logInfo(`დღეს უკვე გამოქვეყნებულია: ${scheduledTime} (${targetZodiac})`);
+        results.push({ post: scheduledTime, status: 'skipped', reason: 'Already published today' });
+        logsToInsert.push({
+          platform: 'instagram',
+          post_type: 'post',
+          scheduled_time: scheduledTime,
+          status: 'skipped',
+          message: 'Already published today',
+        });
         continue;
       }
 
-      logInfo(`📤 იწყება დამუშავება: ${scheduled_time} (${zodiac_sign || 'Random'})`);
+      logInfo(`პოსტის დამუშავება დაიწყო: ${scheduledTime} (${targetZodiac})`);
 
       try {
-        const targetZodiac = zodiac_sign || 'ARIES'; 
-        
-        const { data: config } = await supabase
+        // 3. AI აგენტის კონფიგურაციის წაკითხვა
+        const { data: config, error: configError } = await supabase
           .from('agent_config')
           .select('master_prompt, thinking_style, skills_constraints')
           .eq('agent_type', 'post')
           .single();
 
-        const text1 = await generateViralText1(targetZodiac, config);
-        if (!text1) throw new Error('Text 1 generation failed');
-        
-        const text2 = await generateHoroscopeText2(targetZodiac, text1, config);
-        if (!text2) throw new Error('Text 2 generation failed');
+        if (configError || !config) {
+          throw new Error(`Post Agent-ის კონფიგურაცია ვერ ჩაიტვირთა${configError?.message ? `: ${configError.message}` : ''}`);
+        }
 
-        logInfo('🎨 იქმნება სურათი სერვერზე (100% UI Canvas-ის იდენტური დიზაინი)...');
+        // 4. Text 1-ის გენერირება
+        const text1 = await generateViralText1(targetZodiac, config);
+        if (typeof text1 !== 'string' || !text1.trim()) {
+          throw new Error('Text 1-ის გენერაცია ვერ მოხერხდა ან ცარიელი ტექსტი დაბრუნდა');
+        }
+
+        // 5. Text 2-ის გენერირება
+        const text2 = await generateHoroscopeText2(targetZodiac, text1, config);
+        if (typeof text2 !== 'string' || !text2.trim()) {
+          throw new Error('Text 2-ის გენერაცია ვერ მოხერხდა ან ცარიელი ტექსტი დაბრუნდა');
+        }
+
+        // 6. Instagram-ის სურათის გენერირება (PNG ფორმატში, როგორც @vercel/og აბრუნებს)
+        logInfo('სურათი გენერირდება სერვერზე');
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.toLowerCase()}.png`;
-        
+
         const imageResponse = new ImageResponse(
           (
-            <div style={{ display: 'flex', flexDirection: 'column', width: '1080px', height: '1350px', backgroundColor: '#0f172a', position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
-              <img src={imageUrl} style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)' }} />
-              
-              <img src={DEFAULT_LOGO_URL} style={{ position: 'absolute', top: '20px', right: '20px', width: '130px', height: '130px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)' }} />
-              
-              <div style={{ fontSize: 72, fontStyle: 'italic', color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '-100px', fontFamily: 'serif', wordWrap: 'break-word' }}>
-                {text1}
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                width: '1080px',
+                height: '1350px',
+                backgroundColor: '#0f172a',
+                position: 'relative',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <img
+                src={imageUrl}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: 0.8,
+                }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  position: 'absolute',
+                  bottom: 0,
+                  width: '100%',
+                  height: '60%',
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.82), rgba(0,0,0,0))',
+                }}
+              />
+              <img
+                src={DEFAULT_LOGO_URL}
+                style={{
+                  position: 'absolute',
+                  top: '28px',
+                  right: '28px',
+                  width: '112px',
+                  height: '112px',
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.65)',
+                }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  position: 'relative',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '900px',
+                  marginTop: '-70px',
+                  padding: '30px',
+                  color: '#ffffff',
+                  textAlign: 'center',
+                  fontSize: 68,
+                  fontStyle: 'italic',
+                  fontFamily: 'serif',
+                  fontWeight: 700,
+                  lineHeight: 1.12,
+                  textShadow: '0 3px 18px rgba(0,0,0,0.75)',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                {text1.trim()}
               </div>
-              
-              <div style={{ fontSize: 48, color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '40px', fontFamily: 'serif', lineHeight: 1.4, wordWrap: 'break-word' }}>
-                {text2}
+              <div
+                style={{
+                  display: 'flex',
+                  position: 'relative',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  width: '880px',
+                  marginTop: '24px',
+                  padding: '0 24px',
+                  color: '#ffffff',
+                  textAlign: 'center',
+                  fontSize: 42,
+                  fontFamily: 'serif',
+                  lineHeight: 1.3,
+                  textShadow: '0 2px 12px rgba(0,0,0,0.8)',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                {text2.trim()}
               </div>
-
-              <div style={{ position: 'absolute', bottom: '40px', fontSize: 36, fontStyle: 'italic', color: '#000000', fontFamily: 'serif' }}>
-                {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              <div
+                style={{
+                  display: 'flex',
+                  position: 'absolute',
+                  bottom: '32px',
+                  color: '#ffffff',
+                  fontSize: 30,
+                  fontStyle: 'italic',
+                  fontFamily: 'serif',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                }}
+              >
+                {new Intl.DateTimeFormat('en-US', {
+                  timeZone: GEORGIA_TIMEZONE,
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                }).format(now)}
               </div>
             </div>
           ),
@@ -148,101 +361,146 @@ export async function GET() {
         );
 
         const imageBuffer = await imageResponse.arrayBuffer();
-        const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
+        const storagePath = `posts/${fileName}`;
+        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
 
-        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
+        // 7. სურათის Supabase Storage-ში ატვირთვა
         const { error: uploadError } = await supabase.storage
           .from('lunara-assets')
-          .upload(`posts/${fileName}`, blob, { contentType: 'image/jpeg', upsert: false });
+          .upload(storagePath, imageBlob, { contentType: 'image/png', upsert: false });
 
-        if (uploadError) throw new Error(`ატვირთვა ვერ მოხერხდა: ${uploadError.message}`);
+        if (uploadError) {
+          throw new Error(`სურათის ატვირთვა ვერ მოხერხდა: ${uploadError.message}`);
+        }
 
-        const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(`posts/${fileName}`);
+        const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(storagePath);
         const finalImageUrl = urlData.publicUrl;
-        logInfo(`✅ სურათი აიტვირთა: ${finalImageUrl}`);
+        logInfo(`სურათი აიტვირთა: ${finalImageUrl}`);
 
+        // 8. აქტიური Instagram ანგარიშის მოძიება
         const { data: profile, error: profileError } = await supabase
           .from('instagram_accounts')
           .select('instagram_user_id, instagram_access_token, username')
           .eq('status', 'active')
           .single();
 
-        if (profileError || !profile) throw new Error('აქტიური ინსტაგრამის პროფილი ვერ მოიძებნა');
+        if (profileError || !profile) {
+          throw new Error('აქტიური Instagram ანგარიში ვერ მოიძებნა');
+        }
 
+        // 9. პოსტის გამოქვეყნება
         const agent = new InstagramAdapter(profile.instagram_user_id, profile.instagram_access_token);
         const hashtags = `#${targetZodiac} #Horoscope #Astrology #LUNARA`;
-        const caption = `${text1}\n\n${text2}\n\n${hashtags}`.trim();
+        const caption = `${text1.trim()}\n\n${text2.trim()}\n\n${hashtags}`.trim();
 
         const publishResult = await agent.publishPost(finalImageUrl, caption);
 
-        if (publishResult.success) {
-          logInfo(`🎉 წარმატებით დაიპოსტა! Post ID: ${publishResult.postId}`);
-          
-          await supabase.from('published_content').insert({
-            content_type: 'post',
-            zodiac_sign: targetZodiac,
-            caption: caption,
-            image_url: finalImageUrl,
-            instagram_post_id: publishResult.postId,
-            status: 'published',
-            agent_used: 'server_scheduler',
-            published_at: now.toISOString()
-          });
-
-          results.push({ post: scheduled_time, status: 'published', postId: publishResult.postId });
-          logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'published', message: `Success (ID: ${publishResult.postId})` });
-        } else {
-          throw new Error(publishResult.error || 'უცნობი შეცდომა პუბლიკაციისას');
+        if (!publishResult.success) {
+          throw new Error(publishResult.error || 'პოსტის გამოქვეყნებისას უცნობი შეცდომა მოხდა');
         }
 
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-        logError(`❌ შეცდომა ${scheduled_time}-ის დამუშავებისას`, err);
-        
-        await supabase.from('published_content').insert({
+        logInfo(`Instagram პოსტი გამოქვეყნდა. ID: ${publishResult.postId}`);
+
+        // 10. წარმატებული პოსტის აღრიცხვა
+        const { error: publishedInsertError } = await supabase.from('published_content').insert({
           content_type: 'post',
-          zodiac_sign: zodiac_sign || 'RANDOM',
+          zodiac_sign: targetZodiac,
+          caption,
+          image_url: finalImageUrl,
+          instagram_post_id: publishResult.postId,
+          status: 'published',
+          agent_used: 'server_scheduler',
+          published_at: now.toISOString(),
+        });
+
+        if (publishedInsertError) {
+          logError('პოსტი გამოქვეყნდა, მაგრამ მონაცემთა ბაზაში ჩაწერა ვერ მოხერხდა', publishedInsertError);
+          results.push({
+            post: scheduledTime,
+            status: 'published',
+            postId: publishResult.postId,
+            warning: 'Published successfully, but database record insert failed',
+          });
+          logsToInsert.push({
+            platform: 'instagram',
+            post_type: 'post',
+            scheduled_time: scheduledTime,
+            status: 'published',
+            message: `Published (ID: ${publishResult.postId}); DB insert failed: ${publishedInsertError.message}`,
+          });
+          continue;
+        }
+
+        results.push({ post: scheduledTime, status: 'published', postId: publishResult.postId });
+        logsToInsert.push({
+          platform: 'instagram',
+          post_type: 'post',
+          scheduled_time: scheduledTime,
+          status: 'published',
+          message: `Success (ID: ${publishResult.postId})`,
+        });
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        logError(`პოსტის დამუშავება ვერ მოხერხდა: ${scheduledTime}`, err);
+
+        const { error: failedInsertError } = await supabase.from('published_content').insert({
+          content_type: 'post',
+          zodiac_sign: targetZodiac,
           caption: 'Failed to generate/publish',
           status: 'failed',
           agent_used: 'server_scheduler',
-          error_message: errorMsg,
-          published_at: now.toISOString()
+          error_message: errorMessage,
+          published_at: now.toISOString(),
         });
 
-        results.push({ post: scheduled_time, status: 'failed', error: errorMsg });
-        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'failed', message: errorMsg });
+        if (failedInsertError) {
+          logError('წარუმატებელი მცდელობის აღრიცხვა ვერ მოხერხდა', failedInsertError);
+        }
+
+        results.push({ post: scheduledTime, status: 'failed', error: errorMessage });
+        logsToInsert.push({
+          platform: 'instagram',
+          post_type: 'post',
+          scheduled_time: scheduledTime,
+          status: 'failed',
+          message: errorMessage,
+        });
       }
     }
 
-    // ✅ ჭკვიანური ლოგების ბაზაში ჩაწერა ერთიანად
+    // 11. Scheduler-ის ლოგების ერთიანად შენახვა
     if (logsToInsert.length > 0) {
       const durationMs = Date.now() - startTime;
-      const logsWithTime = logsToInsert.map(log => ({ ...log, execution_time_ms: durationMs }));
-      
-      const { error: logError } = await supabase.from('scheduler_logs').insert(logsWithTime);
-      if (logError) {
-        console.error('❌ IG ლოგების ბაზაში ჩაწერა ვერ მოხერხდა:', logError);
+      const logsWithTime = logsToInsert.map((log) => ({ ...log, execution_time_ms: durationMs }));
+
+      const { error: logsInsertError } = await supabase.from('scheduler_logs').insert(logsWithTime);
+
+      if (logsInsertError) {
+        logError('Instagram Scheduler-ის ლოგების შენახვა ვერ მოხერხდა', logsInsertError);
       } else {
-        console.log('✅ IG ლოგები წარმატებით ჩაიწერა ბაზაში');
+        logInfo('Instagram Scheduler-ის ლოგები წარმატებით შეინახა');
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      timestamp: now.toISOString(),
-      georgiaTime: currentTimeStr,
-      results,
-      durationMs: Date.now() - startTime
-    }, {
-      headers: NO_CACHE_HEADERS
-    });
-
+    // 12. საბოლოო პასუხი
+    return NextResponse.json(
+      {
+        success: true,
+        timestamp: now.toISOString(),
+        georgiaTime: currentTimeStr,
+        results,
+        durationMs: Date.now() - startTime,
+      },
+      { headers: NO_CACHE_HEADERS }
+    );
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    logError('💥 კრიტიკული შეცდომა სქედულერში', error);
-    return NextResponse.json({ success: false, error: errorMsg }, { 
-      status: 500,
-      headers: NO_CACHE_HEADERS 
-    });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logError('Instagram Scheduler-ში კრიტიკული შეცდომა მოხდა', error);
+
+    return NextResponse.json(
+      { success: false, error: errorMessage },
+      { status: 500, headers: NO_CACHE_HEADERS }
+    );
   }
 }
