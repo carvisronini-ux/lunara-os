@@ -1,4 +1,5 @@
 // /home/carvisronini-ux/lunara-os/lib/instagram/ai-generator.ts
+
 import { credentialVault } from '@/services/credentials/credential-vault';
 
 export interface HoroscopeGenerationResult {
@@ -48,7 +49,6 @@ Return ONLY valid JSON in this exact format:
   "hashtags": ["#LUNARA", "#${zodiacName}", "#Astrology", "#Horoscope", "#Zodiac"]
 }`;
 
-  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას, თუ ის არსებობს
   if (config) {
     systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
 
@@ -74,6 +74,7 @@ ${systemPrompt}`;
         messages: [{ role: 'user', content: systemPrompt }],
         response_format: { type: 'json_object' },
         temperature: 0.8,
+        max_tokens: 300 // ✅ დამატებულია: ზღუდავს პასუხის სიგრძეს და კლავს 429 შეცდომას
       })
     });
 
@@ -102,7 +103,6 @@ ${systemPrompt}`;
   }
 }
 
-// ✅ განახლებული: იღებს config-ს და აერთიანებს მას პრომპტთან
 export async function generateViralText1(zodiacName: string, config?: any): Promise<string> {
   await credentialVault.ready;
 
@@ -139,7 +139,6 @@ STRICT RULES:
 
   let systemPrompt = basePrompt;
   
-  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას
   if (config) {
     systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
 
@@ -164,6 +163,7 @@ ${basePrompt}`;
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
         temperature: 0.9,
+        max_tokens: 100 // ✅ დამატებულია: 40 სიმბოლოსთვის 100 ტოკენი სრულიად საკმარისია
       })
     });
 
@@ -190,7 +190,6 @@ ${basePrompt}`;
   }
 }
 
-// ✅ განახლებული: იღებს config-ს და აერთიანებს მას პრომპტთან
 export async function generateHoroscopeText2(zodiacName: string, text1Hook: string, config?: any): Promise<string> {
   await credentialVault.ready;
 
@@ -230,7 +229,6 @@ STRICT RULES:
 
   let systemPrompt = basePrompt;
 
-  // ✅ დინამიურად ვაერთიანებთ კონფიგურაციას
   if (config) {
     systemPrompt = `${config.master_prompt || 'You are an expert Instagram Static Post creation agent.'}
 
@@ -255,6 +253,7 @@ ${basePrompt}`;
         model: modelToUse,
         messages: [{ role: 'user', content: systemPrompt }],
         temperature: 0.85,
+        max_tokens: 200 // ✅ დამატებულია: 150 სიმბოლოსთვის 200 ტოკენი სრულიად საკმარისია
       })
     });
 

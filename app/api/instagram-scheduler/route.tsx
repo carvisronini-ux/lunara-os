@@ -6,7 +6,7 @@ import { generateViralText1, generateHoroscopeText2 } from '@/lib/instagram/ai-g
 import { InstagramAdapter } from '@/services/distribution/instagram-adapter';
 import { ImageResponse } from '@vercel/og';
 
-// ✅ ეს ხაზი კრძალავს Vercel-ის მიერ ამ endpoint-ის პასუხის ქეშირებას (Caching)
+// ✅ კრძალავს Vercel-ის მიერ ამ endpoint-ის პასუხის ქეშირებას
 export const dynamic = 'force-dynamic';
 
 const supabase = createClient(
@@ -18,7 +18,6 @@ const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const SCHEDULE_WINDOW_MINUTES = 15;
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
-// ჰედერები, რომლებიც დამატებით კრძალავს Vercel/ბრაუზერის მიერ პასუხის შენახვას
 const NO_CACHE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
   'Pragma': 'no-cache',
@@ -64,7 +63,7 @@ export async function GET() {
   try {
     const { data: schedules, error: fetchError } = await supabase
       .from('content_schedule')
-      .select('time, content_type, zodiac_sign')
+      .select('id, time, content_type, zodiac_sign, is_active')
       .eq('is_active', true)
       .eq('day_of_week', dbDayOfWeek)
       .eq('content_type', 'post')
@@ -73,15 +72,19 @@ export async function GET() {
     if (fetchError) throw new Error(`განრიგის წაკითხვა ვერ მოხერხდა: ${fetchError.message}`);
 
     const results = [];
+    const logsToInsert = []; // ✅ ლოგების შესანახად (ზუსტად ისე, როგორც ტელეგრამში)
 
     for (const schedule of schedules || []) {
-      const { time: scheduled_time, zodiac_sign } = schedule;
+      const { id, time: scheduled_time, zodiac_sign } = schedule;
 
+      // 1. დროის ფანჯრის შემოწმება
       if (!isTimeInWindow(scheduled_time, hours, minutes)) {
         results.push({ post: scheduled_time, status: 'skipped', reason: 'Not in time window' });
+        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'skipped', message: 'Not in time window' });
         continue;
       }
 
+      // 2. დუბლიკატის შემოწმება
       const { data: alreadyPublished } = await supabase
         .from('published_content')
         .select('id')
@@ -94,6 +97,7 @@ export async function GET() {
       if (alreadyPublished) {
         logInfo(`✅ უკვე დაიპოსტა დღეს: ${scheduled_time} (${zodiac_sign})`);
         results.push({ post: scheduled_time, status: 'skipped', reason: 'Already published today' });
+        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'skipped', message: 'Already published today' });
         continue;
       }
 
@@ -114,26 +118,30 @@ export async function GET() {
         const text2 = await generateHoroscopeText2(targetZodiac, text1, config);
         if (!text2) throw new Error('Text 2 generation failed');
 
-        logInfo('🎨 იქმნება სურათი სერვერზე...');
+        logInfo('🎨 იქმნება სურათი სერვერზე (100% UI Canvas-ის იდენტური დიზაინი)...');
         const imageUrl = `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.toLowerCase()}.png`;
         
+        // ✅ დიზაინი ზუსტად იმეორებს InstagramPanel.tsx-ის ლოგიკას:
+        // - ლოგო: 130px, top: 20px, right: 20px
+        // - გრადიენტი: 0.5 გამჭვირვალობით (არა 0.8)
+        // - თარიღი: 36px (არა 32px)
         const imageResponse = new ImageResponse(
           (
             <div style={{ display: 'flex', flexDirection: 'column', width: '1080px', height: '1350px', backgroundColor: '#0f172a', position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
               <img src={imageUrl} style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
-              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }} />
+              <div style={{ position: 'absolute', bottom: 0, width: '100%', height: '50%', background: 'linear-gradient(to top, rgba(0,0,0,0.5), transparent)' }} />
               
-              <img src={DEFAULT_LOGO_URL} style={{ position: 'absolute', top: '30px', right: '30px', width: '100px', height: '100px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)' }} />
+              <img src={DEFAULT_LOGO_URL} style={{ position: 'absolute', top: '20px', right: '20px', width: '130px', height: '130px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)' }} />
               
-              <div style={{ fontSize: 72, fontStyle: 'italic', color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '-100px', fontFamily: 'serif' }}>
+              <div style={{ fontSize: 72, fontStyle: 'italic', color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '-100px', fontFamily: 'serif', wordWrap: 'break-word' }}>
                 {text1}
               </div>
               
-              <div style={{ fontSize: 48, color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '40px', fontFamily: 'serif', lineHeight: 1.4 }}>
+              <div style={{ fontSize: 48, color: '#000000', textAlign: 'center', maxWidth: '900px', marginTop: '40px', fontFamily: 'serif', lineHeight: 1.4, wordWrap: 'break-word' }}>
                 {text2}
               </div>
 
-              <div style={{ position: 'absolute', bottom: '40px', fontSize: 32, fontStyle: 'italic', color: '#000000', fontFamily: 'serif' }}>
+              <div style={{ position: 'absolute', bottom: '40px', fontSize: 36, fontStyle: 'italic', color: '#000000', fontFamily: 'serif' }}>
                 {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             </div>
@@ -184,6 +192,7 @@ export async function GET() {
           });
 
           results.push({ post: scheduled_time, status: 'published', postId: publishResult.postId });
+          logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'published', message: `Success (ID: ${publishResult.postId})` });
         } else {
           throw new Error(publishResult.error || 'უცნობი შეცდომა პუბლიკაციისას');
         }
@@ -203,6 +212,20 @@ export async function GET() {
         });
 
         results.push({ post: scheduled_time, status: 'failed', error: errorMsg });
+        logsToInsert.push({ platform: 'instagram', post_type: 'post', scheduled_time, status: 'failed', message: errorMsg });
+      }
+    }
+
+    // ✅ ჭკვიანური ლოგების ბაზაში ჩაწერა ერთიანად
+    if (logsToInsert.length > 0) {
+      const durationMs = Date.now() - startTime;
+      const logsWithTime = logsToInsert.map(log => ({ ...log, execution_time_ms: durationMs }));
+      
+      const { error: logError } = await supabase.from('scheduler_logs').insert(logsWithTime);
+      if (logError) {
+        console.error('❌ IG ლოგების ბაზაში ჩაწერა ვერ მოხერხდა:', logError);
+      } else {
+        console.log('✅ IG ლოგები წარმატებით ჩაიწერა ბაზაში');
       }
     }
 
