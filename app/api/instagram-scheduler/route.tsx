@@ -182,7 +182,7 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering
+// Image Rendering (ზუსტი Canvas-ის კოორდინატებით)
 // ============================================================
 
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
@@ -192,42 +192,63 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
   const imageResponse = new ImageResponse(
     (
       <div style={{ display: 'flex', position: 'relative', width: 1080, height: 1350, backgroundColor: '#fffdf5' }}>
-        {/* შაბლონი */}
+        {/* 1. შაბლონი */}
         <img src={templateUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         
-        {/* ლოგო */}
+        {/* 2. ლოგო */}
         <div style={{ position: 'absolute', left: 923, top: 27, width: 130, height: 130, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)' }}>
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        {/* Text 1 (Hook) */}
+        {/* 3. Text 1 (Hook) - Canvas: y = height*0.40 (540px), baseline = 'middle' */}
         <div style={{ 
-          position: 'absolute', left: 76, top: 230, width: 508, height: 189, 
-          display: 'flex', alignItems: 'center', justifyContent: 'center', 
-          textAlign: 'center', color: '#1c1b3a', fontSize: 56, fontStyle: 'italic', 
-          fontFamily: 'serif', lineHeight: 1.2, overflow: 'hidden' 
+          position: 'absolute', 
+          left: '50%', 
+          top: '540px', 
+          transform: 'translate(-50%, -50%)', 
+          width: '85%',
+          textAlign: 'center', 
+          color: '#000000', 
+          fontSize: '72px', 
+          fontStyle: 'italic', 
+          fontFamily: 'serif', 
+          lineHeight: '1.3',
+          fontWeight: 500
         }}>
           {text1}
         </div>
 
-        {/* Date */}
+        {/* 4. Text 2 (Body) - Canvas: იწყება y = height*0.66 (891px)-დან */}
         <div style={{ 
-          position: 'absolute', left: 76, top: 446, width: 432, height: 81, 
-          display: 'flex', alignItems: 'center', justifyContent: 'center', 
-          textAlign: 'center', color: '#1c1b3a', fontSize: 40, fontStyle: 'italic', 
-          fontFamily: 'serif', lineHeight: 1.2 
-        }}>
-          {dateLabel}
-        </div>
-
-        {/* Text 2 (Body) */}
-        <div style={{ 
-          position: 'absolute', left: 76, top: 554, width: 508, height: 284, 
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'center', 
-          textAlign: 'center', color: '#1c1b3a', fontSize: 40, 
-          fontFamily: 'serif', lineHeight: 1.35, overflow: 'hidden' 
+          position: 'absolute', 
+          left: '50%', 
+          top: '861px', 
+          transform: 'translateX(-50%)', 
+          width: '85%',
+          textAlign: 'center', 
+          color: '#000000', 
+          fontSize: '60px',
+          fontFamily: 'serif', 
+          lineHeight: '1.4',
+          fontWeight: 400,
+          overflow: 'hidden'
         }}>
           {text2}
+        </div>
+
+        {/* 5. თარიღი - Canvas: y = height * 0.94 (1269px), baseline = 'middle' */}
+        <div style={{ 
+          position: 'absolute', 
+          left: '50%', 
+          top: '1269px', 
+          transform: 'translate(-50%, -50%)', 
+          textAlign: 'center', 
+          color: '#000000', 
+          fontSize: '36px', 
+          fontStyle: 'italic', 
+          fontFamily: 'serif'
+        }}>
+          {dateLabel}
         </div>
       </div>
     ),
@@ -249,7 +270,6 @@ async function insertSchedulerLogs(supabase: ReturnType<typeof getSupabaseClient
 // Route Handler
 // ============================================================
 
-// ✅ წაშლილია 'request: Request', რადგან ის აღარ გამოიყენება
 export async function GET() {
   const startTime = Date.now();
 
