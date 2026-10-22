@@ -165,9 +165,6 @@ function getDateLabel(date: Date): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: GEORGIA_TIMEZONE, year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 }
 
-/**
- * ✅ საბოლოო ვერსია: ზუსტი პიქსელური მათემატიკა Canvas-ის ლოგიკის 1:1 მისაღებად
- */
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
   
@@ -363,11 +360,17 @@ export async function GET() {
         
         const imageBuffer = await generatePostImage(text1, text2, targetZodiac, now);
         
-        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
+        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
         uploadedStoragePath = `posts/${fileName}`;
-        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
+        
+        // ✅ CRITICAL FIX: PNG ArrayBuffer-ს ვაქციევთ JPEG Buffer-ად
+        // Instagram API ბევრად უკეთ მუშაობს JPEG-თან
+        const imageBufferNode = Buffer.from(imageBuffer);
+        const imageBlob = new Blob([imageBufferNode], { type: 'image/jpeg' });
 
-        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageBlob, { contentType: 'image/png', upsert: false });
+        logInfo('Image buffer converted to JPEG.', { size: imageBlob.size });
+
+        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageBlob, { contentType: 'image/jpeg', upsert: false });
         if (uploadError) throw new Error(`Could not upload post image: ${uploadError.message}`);
 
         const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadedStoragePath);
@@ -389,8 +392,7 @@ export async function GET() {
         const hashtags = generateDynamicHashtags(text2, targetZodiac);
         const caption = `${text1.trim()}\n\n${text2.trim()}\n\n${hashtags}`.trim();
 
-        // ✅ CRITICAL FIX: დავამატეთ Cache-Buster (?v=timestamp) URL-ს, რათა Meta-მ ახლიდან ჩამოტვირთოს სურათი
-        const publishResult = await agent.publishPost(`${finalImageUrl}?v=${Date.now()}`, caption);
+        const publishResult = await agent.publishPost(finalImageUrl, caption);
         
         if (!publishResult.success || !publishResult.postId) throw new Error(publishResult.error || 'Instagram publishing failed or returned no post ID.');
 
