@@ -182,7 +182,7 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering (მარტივი, სტანდარტული შრიფტებით)
+// Image Rendering
 // ============================================================
 
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
@@ -249,7 +249,8 @@ async function insertSchedulerLogs(supabase: ReturnType<typeof getSupabaseClient
 // Route Handler
 // ============================================================
 
-export async function GET(request: Request) {
+// ✅ წაშლილია 'request: Request', რადგან ის აღარ გამოიყენება
+export async function GET() {
   const startTime = Date.now();
 
   try {
