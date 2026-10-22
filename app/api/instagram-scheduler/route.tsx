@@ -184,74 +184,84 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering (PNG → JPEG კონვერტაცია sharp-ით)
+// Image Rendering (PNG → JPEG კონვერტაცია sharp-ით + სწორი კოორდინატები)
 // ============================================================
 
 async function generatePostJpeg(text1: string, text2: string, zodiacSign: string, date: Date): Promise<Buffer> {
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
   const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: GEORGIA_TIMEZONE, year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 
-  // 1. ვქმნით PNG-ს @vercel/og-ით
+  // 1. ვქმნით PNG-ს @vercel/og-ით (ზუსტად ახალი შაბლონის მარცხენა ზონების მიხედვით)
   const imageResponse = new ImageResponse(
     (
       <div style={{ display: 'flex', position: 'relative', width: 1080, height: 1350, backgroundColor: '#fffdf5' }}>
         {/* 1. შაბლონი */}
         <img src={templateUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         
-        {/* 2. ლოგო */}
+        {/* 2. ლოგო (წაშალე ეს ბლოკი, თუ შენს შაბლონში ლოგო უკვე ჩაშენებულია) */}
         <div style={{ position: 'absolute', left: 923, top: 27, width: 130, height: 130, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)' }}>
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        {/* 3. Text 1 (Hook) */}
+        {/* 3. Text 1 (Hook) - მარცხენა მხარეს */}
         <div style={{ 
           position: 'absolute', 
-          left: '50%', 
-          top: '540px', 
-          transform: 'translate(-50%, -50%)', 
-          width: '85%',
+          left: 76, 
+          top: 230, 
+          width: 508, 
+          height: 189,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           textAlign: 'center', 
-          color: '#000000', 
-          fontSize: '72px', 
+          color: '#1c1b3a', 
+          fontSize: 56, 
           fontStyle: 'italic', 
           fontFamily: 'serif', 
-          lineHeight: '1.3',
-          fontWeight: 500
+          lineHeight: 1.2,
+          overflow: 'hidden'
         }}>
           {text1}
         </div>
 
-        {/* 4. Text 2 (Body) */}
+        {/* 4. Date - მარცხენა მხარეს, Text 1-სა და Text 2-ს შორის */}
         <div style={{ 
           position: 'absolute', 
-          left: '50%', 
-          top: '861px', 
-          transform: 'translateX(-50%)', 
-          width: '85%',
+          left: 76, 
+          top: 446, 
+          width: 432, 
+          height: 81,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           textAlign: 'center', 
-          color: '#000000', 
-          fontSize: '60px',
+          color: '#1c1b3a', 
+          fontSize: 40, 
+          fontStyle: 'italic', 
           fontFamily: 'serif', 
-          lineHeight: '1.4',
-          fontWeight: 400,
+          lineHeight: 1.2
+        }}>
+          {dateLabel}
+        </div>
+
+        {/* 5. Text 2 (Body) - მარცხენა მხარეს */}
+        <div style={{ 
+          position: 'absolute', 
+          left: 76, 
+          top: 554, 
+          width: 508, 
+          height: 284,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          textAlign: 'center', 
+          color: '#1c1b3a', 
+          fontSize: 40,
+          fontFamily: 'serif', 
+          lineHeight: 1.35,
           overflow: 'hidden'
         }}>
           {text2}
-        </div>
-
-        {/* 5. თარიღი */}
-        <div style={{ 
-          position: 'absolute', 
-          left: '50%', 
-          top: '1269px', 
-          transform: 'translate(-50%, -50%)', 
-          textAlign: 'center', 
-          color: '#000000', 
-          fontSize: '36px', 
-          fontStyle: 'italic', 
-          fontFamily: 'serif'
-        }}>
-          {dateLabel}
         </div>
       </div>
     ),
@@ -260,8 +270,7 @@ async function generatePostJpeg(text1: string, text2: string, zodiacSign: string
 
   const pngBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-  // 2. ✅ ვაქციევთ PNG-ს JPEG-ად sharp-ით
-  // ეს არის "ოქროს სტანდარტი" Instagram API-სთვის
+  // 2. ✅ ვაქციევთ PNG-ს JPEG-ად sharp-ით (ოქროს სტანდარტი Instagram API-სთვის)
   const jpegBuffer = await sharp(pngBuffer)
     .flatten({ background: '#ffffff' }) // გამჭვირვალობის აღმოფხვრა
     .jpeg({ 
@@ -377,13 +386,13 @@ export async function GET() {
 
         logInfo('Rendering Instagram post image.', { zodiacSign: targetZodiac });
         
-        // ✅ ვიყენებთ generatePostJpeg-ს (PNG → JPEG კონვერტაცია)
+        // ✅ ვიყენებთ generatePostJpeg-ს (ახალი კოორდინატებით + JPEG კონვერტაცია)
         const jpegBuffer = await generatePostJpeg(text1, text2, targetZodiac, now);
         
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
         const uploadedStoragePath = `posts/${fileName}`;
 
-        // ✅ ვტვირთავთ JPEG-ს (არა PNG-ს)
+        // ✅ ვტვირთავთ JPEG-ს
         const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, jpegBuffer, { 
           contentType: 'image/jpeg', 
           upsert: false 
