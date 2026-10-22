@@ -182,7 +182,7 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering (ზუსტი Canvas-ის კოორდინატებით)
+// Image Rendering
 // ============================================================
 
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
@@ -200,7 +200,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        {/* 3. Text 1 (Hook) - Canvas: y = height*0.40 (540px), baseline = 'middle' */}
+        {/* 3. Text 1 (Hook) */}
         <div style={{ 
           position: 'absolute', 
           left: '50%', 
@@ -218,7 +218,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           {text1}
         </div>
 
-        {/* 4. Text 2 (Body) - Canvas: იწყება y = height*0.66 (891px)-დან */}
+        {/* 4. Text 2 (Body) */}
         <div style={{ 
           position: 'absolute', 
           left: '50%', 
@@ -236,7 +236,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           {text2}
         </div>
 
-        {/* 5. თარიღი - Canvas: y = height * 0.94 (1269px), baseline = 'middle' */}
+        {/* 5. თარიღი */}
         <div style={{ 
           position: 'absolute', 
           left: '50%', 
@@ -360,14 +360,23 @@ export async function GET() {
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
         const uploadedStoragePath = `posts/${fileName}`;
         
-        const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
+        // ✅ ვიყენებთ Node.js Buffer-ს Blob-ის ნაცვლად უფრო სტაბილური ატვირთვისთვის
+        const imageNodeBuffer = Buffer.from(imageBuffer);
 
-        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageBlob, { contentType: 'image/png', upsert: false });
+        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageNodeBuffer, { 
+          contentType: 'image/png', 
+          upsert: false 
+        });
         if (uploadError) throw new Error(`Could not upload post image: ${uploadError.message}`);
 
         const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadedStoragePath);
         const finalImageUrl = urlData.publicUrl;
         if (!finalImageUrl) throw new Error('Supabase did not return a public URL.');
+
+        // ✅ 3 წამიანი დაყოვნება (ოქროს სტანდარტი)
+        // ეს აძლევს Supabase CDN-ს საკმარის დროს, რომ ფაილი გლობალურად ხელმისაწვდომი გახადოს Meta-ს სკრაპერისთვის.
+        logInfo('Waiting 3s for Supabase CDN propagation before sending to Instagram...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         const { data: profile, error: profileError } = await supabase
           .from('instagram_accounts')
