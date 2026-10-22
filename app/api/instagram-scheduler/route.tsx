@@ -166,10 +166,9 @@ function getDateLabel(date: Date): string {
 }
 
 /**
- * ✅ ახალი ფუნქცია: იყენებს მზა შაბლონებს და ზუსტად იმეორებს UI Canvas-ის ლოგიკას
+ * ✅ საბოლოო ვერსია: ზუსტი პიქსელური მათემატიკა Canvas-ის ლოგიკის 1:1 მისაღებად
  */
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
-  // ✅ ტვირთავს მზა შაბლონს ნაცვლად ძველი ზოდიაქოს სურათისა
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
   
   const safeText1 = text1.trim();
@@ -184,20 +183,19 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
         height: '1350px', 
         position: 'relative', 
         overflow: 'hidden',
-        backgroundColor: '#fffdf5' // კრემისფერი ფონი შაბლონისთვის
+        backgroundColor: '#fffdf5'
       }}>
-        {/* ✅ მზა შაბლონი როგორც ფონი */}
+        {/* მზა შაბლონი როგორც ფონი */}
         <img 
           src={templateUrl} 
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
         />
         
-        {/* ✅ ლოგო (თუ შაბლონში უკვე არ არის, კოდი ამას ამატებს. თუ შაბლონშია, ეს ბლოკი შეგიძლია წაშალო) */}
+        {/* ლოგო (წაშალე ეს ბლოკი, თუ შაბლონში უკვე არის ჩაშენებული) */}
         <div style={{ 
-          display: 'flex', 
           position: 'absolute', 
-          top: '2%', 
-          right: '2%', 
+          top: '27px', 
+          right: '27px', 
           width: '130px', 
           height: '130px', 
           borderRadius: '50%', 
@@ -208,13 +206,13 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        {/* ✅ Text 1 (Hook): უსტად ისე, როგორც Canvas-ში - შავი, Italic Serif, 40% სიმაღლეზე */}
+        {/* ✅ Text 1: Canvas-ში არის 1350 * 0.40 = 540px, textBaseline = 'middle' */}
         <div style={{ 
           position: 'absolute', 
-          top: '40%', 
+          top: '540px', 
           left: '50%', 
           transform: 'translate(-50%, -50%)', 
-          width: '70%', // მარცხენა ცარიელი სივრცის გათვალისწინებით
+          width: '70%',
           textAlign: 'center',
           color: '#000000', 
           fontSize: '72px', 
@@ -226,29 +224,33 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           {safeText1}
         </div>
 
-        {/* ✅ Text 2 (Forecast): ზუსტად ისე, როგორც Canvas-ში - შავი, Normal Serif, 66% სიმაღლეზე */}
+        {/* ✅ Text 2: Canvas-ში იწყება 1350 * 0.66 = 891px-დან (middle baseline). */}
+        {/* კომპენსაცია: 891 - 30 (ნახევარი ფონტი) ≈ 860px */}
         <div style={{ 
           position: 'absolute', 
-          top: '66%', 
+          top: '860px', 
           left: '50%', 
           transform: 'translateX(-50%)', 
           width: '75%',
+          maxHeight: '340px', // ზღუდავს 4-5 ხაზს, როგორც Canvas-ის maxWidth ციკლი
           textAlign: 'center',
           color: '#000000', 
           fontSize: '60px', 
           fontFamily: 'Georgia, serif', 
-          lineHeight: '1.4',
-          fontWeight: 400
+          lineHeight: '1.4', 
+          fontWeight: 400,
+          overflow: 'hidden', 
+          wordWrap: 'break-word'
         }}>
           {safeText2}
         </div>
 
-        {/* ✅ თარიღი: უსტად ისე, როგორც Canvas-ში - შავი, Italic, ქვემოთ */}
+        {/* ✅ თარიღი: Canvas-ში არის 1350 * 0.94 = 1269px, middle baseline */}
         <div style={{ 
           position: 'absolute', 
-          bottom: '6%', 
+          top: '1269px', 
           left: '50%', 
-          transform: 'translateX(-50%)', 
+          transform: 'translate(-50%, -50%)', 
           textAlign: 'center',
           color: '#000000', 
           fontSize: '36px', 
@@ -365,7 +367,6 @@ export async function GET() {
 
         logInfo('Generating Instagram post image with new template.', { zodiacSign: targetZodiac });
         
-        // ✅ ახალი ფუნქცია, რომელიც იყენებს შაბლონებს
         const imageBuffer = await generatePostImage(text1, text2, targetZodiac, now);
         
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
@@ -381,8 +382,6 @@ export async function GET() {
         if (!finalImageUrl) throw new Error('Supabase did not return a public URL for the image.');
         
         // ✅ 2. სურათის ზომის გადამოწმება და "გაწმენდა" Instagram API-სთვის
-        // ეს პროცესი იძულებით ტვირთავს სურათს, ქმნის ახალ Blob-ს და ხელახლა ტვირთავს,
-        // რაც გარანტირებს, რომ Instagram API-მ მიიღოს სწორი მეტა-მონაცემები.
         try {
             const checkResponse = await fetch(finalImageUrl);
             const checkBuffer = await checkResponse.arrayBuffer();
