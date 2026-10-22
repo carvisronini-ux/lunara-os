@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ImageResponse } from '@vercel/og';
+import sharp from 'sharp';
 
 import {
   generateViralText1,
@@ -23,6 +24,7 @@ export const maxDuration = 60;
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const GEORGIA_UTC_OFFSET = '+04:00';
 const SCHEDULE_WINDOW_MINUTES = 25;
+const JPEG_QUALITY = 95; // მაღალი ხარისხი Instagram-ისთვის
 
 const ASSETS_BASE_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets';
 const DEFAULT_LOGO_URL = `${ASSETS_BASE_URL}/logo.png`;
@@ -168,7 +170,7 @@ function normalizeZodiacSign(value: string): string {
 }
 
 function sanitizeText(value: string): string {
-  return value.replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').replace(/^["“”'‘’\s]+|["“”'‘’\s]+$/g, '').trim();
+  return value.replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').replace(/^["""''\s]+|["""''\s]+$/g, '').trim();
 }
 
 function generateDynamicHashtags(text2: string, zodiacName: string): string {
@@ -182,13 +184,14 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering
+// Image Rendering (PNG → JPEG კონვერტაცია sharp-ით)
 // ============================================================
 
-async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
+async function generatePostJpeg(text1: string, text2: string, zodiacSign: string, date: Date): Promise<Buffer> {
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
   const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: GEORGIA_TIMEZONE, year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 
+  // 1. ვქმნით PNG-ს @vercel/og-ით
   const imageResponse = new ImageResponse(
     (
       <div style={{ display: 'flex', position: 'relative', width: 1080, height: 1350, backgroundColor: '#fffdf5' }}>
@@ -255,7 +258,25 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
     { width: 1080, height: 1350 }
   );
 
-  return imageResponse.arrayBuffer();
+  const pngBuffer = Buffer.from(await imageResponse.arrayBuffer());
+
+  // 2. ✅ ვაქციევთ PNG-ს JPEG-ად sharp-ით
+  // ეს არის "ოქროს სტანდარტი" Instagram API-სთვის
+  const jpegBuffer = await sharp(pngBuffer)
+    .flatten({ background: '#ffffff' }) // გამჭვირვალობის აღმოფხვრა
+    .jpeg({ 
+      quality: JPEG_QUALITY, 
+      mozjpeg: true, // უკეთესი კომპრესია
+      chromaSubsampling: '4:4:4' // მაღალი ხარისხის ფერები
+    })
+    .toBuffer();
+
+  logInfo('PNG converted to JPEG via sharp.', { 
+    pngSizeKB: Math.round(pngBuffer.length / 1024),
+    jpegSizeKB: Math.round(jpegBuffer.length / 1024)
+  });
+
+  return jpegBuffer;
 }
 
 async function insertSchedulerLogs(supabase: ReturnType<typeof getSupabaseClient>, logs: SchedulerLog[], startTime: number): Promise<void> {
@@ -355,16 +376,16 @@ export async function GET() {
         if (!text2) throw new Error('Text 2 generation returned empty result.');
 
         logInfo('Rendering Instagram post image.', { zodiacSign: targetZodiac });
-        const imageBuffer = await generatePostImage(text1, text2, targetZodiac, now);
         
-        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
+        // ✅ ვიყენებთ generatePostJpeg-ს (PNG → JPEG კონვერტაცია)
+        const jpegBuffer = await generatePostJpeg(text1, text2, targetZodiac, now);
+        
+        const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
         const uploadedStoragePath = `posts/${fileName}`;
-        
-        // ✅ ვიყენებთ Node.js Buffer-ს Blob-ის ნაცვლად უფრო სტაბილური ატვირთვისთვის
-        const imageNodeBuffer = Buffer.from(imageBuffer);
 
-        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageNodeBuffer, { 
-          contentType: 'image/png', 
+        // ✅ ვტვირთავთ JPEG-ს (არა PNG-ს)
+        const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, jpegBuffer, { 
+          contentType: 'image/jpeg', 
           upsert: false 
         });
         if (uploadError) throw new Error(`Could not upload post image: ${uploadError.message}`);
@@ -373,8 +394,7 @@ export async function GET() {
         const finalImageUrl = urlData.publicUrl;
         if (!finalImageUrl) throw new Error('Supabase did not return a public URL.');
 
-        // ✅ 3 წამიანი დაყოვნება (ოქროს სტანდარტი)
-        // ეს აძლევს Supabase CDN-ს საკმარის დროს, რომ ფაილი გლობალურად ხელმისაწვდომი გახადოს Meta-ს სკრაპერისთვის.
+        // ✅ 3 წამიანი დაყოვნება CDN-ისთვის
         logInfo('Waiting 3s for Supabase CDN propagation before sending to Instagram...');
         await new Promise(resolve => setTimeout(resolve, 3000));
 
