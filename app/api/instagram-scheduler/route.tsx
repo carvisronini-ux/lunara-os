@@ -1,6 +1,5 @@
 // /home/carvisronini-ux/lunara-os/app/api/instagram-scheduler/route.tsx
 
-import { timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { ImageResponse } from '@vercel/og';
@@ -18,7 +17,7 @@ export const revalidate = 0;
 export const maxDuration = 60;
 
 // ============================================================
-// Configuration (ყველაფერი მარტივად და ფიქსირებულად)
+// Configuration
 // ============================================================
 
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
@@ -183,7 +182,7 @@ function generateDynamicHashtags(text2: string, zodiacName: string): string {
 }
 
 // ============================================================
-// Image Rendering (მარტივი, სტანდარტული შრიფტებით, Sharp-ის გარეშე)
+// Image Rendering (მარტივი, სტანდარტული შრიფტებით)
 // ============================================================
 
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
@@ -232,7 +231,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
         </div>
       </div>
     ),
-    { width: 1080, height: 1350 } // სტანდარტული შრიფტები ავტომატურად მუშაობს აქ
+    { width: 1080, height: 1350 }
   );
 
   return imageResponse.arrayBuffer();
@@ -340,7 +339,6 @@ export async function GET(request: Request) {
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
         const uploadedStoragePath = `posts/${fileName}`;
         
-        // სტანდარტული PNG Blob, რომელსაც Instagram უპრობლემოდ იღებს
         const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
 
         const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageBlob, { contentType: 'image/png', upsert: false });
