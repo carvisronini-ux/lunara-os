@@ -208,7 +208,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        {/* ✅ Text 1 (Hook): ზუსტად ისე, როგორც Canvas-ში - შავი, Italic Serif, 40% სიმაღლეზე */}
+        {/* ✅ Text 1 (Hook): უსტად ისე, როგორც Canvas-ში - შავი, Italic Serif, 40% სიმაღლეზე */}
         <div style={{ 
           position: 'absolute', 
           top: '40%', 
@@ -243,7 +243,7 @@ async function generatePostImage(text1: string, text2: string, zodiacSign: strin
           {safeText2}
         </div>
 
-        {/* ✅ თარიღი: ზუსტად ისე, როგორც Canvas-ში - შავი, Italic, ქვემოთ */}
+        {/* ✅ თარიღი: უსტად ისე, როგორც Canvas-ში - შავი, Italic, ქვემოთ */}
         <div style={{ 
           position: 'absolute', 
           bottom: '6%', 
@@ -372,12 +372,32 @@ export async function GET() {
         uploadedStoragePath = `posts/${fileName}`;
         const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
 
+        // ✅ 1. პირველადი ატვირთვა Supabase-ში
         const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, imageBlob, { contentType: 'image/png', upsert: false });
         if (uploadError) throw new Error(`Could not upload post image: ${uploadError.message}`);
 
         const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadedStoragePath);
         const finalImageUrl = urlData.publicUrl;
         if (!finalImageUrl) throw new Error('Supabase did not return a public URL for the image.');
+        
+        // ✅ 2. სურათის ზომის გადამოწმება და "გაწმენდა" Instagram API-სთვის
+        // ეს პროცესი იძულებით ტვირთავს სურათს, ქმნის ახალ Blob-ს და ხელახლა ტვირთავს,
+        // რაც გარანტირებს, რომ Instagram API-მ მიიღოს სწორი მეტა-მონაცემები.
+        try {
+            const checkResponse = await fetch(finalImageUrl);
+            const checkBuffer = await checkResponse.arrayBuffer();
+            const cleanBlob = new Blob([checkBuffer], { type: 'image/png' });
+            
+            const { error: reuploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, cleanBlob, { contentType: 'image/png', upsert: true });
+            if (reuploadError) {
+                logError('Re-upload failed, but continuing with original...', reuploadError);
+            } else {
+                logInfo('✅ Image re-uploaded with verified dimensions.');
+            }
+        } catch (e) {
+            logError('Dimension check failed, proceeding anyway...', e);
+        }
+
         logInfo('Post image uploaded successfully.', { imageUrl: finalImageUrl });
 
         const { data: profile, error: profileError } = await supabase
