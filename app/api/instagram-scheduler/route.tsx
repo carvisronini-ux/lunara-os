@@ -165,48 +165,97 @@ function getDateLabel(date: Date): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: GEORGIA_TIMEZONE, year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 }
 
-function cleanText(value: string, maxLength: number): string {
-  const cleaned = value.trim().replace(/\s+/g, ' ');
-  if (cleaned.length > maxLength) {
-    return `${cleaned.slice(0, maxLength - 1).trimEnd()}…`;
-  }
-  return cleaned;
-}
-
+/**
+ * ✅ ახალი ფუნქცია: იყენებს მზა შაბლონებს და ზუსტად იმეორებს UI Canvas-ის ლოგიკას
+ */
 async function generatePostImage(text1: string, text2: string, zodiacSign: string, date: Date): Promise<ArrayBuffer> {
-  const imageUrl = `${ASSETS_BASE_URL}/zodiac-signs/${zodiacSign.toLowerCase()}.png`;
-  const safeText1 = cleanText(text1, 180);
-  const safeText2 = cleanText(text2, 360);
+  // ✅ ტვირთავს მზა შაბლონს ნაცვლად ძველი ზოდიაქოს სურათისა
+  const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
+  
+  const safeText1 = text1.trim();
+  const safeText2 = text2.trim();
   const dateLabel = getDateLabel(date);
 
   const imageResponse = new ImageResponse(
     (
-      <div style={{ display: 'flex', width: '1080px', height: '1350px', position: 'relative', overflow: 'hidden', backgroundColor: '#0f172a', fontFamily: 'serif' }}>
-        <img src={imageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        <div style={{ display: 'flex', position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(5,8,24,0.08) 0%, rgba(5,8,24,0.08) 25%, rgba(5,8,24,0.32) 50%, rgba(5,8,24,0.82) 100%)' }} />
+      <div style={{ 
+        display: 'flex', 
+        width: '1080px', 
+        height: '1350px', 
+        position: 'relative', 
+        overflow: 'hidden',
+        backgroundColor: '#fffdf5' // კრემისფერი ფონი შაბლონისთვის
+      }}>
+        {/* ✅ მზა შაბლონი როგორც ფონი */}
+        <img 
+          src={templateUrl} 
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} 
+        />
         
-        <div style={{ display: 'flex', position: 'absolute', top: 28, right: 28, width: 112, height: 112, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.65)', backgroundColor: 'rgba(15,23,42,0.65)' }}>
+        {/* ✅ ლოგო (თუ შაბლონში უკვე არ არის, კოდი ამას ამატებს. თუ შაბლონშია, ეს ბლოკი შეგიძლია წაშალო) */}
+        <div style={{ 
+          display: 'flex', 
+          position: 'absolute', 
+          top: '2%', 
+          right: '2%', 
+          width: '130px', 
+          height: '130px', 
+          borderRadius: '50%', 
+          overflow: 'hidden', 
+          border: '2px solid rgba(255,255,255,0.4)',
+          backgroundColor: 'rgba(255,255,255,0.1)'
+        }}>
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
 
-        <div style={{ display: 'flex', position: 'absolute', top: 110, left: 70, right: 70, justifyContent: 'center', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontSize: 24, fontWeight: 600, letterSpacing: 7, textAlign: 'center', textTransform: 'uppercase', textShadow: '0 2px 12px rgba(0,0,0,0.65)' }}>
-          {zodiacSign}
-        </div>
-
-        <div style={{ display: 'flex', position: 'absolute', top: 350, left: 72, right: 72, maxHeight: 390, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: '#ffffff', fontSize: 62, fontStyle: 'italic', fontWeight: 600, lineHeight: 1.2, textAlign: 'center', textShadow: '0 3px 18px rgba(0,0,0,0.9)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+        {/* ✅ Text 1 (Hook): ზუსტად ისე, როგორც Canvas-ში - შავი, Italic Serif, 40% სიმაღლეზე */}
+        <div style={{ 
+          position: 'absolute', 
+          top: '40%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)', 
+          width: '70%', // მარცხენა ცარიელი სივრცის გათვალისწინებით
+          textAlign: 'center',
+          color: '#000000', 
+          fontSize: '72px', 
+          fontStyle: 'italic', 
+          fontFamily: 'Georgia, serif', 
+          lineHeight: '1.3',
+          fontWeight: 500
+        }}>
           {safeText1}
         </div>
 
-        <div style={{ display: 'flex', position: 'absolute', top: 790, left: 90, right: 90, maxHeight: 340, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: '#ffffff', fontSize: 38, fontWeight: 400, lineHeight: 1.35, textAlign: 'center', textShadow: '0 2px 14px rgba(0,0,0,0.95)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+        {/* ✅ Text 2 (Forecast): ზუსტად ისე, როგორც Canvas-ში - შავი, Normal Serif, 66% სიმაღლეზე */}
+        <div style={{ 
+          position: 'absolute', 
+          top: '66%', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          width: '75%',
+          textAlign: 'center',
+          color: '#000000', 
+          fontSize: '60px', 
+          fontFamily: 'Georgia, serif', 
+          lineHeight: '1.4',
+          fontWeight: 400
+        }}>
           {safeText2}
         </div>
 
-        <div style={{ display: 'flex', position: 'absolute', bottom: 58, left: 70, right: 70, justifyContent: 'center', color: 'rgba(255,255,255,0.92)', fontSize: 27, fontStyle: 'italic', textAlign: 'center', textShadow: '0 2px 12px rgba(0,0,0,0.9)' }}>
+        {/* ✅ თარიღი: ზუსტად ისე, როგორც Canvas-ში - შავი, Italic, ქვემოთ */}
+        <div style={{ 
+          position: 'absolute', 
+          bottom: '6%', 
+          left: '50%', 
+          transform: 'translateX(-50%)', 
+          textAlign: 'center',
+          color: '#000000', 
+          fontSize: '36px', 
+          fontStyle: 'italic', 
+          fontFamily: 'Georgia, serif'
+        }}>
           {dateLabel}
-        </div>
-
-        <div style={{ display: 'flex', position: 'absolute', bottom: 20, left: 70, right: 70, justifyContent: 'center', color: 'rgba(255,255,255,0.75)', fontFamily: 'Arial, sans-serif', fontSize: 16, letterSpacing: 5, textAlign: 'center' }}>
-          LUNARA · YOUR COSMIC GUIDE
         </div>
       </div>
     ),
@@ -314,8 +363,11 @@ export async function GET() {
         const text2 = await generateHoroscopeText2(targetZodiac, text1, agentConfig);
         if (typeof text2 !== 'string' || !text2.trim()) throw new Error('Text 2 generation returned an empty or invalid result.');
 
-        logInfo('Generating Instagram post image.', { zodiacSign: targetZodiac });
+        logInfo('Generating Instagram post image with new template.', { zodiacSign: targetZodiac });
+        
+        // ✅ ახალი ფუნქცია, რომელიც იყენებს შაბლონებს
         const imageBuffer = await generatePostImage(text1, text2, targetZodiac, now);
+        
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.png`;
         uploadedStoragePath = `posts/${fileName}`;
         const imageBlob = new Blob([imageBuffer], { type: 'image/png' });
