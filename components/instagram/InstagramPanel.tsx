@@ -239,6 +239,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        removeContainer: true,
         // ✅ ვიგნორებთ backdrop-blur ელემენტებს, რადგან ისინი არღვევენ html2canvas-ს
         ignoreElements: (element) => element.classList.contains('backdrop-blur-md'),
       });
@@ -470,12 +471,14 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
                   
-                  {/* ✅ შეცვლილია: transparent შეცვლილია rgba(0,0,0,0)-ით html2canvas-ის თავსებადობისთვის */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-[rgba(0,0,0,0)] via-[rgba(0,0,0,0)] to-black/40 pointer-events-none z-0" />
+                  {/* ✅ შეცვლილია: Tailwind-ის გრადიენტი შეცვლილია სტანდარტული CSS linear-gradient-ით, რათა html2canvas-მა ზუსტად წაიკითხოს */}
+                  <div 
+                    className="absolute inset-0 pointer-events-none z-0" 
+                    style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} 
+                  />
                   
                   {showLogo && logoUrl && isLogoValid && (
                     <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
-                      {/* ✅ შეცვლილია: წაშლილია backdrop-blur-md, რადგან ის არღვევს html2canvas-ს */}
                       <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10">
                         <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" crossOrigin="anonymous" onError={() => setIsLogoValid(false)} />
                       </div>
