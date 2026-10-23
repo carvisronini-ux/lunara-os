@@ -38,26 +38,15 @@ export interface UploadResult {
   error?: string;
 }
 
-/**
- * ტექსტის ტრანკაცია (თუ გრძელია)
- * ამოჭრის ბოლო სიტყვას და დაამატებს "…"
- */
 function truncateText(text: string, maxLines: number, _lineHeight: number, fontSize: number, maxWidth: number): string {
   if (maxLines === 0) return text;
-  
-  // მარტივი ესტიმაცია: თუ ტექსტი ძალიან გრძელია, შევკვეცოთ
   const maxChars = Math.floor((maxWidth / fontSize) * maxLines * 1.5);
   if (text.length <= maxChars) return text;
-  
-  // ვპოულობთ ბოლო სრულ სიტყვას
   const truncated = text.substring(0, maxChars);
   const lastSpace = truncated.lastIndexOf(' ');
   return (lastSpace > 0 ? truncated.substring(0, lastSpace) : truncated) + '…';
 }
 
-/**
- * გენერირებს Instagram-ისთვის მზა სურათს
- */
 export async function generateInstagramImage(options: GenerateImageOptions): Promise<GeneratedImage> {
   const {
     zodiacSign,
@@ -71,7 +60,9 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   } = options;
 
   const { width, height } = config.dimensions[format];
-  const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
+  
+  // ✅ გასწორებულია: zodiac-signs/ ნაცვლად templates/-ისა
+  const templateUrl = `${ASSETS_BASE_URL}/zodiac-signs/${zodiacSign.toLowerCase()}.png`;
 
   const finalDateText = dateText || new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Tbilisi',
@@ -237,9 +228,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   };
 }
 
-/**
- * სურათის ატვირთვა Supabase Storage-ში
- */
 export async function uploadImageToSupabase(
   supabase: any,
   image: GeneratedImage,
