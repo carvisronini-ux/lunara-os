@@ -42,7 +42,7 @@ export interface UploadResult {
  * ტექსტის ტრანკაცია (თუ გრძელია)
  * ამოჭრის ბოლო სიტყვას და დაამატებს "…"
  */
-function truncateText(text: string, maxLines: number, lineHeight: number, fontSize: number, maxWidth: number): string {
+function truncateText(text: string, maxLines: number, _lineHeight: number, fontSize: number, maxWidth: number): string {
   if (maxLines === 0) return text;
   
   // მარტივი ესტიმაცია: თუ ტექსტი ძალიან გრძელია, შევკვეცოთ
