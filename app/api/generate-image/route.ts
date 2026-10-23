@@ -25,14 +25,7 @@ export const maxDuration = 30; // 30 წამი მაქსიმუმი
  */
 export async function POST(request: Request) {
   try {
-    // 1. ავტორიზაციის შემოწმება (მარტივი შემოწმება, მომავალში შეიძლება გაუმჯობესდეს)
-    const authHeader = request.headers.get('authorization');
-    // შენიშვნა: თუ ლოკალურად ტესტავ და token არ გაქვს, ეს ხაზი შეგიძლია დროებით დააკომენტარო
-    // if (!authHeader) {
-    //   return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    // }
-
-    // 2. Request body-ის პარსინგი
+    // 1. Request body-ის პარსინგი
     const body = await request.json();
     const {
       zodiacSign,
@@ -48,7 +41,7 @@ export async function POST(request: Request) {
       dateText?: string;
     };
 
-    // 3. ვალიდაცია
+    // 2. ვალიდაცია
     if (!zodiacSign || !text1 || !text2) {
       return NextResponse.json(
         { 
@@ -71,7 +64,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. სურათის გენერაცია
+    // 3. სურათის გენერაცია
     const image = await generateInstagramImage({
       zodiacSign: zodiacSign.toUpperCase(),
       text1,
@@ -83,7 +76,7 @@ export async function POST(request: Request) {
 
     console.log(`[Generate Image] Generated: ${image.sizeKB}KB (${image.width}x${image.height})`);
 
-    // 5. ატვირთვა Supabase-ში
+    // 4. ატვირთვა Supabase-ში
     const uploadResult = await uploadImageToSupabase(
       supabase,
       image,
@@ -100,7 +93,7 @@ export async function POST(request: Request) {
 
     console.log(`[Generate Image] Uploaded: ${uploadResult.url}`);
 
-    // 6. წარმატებული პასუხი
+    // 5. წარმატებული პასუხი
     return NextResponse.json({
       success: true,
       imageUrl: uploadResult.url,
