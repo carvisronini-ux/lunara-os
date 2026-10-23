@@ -1,10 +1,7 @@
 // /home/carvisronini-ux/lunara-os/services/image-generator.ts
-import { createCanvas, loadImage, registerFont } from 'canvas';
+import { createCanvas, loadImage } from 'canvas';
 import type { CanvasRenderingContext2D } from 'canvas';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs/promises';
 
 // ============================================================
 // Configuration
@@ -14,17 +11,15 @@ const ASSETS_BASE_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/obj
 const TEMPLATE_FOLDER = process.env.IG_TEMPLATE_FOLDER || 'zodiac-signs';
 const DEFAULT_LOGO_URL = `${ASSETS_BASE_URL}/logo.png`;
 
-const FONT_REGULAR_URL = process.env.IG_FONT_REGULAR_URL || `${ASSETS_BASE_URL}/fonts/post-regular.ttf`;
-const FONT_ITALIC_URL = process.env.IG_FONT_ITALIC_URL || `${ASSETS_BASE_URL}/fonts/post-italic.ttf`;
-const FONT_FAMILY = 'PostSerif';
-const FALLBACK_FONT_STACK = 'Georgia, "Times New Roman", serif';
+// ✅ დროებით ვიყენებთ მხოლოდ სისტემურ ფონტს, რათა გამოვრიცხოთ .ttf ჩამოტვირთვის პრობლემები
+const FONT_STACK = 'Georgia, "Times New Roman", serif';
 
 const FETCH_TIMEOUT_MS = 15000;
 const MIN_DIMENSION = 320;
 const MAX_DIMENSION = 4096;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-const TEXT_MAX_WIDTH_RATIO = 0.90; // 5% padding on each side
+const TEXT_MAX_WIDTH_RATIO = 0.90;
 const TEXT1_LINE_HEIGHT = 1.3;
 const TEXT2_LINE_HEIGHT = 1.4;
 const TEXT1_MAX_LINES = 2;
@@ -98,50 +93,6 @@ async function fetchBuffer(url: string): Promise<Buffer> {
   const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), cache: 'no-store' });
   if (!response.ok) throw new Error(`Request failed (${response.status}): ${url}`);
   return Buffer.from(await response.arrayBuffer());
-}
-
-async function downloadFont(url: string, fileName: string): Promise<string> {
-  const ext = path.extname(new URL(url).pathname) || '.ttf';
-  const filePath = path.join(os.tmpdir(), `${fileName}${ext}`);
-  try {
-    await fs.access(filePath);
-    return filePath;
-  } catch {
-    await fs.writeFile(filePath, await fetchBuffer(url));
-    return filePath;
-  }
-}
-
-let fontsPromise: Promise<boolean> | null = null;
-
-async function ensureFonts(): Promise<boolean> {
-  if (!fontsPromise) {
-    fontsPromise = (async () => {
-      const [regular, italic] = await Promise.allSettled([
-        downloadFont(FONT_REGULAR_URL, 'post-regular'),
-        downloadFont(FONT_ITALIC_URL, 'post-italic'),
-      ]);
-
-      let registered = false;
-      if (regular.status === 'fulfilled') {
-        registerFont(regular.value, { family: FONT_FAMILY, style: 'normal' });
-        registered = true;
-      }
-      if (italic.status === 'fulfilled') {
-        registerFont(italic.value, { family: FONT_FAMILY, style: 'italic' });
-        registered = true;
-      } else if (regular.status === 'fulfilled') {
-        registerFont(regular.value, { family: FONT_FAMILY, style: 'italic' });
-      }
-
-      if (!registered) console.warn('[image-generator] Custom fonts unavailable. Using fallback font stack.');
-      return registered;
-    })();
-  }
-
-  const ok = await fontsPromise;
-  if (!ok) fontsPromise = null;
-  return ok;
 }
 
 export function getTemplateUrl(zodiacSign: string): string {
@@ -258,9 +209,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
 
   const textColor = /^#[0-9a-fA-F]{3,8}$/.test(visualConfig.textColor ?? '') ? (visualConfig.textColor as string) : '#000000';
 
-  const fontsLoaded = await ensureFonts();
-  const fontStack = fontsLoaded ? `"${FONT_FAMILY}", ${FALLBACK_FONT_STACK}` : FALLBACK_FONT_STACK;
-
   const templateUrl = options.templateUrl && isAllowedAssetUrl(options.templateUrl) ? options.templateUrl : getTemplateUrl(zodiacSign);
   let templateBuffer: Buffer;
   try {
@@ -307,50 +255,57 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     }
   }
 
-  // ✅ მასშტაბირების კოეფიციენტი: კონსტრუქტორის 400px-იანი პრევიუდან 1080px-იან საბოლოო ზომაზე
+  // ✅ მასშტაბირების კოეფიციენტი
   const PREVIEW_WIDTH = 400;
   const scale = width / PREVIEW_WIDTH;
   const maxTextWidth = width * TEXT_MAX_WIDTH_RATIO;
   const centerX = width / 2;
 
-  // 3. Text 1: vertically centered on its anchor (like CSS translateY(-50%)), max 2 lines
+  // ✅ დიაგნოსტიკური ლოგები (Vercel-ის logs-ში რომ დაინახო)
+  console.log('🎨 [Canvas Debug] Text 1 Font:', `${visualConfig.text1FontSize * scale}px ${FONT_STACK}`);
+  console.log('🎨 [Canvas Debug] Text 1 Y:', (visualConfig.text1TopPercent / 100) * height);
+  console.log('🎨 [Canvas Debug] Text 2 Font:', `${visualConfig.text2FontSize * scale}px ${FONT_STACK}`);
+  console.log('🎨 [Canvas Debug] Text 2 Y:', (visualConfig.text2TopPercent / 100) * height);
+  console.log('🎨 [Canvas Debug] Color:', textColor);
+
+  // 3. Text 1
   drawTextBlock(ctx, {
     text: text1,
     centerX,
     anchorY: (visualConfig.text1TopPercent / 100) * height,
     vAlign: 'center',
-    fontSize: visualConfig.text1FontSize * scale, // ✅ მასშტაბირება დამატებულია
+    fontSize: visualConfig.text1FontSize * scale,
     italic: true,
     lineHeight: TEXT1_LINE_HEIGHT,
     maxLines: TEXT1_MAX_LINES,
     maxWidth: maxTextWidth,
     color: textColor,
-    fontStack,
+    fontStack: FONT_STACK, // ✅ მხოლოდ სისტემური ფონტი
   });
 
-  // 4. Text 2: starts at its anchor and flows downwards, max 5 lines
+  // 4. Text 2
   drawTextBlock(ctx, {
     text: text2,
     centerX,
     anchorY: (visualConfig.text2TopPercent / 100) * height,
     vAlign: 'top',
-    fontSize: visualConfig.text2FontSize * scale, // ✅ მასშტაბირება დამატებულია
+    fontSize: visualConfig.text2FontSize * scale,
     italic: false,
     lineHeight: TEXT2_LINE_HEIGHT,
     maxLines: TEXT2_MAX_LINES,
     maxWidth: maxTextWidth,
     color: textColor,
-    fontStack,
+    fontStack: FONT_STACK, // ✅ მხოლოდ სისტემური ფონტი
   });
 
   // 5. Date
   if (visualConfig.showDate && dateText) {
-    const dateFontSize = (visualConfig.dateFontSize ?? 14) * scale; // ✅ მასშტაბირება დამატებულია (14px არის კონსტრუქტორში)
-    ctx.font = `italic ${dateFontSize}px ${fontStack}`;
+    const dateFontSize = (visualConfig.dateFontSize ?? 14) * scale;
+    ctx.font = `italic ${dateFontSize}px ${FONT_STACK}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = textColor;
-    ctx.fillText(dateText, centerX, height - 0.06 * height); // 6% ქვემოდან
+    ctx.fillText(dateText, centerX, height - 0.06 * height);
   }
 
   const buffer = canvas.toBuffer('image/jpeg', { quality: 0.95, chromaSubsampling: false });
