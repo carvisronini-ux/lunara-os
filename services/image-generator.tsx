@@ -11,49 +11,26 @@ import {
 
 const ASSETS_BASE_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets';
 
-/**
- * სურათის გენერაციის ოფციები
- */
 export interface GenerateImageOptions {
-  /** ზოდიაქოს ნიშანი (მაგ: "ARIES") */
   zodiacSign: string;
-  /** Text 1 (Hook) */
   text1: string;
-  /** Text 2 (Forecast) */
   text2: string;
-  /** თარიღი */
   date: Date;
-  /** ფორმატი (post/story/carousel) */
   format?: PostFormat;
-  /** კონფიგურაცია (ოფციონალური, დეფოლტად იყენებს DEFAULT_INSTAGRAM_POST_CONFIG) */
   config?: TemplateConfig;
-  /** ლოგოს URL (ოფციონალური) */
   logoUrl?: string;
-  /** თარიღის ტექსტი (ოფციონალური, თუ არ არის, ავტომატურად გენერირდება) */
   dateText?: string;
 }
 
-/**
- * გენერირებული სურათის შედეგი
- */
 export interface GeneratedImage {
-  /** JPEG ბუფერი */
   buffer: Buffer;
-  /** სურათის ზომა ბაიტებში */
   size: number;
-  /** სურათის ზომა კილობაიტებში */
   sizeKB: number;
-  /** ფორმატი */
   format: 'jpeg';
-  /** სიგანე */
   width: number;
-  /** სიმაღლე */
   height: number;
 }
 
-/**
- * ატვირთვის შედეგი
- */
 export interface UploadResult {
   success: boolean;
   url?: string;
@@ -68,8 +45,6 @@ export interface UploadResult {
 function truncateText(text: string, maxLines: number, lineHeight: number, fontSize: number, maxWidth: number): string {
   if (maxLines === 0) return text;
   
-  const maxHeight = maxLines * lineHeight * fontSize;
-  
   // მარტივი ესტიმაცია: თუ ტექსტი ძალიან გრძელია, შევკვეცოთ
   const maxChars = Math.floor((maxWidth / fontSize) * maxLines * 1.5);
   if (text.length <= maxChars) return text;
@@ -82,15 +57,6 @@ function truncateText(text: string, maxLines: number, lineHeight: number, fontSi
 
 /**
  * გენერირებს Instagram-ისთვის მზა სურათს
- * 
- * ეს არის ერთიანი წერტილი სურათის გენერაციისთვის.
- * ის გამოიყენება როგორც კონსტრუქტორიდან (InstagramPanel),
- * ისე ავტომატური სქედულერიდან (instagram-scheduler).
- * 
- * პროცესი:
- * 1. @vercel/og რენდერავს HTML/CSS-ს PNG ArrayBuffer-ად
- * 2. sharp გარდაქმნის PNG-ს მაღალი ხარისხის JPEG-ად
- * 3. აბრუნებს Buffer-ს, რომელიც მზადაა ატვირთვისთვის
  */
 export async function generateInstagramImage(options: GenerateImageOptions): Promise<GeneratedImage> {
   const {
@@ -104,13 +70,9 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     dateText,
   } = options;
 
-  // 1. მივიღოთ ომები ფორმატის მიხედვით
   const { width, height } = config.dimensions[format];
-
-  // 2. შაბლონის URL
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
 
-  // 3. თარიღის ტექსტი
   const finalDateText = dateText || new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Tbilisi',
     year: 'numeric',
@@ -118,7 +80,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     day: 'numeric',
   }).format(date);
 
-  // 4. კოორდინატების გამოთვლა პიქსელებში
   const text1X = percentToPixels(config.text1.leftPercent, width);
   const text1Y = percentToPixels(config.text1.topPercent, height);
   const text1Width = percentToPixels(config.text1.maxWidthPercent, width);
@@ -133,7 +94,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
 
   const dateY = height - percentToPixels(config.date.bottomPercent, height);
 
-  // 5. ტექსტების ტრანკაცია (თუ გრძელია)
   const safeText1 = config.text1.maxLines > 0 
     ? truncateText(text1.trim(), config.text1.maxLines, config.text1.lineHeight, config.text1.fontSize, text1Width)
     : text1.trim();
@@ -142,7 +102,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     ? truncateText(text2.trim(), config.text2.maxLines, config.text2.lineHeight, config.text2.fontSize, text2Width)
     : text2.trim();
 
-  // 6. რენდერი @vercel/og-ით
   const imageResponse = new ImageResponse(
     (
       <div
@@ -168,7 +127,7 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
           }}
         />
 
-        {/* ოგო */}
+        {/* ლოგო */}
         {config.logo.enabled && (
           <div
             style={{
@@ -257,10 +216,8 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     { width, height }
   );
 
-  // 7. PNG ArrayBuffer-ის მიღება
   const pngBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-  // 8. JPEG-ში კონვერტაცია sharp-ით (Instagram API-სთვის)
   const jpegBuffer = await sharp(pngBuffer)
     .flatten({ background: '#ffffff' })
     .jpeg({
