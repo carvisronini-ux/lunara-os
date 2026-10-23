@@ -4,6 +4,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
+import html2canvas from "html2canvas"; // ✅ ახალი იმპორტი
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -20,18 +21,12 @@ const supabase = createClient(
 );
 
 const ZODIAC_SIGNS = [
-  { name: 'ARIES', search: 'ARIES ARIES' },
-  { name: 'TAURUS', search: 'TAURUS TAURUS' },
-  { name: 'GEMINI', search: 'GEMINI GEMINI' },
-  { name: 'CANCER', search: 'CANCER CANCER' },
-  { name: 'LEO', search: 'LEO LEO' },
-  { name: 'VIRGO', search: 'VIRGO VIRGO' },
-  { name: 'LIBRA', search: 'LIBRA LIBRA' },
-  { name: 'SCORPIO', search: 'SCORPIO SCORPIO' },
-  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS' },
-  { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN' },
-  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS' },
-  { name: 'PISCES', search: 'PISCES PISCES' },
+  { name: 'ARIES', search: 'ARIES ARIES' }, { name: 'TAURUS', search: 'TAURUS TAURUS' },
+  { name: 'GEMINI', search: 'GEMINI GEMINI' }, { name: 'CANCER', search: 'CANCER CANCER' },
+  { name: 'LEO', search: 'LEO LEO' }, { name: 'VIRGO', search: 'VIRGO VIRGO' },
+  { name: 'LIBRA', search: 'LIBRA LIBRA' }, { name: 'SCORPIO', search: 'SCORPIO SCORPIO' },
+  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS' }, { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN' },
+  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS' }, { name: 'PISCES', search: 'PISCES PISCES' },
 ];
 
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
@@ -39,16 +34,10 @@ const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/ob
 const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const baseTags = [`#${zodiacName}`, "#Horoscope", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
   if (!text2 || text2.trim().length < 10) return [...baseTags].join(" ");
-
-  const stopWords = new Set([
-    "the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", 
-    "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were"
-  ]);
-
+  const stopWords = new Set(["the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were"]);
   const words = text2.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").split(/\s+/);
   const extractedTags = words.filter(word => word.length > 3).filter(word => !stopWords.has(word)).map(word => `#${word}`);
-  const uniqueExtractedTags = Array.from(new Set(extractedTags)).slice(0, 4);
-  return [...baseTags, ...uniqueExtractedTags].join(" ");
+  return [...baseTags, ...Array.from(new Set(extractedTags)).slice(0, 4)].join(" ");
 };
 
 const THEME = {
@@ -224,7 +213,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: აგზავნის დინამიურ visualConfig-ს სერვერზე (მასშტაბირების გარეშე, რადგან ბექენდი აკეთებს მას)
+  // ✅ ახალი ლოგიკა: სქრინშოთის გადაღება პირდაპირ DOM-დან (100% იდენტური)
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
@@ -236,69 +225,53 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
 
-    if (!targetZodiac || !targetFormat) { 
+    if (!targetZodiac || !targetFormat || !previewRef.current) { 
       addLog("❌ Preview not ready or Zodiac/Format not selected."); 
       return null; 
     }
     
     setIsPublishing(true);
-    addLog(`📸 [1/3] იწყებს სერვერზე სურათის გენერაციას...`);
-    addLog(`🔍 დიაგნოსტიკა: Text1 = "${targetText1?.substring(0, 30)}..." (სიგრძე: ${targetText1?.length || 0})`);
-    addLog(`🔍 დიაგნოსტიკა: Text2 = "${targetText2?.substring(0, 30)}..." (სიგრძე: ${targetText2?.length || 0})`);
+    addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`);
 
     try {
-      const dateText = showWeekRange ? getWeekRange() : (showDate ? getCurrentDate() : undefined);
-
-      const payloadToSend = {
-        zodiacSign: targetZodiac.name,
-        text1: targetText1 || '',
-        text2: targetText2 || '',
-        format: targetFormat,
-        dateText,
-        visualConfig: {
-          text1FontSize: text1FontSize, // ✅ ყურადღება: ამოღებულია * 3. ბექენდი აკეთებს მასშტაბირებას (1080 / 400 = 2.7x)
-          text2FontSize: text2FontSize, // ✅ ყურადღება: ამოღებულია * 3
-          text1TopPercent: 40,
-          text2TopPercent: 66,
-          showDate: showDate,
-          showLogo: showLogo,
-          logoUrl: logoUrl,
-        }
-      };
-      console.log('📤 [FRONTEND] Sending exact payload to /api/generate-image:', JSON.stringify(payloadToSend, null, 2));
-
-      addLog(`⏳ [2/3] გზავნის მოთხოვნას /api/generate-image-ზე...`);
-      
-      const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToSend),
+      // ✅ html2canvas აიძულებს ბრაუზერს დაარენდეროს ელემენტი ზუსტად 1080x1350 ზომაში
+      const canvas = await html2canvas(previewRef.current, {
+        width: 1080,
+        height: 1350,
+        scale: 1, // 1080x1350 უკვე Instagram-ის ზომაა, scale:1 საკმარისია
+        useCORS: true, // აუცილებელია Supabase-ის სურათების ჩასატვირთად
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
       });
 
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Unknown error during image generation');
-      }
-
-      addLog(`✅ [3/3] სურათი წარმატებით გენერირდა და აიტვირთა! ზომა: ${data.imageSize}KB`);
-      addLog(`✅ URL: ${data.imageUrl}`);
+      addLog(`⏳ [2/3] ვაქციევთ JPEG-ად და ვტვირთავთ...`);
       
-      // ✅ ახალი: დეტალური სერვერული ლოგების დამატება UI-ში
-      if (data.debugLogs && Array.isArray(data.debugLogs)) {
-        addLog("🔍 --- დეტალური სერვერული ლოგები ---");
-        data.debugLogs.forEach((logLine: string) => {
-          if (logLine.trim()) addLog(`[SERVER] ${logLine}`);
-        });
-        addLog("🔍 ----------------------------------");
-      }
+      // კონვერტაცია Blob-ად
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+      if (!blob) throw new Error("Failed to create image blob");
+
+      const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
+      const uploadPath = `posts/${fileName}`;
+
+      // ატვირთვა პირდაპირ Supabase-ში
+      const { error: uploadError, data } = await supabase.storage
+        .from('lunara-assets')
+        .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
+
+      if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
       
-      setUploadedImageUrl(data.imageUrl);
-      return data.imageUrl;
+      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_OS_URL}/storage/v1/object/public/lunara-assets/${uploadPath}`;
+      
+      addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`);
+      addLog(`✅ URL: ${publicUrl}`);
+      
+      setUploadedImageUrl(publicUrl);
+      return publicUrl;
 
     } catch (error) {
       addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`);
-      console.error("Upload Error Details:", error);
+      console.error("Screenshot/Upload Error Details:", error);
       return null;
     } finally {
       setIsPublishing(false);
@@ -371,9 +344,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         return true;
       } else {
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`);
-        if (data.details) {
-          addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
-        }
+        if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
         
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
@@ -434,7 +405,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (!t2) return false;
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია და ატვირთვა...");
+      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
       if (!imgUrl) { 
         addLog("❌ ატვირთვა ვერ მოხერხდა"); 
@@ -499,13 +470,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
             <div className="xl:sticky xl:top-24 xl:self-start">
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
                 <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]"><span className="font-semibold">Live preview</span><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span></div>
+                
+                {/* ✅ ეს არის ის div, რომლის სქრინშოთიც გადაიღება. მისი ვიზუალური ზომა შეიძლება იყოს მცირე, მაგრამ html2canvas მას 1080x1350-ად დაარენდერებს */}
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
-                  <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
                   {showLogo && logoUrl && isLogoValid && (
                     <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
                       <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
-                        <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" onError={() => setIsLogoValid(false)} />
+                        <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" crossOrigin="anonymous" onError={() => setIsLogoValid(false)} />
                       </div>
                     </div>
                   )}
@@ -517,6 +490,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   )}
                   {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
                 </div>
+
               </div>
             </div>
             <div className="flex min-w-0 flex-col gap-4">
