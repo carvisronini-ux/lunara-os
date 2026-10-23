@@ -95,7 +95,6 @@ const STYLES = `
 .ag-ch h2,.ag-ch h3{margin:0;font-size:15px;font-weight:600}
 .ag-ch .ag-r{margin-left:auto;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:8px}
 
-/* ✅ განახლებული: 2 სვეტიანი ბადე აგენტებისთვის */
 .ag-agents-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -165,7 +164,6 @@ const STYLES = `
 .ag-ev.done{opacity:.7}
 .ag-empty-day{font-size:11px;color:var(--mute);opacity:.6;padding:4px 2px}
 
-/* ✅ განახლებული: 12 სვეტიანი ბადე ზოდიაქოსთვის (სქროლის გარეშე) */
 .ag-zod {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
@@ -254,7 +252,7 @@ const STYLES = `
 }
 @media(max-width:760px){
   .ag-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .ag-agents-grid { grid-template-columns: 1fr; } /* მობილურზე 1 სვეტი უკეთესი UX-ია */
+  .ag-agents-grid { grid-template-columns: 1fr; }
   .ag-week{grid-template-columns:1fr}
   .ag-day{min-height:0}
   .ag-z .g { font-size: 14px; }
@@ -285,6 +283,8 @@ const Icons = {
   close: <svg width="18" height="18" viewBox="0 0 24 24" {...svgProps}><path d="M18 6L6 18M6 6l12 12" /></svg>,
   studio: <svg width="16" height="16" viewBox="0 0 24 24" {...svgProps}><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>,
   play: <svg width="14" height="14" viewBox="0 0 24 24" {...svgProps}><polygon points="6 4 20 12 6 20 6 4" /></svg>,
+  copy: <svg width="14" height="14" viewBox="0 0 24 24" {...svgProps}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>,
+  trash: <svg width="14" height="14" viewBox="0 0 24 24" {...svgProps}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>,
 };
 
 // ============================================================
@@ -375,7 +375,6 @@ const colorVar = (type: string) => ({ ["--t" as string]: TYPE_COLORS[type] ?? "#
 // Pure helpers
 // ============================================================
 
-/** Date → "YYYY-MM-DD" in Georgia time. */
 function georgiaDateStr(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: GEORGIA_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
@@ -456,7 +455,6 @@ export default function AgentsPage() {
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [selectedFailedPost, setSelectedFailedPost] = useState<FailedPost | null>(null);
 
-  // Browser auto-pilot: runs only while this page is open. Off by default (the server scheduler is the primary publisher).
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
   const [showManualStudio, setShowManualStudio] = useState(false);
 
@@ -472,10 +470,6 @@ export default function AgentsPage() {
     const time = new Date().toLocaleTimeString();
     setAgentLogs((prev) => [`[${time}] ${msg}`, ...prev].slice(0, 80));
   }, []);
-
-  // ------------------------------------------------------------
-  // Data loading
-  // ------------------------------------------------------------
 
   const refreshAll = useCallback(async () => {
     setIsRefreshing(true);
@@ -494,11 +488,9 @@ export default function AgentsPage() {
           .select("*")
           .order("day_of_week", { ascending: true })
           .order("time", { ascending: true }),
-        // never select the access token on the client
         supabase.from("instagram_accounts").select("username, status").eq("status", "active").limit(1),
       ]);
 
-      // scheduler_logs: order by created_at when the column exists, otherwise fall back to an unordered read
       let schedulerLogs: SchedulerLogRow[] = [];
       const ordered = await supabase.from("scheduler_logs").select("*").order("created_at", { ascending: false }).limit(25);
       if (!ordered.error && ordered.data) {
@@ -522,7 +514,6 @@ export default function AgentsPage() {
         schedulerLogs,
       });
 
-      // Next PostAgent run
       const postRules = rules.filter((r) => r.content_type === "post" && r.is_active);
       const now = new Date();
       let nextRule: (RuleRow & { nextDate: Date }) | null = null;
@@ -543,10 +534,6 @@ export default function AgentsPage() {
       setIsRefreshing(false);
     }
   }, [addAgentLog]);
-
-  // ------------------------------------------------------------
-  // PostAgent execution (logic preserved)
-  // ------------------------------------------------------------
 
   const checkAndRunPostAgent = useCallback(async (forceRun: boolean = false) => {
     if (checkingRef.current) return;
@@ -640,10 +627,6 @@ export default function AgentsPage() {
     }
   }, [addAgentLog, refreshAll]);
 
-  // ------------------------------------------------------------
-  // Effects
-  // ------------------------------------------------------------
-
   useEffect(() => {
     void refreshAll();
     const liveInterval = setInterval(() => { void refreshAll(); }, POLL_INTERVAL_MS);
@@ -659,7 +642,6 @@ export default function AgentsPage() {
       console.error("Failed to load saved settings", e);
     }
 
-    // Browser auto-run: reads the latest state from refs (no stale closures, no side effects inside state updaters)
     const autoInterval = setInterval(() => {
       const postAgent = agentsRef.current.find((a) => a.id === "post-agent");
       if (postAgent?.status === "active" && autoPilotRef.current) {
@@ -672,10 +654,6 @@ export default function AgentsPage() {
       clearInterval(autoInterval);
     };
   }, [refreshAll, checkAndRunPostAgent]);
-
-  // ------------------------------------------------------------
-  // Actions
-  // ------------------------------------------------------------
 
   const loadAgentConfig = async (agentType: string) => {
     const { data: config, error } = await supabase.from("agent_config").select("*").eq("agent_type", agentType).single();
@@ -782,9 +760,29 @@ export default function AgentsPage() {
     }
   };
 
-  // ------------------------------------------------------------
-  // Derived data
-  // ------------------------------------------------------------
+  // ✅ ახალი: პოსტის ჩანაწერის წაშლა მონაცემთა ბაზიდან
+  const handleDeletePost = async (postId: string) => {
+    if (window.confirm("დარწმუნებული ხარ, რომ გინდა ამ პოსტის ჩანაწერის წაშლა ბაზიდან? (ეს არ წაშლის რეალურ პოსტს Instagram-ზე)")) {
+      addAgentLog(`🗑️ იშლება პოსტის ჩანაწერი: ${postId}...`);
+      const { error } = await supabase.from("published_content").delete().eq("id", postId);
+      if (error) {
+        addAgentLog(`❌ წაშლა ვერ მოხერხდა: ${error.message}`);
+      } else {
+        addAgentLog(`✅ პოსტის ჩანაწერი წარმატებით წაიშალა.`);
+        void refreshAll();
+      }
+    }
+  };
+
+  // ✅ ახალი: ლოგების კოპირება
+  const handleCopyLogs = () => {
+    const logsToCopy = logTab === "agent" 
+      ? agentLogs.join('\n') 
+      : data.schedulerLogs.map(row => `[${row.created_at ? formatShort(row.created_at) : row.scheduled_time}] ${row.status.toUpperCase()} · ${row.message}`).join('\n');
+    
+    navigator.clipboard.writeText(logsToCopy);
+    addAgentLog("📋 ლოგები დაკოპირდა Clipboard-ზე");
+  };
 
   const { dateStr: todayStr, dayIndex: todayIndex, hhmm: nowHHMM } = getGeorgiaNow();
   const nowMs = Date.now();
@@ -838,15 +836,10 @@ export default function AgentsPage() {
     : log.includes("🔍") || log.includes("⏳") || log.includes("📋") || log.includes("📝") ? "l-dbg"
     : "l-def";
 
-  // ------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------
-
   return (
     <div className="ag-root">
       <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
-      {/* ================= HEADER ================= */}
       <header className="ag-header">
         <div className="ag-header-in">
           <div className="ag-hl">
@@ -880,7 +873,6 @@ export default function AgentsPage() {
       </header>
 
       <main className="ag-main">
-        {/* ================= KPIs ================= */}
         <section className="ag-kpis" aria-label="Key numbers">
           <div className="ag-card">
             <div className="ag-kpi-l">Published today</div>
@@ -915,10 +907,7 @@ export default function AgentsPage() {
         </section>
 
         <div className="ag-grid">
-          {/* ================= MAIN COLUMN ================= */}
           <div className="ag-col">
-            
-            {/* ✅ განახლებული: 2 სვეტიანი ბადე აგენტებისთვის */}
             <div className="ag-agents-grid">
               {agents.map((agent) => {
                 const rules = agentRules(agent.type);
@@ -971,7 +960,6 @@ export default function AgentsPage() {
               })}
             </div>
 
-            {/* Manual studio: always mounted so the auto-run ref stays available; hidden when closed */}
             <section className="ag-card ag-studio" style={{ display: showManualStudio ? "block" : "none" }} aria-label="Manual Studio">
               <div className="ag-ch">
                 <h2 style={{ color: "var(--violet-soft)" }}>Manual Studio (override mode)</h2>
@@ -984,7 +972,6 @@ export default function AgentsPage() {
               />
             </section>
 
-            {/* Weekly schedule */}
             <section className="ag-card" aria-label="Weekly schedule">
               <div className="ag-ch">
                 <h2>Weekly schedule</h2>
@@ -1029,7 +1016,6 @@ export default function AgentsPage() {
               )}
             </section>
 
-            {/* ✅ განახლებული: Zodiac coverage მკაცრად 1 ხაზზე, სქროლის გარეშე */}
             <section className="ag-card" aria-label="Zodiac coverage today">
               <div className="ag-ch">
                 <h2>Zodiac coverage today</h2>
@@ -1048,7 +1034,6 @@ export default function AgentsPage() {
               </div>
             </section>
 
-            {/* Recent published + 7-day activity */}
             <section className="ag-card" aria-label="Recent posts">
               <div className="ag-ch"><h2>Recent posts</h2><span className="ag-r">Last 7 days</span></div>
               <div className="ag-bars" role="img" aria-label="Posts published per day, last 7 days" style={{ marginBottom: 16 }}>
@@ -1065,7 +1050,6 @@ export default function AgentsPage() {
                 {published.slice(0, 8).map((p) => (
                   <div key={p.id} className="ag-fi">
                     {p.image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
                       <img className="ag-th" src={p.image_url} alt="" loading="lazy" />
                     ) : (
                       <div className="ag-th" />
@@ -1075,14 +1059,23 @@ export default function AgentsPage() {
                       <small>{p.caption ? p.caption.replace(/\s+/g, " ").slice(0, 90) : "No caption"}</small>
                       <small className="ag-mono">{formatShort(p.published_at)}</small>
                     </div>
-                    <span className="ag-tag ok">{Icons.check} Published</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="ag-tag ok">{Icons.check} Published</span>
+                      <button 
+                        className="ag-btn sm" 
+                        style={{ background: 'rgba(255,122,107,0.1)', borderColor: 'rgba(255,122,107,0.3)', color: 'var(--bad)' }}
+                        onClick={() => handleDeletePost(p.id)}
+                        title="Delete record"
+                      >
+                        {Icons.trash}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </section>
           </div>
 
-          {/* ================= SIDE COLUMN ================= */}
           <aside className="ag-side">
             <section className="ag-card" aria-label="PostAgent timeline">
               <div className="ag-ch"><h3>PostAgent timeline</h3></div>
@@ -1146,6 +1139,11 @@ export default function AgentsPage() {
                 <h3 style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <span className={`ag-dot ${isChecking ? "warn pulse" : ""}`} />Live logs
                 </h3>
+                <span className="ag-r">
+                  <button className="ag-btn sm" onClick={handleCopyLogs} title="Copy logs to clipboard">
+                    {Icons.copy} Copy
+                  </button>
+                </span>
               </div>
               <div className="ag-tabs" role="tablist" aria-label="Log source">
                 <button role="tab" aria-selected={logTab === "agent"} className={logTab === "agent" ? "on" : ""} onClick={() => setLogTab("agent")}>Agent</button>
@@ -1182,7 +1180,6 @@ export default function AgentsPage() {
         </div>
       </main>
 
-      {/* ================= FAILED POST MODAL ================= */}
       {showFailedModal && selectedFailedPost && (
         <div className="ag-modal-bg" onClick={() => setShowFailedModal(false)}>
           <div className="ag-modal bad" role="dialog" aria-modal="true" aria-label="Failed post details" onClick={(e) => e.stopPropagation()}>
@@ -1222,7 +1219,6 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {/* ================= CONFIG MODAL ================= */}
       {showConfigModal && (
         <div className="ag-modal-bg" onClick={() => setShowConfigModal(false)}>
           <div className="ag-modal" style={{ maxWidth: 780 }} role="dialog" aria-modal="true" aria-label="Configure agent" onClick={(e) => e.stopPropagation()}>
