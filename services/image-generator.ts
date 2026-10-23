@@ -3,7 +3,6 @@ import { createCanvas, loadImage } from 'canvas';
 
 const ASSETS_BASE_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets';
 
-// ეს ინტერფეისი ზუსტად ემთხვევა იმას, რასაც ფრონტენდი გამოგვიგზავნის
 export interface VisualConfig {
   text1FontSize: number;
   text2FontSize: number;
@@ -21,7 +20,7 @@ export interface GenerateImageOptions {
   dateText?: string;
   width: number;
   height: number;
-  visualConfig: VisualConfig; // დინამიური კონფიგურაცია ფრონტენდიდან
+  visualConfig: VisualConfig;
 }
 
 export interface GeneratedImage {
@@ -49,10 +48,10 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   const templateImg = await loadImage(templateUrl);
   ctx.drawImage(templateImg, 0, 0, width, height);
 
-  // 2. ლოგო (მხოლოდ თუ visualConfig-ში არის ჩართული)
+  // 2. ლოგო
   if (visualConfig.showLogo) {
     const logoImg = await loadImage(visualConfig.logoUrl);
-    const logoSize = width * 0.12; // 12% სიგანის
+    const logoSize = width * 0.12;
     const padding = width * 0.02;
     const logoX = width - logoSize - padding;
     const logoY = padding;
@@ -68,24 +67,24 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     ctx.restore();
   }
 
-  // დამხმარე ფუნქცია ტექსტის დასახატად (ზუსტად ისე, როგორც ბრაუზერში)
-  const drawText = (text: string, topPercent: number, fontSize: number, isItalic: boolean) => {
+  // დამხმარე ფუნქცია, რომელიც ზუსტად იმეორებს ბრაუზერის CSS ლოგიკას
+  const drawText = (text: string, topPercent: number, fontSize: number, isItalic: boolean, isCentered: boolean) => {
     if (!text || text.trim().length === 0) return;
     
     const x = width / 2;
-    const y = (topPercent / 100) * height;
     const maxWidth = width * 0.85;
-    const lineHeight = fontSize * 1.4;
+    const lineHeight = fontSize * 1.4; // ზუსტად ისე, როგორც CSS-ში
     
     ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px Georgia, serif`;
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textBaseline = 'top'; // 'top' გვაძლევს ზუსტ კონტროლს საწყის Y კოორდინატზე
     ctx.fillStyle = '#000000';
 
     const words = text.trim().split(' ');
     let line = '';
     const lines: string[] = [];
 
+    // სიტყვების ხაზებად დაყოფა
     for (let n = 0; n < words.length; n++) {
       const testLine = line + words[n] + ' ';
       if (ctx.measureText(testLine).width > maxWidth && n > 0) {
@@ -97,27 +96,37 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
     }
     lines.push(line.trim());
 
-    // ცენტრირება Y ღერძზე
-    const maxLines = topPercent === 40 ? 2 : 5; // Text 1-ს 2 ხაზი, Text 2-ს 5
-    const totalHeight = Math.min(lines.length, maxLines) * lineHeight;
-    let currentY = y - (totalHeight / 2) + (lineHeight / 2);
+    const maxLines = isCentered ? 2 : 5; // Text 1-ს მაქს 2 ხაზი, Text 2-ს მაქს 5
+    
+    // საწყისი Y კოორდინატის გამოთვლა
+    let startY = (topPercent / 100) * height;
+    
+    if (isCentered) {
+      // თუ ცენტრირებულია (როგორც Text 1 CSS-ში transform: translateY(-50%)), 
+      // მაშინ საწყისი წერტილი უნდა იყოს ზემოთ წანაცვლებული ტექსტის სიმაღლის ნახევარზე
+      const totalHeight = Math.min(lines.length, maxLines) * lineHeight;
+      startY = startY - (totalHeight / 2);
+    }
 
+    // ხაზების დახატვა
     for (let i = 0; i < lines.length; i++) {
       if (i >= maxLines) break;
       let textToDraw = lines[i];
+      // თუ ტექსტი ზედმეტად გრძელია, ბოლო ხაზს ვამატებთ "…"
       if (i === maxLines - 1 && lines.length > maxLines) {
         textToDraw = textToDraw.substring(0, textToDraw.length - 1) + '…';
       }
-      ctx.fillText(textToDraw, x, currentY);
-      currentY += lineHeight;
+      ctx.fillText(textToDraw, x, startY + (i * lineHeight));
     }
   };
 
-  // 3. Text 1 & Text 2 დინამიური პარამეტრებით
-  drawText(text1, visualConfig.text1TopPercent, visualConfig.text1FontSize, true);
-  drawText(text2, visualConfig.text2TopPercent, visualConfig.text2FontSize, false);
+  // 3. Text 1 (ცენტრირებული 40%-ზე, როგორც ბრაუზერში)
+  drawText(text1, visualConfig.text1TopPercent, visualConfig.text1FontSize, true, true);
+  
+  // 4. Text 2 (იწყება 66%-დან და მიდის ქვემოთ, როგორც ბრაუზერში)
+  drawText(text2, visualConfig.text2TopPercent, visualConfig.text2FontSize, false, false);
 
-  // 4. თარიღი (მხოლოდ თუ ჩართულია)
+  // 5. თარიღი
   if (visualConfig.showDate && dateText) {
     const x = width / 2;
     const y = height - (0.06 * height); // 6% ქვემოდან
