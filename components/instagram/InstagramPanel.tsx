@@ -4,7 +4,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
-import html2canvas from "html2canvas"; // ✅ ახალი იმპორტი
+import html2canvas from "html2canvas";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -213,12 +213,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იღებს სქრინშოტს პირდაპირ DOM-დან (100% იდენტური Live Preview-სთან)
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
-    _overrideText1?: string, // ✅ დამატებულია '_', რადგან აღარ გამოიყენება
-    _overrideText2?: string  // ✅ დამატებულია '_', რადგან აღარ გამოიყენება
+    _overrideText1?: string,
+    _overrideText2?: string
   ) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
@@ -232,27 +231,26 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`);
 
     try {
-      // ✅ html2canvas აიძულებს ბრაუზერს დაარენდეროს ელემენტი ზუსტად 1080x1350 ზომაში
       const canvas = await html2canvas(previewRef.current, {
         width: 1080,
         height: 1350,
-        scale: 1, // 1080x1350 უკვე Instagram-ის ზომაა
-        useCORS: true, // აუცილებელია Supabase-ის სურათების ჩასატვირთად
+        scale: 1,
+        useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        // ✅ ვიგნორებთ backdrop-blur ელემენტებს, რადგან ისინი არღვევენ html2canvas-ს
+        ignoreElements: (element) => element.classList.contains('backdrop-blur-md'),
       });
 
       addLog(`⏳ [2/3] ვაქციევთ JPEG-ად და ვტვირთავთ...`);
       
-      // კონვერტაცია Blob-ად
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
       if (!blob) throw new Error("Failed to create image blob");
 
       const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
 
-      // ატვირთვა პირდაპირ Supabase-ში
       const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
@@ -469,13 +467,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
                 <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]"><span className="font-semibold">Live preview</span><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span></div>
                 
-                {/* ✅ ეს არის ის div, რომლის სქრინშოთიც გადაიღება. */}
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
+                  
+                  {/* ✅ შეცვლილია: transparent შეცვლილია rgba(0,0,0,0)-ით html2canvas-ის თავსებადობისთვის */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-[rgba(0,0,0,0)] via-[rgba(0,0,0,0)] to-black/40 pointer-events-none z-0" />
+                  
                   {showLogo && logoUrl && isLogoValid && (
                     <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
-                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10 backdrop-blur-md">
+                      {/* ✅ შეცვლილია: წაშლილია backdrop-blur-md, რადგან ის არღვევს html2canvas-ს */}
+                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10">
                         <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover" crossOrigin="anonymous" onError={() => setIsLogoValid(false)} />
                       </div>
                     </div>
