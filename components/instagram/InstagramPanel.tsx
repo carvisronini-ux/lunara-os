@@ -179,7 +179,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const handleFormatSelect = (format: PostFormat) => { setSelectedFormat(format); addLog(`✅ Format selected: ${format}`); setStep("preview"); };
 
-  // ✅ განახლებული: იღებს config-ს პარამეტრად და გადასცემს AI გენერატორს
   const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
@@ -198,7 +197,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იღებს config-ს პარამეტრად და გადასცემს AI გენერატორს
   const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string, config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
@@ -226,6 +224,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
+  // ✅ განახლებული: იყენებს ახალ /api/generate-image ენდპოინტს Canvas-ის ნაცვლად
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
@@ -234,100 +233,47 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   ) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
-    const targetImageUrl = targetZodiac ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${targetZodiac.name.toLowerCase()}.png` : imageUrl;
-    
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
 
-    if (!targetZodiac || !targetImageUrl || !targetFormat) { addLog("❌ Preview not ready or Zodiac/Format not selected."); return null; }
+    if (!targetZodiac || !targetFormat) { 
+      addLog("❌ Preview not ready or Zodiac/Format not selected."); 
+      return null; 
+    }
     
     setIsPublishing(true);
-    addLog(`📸 [1/6] იწყებს Canvas-ის აწყობას...`);
+    addLog(`📸 [1/3] იწყებს სერვერზე სურათის გენერაციას...`);
     addLog(`🔍 დიაგნოსტიკა: Text1 = "${targetText1?.substring(0, 30)}..." (სიგრძე: ${targetText1?.length || 0})`);
     addLog(`🔍 დიაგნოსტიკა: Text2 = "${targetText2?.substring(0, 30)}..." (სიგრძე: ${targetText2?.length || 0})`);
 
     try {
-      let width = 1080, height = 1350;
-      if (targetFormat === 'story') { width = 1080; height = 1920; }
-      else if (targetFormat === 'carousel') { width = 1080; height = 1080; }
+      const dateText = showWeekRange ? getWeekRange() : (showDate ? getCurrentDate() : undefined);
 
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error("Failed to get canvas context");
-
-      addLog(`⏳ [2/6] Canvas შეიქმნა: ${width}x${height}px`);
-      ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, width, height);
-
-      addLog("⏳ [3/6] ტვირთავს ზოდიაქოს სურათს...");
-      const zodiacImg = new Image(); zodiacImg.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => { zodiacImg.onload = resolve; zodiacImg.onerror = reject; zodiacImg.src = targetImageUrl; });
-      const scale = Math.max(width / zodiacImg.width, height / zodiacImg.height);
-      ctx.drawImage(zodiacImg, (width / 2) - (zodiacImg.width / 2) * scale, (height / 2) - (zodiacImg.height / 2) * scale, zodiacImg.width * scale, zodiacImg.height * scale);
+      addLog(`⏳ [2/3] გზავნის მოთხოვნას /api/generate-image-ზე...`);
       
-      const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, 'rgba(0,0,0,0)'); gradient.addColorStop(0.6, 'rgba(0,0,0,0)'); gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
-      ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zodiacSign: targetZodiac.name,
+          text1: targetText1 || '',
+          text2: targetText2 || '',
+          format: targetFormat,
+          dateText,
+        }),
+      });
 
-      if (showLogo && logoUrl && isLogoValid) {
-        const logoImg = new Image(); logoImg.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => { logoImg.onload = resolve; logoImg.onerror = reject; logoImg.src = logoUrl; });
-        const logoSize = Math.min(width * 0.12, 130); const padding = width * 0.02;
-        ctx.save(); ctx.beginPath(); ctx.arc(width - logoSize - padding + logoSize / 2, padding + logoSize / 2, logoSize / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-        ctx.drawImage(logoImg, width - logoSize - padding, padding, logoSize, logoSize);
-        ctx.lineWidth = Math.max(2, width * 0.004); ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.stroke(); ctx.restore();
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Unknown error during image generation');
       }
 
-      const drawStyledText = (text: string, x: number, y: number, fontSize: number, isItalic: boolean) => {
-        ctx.font = `${isItalic ? 'italic' : 'normal'} ${fontSize}px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000';
-        ctx.fillText(text, x, y);
-      };
-
-      addLog("⏳ [4/6] ხატავს ტექსტებს Canvas-ზე...");
-      if (targetText1 && targetText1.trim().length > 0) {
-        drawStyledText(targetText1, width / 2, height * 0.40, text1FontSize * 3, true);
-        addLog(`✅ Text 1 დაიხატა.`);
-      } else {
-        addLog(`⚠️ Text 1 ცარიელია, ვერ დაიხატა!`);
-      }
-
-      if (targetText2 && targetText2.trim().length > 0) {
-        const words = targetText2.split(' '); let line = ''; let currentY = height * 0.66;
-        const lineHeight = text2FontSize * 3 * 1.4; const maxWidth = width * 0.85;
-        ctx.font = `normal ${text2FontSize * 3}px serif`;
-        for (let n = 0; n < words.length; n++) {
-          const testLine = line + words[n] + ' ';
-          if (ctx.measureText(testLine).width > maxWidth && n > 0) {
-            ctx.fillText(line, width / 2, currentY); line = words[n] + ' '; currentY += lineHeight;
-          } else { line = testLine; }
-        }
-        ctx.fillText(line, width / 2, currentY);
-        addLog(`✅ Text 2 დაიხატა.`);
-      } else {
-        addLog(`⚠️ Text 2 ცარიელია, ვერ დაიხატა!`);
-      }
-
-      if (showDate || showWeekRange) {
-        ctx.font = `italic 36px serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000';
-        ctx.fillText(showWeekRange ? getWeekRange() : getCurrentDate(), width / 2, height * 0.94);
-      }
-
-      addLog("⏳ [5/6] აკონვერტირებს JPEG-ში...");
-      const blob = await new Promise<Blob>((resolve) => { canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95); });
-      addLog(`✅ კონვერტაცია დასრულდა. ზომა: ${(blob.size / 1024).toFixed(2)} KB`);
-
-      const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
-      const uploadPath = `posts/${fileName}`;
-      addLog(`⏳ [6/6] ტვირთავს Supabase-ში...`);
-
-      const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
-      if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
+      addLog(`✅ [3/3] სურათი წარმატებით გენერირდა და აიტვირთა! ზომა: ${data.imageSize}KB`);
+      addLog(`✅ URL: ${data.imageUrl}`);
       
-      const { data: urlData } = supabase.storage.from('lunara-assets').getPublicUrl(uploadPath);
-      setUploadedImageUrl(urlData.publicUrl);
-      
-      addLog(`✅ წარმატებით აიტვირთა! URL: ${urlData.publicUrl}`);
-      return urlData.publicUrl;
+      setUploadedImageUrl(data.imageUrl);
+      return data.imageUrl;
 
     } catch (error) {
       addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`);
@@ -435,7 +381,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
       if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
 
-      // ✅ ახალი: კონფიგურაციის წაკითხვა ბაზიდან გენერაციის დაწყებამდე
       addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...");
       const { data: config, error: configError } = await supabase
         .from('agent_config')
@@ -459,13 +404,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...");
-      // ✅ გადავცემთ config-ს გენერატორს
       const t1 = await handleGenerateText1(zodiac, config);
       if (!t1) return false;
       await new Promise(r => setTimeout(r, 1500));
       
       addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...");
-      // ✅ გადავცემთ config-ს გენერატორს
       const t2 = await handleGenerateText2(zodiac, t1, config);
       if (!t2) return false;
       await new Promise(r => setTimeout(r, 1500));
