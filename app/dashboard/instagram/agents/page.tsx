@@ -95,23 +95,64 @@ const STYLES = `
 .ag-ch h2,.ag-ch h3{margin:0;font-size:15px;font-weight:600}
 .ag-ch .ag-r{margin-left:auto;font-size:12px;color:var(--mute);display:flex;align-items:center;gap:8px}
 
-.ag-agent{display:flex;flex-direction:column;gap:14px}
-.ag-agent-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.ag-ai{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--t);background:color-mix(in srgb,var(--t) 12%,transparent);border:1px solid color-mix(in srgb,var(--t) 28%,transparent)}
-.ag-an{font-size:16px;font-weight:600}
-.ag-at{font-size:12px;color:var(--mute);text-transform:capitalize}
-.ag-ast{margin-left:auto;display:flex;align-items:center;gap:12px}
-.ag-ast span.l{font-size:12px;font-weight:600}
-.ag-agent-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--mute)}
-.ag-agent-meta b{color:var(--moon);font-weight:500;margin-left:4px}
-.ag-actions{display:flex;gap:8px;flex-wrap:wrap}
-.ag-btn{display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:9px 15px;font-size:13px;font-weight:600;border:1px solid var(--line-2);background:none;color:var(--moon);transition:.15s}
-.ag-btn:hover:not(:disabled){background:rgba(255,255,255,.05)}
-.ag-btn.pri{background:var(--violet);border-color:var(--violet);color:var(--ink)}
-.ag-btn.pri:hover:not(:disabled){opacity:.9;background:var(--violet)}
-.ag-btn.soft{background:rgba(155,140,255,.1);border-color:rgba(155,140,255,.3);color:var(--violet-soft)}
-.ag-btn.ok{background:rgba(95,214,164,.1);border-color:rgba(95,214,164,.3);color:var(--ok)}
-.ag-btn.sm{padding:6px 11px;font-size:12px;border-radius:9px}
+/* ✅ განახლებული: 2 სვეტიანი ბადე აგენტებისთვის */
+.ag-agents-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.ag-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+.ag-agent-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ag-ai {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--t);
+  background: color-mix(in srgb, var(--t) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--t) 28%, transparent);
+}
+.ag-an { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.ag-at { font-size: 11px; color: var(--mute); text-transform: capitalize; }
+.ag-ast { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.ag-ast span.l { font-size: 11px; font-weight: 600; }
+.ag-agent-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--mute);
+  background: rgba(255,255,255,0.02);
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+.ag-agent-meta b { color: var(--moon); font-weight: 500; margin-left: 4px; }
+.ag-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ag-actions .ag-btn {
+  flex: 1;
+  justify-content: center;
+  padding: 8px 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ag-actions .ag-btn svg { width: 14px; height: 14px; flex: none; }
 
 .ag-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
 .ag-day{background:var(--ink-4);border:1px solid var(--line);border-radius:12px;padding:8px;min-height:150px;display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -124,28 +165,26 @@ const STYLES = `
 .ag-ev.done{opacity:.7}
 .ag-empty-day{font-size:11px;color:var(--mute);opacity:.6;padding:4px 2px}
 
-/* ✅ განახლებული: ერთი ჰორიზონტალური ხაზი ზოდიაქოსთვის */
+/* ✅ განახლებული: 12 სვეტიანი ბადე ზოდიაქოსთვის (სქროლის გარეშე) */
 .ag-zod {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 6px; /* ადგილი სქროლბარისთვის */
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
 }
 .ag-z {
-  flex: 0 0 auto; /* კრძალავს შეკუმშვას */
-  min-width: 72px; /* უზრუნველყოფს, რომ არ გახდეს ზედმეტად პატარა */
   border: 1px solid var(--line);
-  border-radius: 11px;
-  padding: 8px 4px;
+  border-radius: 8px;
+  padding: 6px 0;
   text-align: center;
   background: var(--ink-4);
+  min-width: 0;
 }
-.ag-z .g{font-size:18px;line-height:1}
-.ag-z .n{font-size:10px;color:var(--mute);margin-top:4px;letter-spacing:.04em}
-.ag-z.pub{border-color:rgba(95,214,164,.45);background:rgba(95,214,164,.08)}
-.ag-z.pub .n{color:var(--ok)}
-.ag-z.fail{border-color:rgba(255,122,107,.45);background:rgba(255,122,107,.08)}
-.ag-z.fail .n{color:var(--bad)}
+.ag-z .g { font-size: 16px; line-height: 1; display: block; }
+.ag-z .n { font-size: 9px; color: var(--mute); margin-top: 2px; letter-spacing: .02em; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-z.pub { border-color: rgba(95, 214, 164, .45); background: rgba(95, 214, 164, .08); }
+.ag-z.pub .n { color: var(--ok); }
+.ag-z.fail { border-color: rgba(255, 122, 107, .45); background: rgba(255, 122, 107, .08); }
+.ag-z.fail .n { color: var(--bad); }
 
 .ag-feed{display:flex;flex-direction:column}
 .ag-fi{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
@@ -208,12 +247,18 @@ const STYLES = `
 .ag-mf .ag-btn{flex:1;justify-content:center;padding:12px}
 .ag-field{border:1px solid var(--line-2);background:var(--ink-4);border-radius:12px;padding:11px 13px;font-size:13px}
 
-@media(max-width:1100px){.ag-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ag-grid{grid-template-columns:1fr}.ag-side{position:static}}
+@media(max-width:1100px){
+  .ag-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ag-grid{grid-template-columns:1fr}
+  .ag-side{position:static}
+}
 @media(max-width:760px){
   .ag-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ag-agents-grid { grid-template-columns: 1fr; } /* მობილურზე 1 სვეტი უკეთესი UX-ია */
   .ag-week{grid-template-columns:1fr}
   .ag-day{min-height:0}
-  .ag-z { min-width: 64px; } /* მობილურზე ოდნავ უფრო კომპაქტური, მაგრამ მაინც ერთ ხაზზე სქროლით */
+  .ag-z .g { font-size: 14px; }
+  .ag-z .n { font-size: 8px; }
   .ag-main{padding:16px}
   .ag-header-in{padding:12px 16px}
 }
@@ -872,54 +917,59 @@ export default function AgentsPage() {
         <div className="ag-grid">
           {/* ================= MAIN COLUMN ================= */}
           <div className="ag-col">
-            {/* Agents */}
-            {agents.map((agent) => {
-              const rules = agentRules(agent.type);
-              const activeRules = rules.filter((r) => r.is_active).length;
-              return (
-                <article key={agent.id} className="ag-card ag-agent" style={colorVar(agent.type)}>
-                  <div className="ag-agent-top">
-                    <div className="ag-ai">{TYPE_ICONS[agent.type]}</div>
-                    <div>
-                      <div className="ag-an">{agent.name}</div>
-                      <div className="ag-at">{agent.type} agent</div>
+            
+            {/* ✅ განახლებული: 2 სვეტიანი ბადე აგენტებისთვის */}
+            <div className="ag-agents-grid">
+              {agents.map((agent) => {
+                const rules = agentRules(agent.type);
+                const activeRules = rules.filter((r) => r.is_active).length;
+                return (
+                  <article key={agent.id} className="ag-card ag-agent" style={colorVar(agent.type)}>
+                    <div className="ag-agent-top">
+                      <div className="ag-ai">{TYPE_ICONS[agent.type]}</div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="ag-an">{agent.name}</div>
+                        <div className="ag-at">{agent.type} agent</div>
+                      </div>
+                      <div className="ag-ast">
+                        <span className="l" style={{ color: agent.status === "active" ? "var(--ok)" : "var(--mute)" }}>
+                          {agent.status === "active" ? "Active" : "Inactive"}
+                        </span>
+                        <button
+                          role="switch"
+                          aria-checked={agent.status === "active"}
+                          aria-label={`${agent.status === "active" ? "Deactivate" : "Activate"} ${agent.name}`}
+                          className={`ag-switch ${agent.status === "active" ? "on" : ""}`}
+                          onClick={() => void toggleAgent(agent.id)}
+                        ><i /></button>
+                      </div>
                     </div>
-                    <div className="ag-ast">
-                      <span className="l" style={{ color: agent.status === "active" ? "var(--ok)" : "var(--mute)" }}>
-                        {agent.status === "active" ? "Active" : "Inactive"}
-                      </span>
-                      <button
-                        role="switch"
-                        aria-checked={agent.status === "active"}
-                        aria-label={`${agent.status === "active" ? "Deactivate" : "Activate"} ${agent.name}`}
-                        className={`ag-switch ${agent.status === "active" ? "on" : ""}`}
-                        onClick={() => void toggleAgent(agent.id)}
-                      ><i /></button>
-                    </div>
-                  </div>
 
-                  <div className="ag-agent-meta">
-                    <span>Rules<b>{activeRules} active / {rules.length}</b></span>
-                    {agent.id === "post-agent" && <span>Last post<b>{lastPostTime}</b></span>}
+                    <div className="ag-agent-meta">
+                      <span>Rules<b>{activeRules} active / {rules.length}</b></span>
+                      {agent.id === "post-agent" && <span>Last post<b>{lastPostTime}</b></span>}
+                      {agent.id === "post-agent" && (
+                        <span>Mode<b>{autoPilotEnabled ? "Browser + server" : "Server scheduler"}</b></span>
+                      )}
+                    </div>
+
                     {agent.id === "post-agent" && (
-                      <span>Mode<b>{autoPilotEnabled ? "Browser + server" : "Server scheduler"}</b></span>
+                      <div className="ag-actions">
+                        <button className="ag-btn soft" onClick={() => openConfigModal("post")} title="Configure">
+                          {Icons.brain} Config
+                        </button>
+                        <button className="ag-btn" onClick={() => setShowManualStudio((v) => !v)} title="Manual Studio">
+                          {Icons.studio} {showManualStudio ? "Hide" : "Studio"}
+                        </button>
+                        <button className="ag-btn pri" onClick={() => void checkAndRunPostAgent(true)} disabled={isChecking} title="Run Now">
+                          {Icons.play} {isChecking ? "Run..." : "Run"}
+                        </button>
+                      </div>
                     )}
-                  </div>
-
-                  {agent.id === "post-agent" && (
-                    <div className="ag-actions">
-                      <button className="ag-btn soft" onClick={() => openConfigModal("post")}>{Icons.brain} Configure PostAgent</button>
-                      <button className="ag-btn" onClick={() => setShowManualStudio((v) => !v)}>
-                        {Icons.studio} {showManualStudio ? "Hide Manual Studio" : "Open Manual Studio"}
-                      </button>
-                      <button className="ag-btn pri" onClick={() => void checkAndRunPostAgent(true)} disabled={isChecking}>
-                        {Icons.play} {isChecking ? "Running…" : "Run now"}
-                      </button>
-                    </div>
-                  )}
-                </article>
-              );
-            })}
+                  </article>
+                );
+              })}
+            </div>
 
             {/* Manual studio: always mounted so the auto-run ref stays available; hidden when closed */}
             <section className="ag-card ag-studio" style={{ display: showManualStudio ? "block" : "none" }} aria-label="Manual Studio">
@@ -979,7 +1029,7 @@ export default function AgentsPage() {
               )}
             </section>
 
-            {/* Zodiac coverage (ახლა მკაცრად ერთ ჰორიზონტალურ ხაზზეა) */}
+            {/* ✅ განახლებული: Zodiac coverage მკაცრად 1 ხაზზე, სქროლის გარეშე */}
             <section className="ag-card" aria-label="Zodiac coverage today">
               <div className="ag-ch">
                 <h2>Zodiac coverage today</h2>
