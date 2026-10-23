@@ -96,6 +96,11 @@ const Icons = {
       <line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
   ),
+  refresh: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/>
+    </svg>
+  ),
 };
 
 interface Agent {
@@ -167,6 +172,10 @@ export default function AgentsPage() {
   const [failedPosts, setFailedPosts] = useState<FailedPost[]>([]);
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [selectedFailedPost, setSelectedFailedPost] = useState<FailedPost | null>(null);
+  
+  // ✅ ახალი: Auto-Pilot vs Manual Override მართვა
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState(true);
+  const [showManualStudio, setShowManualStudio] = useState(false);
   
   const panelRef = useRef<any>(null);
   const nextRuleRef = useRef<any>(null);
@@ -305,7 +314,7 @@ export default function AgentsPage() {
     const interval = setInterval(() => {
       setAgents(currentAgents => {
         const postAgent = currentAgents.find(a => a.id === 'post-agent');
-        if (postAgent?.status === 'active') {
+        if (postAgent?.status === 'active' && autoPilotEnabled) {
           checkAndRunPostAgent(false);
         }
         return currentAgents;
@@ -316,7 +325,7 @@ export default function AgentsPage() {
       clearInterval(interval);
       clearInterval(liveInterval);
     };
-  }, []);
+  }, [autoPilotEnabled]);
 
   const addAgentLog = (msg: string) => {
     const time = new Date().toLocaleTimeString();
@@ -467,6 +476,7 @@ export default function AgentsPage() {
           addAgentLog("🎉 PostAgent-მა წარმატებით დაასრულა ციკლი!");
           setAgents(prev => prev.map(a => a.id === 'post-agent' ? { ...a, lastRun: 'Just now', totalPosts: a.totalPosts + 1 } : a));
           fetchTimelineData();
+          fetchFailedPosts();
         } else {
           addAgentLog("❌ PostAgent-ის ციკლი ვერ დასრულდა წარმატებით.");
         }
@@ -481,14 +491,12 @@ export default function AgentsPage() {
     }
   };
 
-  // ✅ გასწორებული ლოგიკა: ცხადად მითითებულია 'active' | 'inactive' ტიპი
   const toggleAgent = async (id: string) => {
     const agentToToggle = agents.find(a => a.id === id);
     if (!agentToToggle) return;
 
     const newStatus: 'active' | 'inactive' = agentToToggle.status === 'active' ? 'inactive' : 'active';
 
-    // 1. ვაახლებთ ლოკალურ სტეიტს (UI-ს სწრაფი რეაგირებისთვის)
     setAgents(prev => {
       const newAgents = prev.map(agent => 
         agent.id === id ? { ...agent, status: newStatus } : agent
@@ -501,7 +509,6 @@ export default function AgentsPage() {
       return newAgents;
     });
 
-    // 2. ვაგზავნით მოთხოვნას ბაზაში, რომ განვაახლოთ ყველა ჩანაწერი ამ აგენტის ტიპისთვის
     addAgentLog(`🔄 ${agentToToggle.name} ${newStatus === 'active' ? 'ჩაირთო' : 'გაითიშა'}. განრიგის განახლება...`);
     
     const { error } = await supabase
@@ -522,6 +529,22 @@ export default function AgentsPage() {
     setShowFailedModal(true);
   };
 
+  // ✅ ახალი: შეცდომის მქონე პოსტის ხელახლა გაშვება
+  const retryFailedPost = async (post: FailedPost) => {
+    addAgentLog(`🔄 ვცდილობ ${post.zodiac_sign || 'Unknown'} პოსტის ხელახლა გამოქვეყნებას...`);
+    setShowFailedModal(false);
+    if (panelRef.current && post.zodiac_sign) {
+      const success = await panelRef.current.executeAutoPostSequence(post.zodiac_sign);
+      if (success) {
+        addAgentLog(`✅ ${post.zodiac_sign} წარმატებით დაიპოსტა (Retry)!`);
+        fetchFailedPosts();
+        fetchTimelineData();
+      } else {
+        addAgentLog(`❌ ${post.zodiac_sign} Retry ვერ მოხერხდა.`);
+      }
+    }
+  };
+
   const activeAgentsCount = agents.filter(a => a.status === 'active').length;
   const totalPostsCount = agents.reduce((sum, a) => sum + a.totalPosts, 0);
 
@@ -534,17 +557,29 @@ export default function AgentsPage() {
           <div className="flex min-w-0 items-center gap-4">
             <Link href="/dashboard/instagram" className="flex shrink-0 items-center gap-2 rounded-xl border border-[var(--line-2)] bg-white/[.025] px-3.5 py-2 text-sm text-[var(--mute)] transition-colors hover:border-[var(--line-2)] hover:text-[var(--moon)]">
               {Icons.back}
-              <span className="hidden sm:inline">Back to Instagram</span>
+              <span className="hidden sm:inline">Dashboard</span>
             </Link>
             <div>
               <h1 className="text-xl font-semibold tracking-tight">Agents Control Center</h1>
-              <p className="hidden text-xs text-[var(--mute)] sm:block mt-0.5">Manage all automated posting agents</p>
+              <p className="hidden text-xs text-[var(--mute)] sm:block mt-0.5">Full manual & automated control</p>
             </div>
           </div>
-          <button className="flex items-center gap-1.5 rounded-xl border border-[var(--line-2)] bg-white/[.035] px-4 py-2.5 text-sm font-medium shadow-[0_8px_24px_rgba(0,0,0,.12)] text-[var(--moon)] transition-colors hover:bg-[var(--ink-3)]">
-            {Icons.settings}
-            <span className="hidden sm:inline">Global Settings</span>
-          </button>
+          
+          {/* ✅ MASTER AUTO-PILOT TOGGLE */}
+          <div className="flex items-center gap-3 rounded-xl border border-[var(--line-2)] bg-[var(--ink-3)] px-4 py-2">
+            <span className={`text-xs font-bold uppercase tracking-wider ${autoPilotEnabled ? 'text-[var(--ok)]' : 'text-[var(--amber)]'}`}>
+              {autoPilotEnabled ? '🤖 AUTO-PILOT' : '🛠️ MANUAL'}
+            </span>
+            <button
+              onClick={() => {
+                setAutoPilotEnabled(!autoPilotEnabled);
+                setShowManualStudio(autoPilotEnabled); // Show studio when switching to manual
+              }}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-all duration-300 ${autoPilotEnabled ? 'bg-[var(--ok)]' : 'bg-[var(--ink)] ring-1 ring-inset ring-[var(--line-2)]'}`}
+            >
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-md transition-all duration-300 ${autoPilotEnabled ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -598,20 +633,6 @@ export default function AgentsPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
-                      <p className="text-xs text-[var(--mute)]">Next Run</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.nextRun}</p>
-                    </div>
-                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
-                      <p className="text-xs text-[var(--mute)]">Last Run</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.lastRun}</p>
-                    </div>
-                    <div className="rounded-xl border border-white/[.035] bg-black/20 p-3.5">
-                      <p className="text-xs text-[var(--mute)]">Total Published</p>
-                      <p className="mt-1 text-sm font-medium text-[var(--moon)]">{agent.totalPosts}</p>
-                    </div>
-                  </div>
                   
                   {agent.id === 'post-agent' && (
                     <div className="mt-6 flex flex-wrap gap-2">
@@ -623,17 +644,42 @@ export default function AgentsPage() {
                         Configure PostAgent
                       </button>
                       <button 
+                        onClick={() => { setShowManualStudio(true); setAutoPilotEnabled(false); }}
+                        className="flex-1 rounded-xl border border-[var(--amber)]/30 bg-[var(--amber)]/10 px-5 py-2.5 text-sm font-bold text-[var(--amber)] transition-opacity hover:bg-[var(--amber)]/20 sm:flex-none"
+                      >
+                        🛠️ Open Manual Studio
+                      </button>
+                      <button 
                         onClick={() => checkAndRunPostAgent(true)}
                         disabled={isChecking}
                         className="flex-1 rounded-xl bg-gradient-to-r from-[var(--violet)] to-[var(--violet-2)] px-5 py-2.5 text-sm font-bold text-[var(--ink)] shadow-[0_10px_28px_rgba(128,108,246,.22)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:flex-none"
                       >
-                        {isChecking ? 'Running...' : 'Run Now'}
+                        {isChecking ? 'Running...' : '⚡ Run Now'}
                       </button>
                     </div>
                   )}
                 </div>
               );
             })}
+
+            {/* ✅ MANUAL STUDIO PANEL (სრულფასოვანი, არა დამალული) */}
+            {showManualStudio && (
+              <div className="rounded-2xl border border-[var(--violet)]/30 bg-[var(--ink-2)] p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-[var(--violet)] flex items-center gap-2">
+                    🛠️ Manual Studio (Override Mode)
+                  </h3>
+                  <button onClick={() => setShowManualStudio(false)} className="text-xs text-[var(--mute)] hover:text-[var(--moon)] transition-colors">Close Panel</button>
+                </div>
+                <div className="w-full">
+                  <InstagramPanel 
+                    ref={panelRef} 
+                    profileUsername="@lunaraosapp" 
+                    pushEvent={(type, msg) => addAgentLog(`[${type.toUpperCase()}] ${msg}`)} 
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
@@ -704,19 +750,20 @@ export default function AgentsPage() {
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                   {failedPosts.map((post) => (
-                    <button
-                      key={post.id}
-                      onClick={() => openFailedPostDetails(post)}
-                      className="w-full text-left rounded-lg border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-2.5 transition-colors hover:bg-[var(--rose)]/10"
-                    >
+                    <div key={post.id} className="rounded-lg border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-2.5">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium text-[var(--moon)]">
-                          {post.zodiac_sign || 'Unknown'} · {new Date(post.published_at).toLocaleString('ka-GE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {post.zodiac_sign || 'Unknown'}
                         </span>
-                        <span className="text-[10px] text-[var(--rose)]">View Details →</span>
+                        <button 
+                          onClick={() => retryFailedPost(post)} 
+                          className="flex items-center gap-1 text-[10px] font-bold text-[var(--ok)] hover:underline"
+                        >
+                          {Icons.refresh} Retry
+                        </button>
                       </div>
                       <p className="text-[10px] text-[var(--mute)] truncate">{post.error_message || 'Unknown error'}</p>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -727,28 +774,22 @@ export default function AgentsPage() {
                 <span className={`h-2 w-2 rounded-full ${isChecking ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--ok)]'}`} />
                 PostAgent Live Logs
               </h4>
-              <div className="h-96 overflow-y-auto rounded-xl border border-white/[.035] bg-black/20 p-3.5 font-mono text-xs space-y-1 custom-scrollbar">
+              <div className="h-96 overflow-y-auto rounded-xl border border-white/[.035] bg-black/20 p-3.5 font-mono text-[11px] space-y-1.5 custom-scrollbar">
                 {agentLogs.length === 0 ? (
                   <p className="text-[var(--mute)]">ლოგები გამოჩნდება აქ, როცა აგენტი ამოქმედდება...</p>
                 ) : (
-                  agentLogs.map((log, i) => (
-                    <div key={i} className="text-[var(--moon)] border-b border-[var(--line)] pb-2 mb-2 last:border-0">
-                      {log}
-                    </div>
-                  ))
+                  agentLogs.map((log, i) => {
+                    const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
+                    const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('🎉');
+                    const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
+                    const isDebug = log.includes('🔍') || log.includes('⏳') || log.includes('📋') || log.includes('📝');
+                    return (
+                      <div key={i} className={`break-words leading-tight ${isError ? 'text-[var(--rose)]' : isSuccess ? 'text-[var(--ok)] font-semibold' : isWarning ? 'text-[var(--amber)]' : isDebug ? 'text-[var(--violet)]' : 'text-[var(--mute)]'}`}>
+                        {log}
+                      </div>
+                    );
+                  })
                 )}
-              </div>
-            </div>
-
-            <div className="stat-card rounded-2xl border border-[var(--line)] p-5">
-              <h4 className="text-sm font-semibold mb-3">Agent Engine (Hidden)</h4>
-              <p className="text-xs text-[var(--mute)] mb-3">ეს კომპონენტი ასრულებს რეალურ სამუშაოს ფონზე.</p>
-              <div className="opacity-30 pointer-events-none scale-75 origin-top-left">
-                <InstagramPanel 
-                  ref={panelRef} 
-                  profileUsername="@lunaraosapp" 
-                  pushEvent={(type, msg) => addAgentLog(`[${type}] ${msg}`)} 
-                />
               </div>
             </div>
           </div>
@@ -756,7 +797,7 @@ export default function AgentsPage() {
 
         <div className="rounded-2xl border border-[var(--violet)]/15 bg-gradient-to-r from-[var(--violet)]/[.07] via-transparent to-[var(--rose)]/[.04] p-5 text-center shadow-[0_14px_35px_rgba(0,0,0,.12)]">
           <p className="text-sm text-[var(--violet)]">
-            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
+            💡 <span className="font-semibold">How it works:</span> PostAgent ყოველდღე ამოწმებს Master Schedule-ს, ირჩევს ზოდიაქოს ბაზიდან (ან random-ს თუ ALL/NULL), ქმნის კონტენტს და აქვეყნებს Instagram-ზე.
           </p>
         </div>
       </main>
@@ -813,20 +854,15 @@ export default function AgentsPage() {
                   </div>
                 </div>
               </div>
-
-              <div>
-                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--mute)]">
-                  Caption
-                </label>
-                <div className="rounded-xl border border-[var(--line-2)] bg-black/20 p-3">
-                  <p className="text-sm text-[var(--moon)] whitespace-pre-wrap">
-                    {selectedFailedPost.caption || 'No caption'}
-                  </p>
-                </div>
-              </div>
             </div>
 
             <div className="mt-6 flex gap-3 border-t border-[var(--line)] pt-4">
+              <button
+                onClick={() => retryFailedPost(selectedFailedPost)}
+                className="flex-1 rounded-xl bg-[var(--ok)]/10 border border-[var(--ok)]/30 py-3 text-sm font-semibold text-[var(--ok)] transition-colors hover:bg-[var(--ok)]/20 flex items-center justify-center gap-2"
+              >
+                {Icons.refresh} Retry This Post
+              </button>
               <button
                 onClick={() => setShowFailedModal(false)}
                 className="flex-1 rounded-xl border border-[var(--line-2)] bg-white/[.025] py-3 text-sm font-semibold transition-colors hover:bg-white/5"
