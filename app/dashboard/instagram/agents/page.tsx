@@ -173,7 +173,6 @@ export default function AgentsPage() {
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [selectedFailedPost, setSelectedFailedPost] = useState<FailedPost | null>(null);
   
-  // ✅ ახალი: Auto-Pilot vs Manual Override მართვა
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(true);
   const [showManualStudio, setShowManualStudio] = useState(false);
   
@@ -529,7 +528,6 @@ export default function AgentsPage() {
     setShowFailedModal(true);
   };
 
-  // ✅ ახალი: შეცდომის მქონე პოსტის ხელახლა გაშვება
   const retryFailedPost = async (post: FailedPost) => {
     addAgentLog(`🔄 ვცდილობ ${post.zodiac_sign || 'Unknown'} პოსტის ხელახლა გამოქვეყნებას...`);
     setShowFailedModal(false);
@@ -565,7 +563,6 @@ export default function AgentsPage() {
             </div>
           </div>
           
-          {/* ✅ MASTER AUTO-PILOT TOGGLE */}
           <div className="flex items-center gap-3 rounded-xl border border-[var(--line-2)] bg-[var(--ink-3)] px-4 py-2">
             <span className={`text-xs font-bold uppercase tracking-wider ${autoPilotEnabled ? 'text-[var(--ok)]' : 'text-[var(--amber)]'}`}>
               {autoPilotEnabled ? '🤖 AUTO-PILOT' : '🛠️ MANUAL'}
@@ -573,7 +570,7 @@ export default function AgentsPage() {
             <button
               onClick={() => {
                 setAutoPilotEnabled(!autoPilotEnabled);
-                setShowManualStudio(autoPilotEnabled); // Show studio when switching to manual
+                setShowManualStudio(autoPilotEnabled);
               }}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-all duration-300 ${autoPilotEnabled ? 'bg-[var(--ok)]' : 'bg-[var(--ink)] ring-1 ring-inset ring-[var(--line-2)]'}`}
             >
@@ -662,7 +659,6 @@ export default function AgentsPage() {
               );
             })}
 
-            {/* ✅ MANUAL STUDIO PANEL (სრულფასოვანი, არა დამალული) */}
             {showManualStudio && (
               <div className="rounded-2xl border border-[var(--violet)]/30 bg-[var(--ink-2)] p-4 sm:p-6 shadow-[0_20px_60px_rgba(0,0,0,.3)]">
                 <div className="mb-4 flex items-center justify-between">
@@ -750,20 +746,19 @@ export default function AgentsPage() {
                 </h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
                   {failedPosts.map((post) => (
-                    <div key={post.id} className="rounded-lg border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-2.5">
+                    <button
+                      key={post.id}
+                      onClick={() => openFailedPostDetails(post)}
+                      className="w-full text-left rounded-lg border border-[var(--rose)]/20 bg-[var(--rose)]/5 p-2.5 transition-colors hover:bg-[var(--rose)]/10"
+                    >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium text-[var(--moon)]">
-                          {post.zodiac_sign || 'Unknown'}
+                          {post.zodiac_sign || 'Unknown'} · {new Date(post.published_at).toLocaleString('ka-GE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <button 
-                          onClick={() => retryFailedPost(post)} 
-                          className="flex items-center gap-1 text-[10px] font-bold text-[var(--ok)] hover:underline"
-                        >
-                          {Icons.refresh} Retry
-                        </button>
+                        <span className="text-[10px] text-[var(--rose)]">View Details →</span>
                       </div>
                       <p className="text-[10px] text-[var(--mute)] truncate">{post.error_message || 'Unknown error'}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
