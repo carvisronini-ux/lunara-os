@@ -213,17 +213,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ ახალი ლოგიკა: სქრინშოთის გადაღება პირდაპირ DOM-დან (100% იდენტური)
+  // ✅ განახლებული: იღებს სქრინშოტს პირდაპირ DOM-დან (100% იდენტური Live Preview-სთან)
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
-    overrideText1?: string,
-    overrideText2?: string
+    _overrideText1?: string, // ✅ დამატებულია '_', რადგან აღარ გამოიყენება
+    _overrideText2?: string  // ✅ დამატებულია '_', რადგან აღარ გამოიყენება
   ) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
-    const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
-    const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
 
     if (!targetZodiac || !targetFormat || !previewRef.current) { 
       addLog("❌ Preview not ready or Zodiac/Format not selected."); 
@@ -238,7 +236,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const canvas = await html2canvas(previewRef.current, {
         width: 1080,
         height: 1350,
-        scale: 1, // 1080x1350 უკვე Instagram-ის ზომაა, scale:1 საკმარისია
+        scale: 1, // 1080x1350 უკვე Instagram-ის ზომაა
         useCORS: true, // აუცილებელია Supabase-ის სურათების ჩასატვირთად
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -255,7 +253,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const uploadPath = `posts/${fileName}`;
 
       // ატვირთვა პირდაპირ Supabase-ში
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
 
@@ -471,7 +469,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
                 <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]"><span className="font-semibold">Live preview</span><span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />Updates as you type</span></div>
                 
-                {/* ✅ ეს არის ის div, რომლის სქრინშოთიც გადაიღება. მისი ვიზუალური ზომა შეიძლება იყოს მცირე, მაგრამ html2canvas მას 1080x1350-ად დაარენდერებს */}
+                {/* ✅ ეს არის ის div, რომლის სქრინშოთიც გადაიღება. */}
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
                   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/40 pointer-events-none z-0" />
