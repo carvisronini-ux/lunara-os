@@ -249,7 +249,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     try {
       const dateText = showWeekRange ? getWeekRange() : (showDate ? getCurrentDate() : undefined);
 
-      // ✅ დეტალური ლოგი ბრაუზერის კონსოლში (F12)
       const payloadToSend = {
         zodiacSign: targetZodiac.name,
         text1: targetText1 || '',
@@ -284,6 +283,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog(`✅ [3/3] სურათი წარმატებით გენერირდა და აიტვირთა! ზომა: ${data.imageSize}KB`);
       addLog(`✅ URL: ${data.imageUrl}`);
+      
+      // ✅ ახალი: დეტალური სერვერული ლოგების დამატება UI-ში
+      if (data.debugLogs && Array.isArray(data.debugLogs)) {
+        addLog("🔍 --- დეტალური სერვერული ლოგები ---");
+        data.debugLogs.forEach((logLine: string) => {
+          if (logLine.trim()) addLog(`[SERVER] ${logLine}`);
+        });
+        addLog("🔍 ----------------------------------");
+      }
       
       setUploadedImageUrl(data.imageUrl);
       return data.imageUrl;
