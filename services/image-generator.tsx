@@ -60,8 +60,6 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   } = options;
 
   const { width, height } = config.dimensions[format];
-  
-  // ✅ გასწორებულია: zodiac-signs/ ნაცვლად templates/-ისა
   const templateUrl = `${ASSETS_BASE_URL}/zodiac-signs/${zodiacSign.toLowerCase()}.png`;
 
   const finalDateText = dateText || new Intl.DateTimeFormat('en-US', {
@@ -118,10 +116,13 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
           }}
         />
 
-        {/* ლოგო */}
+        {/* ოგო - დამატებულია display: flex */}
         {config.logo.enabled && (
           <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               position: 'absolute',
               left: logoX,
               top: logoY,
@@ -140,10 +141,13 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
           </div>
         )}
 
-        {/* Text 1 (Hook) */}
+        {/* Text 1 (Hook) - დამატებულია display: flex */}
         {safeText1 && (
           <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: config.text1.align === 'center' ? 'center' : config.text1.align === 'right' ? 'flex-end' : 'flex-start',
               position: 'absolute',
               left: text1X,
               top: text1Y,
@@ -162,10 +166,13 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
           </div>
         )}
 
-        {/* Text 2 (Forecast) */}
+        {/* Text 2 (Forecast) - დამატებულია display: flex */}
         {safeText2 && (
           <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: config.text2.align === 'center' ? 'center' : config.text2.align === 'right' ? 'flex-end' : 'flex-start',
               position: 'absolute',
               left: text2X,
               top: text2Y,
@@ -184,10 +191,13 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
           </div>
         )}
 
-        {/* თარიღი */}
+        {/* თარიღი - დამატებულია display: flex */}
         {config.date.enabled && (
           <div
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               position: 'absolute',
               left: '50%',
               top: dateY,
