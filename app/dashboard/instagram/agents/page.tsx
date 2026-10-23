@@ -34,7 +34,7 @@ const DAY_NAMES = ["ორშაბათი", "სამშაბათი", "�
 const DAY_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // ============================================================
-// Styles (scoped, plain CSS: no dependency on Tailwind opacity syntax)
+// Styles (scoped, plain CSS)
 // ============================================================
 
 const STYLES = `
@@ -124,8 +124,22 @@ const STYLES = `
 .ag-ev.done{opacity:.7}
 .ag-empty-day{font-size:11px;color:var(--mute);opacity:.6;padding:4px 2px}
 
-.ag-zod{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-.ag-z{border:1px solid var(--line);border-radius:11px;padding:8px 6px;text-align:center;background:var(--ink-4);min-width:0}
+/* ✅ განახლებული: ერთი ჰორიზონტალური ხაზი ზოდიაქოსთვის */
+.ag-zod {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px; /* ადგილი სქროლბარისთვის */
+}
+.ag-z {
+  flex: 0 0 auto; /* კრძალავს შეკუმშვას */
+  min-width: 72px; /* უზრუნველყოფს, რომ არ გახდეს ზედმეტად პატარა */
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 8px 4px;
+  text-align: center;
+  background: var(--ink-4);
+}
 .ag-z .g{font-size:18px;line-height:1}
 .ag-z .n{font-size:10px;color:var(--mute);margin-top:4px;letter-spacing:.04em}
 .ag-z.pub{border-color:rgba(95,214,164,.45);background:rgba(95,214,164,.08)}
@@ -195,7 +209,14 @@ const STYLES = `
 .ag-field{border:1px solid var(--line-2);background:var(--ink-4);border-radius:12px;padding:11px 13px;font-size:13px}
 
 @media(max-width:1100px){.ag-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ag-grid{grid-template-columns:1fr}.ag-side{position:static}}
-@media(max-width:760px){.ag-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ag-week{grid-template-columns:1fr}.ag-day{min-height:0}.ag-zod{grid-template-columns:repeat(4,minmax(0,1fr))}.ag-main{padding:16px}.ag-header-in{padding:12px 16px}}
+@media(max-width:760px){
+  .ag-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ag-week{grid-template-columns:1fr}
+  .ag-day{min-height:0}
+  .ag-z { min-width: 64px; } /* მობილურზე ოდნავ უფრო კომპაქტური, მაგრამ მაინც ერთ ხაზზე სქროლით */
+  .ag-main{padding:16px}
+  .ag-header-in{padding:12px 16px}
+}
 @media(prefers-reduced-motion:reduce){.ag-root *{transition:none!important;animation:none!important}}
 `;
 
@@ -958,7 +979,7 @@ export default function AgentsPage() {
               )}
             </section>
 
-            {/* Zodiac coverage */}
+            {/* Zodiac coverage (ახლა მკაცრად ერთ ჰორიზონტალურ ხაზზეა) */}
             <section className="ag-card" aria-label="Zodiac coverage today">
               <div className="ag-ch">
                 <h2>Zodiac coverage today</h2>
