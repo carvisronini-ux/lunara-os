@@ -174,7 +174,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const upperInput = inputValue.trim().toUpperCase();
     const found = ZODIAC_SIGNS.find(z => z.search.toUpperCase().includes(upperInput));
     if (found) { setSelectedZodiac(found); addLog(`✅ Zodiac selected: ${found.name}`); setStep("format"); return found; }
-    else { addLog(`❌ Zodiac not found.`); return null; }
+    else { addLog(` Zodiac not found.`); return null; }
   };
 
   const handleFormatSelect = (format: PostFormat) => { setSelectedFormat(format); addLog(`✅ Format selected: ${format}`); setStep("preview"); };
@@ -200,7 +200,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string, config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
-    if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
+    if (!targetZodiac) { addLog(" Please select a zodiac sign first!"); return null; }
     setIsGeneratingText2(true);
     addLog(`⏳ ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`);
     try {
@@ -224,7 +224,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  // ✅ განახლებული: იყენებს ახალ /api/generate-image ენდპოინტს Canvas-ის ნაცვლად
+  // ✅ განახლებული: აგზავნის დინამიურ visualConfig-ს სერვერზე
   const handleReadyAndUpload = async (
     overrideZodiac?: typeof ZODIAC_SIGNS[0], 
     overrideFormat?: PostFormat,
@@ -251,6 +251,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog(`⏳ [2/3] გზავნის მოთხოვნას /api/generate-image-ზე...`);
       
+      // ✅ დინამიური კონფიგურაციის გაგზავნა
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -260,6 +261,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
           text2: targetText2 || '',
           format: targetFormat,
           dateText,
+          // ✅ აქ ვაგზავნით ზუსტად იმ პარამეტრებს, რაც ეკრანზეა ახლა
+          visualConfig: {
+            text1FontSize: text1FontSize * 3, // Canvas-ის მასშტაბირება (1080px-ზე)
+            text2FontSize: text2FontSize * 3,
+            text1TopPercent: 40, // კონსტრუქტორში არსებული პოზიცია
+            text2TopPercent: 66, // კონსტრუქტორში არსებული პოზიცია
+            showDate: showDate,
+            showLogo: showLogo,
+            logoUrl: logoUrl,
+          }
         }),
       });
 
@@ -303,7 +314,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
     
     setIsPublishing(true);
-    addLog("🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...");
+    addLog(" [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...");
     
     try {
       const payload = {
@@ -381,7 +392,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
       if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
 
-      addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...");
+      addLog(" იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...");
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('master_prompt, thinking_style, skills_constraints')
@@ -413,7 +424,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (!t2) return false;
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია და ატვირთვა...");
+      addLog(" ნაბიჯი 3: სურათის გენერაცია და ატვირთვა...");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
       if (!imgUrl) { 
         addLog("❌ ატვირთვა ვერ მოხერხდა"); 
@@ -427,7 +438,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog("⏳ ნაბიჯი 5: გამოქვეყნება...");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
-        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
+        addLog(" აგენტმა წარმატებით დაასრულა ციკლი!");
         return true;
       } else {
         addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა (შეიძლება ხელახლა სცადოს)");

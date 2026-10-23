@@ -1,8 +1,7 @@
 // /home/carvisronini-ux/lunara-os/app/api/generate-image/route.ts
-
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateInstagramImage, uploadImageToSupabase } from '@/services/image-generator';
+import { generateInstagramImage, uploadImageToSupabase, type VisualConfig } from '@/services/image-generator';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
@@ -16,42 +15,34 @@ export const maxDuration = 30;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { zodiacSign, text1, text2, format = 'post', dateText } = body;
+    const { 
+      zodiacSign, 
+      text1, 
+      text2, 
+      format = 'post', 
+      dateText,
+      visualConfig // ეს არის მთავარი: ფრონტენდიდან მოსული დინამიური პარამეტრები
+    } = body;
 
-    if (!zodiacSign || !text1 || !text2) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields: zodiacSign, text1, text2' },
-        { status: 400 }
-      );
+    if (!zodiacSign || !text1 || !text2 || !visualConfig) {
+      return NextResponse.json({ success: false, error: 'Missing required fields or visualConfig' }, { status: 400 });
     }
 
-    const VALID_SIGNS = [
-      'ARIES', 'TAURUS', 'GEMINI', 'CANCER', 'LEO', 'VIRGO',
-      'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
-    ];
-    
-    if (!VALID_SIGNS.includes(zodiacSign.toUpperCase())) {
-      return NextResponse.json(
-        { success: false, error: `Invalid zodiac sign: ${zodiacSign}` },
-        { status: 400 }
-      );
-    }
+    const dimensions = format === 'story' ? { width: 1080, height: 1920 } : format === 'carousel' ? { width: 1080, height: 1080 } : { width: 1080, height: 1350 };
 
     const image = await generateInstagramImage({
       zodiacSign: zodiacSign.toUpperCase(),
       text1,
       text2,
-      date: new Date(),
-      format,
       dateText,
+      width: dimensions.width,
+      height: dimensions.height,
+      visualConfig: visualConfig as VisualConfig,
     });
-
-    console.log(`[Generate Image] Generated: ${image.sizeKB}KB`);
 
     const uploadResult = await uploadImageToSupabase(supabase, image, zodiacSign.toUpperCase());
 
     if (!uploadResult.success) {
-      console.error('[Generate Image] Upload failed:', uploadResult.error);
       return NextResponse.json({ success: false, error: uploadResult.error }, { status: 500 });
     }
 
@@ -59,14 +50,10 @@ export async function POST(request: Request) {
       success: true,
       imageUrl: uploadResult.url,
       imageSize: image.sizeKB,
-      dimensions: { width: image.width, height: image.height },
     });
 
   } catch (error) {
     console.error('[Generate Image] Error:', error);
-    return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
