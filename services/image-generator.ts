@@ -108,7 +108,7 @@ function drawCover(ctx: CanvasRenderingContext2D, img: { width: number; height: 
   const drawHeight = img.height * scale;
   const x = (width - drawWidth) / 2;
   const y = (height - drawHeight) / 2;
-  console.log(`   ️ [Template] Original: ${img.width}x${img.height}px → Scaled: ${drawWidth.toFixed(0)}x${drawHeight.toFixed(0)}px at (${x.toFixed(0)}, ${y.toFixed(0)})`);
+  console.log(`   🖼️ [Template] Original: ${img.width}x${img.height}px → Scaled: ${drawWidth.toFixed(0)}x${drawHeight.toFixed(0)}px at (${x.toFixed(0)}, ${y.toFixed(0)})`);
   ctx.drawImage(img as any, x, y, drawWidth, drawHeight);
 }
 
@@ -147,6 +147,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
+// ✅ ეს ფუნქცია ახლა გამოიყენება ქვემოთ
 function ellipsize(ctx: CanvasRenderingContext2D, line: string, maxWidth: number): string {
   let value = line.replace(/[\s.,;:!?-]+$/, '');
   while (value.length > 1 && ctx.measureText(`${value}…`).width > maxWidth) {
@@ -174,8 +175,8 @@ interface TextBlockOptions {
 function drawTextBlock(ctx: CanvasRenderingContext2D, options: TextBlockOptions): void {
   const { text, centerX, anchorY, vAlign, fontSize, italic, lineHeight, maxLines, maxWidth, color, fontStack, label } = options;
   
-  console.log(`\n    [${label}] DEBUG:`);
-  console.log(`      • Raw Text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+  console.log(`\n   📝 [${label}] DEBUG:`);
+  console.log(`      • Raw Text: "${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"`);
   console.log(`      • Font: ${italic ? 'italic' : 'normal'} ${fontSize.toFixed(1)}px ${fontStack}`);
   console.log(`      • Color: ${color}`);
   console.log(`      • Anchor Y: ${anchorY.toFixed(1)}px (${vAlign})`);
@@ -183,7 +184,7 @@ function drawTextBlock(ctx: CanvasRenderingContext2D, options: TextBlockOptions)
   console.log(`      • Max Lines: ${maxLines}, Line Height: ${lineHeight}x`);
 
   if (!text || !text.trim()) {
-    console.log(`      ️ SKIPPED: Empty text`);
+    console.log(`      ⚠️ SKIPPED: Empty text`);
     return;
   }
 
@@ -198,11 +199,8 @@ function drawTextBlock(ctx: CanvasRenderingContext2D, options: TextBlockOptions)
   if (lines.length > maxLines) {
     console.log(`      ✂️ Truncating from ${lines.length} to ${maxLines} lines`);
     lines = lines.slice(0, maxLines);
-    let lastLine = lines[maxLines - 1];
-    while (ctx.measureText(lastLine + '…').width > maxWidth && lastLine.length > 1) {
-      lastLine = lastLine.slice(0, -1);
-    }
-    lines[maxLines - 1] = lastLine + '…';
+    // ✅ აქ ვიყენებთ ellipsize ფუნქციას
+    lines[maxLines - 1] = ellipsize(ctx, lines[maxLines - 1], maxWidth);
     console.log(`      … Last line: "${lines[maxLines - 1]}"`);
   }
 
@@ -228,7 +226,7 @@ function drawTextBlock(ctx: CanvasRenderingContext2D, options: TextBlockOptions)
 
 export async function generateInstagramImage(options: GenerateImageOptions): Promise<GeneratedImage> {
   console.log('\n🎨 ==========================================');
-  console.log(' [GENERATOR] Starting Image Generation');
+  console.log('🎨 [GENERATOR] Starting Image Generation');
   console.log('🎨 ==========================================\n');
 
   const { text1, text2, dateText, visualConfig } = options;
@@ -251,11 +249,11 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   const textColor = /^#[0-9a-fA-F]{3,8}$/.test(visualConfig.textColor ?? '') ? (visualConfig.textColor as string) : '#000000';
   const templateUrl = options.templateUrl && isAllowedAssetUrl(options.templateUrl) ? options.templateUrl : getTemplateUrl(zodiacSign);
 
-  console.log(`\n1️ Loading Template...`);
+  console.log(`\n1️⃣ Loading Template...`);
   console.log(`   • URL: ${templateUrl}`);
   const templateBuffer = await fetchBuffer(templateUrl);
   
-  console.log(`\n2️ Creating Canvas...`);
+  console.log(`\n2️⃣ Creating Canvas...`);
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
@@ -401,7 +399,7 @@ export async function generateInstagramImage(options: GenerateImageOptions): Pro
   }
 
   console.log(`\n✅ [GENERATOR] Image generation completed successfully!`);
-  console.log(' ==========================================\n');
+  console.log('🎨 ==========================================\n');
 
   return {
     buffer,
@@ -454,7 +452,7 @@ export async function uploadImageToSupabase(
 
   console.log(`   • Public URL: ${urlData.publicUrl}`);
   console.log(`\n✅ [UPLOAD] Upload completed successfully!`);
-  console.log(' ==========================================\n');
+  console.log('📤 ==========================================\n');
 
   return { success: true, url: urlData.publicUrl, path: uploadPath };
 }
