@@ -8,6 +8,12 @@
  * - კონსტრუქტორში (InstagramPanel)
  * - ავტომატურ სქედულერში (instagram-scheduler)
  * - ნებისმიერ სხვა ადგილას, სადაც ეს კონფიგურაცია გამოიყენება
+ * 
+ * ️ მნიშვნელოვანი: კოორდინატები მორგებულია Supabase-ში არსებულ
+ * zodiac-signs/*.png შაბლონებზე, სადაც:
+ * - ილუსტრაცია ზემოთ (~0-30%)
+ * - ზოდიაქოს სახელი (მაგ: VIRGO) შუაში (~50%)
+ * - ტელეგრამის ლინკი ქვემოთ (~90%)
  */
 
 export type PostFormat = 'post' | 'story' | 'carousel';
@@ -79,9 +85,9 @@ export interface TemplateConfig {
 /**
  * ნაგულისხმევი კონფიგურაცია Instagram Post-ისთვის (1080x1350)
  * 
- * ეს კოორდინატები ემთხვევა InstagramPanel.tsx-ში არსებულ ლოგიკას:
- * - Text 1: top 40% (ილუსტრაციასა და სახელს შორის)
- * - Text 2: top 66% (სახელსა და ტელეგრამს შორის)
+ * კოორდინატები მორგებულია zodiac-signs/*.png შაბლონებზე:
+ * - Text 1: top 35% (ილუსტრაციასა და ოდიაქოს სახელს შორის)
+ * - Text 2: top 75% (ზოდიაქოს სახელსა და ტელეგრამის ლინკს შორის)
  * - Date: bottom 6% (ქვემოთ ცენტრში)
  */
 export const DEFAULT_INSTAGRAM_POST_CONFIG: TemplateConfig = {
@@ -90,10 +96,11 @@ export const DEFAULT_INSTAGRAM_POST_CONFIG: TemplateConfig = {
     story: { width: 1080, height: 1920 },
     carousel: { width: 1080, height: 1080 },
   },
-  backgroundColor: '#ffffff', // გამჭვირვალე ფონი (შაბლონი ფარავს)
+  backgroundColor: '#ffffff', // შაბლონი ფარავს ფონს
   
+  // ✅ განახლებული: 40% → 35% (ილუსტრაციასა და სახელს შორის)
   text1: {
-    topPercent: 40,
+    topPercent: 35,
     leftPercent: 50,
     maxWidthPercent: 85,
     fontSize: 72, // 24px UI × 3 (canvas scale)
@@ -104,8 +111,9 @@ export const DEFAULT_INSTAGRAM_POST_CONFIG: TemplateConfig = {
     align: 'center',
   },
   
+  // ✅ განახლებული: 66% → 75% (სახელსა და ტელეგრამს შორის)
   text2: {
-    topPercent: 66,
+    topPercent: 75,
     leftPercent: 50,
     maxWidthPercent: 85,
     fontSize: 60, // 20px UI × 3
@@ -141,11 +149,6 @@ export const DEFAULT_INSTAGRAM_POST_CONFIG: TemplateConfig = {
  * მომავალში შეიძლება დამატება: მომხმარებლის მიხედვით კონფიგურაციის ჩატვირთვა ბაზიდან
  */
 export function getTemplateConfig(_format: PostFormat = 'post'): TemplateConfig {
-  // ჯერ ვიყენებთ დეფოლტ კონფიგურაციას
-  // მომავალში აქ შეიძლება დაემატოს:
-  // - მომხმარებლის პრეფერენციები Supabase-დან
-  // - A/B ტესტირების ვარიანტები
-  // - სეზონური თემები
   return DEFAULT_INSTAGRAM_POST_CONFIG;
 }
 
