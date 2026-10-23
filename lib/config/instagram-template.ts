@@ -140,7 +140,7 @@ export const DEFAULT_INSTAGRAM_POST_CONFIG: TemplateConfig = {
  * Helper ფუნქცია კონფიგურაციის მისაღებად
  * მომავალში შეიძლება დამატება: მომხმარებლის მიხედვით კონფიგურაციის ჩატვირთვა ბაზიდან
  */
-export function getTemplateConfig(format: PostFormat = 'post'): TemplateConfig {
+export function getTemplateConfig(_format: PostFormat = 'post'): TemplateConfig {
   // ჯერ ვიყენებთ დეფოლტ კონფიგურაციას
   // მომავალში აქ შეიძლება დაემატოს:
   // - მომხმარებლის პრეფერენციები Supabase-დან
