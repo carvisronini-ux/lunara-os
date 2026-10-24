@@ -141,7 +141,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  // ✅ უნიკალური ID თითოეული ოპერაციისთვის (ორმაგი გაშვების აღმოსაფხვრელად)
   const operationIdRef = useRef<string | null>(null);
 
   const addLog = (message: string, type: "info" | "debug" | "error" | "success" | "warning" = "info") => {
@@ -163,7 +162,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   };
 
-  // ✅ ლოგირება როცა კომპონენტის მდგომარეობა იცვლება
   useEffect(() => {
     addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
   }, [step, selectedZodiac, selectedFormat]);
@@ -196,6 +194,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     setSelectedFormat(format); 
     addLog(`✅ Format selected: ${format}`, "success"); 
     setStep("preview"); 
+  };
+
+  // ✅ ახალი: შემთხვევითი ზოდიაქოს სურათის გენერირება
+  const handleRandomizeImage = () => {
+    const randomZodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
+    setSelectedZodiac(randomZodiac);
+    addLog(`🎲 შეიცვალა ზოდიაქოს სურათი: ${randomZodiac.name}`, "info");
   };
 
   const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], config?: any) => {
@@ -255,7 +260,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     _overrideText1?: string,
     _overrideText2?: string
   ) => {
-    // ✅ გენერირება უნიკალური ოპერაციის ID
     const newOpId = `OP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     operationIdRef.current = newOpId;
 
@@ -263,7 +267,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`🔖 Operation ID: ${newOpId}`);
     addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
 
-    // ✅ ბლოკავს მეორე დაჭერას
     if (isPublishing) {
       addLog(`⚠️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
       operationIdRef.current = null;
@@ -284,9 +287,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     if (!targetZodiac || !targetFormat || !previewRef.current) { 
       addLog(`❌ VALIDATION FAILED: Missing required parameters`, "error");
-      addLog(`   • targetZodiac: ${!!targetZodiac}`);
-      addLog(`   • targetFormat: ${!!targetFormat}`);
-      addLog(`   • previewRef.current: ${!!previewRef.current}`);
       operationIdRef.current = null;
       return null; 
     }
@@ -295,11 +295,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`, "info");
 
     try {
-      // 1. ვუცდით 1 წამს, რომ DOM-მა დაასტაბილუროს
       addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 2. ვიღებთ სქრინშოტს ზუსტად იმ ზომაში, რაც ეკრანზეა (რაც გარანტირებულია, რომ ვიზუალურად იდეალურია)
       addLog(`📷 Capturing screenshot with html-to-image...`, "debug");
       const dataUrl = await toJpeg(previewRef.current, {
         quality: 1.0,
@@ -308,21 +306,17 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       });
 
       addLog(`✅ Screenshot captured! Data URL length: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
-      
       addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ზომის სურათს (Canvas Resize)...`, "info");
       
-      // 3. ვქმნით Canvas-ს, რომ სურათი გავადიდოთ 1080x1350-მდე (ეს ბევრად უფრო ხარისხიანია და არ არღვევს ლეიაუთს)
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       canvas.height = 1350;
       const ctx = canvas.getContext('2d');
       
-      // ✅ TypeScript-ისთვის null check დამატება
       if (!ctx) {
         throw new Error("Failed to get canvas context");
       }
       
-      // თეთრი ფონი (უსაფრთხოებისთვის)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1080, 1350);
 
@@ -330,7 +324,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       img.src = dataUrl;
       await new Promise(resolve => { img.onload = resolve; });
 
-      // ვხატავთ სურათს 1080x1350 ზომაზე
       ctx.drawImage(img, 0, 0, 1080, 1350);
       addLog(`✅ Canvas resized to 1080x1350`, "success");
 
@@ -382,7 +375,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     overrideText2?: string, 
     overrideImageUrl?: string
   ) => {
-    // ✅ ბლოკავს მეორე დაჭერას
     if (isPublishing) {
       addLog(`⚠️ WARNING: Publish already in progress! Blocking duplicate call.`, "warning");
       return false;
@@ -397,19 +389,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     addLog(`\n🚀 ========== STARTING PUBLISH PROCESS ==========`);
     addLog(`🔖 Operation ID: ${operationIdRef.current || 'NO_ID'}`);
-    addLog(`📋 PUBLISH PARAMETERS:`);
-    addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
-    addLog(`   • Format: ${targetFormat || 'NULL'}`);
-    addLog(`   • Image URL: ${targetImageUrl ? 'EXISTS' : 'NULL'}`);
-    addLog(`   • Text1: "${targetText1?.substring(0, 50)}..."`);
-    addLog(`   • Text2: "${targetText2?.substring(0, 50)}..."`);
 
     if (!targetImageUrl || !targetText2 || !targetZodiac || !targetFormat) {
       addLog(`❌ PRE-FLIGHT CHECK FAILED:`, "error");
-      addLog(`   • targetImageUrl: ${!!targetImageUrl}`);
-      addLog(`   • targetText2: ${!!targetText2}`);
-      addLog(`   • targetZodiac: ${!!targetZodiac}`);
-      addLog(`   • targetFormat: ${!!targetFormat}`);
       setIsPublishing(false);
       return false;
     }
@@ -426,13 +408,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         imageUrl: targetImageUrl,
         profileUsername: profileUsername
       };
-
-      addLog(`📤 Payload sent to API:`, "debug");
-      addLog(`   • zodiacName: ${payload.zodiacName}`);
-      addLog(`   • format: ${payload.format}`);
-      addLog(`   • text1 length: ${payload.text1?.length}`);
-      addLog(`   • text2 length: ${payload.text2?.length}`);
-      addLog(`   • hashtags: ${payload.generatedHashtags ? 'INCLUDED' : 'EXCLUDED'}`);
 
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
@@ -461,17 +436,10 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
 
         addLog(`✅ Database record created`);
-        
-        setStep("input");
-        setInputValue("");
-        setSelectedZodiac(null);
-        setSelectedFormat(null);
-        setText1("");
-        setText2("");
-        setUploadedImageUrl(null);
+        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
-        addLog(`\n🏁 ========== PUBLISH PROCESS COMPLETED ==========\n`);
+        // ✅ აღარ ვასუფთავებთ ფორმას ავტომატურად!
         return true;
       } else {
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
@@ -489,20 +457,17 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
         
         setIsPublishing(false);
-        addLog(`\n❌ ========== PUBLISH PROCESS FAILED ==========\n`);
         return false;
       }
     } catch (error) {
       addLog(`💥 კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsPublishing(false);
-      addLog(`\n💥 ========== PUBLISH PROCESS CRASHED ==========\n`);
       return false;
     }
   };
 
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
-      // ✅ ბლოკავს აგენტის მეორედ გაშვებას
       if (isPublishing) {
         addLog("⚠️ Agent already running! Blocking duplicate execution.", "warning");
         return false;
@@ -541,26 +506,17 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
       const t1 = await handleGenerateText1(zodiac, config);
-      if (!t1) {
-        addLog("❌ Text 1 generation failed. Aborting.", "error");
-        return false;
-      }
+      if (!t1) { addLog("❌ Text 1 generation failed. Aborting.", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
       
       addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...", "info");
       const t2 = await handleGenerateText2(zodiac, t1, config);
-      if (!t2) {
-        addLog("❌ Text 2 generation failed. Aborting.", "error");
-        return false;
-      }
+      if (!t2) { addLog("❌ Text 2 generation failed. Aborting.", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
-      if (!imgUrl) { 
-        addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); 
-        return false; 
-      }
+      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
@@ -570,11 +526,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
-        addLog(`\n🏁 ========== AGENT COMPLETED SUCCESSFULLY ==========\n`);
         return true;
       } else {
-        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა (შეიძლება ხელახლა სცადოს)", "error");
-        addLog(`\n❌ ========== AGENT COMPLETED WITH ERRORS ==========\n`);
+        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა", "error");
         return false;
       }
     }
@@ -615,8 +569,22 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       {step === "preview" && selectedZodiac && imageUrl && (
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <div><h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>{activeFormatOption && <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>}</div>
-            <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
+            <div>
+              <h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>
+              {activeFormatOption && <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* ✅ ახალი: Randomize Image ღილაკი */}
+              <button 
+                onClick={handleRandomizeImage} 
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-2 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 hover:text-[var(--p-violet)]"
+                title="შემთხვევითი ზოდიაქოს სურათი"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Randomize
+              </button>
+              <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]">
             <div className="xl:sticky xl:top-24 xl:self-start">
@@ -625,11 +593,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
-                  
-                  <div 
-                    className="absolute inset-0 pointer-events-none z-0" 
-                    style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} 
-                  />
+                  <div className="absolute inset-0 pointer-events-none z-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} />
                   
                   {showLogo && logoUrl && isLogoValid && (
                     <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
@@ -647,7 +611,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
                 </div>
 
-                {/* ✅ DEBUG INFO: აჩვენებს ზუსტ კოორდინატებს ეკრანზე */}
                 <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono border border-[var(--p-line-2)] rounded-lg p-2 bg-[var(--p-ink-2)]">
                   <div className="grid grid-cols-2 gap-2">
                     <div>Text1: top=40%, font={text1FontSize}px, lines≤2</div>
@@ -674,10 +637,31 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 </div>
                 {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
               </Section>
+              
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button onClick={() => handleReadyAndUpload()} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}</button>
                 <button onClick={() => handlePublish()} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>{isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}</button>
               </div>
+              
+              {/* ✅ ახალი: Start New Post ღილაკი */}
+              <button 
+                onClick={() => {
+                  setStep("input");
+                  setInputValue("");
+                  setSelectedZodiac(null);
+                  setSelectedFormat(null);
+                  setText1("");
+                  setText2("");
+                  setUploadedImageUrl(null);
+                  setLogs([]);
+                  addLog("🔄 ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
+                }} 
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                Start New Post
+              </button>
+
               {logs.length > 0 && (
                 <div className="overflow-hidden rounded-2xl border border-[var(--p-line)] bg-[#080a16]">
                   <div className="flex items-center justify-between border-b border-[var(--p-line)] px-4 py-2.5">
