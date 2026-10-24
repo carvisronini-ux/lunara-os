@@ -2,7 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
-import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
+// ✅ კომენტარად არის გადაყვანილი, რადგან autoCreateAndPublish გათიშულია და TypeScript შეცდომას არ მოგვცემს
+// import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
 const supabaseKey = process.env.SUPABASE_OS_SERVICE_ROLE_KEY!;
@@ -25,7 +26,6 @@ export class InstagramAgent {
   private instagramAdapter: InstagramAdapter;
 
   constructor() {
-    // ✅ FIX: გადავცემთ .env ცვლადებს InstagramAdapter-ს
     this.instagramAdapter = new InstagramAdapter(
       process.env.INSTAGRAM_USER_ID || '',
       process.env.INSTAGRAM_ACCESS_TOKEN || ''
@@ -47,7 +47,6 @@ export class InstagramAgent {
 
     /* 
     // ქვემოთ მოცემული კოდი დარჩა, მაგრამ ზემოთ return-ის გამო არასდროს შესრულდება.
-    // როცა პრობლემას ვიპოვით, უბრალოდ წავშლით ამ კომენტარებს და Kill Switch-ს.
     
     console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
