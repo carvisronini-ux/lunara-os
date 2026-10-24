@@ -5,7 +5,8 @@ import { InstagramAgent } from '@/agents/content/instagram-agent';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-export async function GET(request: NextRequest) {
+// ✅ დავამატეთ '_' request-ის წინ, რათა TypeScript-მა არ იჩივლოს გამოუყენებელ ცვლადზე
+export async function GET(_request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
