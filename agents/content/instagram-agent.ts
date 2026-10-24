@@ -2,7 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { InstagramAdapter } from '../../services/distribution/instagram-adapter';
-// ✅ კომენტარად არის გადაყვანილი, რადგან autoCreateAndPublish გათიშულია და TypeScript შეცდომას არ მოგვცემს
+// ✅ კომენტარად არის გადაყვანილი, რადგან autoCreateAndPublish გათიშულია
 // import { generateHoroscopeContent } from '../../lib/instagram/ai-generator';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_OS_URL!;
@@ -11,7 +11,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
-const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
+// ✅ კომენტარად არის გადაყვანილი, რადგან ამ ეტაპზე არ გამოიყენება და შეცდომას იწვევს
+// const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const ZODIAC_SIGNS = [
   { name: 'ARIES', georgian: 'ვერძი' }, { name: 'TAURUS', georgian: 'კურო' },
