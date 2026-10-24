@@ -142,7 +142,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   // ✅ უნიკალური ID თითოეული ოპერაციისთვის (ორმაგი გაშვების აღმოსაფხვრელად)
-  const [operationId, setOperationId] = useState<string | null>(null);
   const operationIdRef = useRef<string | null>(null);
 
   const addLog = (message: string, type: "info" | "debug" | "error" | "success" | "warning" = "info") => {
@@ -259,7 +258,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     // ✅ გენერირება უნიკალური ოპერაციის ID
     const newOpId = `OP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     operationIdRef.current = newOpId;
-    setOperationId(newOpId);
 
     addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
     addLog(`🔖 Operation ID: ${newOpId}`);
