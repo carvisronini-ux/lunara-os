@@ -1,7 +1,7 @@
 // /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
-import { useState, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 import { toJpeg } from "html-to-image";
@@ -141,11 +141,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  const addLog = (message: string) => {
+  // ✅ უნიკალური ID თითოეული პერაციისთვის (ორმაგი გაშვების აღმოსაფხვრელად)
+  const [operationId, setOperationId] = useState<string | null>(null);
+  const operationIdRef = useRef<string | null>(null);
+
+  const addLog = (message: string, type: "info" | "debug" | "error" | "success" = "info") => {
     const timestamp = new Date().toLocaleTimeString();
-    const newLog = `[${timestamp}] ${message}`;
+    const opId = operationIdRef.current || "NO_OP_ID";
+    const newLog = `[${timestamp}] [${opId}] ${message}`;
     setLogs(prev => [...prev, newLog]);
-    console.log(newLog);
+    console.log(`[${type.toUpperCase()}] ${newLog}`);
     pushEvent("system", message);
   };
 
@@ -159,28 +164,60 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   };
 
+  // ✅ ლოგირება როცა კომპონენტი იცვლება
+  useEffect(() => {
+    addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
+  }, [step, selectedZodiac, selectedFormat]);
+
+  // ✅ ლოგირება როცა ტექსტი იცვლება
+  useEffect(() => {
+    if (text1 || text2) {
+      addLog(`📝 TEXT UPDATE: Text1="${text1.substring(0, 30)}..." (${text1.length}), Text2="${text2.substring(0, 30)}..." (${text2.length})`, "debug");
+    }
+  }, [text1, text2]);
+
+  // ✅ ლოგირება როცა ფონტის ზომა იცვლება
+  useEffect(() => {
+    addLog(` FONT SIZE: Text1=${text1FontSize}px, Text2=${text2FontSize}px`, "debug");
+  }, [text1FontSize, text2FontSize]);
+
   const handleZodiacSubmit = () => {
     const upperInput = inputValue.trim().toUpperCase();
     const found = ZODIAC_SIGNS.find(z => z.search.toUpperCase().includes(upperInput));
-    if (found) { setSelectedZodiac(found); addLog(`✅ Zodiac selected: ${found.name}`); setStep("format"); return found; }
-    else { addLog(`❌ Zodiac not found.`); return null; }
+    if (found) { 
+      setSelectedZodiac(found); 
+      addLog(`✅ Zodiac selected: ${found.name}`, "success"); 
+      setStep("format"); 
+      return found; 
+    }
+    else { 
+      addLog(`❌ Zodiac not found for: "${upperInput}"`, "error"); 
+      return null; 
+    }
   };
 
-  const handleFormatSelect = (format: PostFormat) => { setSelectedFormat(format); addLog(`✅ Format selected: ${format}`); setStep("preview"); };
+  const handleFormatSelect = (format: PostFormat) => { 
+    setSelectedFormat(format); 
+    addLog(`✅ Format selected: ${format}`, "success"); 
+    setStep("preview"); 
+  };
 
   const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
-    if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
+    if (!targetZodiac) { 
+      addLog("❌ Please select a zodiac sign first!", "error"); 
+      return null; 
+    }
     setIsGeneratingText1(true);
-    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`);
+    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateViralText1(targetZodiac.name, config);
       setText1(generatedText);
-      addLog(`✅ მიიღო Text 1: "${generatedText}" (სიგრძე: ${generatedText.length})`);
+      addLog(`✅ მიიღო Text 1: "${generatedText}" (სიგრძე: ${generatedText.length})`, "success");
       setIsGeneratingText1(false);
       return generatedText;
     } catch (error) {
-      addLog(`❌ შეცდომა Text 1-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(`❌ შეცდომა Text 1-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsGeneratingText1(false);
       return null;
     }
@@ -189,9 +226,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string, config?: any) => {
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
-    if (!targetZodiac) { addLog("❌ Please select a zodiac sign first!"); return null; }
+    if (!targetZodiac) { 
+      addLog("❌ Please select a zodiac sign first!", "error"); 
+      return null; 
+    }
     setIsGeneratingText2(true);
-    addLog(`⏳ ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`);
+    addLog(` ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1, config);
       let cleanedText = generatedText;
@@ -203,11 +243,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }
       }
       setText2(cleanedText);
-      addLog(`✅ მიიღო Text 2: "${cleanedText}" (სიგრძე: ${cleanedText.length})`);
+      addLog(`✅ მიიღო Text 2: "${cleanedText}" (სიგრძე: ${cleanedText.length})`, "success");
       setIsGeneratingText2(false);
       return cleanedText;
     } catch (error) {
-      addLog(`❌ შეცდომა Text 2-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(`❌ შეცდომა Text 2-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsGeneratingText2(false);
       return null;
     }
@@ -219,58 +259,119 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     _overrideText1?: string,
     _overrideText2?: string
   ) => {
+    // ✅ გენერირება უნიკალური ოპერაციის ID
+    const newOpId = `OP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    operationIdRef.current = newOpId;
+    setOperationId(newOpId);
+
+    addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
+    addLog(`🔖 Operation ID: ${newOpId}`);
+    addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
+
+    // ✅ ბლოკავს მეორე დაჭერას
+    if (isPublishing) {
+      addLog(`️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
+      operationIdRef.current = null;
+      return null;
+    }
+
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
 
+    addLog(` INPUT PARAMETERS:`);
+    addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
+    addLog(`   • Format: ${targetFormat || 'NULL'}`);
+    addLog(`   • Text1: "${text1.substring(0, 50)}..." (${text1.length} chars)`);
+    addLog(`   • Text2: "${text2.substring(0, 50)}..." (${text2.length} chars)`);
+    addLog(`   • Text1 Font Size: ${text1FontSize}px`);
+    addLog(`   • Text2 Font Size: ${text2FontSize}px`);
+    addLog(`   • Preview Ref Exists: ${!!previewRef.current}`);
+
     if (!targetZodiac || !targetFormat || !previewRef.current) { 
-      addLog("❌ Preview not ready or Zodiac/Format not selected."); 
+      addLog(`❌ VALIDATION FAILED: Missing required parameters`, "error");
+      addLog(`   • targetZodiac: ${!!targetZodiac}`);
+      addLog(`   • targetFormat: ${!!targetFormat}`);
+      addLog(`   • previewRef.current: ${!!previewRef.current}`);
+      operationIdRef.current = null;
       return null; 
     }
     
     setIsPublishing(true);
-    addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`);
+    addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`, "info");
 
     try {
-      // ✅ კრიტიკული: 1 წამიანი ლოდინი, რათა ბრაუზერმა სრულად დაასტაბილუროს DOM და CSS (გრადიენტები, პოზიციები)
+      // 1. ვუცდით 1 წამს, რომ DOM-მა დაასტაბილუროს
+      addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
       await new Promise(resolve => setTimeout(resolve, 1000));
 
+      // 2. ვიღებთ სქრინშოტს ზუსტად იმ ომაში, რაც ეკრანზეა
+      addLog(` Capturing screenshot with html-to-image...`, "debug");
       const dataUrl = await toJpeg(previewRef.current, {
-        width: 1080,
-        height: 1350,
-        quality: 0.95,
+        quality: 1.0,
         cacheBust: true,
-        pixelRatio: 1,
-        backgroundColor: '#ffffff', // უზრუნველყოფს, რომ ფონი არ იყოს გამჭვირვალე
+        backgroundColor: '#ffffff',
       });
 
-      addLog(`⏳ [2/3] ვტვირთავთ სურათს Supabase-ში...`);
+      addLog(`✅ Screenshot captured! Size: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
       
-      const response = await fetch(dataUrl);
+      addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ომის სურათს...`, "info");
+      
+      // 3. ვქმნით Canvas-ს, რომ სურათი გავადიდოთ 1080x1350-მდე
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1350;
+      const ctx = canvas.getContext('2d');
+      
+      // თეთრი ფონი
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 1080, 1350);
+
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise(resolve => { img.onload = resolve; });
+
+      // ვხატავთ სურათს 1080x1350 ზომაზე
+      ctx.drawImage(img, 0, 0, 1080, 1350);
+      addLog(`✅ Canvas resized to 1080x1350`, "success");
+
+      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const response = await fetch(finalDataUrl);
       const blob = await response.blob();
 
       const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
 
+      addLog(`⏳ [3/3] Uploading to Supabase...`, "info");
+      addLog(`   • File Name: ${fileName}`);
+      addLog(`   • Upload Path: ${uploadPath}`);
+      addLog(`   • Blob Size: ${(blob.size / 1024).toFixed(1)}KB`);
+
       const { error: uploadError } = await supabase.storage
         .from('lunara-assets')
         .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
 
-      if (uploadError) throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
+      if (uploadError) {
+        addLog(`❌ Upload Error: ${uploadError.message}`, "error");
+        throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
+      }
       
       const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_OS_URL}/storage/v1/object/public/lunara-assets/${uploadPath}`;
       
-      addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`);
-      addLog(`✅ URL: ${publicUrl}`);
+      addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`, "success");
+      addLog(`✅ URL: ${publicUrl}`, "success");
+      addLog(`\n🏁 ========== UPLOAD PROCESS COMPLETED ==========\n`);
       
       setUploadedImageUrl(publicUrl);
       return publicUrl;
 
     } catch (error) {
-      addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       console.error("Screenshot/Upload Error Details:", error);
+      addLog(`\n ========== UPLOAD PROCESS FAILED ==========\n`);
       return null;
     } finally {
       setIsPublishing(false);
+      operationIdRef.current = null;
     }
   };
 
@@ -281,19 +382,39 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     overrideText2?: string, 
     overrideImageUrl?: string
   ) => {
+    // ✅ ბლოკავს მეორე დაჭერას
+    if (isPublishing) {
+      addLog(`️ WARNING: Publish already in progress! Blocking duplicate call.`, "warning");
+      return false;
+    }
+    setIsPublishing(true);
+
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
     const targetImageUrl = overrideImageUrl || uploadedImageUrl;
 
+    addLog(`\n🚀 ========== STARTING PUBLISH PROCESS ==========`);
+    addLog(`🔖 Operation ID: ${operationIdRef.current || 'NO_ID'}`);
+    addLog(`📋 PUBLISH PARAMETERS:`);
+    addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
+    addLog(`   • Format: ${targetFormat || 'NULL'}`);
+    addLog(`   • Image URL: ${targetImageUrl ? 'EXISTS' : 'NULL'}`);
+    addLog(`   • Text1: "${targetText1?.substring(0, 50)}..."`);
+    addLog(`   • Text2: "${targetText2?.substring(0, 50)}..."`);
+
     if (!targetImageUrl || !targetText2 || !targetZodiac || !targetFormat) {
-      addLog("❌ PRE-FLIGHT CHECK FAILED: Missing imageUrl, text2, zodiac, or format.");
+      addLog(`❌ PRE-FLIGHT CHECK FAILED:`, "error");
+      addLog(`   • targetImageUrl: ${!!targetImageUrl}`);
+      addLog(`   • targetText2: ${!!targetText2}`);
+      addLog(`   • targetZodiac: ${!!targetZodiac}`);
+      addLog(`   • targetFormat: ${!!targetFormat}`);
+      setIsPublishing(false);
       return false;
     }
     
-    setIsPublishing(true);
-    addLog("🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...");
+    addLog(`🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
     
     try {
       const payload = {
@@ -306,6 +427,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         profileUsername: profileUsername
       };
 
+      addLog(`📤 Payload sent to API:`, "debug");
+      addLog(`   • zodiacName: ${payload.zodiacName}`);
+      addLog(`   • format: ${payload.format}`);
+      addLog(`   • text1 length: ${payload.text1?.length}`);
+      addLog(`   • text2 length: ${payload.text2?.length}`);
+      addLog(`   • hashtags: ${payload.generatedHashtags ? 'INCLUDED' : 'EXCLUDED'}`);
+
       const response = await fetch('/api/instagram/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -314,10 +442,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       
       const responseText = await response.text();
       let data;
-      try { data = JSON.parse(responseText); } catch (e) { throw new Error(`Invalid JSON: ${responseText}`); }
+      try { data = JSON.parse(responseText); } catch (e) { 
+        addLog(`❌ Invalid JSON response: ${responseText}`, "error");
+        throw new Error(`Invalid JSON: ${responseText}`); 
+      }
       
       if (data.success) {
-        addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`);
+        addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`, "success");
+        
+        // ჩანაწერის დამატება ბაზაში
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
           zodiac_sign: targetZodiac.name,
@@ -328,6 +461,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
           agent_used: 'client_agent'
         }]);
 
+        addLog(`✅ Database record created`);
+        
+        // ფორმის გასუფთავება
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
@@ -337,11 +473,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         setUploadedImageUrl(null);
         
         setIsPublishing(false);
+        addLog(`\n🏁 ========== PUBLISH PROCESS COMPLETED ==========\n`);
         return true;
       } else {
-        addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`);
-        if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`);
+        addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
+        if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`, "error");
         
+        // ჩანაწერის დამატება ბაზაში (failed)
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
           zodiac_sign: targetZodiac.name,
@@ -354,22 +492,35 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
         
         setIsPublishing(false);
+        addLog(`\n ========== PUBLISH PROCESS FAILED ==========\n`);
         return false;
       }
     } catch (error) {
-      addLog(`💥 კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`);
+      addLog(` კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsPublishing(false);
+      addLog(`\n💥 ========== PUBLISH PROCESS CRASHED ==========\n`);
       return false;
     }
   };
 
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
-      addLog(`🤖 აგენტი იწყებს მუშაობას: ${zodiacName}`);
-      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
-      if (!zodiac) { addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`); return false; }
+      // ✅ ბლოკავს აგენტის მეორედ გაშვებას
+      if (isPublishing) {
+        addLog("️ Agent already running! Blocking duplicate execution.", "warning");
+        return false;
+      }
 
-      addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...");
+      addLog(`\n🤖 ========== AGENT STARTED ==========`);
+      addLog(`🎯 Target Zodiac: ${zodiacName}`);
+      
+      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
+      if (!zodiac) { 
+        addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`, "error"); 
+        return false; 
+      }
+
+      addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...", "info");
       const { data: config, error: configError } = await supabase
         .from('agent_config')
         .select('master_prompt, thinking_style, skills_constraints')
@@ -377,9 +528,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         .single();
 
       if (configError || !config) {
-        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`);
+        addLog(`️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
       } else {
-        addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!");
+        addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
       }
 
       setInputValue(zodiacName);
@@ -391,34 +542,42 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setStep("preview");
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...");
+      addLog(" ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
       const t1 = await handleGenerateText1(zodiac, config);
-      if (!t1) return false;
+      if (!t1) {
+        addLog("❌ Text 1 generation failed. Aborting.", "error");
+        return false;
+      }
       await new Promise(r => setTimeout(r, 1500));
       
-      addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...");
+      addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...", "info");
       const t2 = await handleGenerateText2(zodiac, t1, config);
-      if (!t2) return false;
+      if (!t2) {
+        addLog("❌ Text 2 generation failed. Aborting.", "error");
+        return false;
+      }
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...");
+      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
       if (!imgUrl) { 
-        addLog("❌ ატვირთვა ვერ მოხერხდა"); 
+        addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); 
         return false; 
       }
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...");
+      addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
       await new Promise(r => setTimeout(r, 7000));
       
-      addLog("⏳ ნაბიჯი 5: გამოქვეყნება...");
+      addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
-        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!");
+        addLog(" აგენტმა წარმატებით დაასრულა ციკლი!", "success");
+        addLog(`\n🏁 ========== AGENT COMPLETED SUCCESSFULLY ==========\n`);
         return true;
       } else {
-        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა (შეიძლება ხელახლა სცადოს)");
+        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა (შეიძლება ხელახლა სცადოს)", "error");
+        addLog(`\n❌ ========== AGENT COMPLETED WITH ERRORS ==========\n`);
         return false;
       }
     }
@@ -491,13 +650,23 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
                 </div>
 
+                {/* ✅ DEBUG INFO: აჩვენებს უსტ კოორდინატებს ეკრანზე */}
+                <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>Text1: top=40%, font={text1FontSize}px, lines≤2</div>
+                    <div>Text2: top=66%, font={text2FontSize}px, lines≤5</div>
+                    <div>Preview Width: {selectedFormat === 'story' ? '300px' : '400px'}</div>
+                    <div>Format: {selectedFormat} ({activeFormatOption?.ratio})</div>
+                  </div>
+                </div>
+
               </div>
             </div>
             <div className="flex min-w-0 flex-col gap-4">
-              <Section title="Text 1 · hook (max 2 lines)" actions={<><button onClick={() => handleGenerateText1()} disabled={isGeneratingText1} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text1FontSize} onMinus={() => setText1FontSize(Math.max(12, text1FontSize - 2))} onPlus={() => setText1FontSize(Math.min(60, text1FontSize + 2))} /></>}>
+              <Section title="Text 1 · hook (max 2 lines)" actions={<><button onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text1FontSize} onMinus={() => setText1FontSize(Math.max(12, text1FontSize - 2))} onPlus={() => setText1FontSize(Math.min(60, text1FontSize + 2))} /></>}>
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none`} />
               </Section>
-              <Section title="Text 2 · forecast (max 5 lines)" actions={<><button onClick={() => handleGenerateText2()} disabled={isGeneratingText2} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text2FontSize} onMinus={() => setText2FontSize(Math.max(12, text2FontSize - 2))} onPlus={() => setText2FontSize(Math.min(60, text2FontSize + 2))} /></>}>
+              <Section title="Text 2 · forecast (max 5 lines)" actions={<><button onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button><SizeControl value={text2FontSize} onMinus={() => setText2FontSize(Math.max(12, text2FontSize - 2))} onPlus={() => setText2FontSize(Math.min(60, text2FontSize + 2))} /></>}>
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none`} />
               </Section>
               <Section title="Design elements">
@@ -520,12 +689,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy logs
                     </button>
                   </div>
-                  <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[11px]">
+                  <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]">
                     {logs.map((log, i) => {
-                      const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
+                      const isError = log.includes('') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
