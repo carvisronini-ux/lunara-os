@@ -4,7 +4,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
-import { toJpeg } from "html-to-image"; // ✅ სწორი იმპორტი
+import { toJpeg } from "html-to-image";
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -231,16 +231,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`);
 
     try {
-      // ✅ html-to-image იყენებს SVG foreignObject-ს, რაც ბევრად უკეთესად მუშაობს გრადიენტებთან
+      // ✅ კრიტიკული: 1 წამიანი ლოდინი, რათა ბრაუზერმა სრულად დაასტაბილუროს DOM და CSS (გრადიენტები, პოზიციები)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const dataUrl = await toJpeg(previewRef.current, {
         width: 1080,
         height: 1350,
         quality: 0.95,
         cacheBust: true,
         pixelRatio: 1,
-        style: {
-          transform: 'none', 
-        },
+        backgroundColor: '#ffffff', // უზრუნველყოფს, რომ ფონი არ იყოს გამჭვირვალე
       });
 
       addLog(`⏳ [2/3] ვტვირთავთ სურათს Supabase-ში...`);
