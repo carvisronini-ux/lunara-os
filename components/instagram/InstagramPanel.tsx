@@ -317,6 +317,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       canvas.height = 1350;
       const ctx = canvas.getContext('2d');
       
+      // ✅ TypeScript-ისთვის null check დამატება
+      if (!ctx) {
+        throw new Error("Failed to get canvas context");
+      }
+      
       // თეთრი ფონი (უსაფრთხოებისთვის)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1080, 1350);
