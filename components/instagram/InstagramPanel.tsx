@@ -196,7 +196,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     setStep("preview"); 
   };
 
-  // ✅ ახალი: შემთხვევითი ზოდიაქოს სურათის გენერირება
   const handleRandomizeImage = () => {
     const randomZodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
     setSelectedZodiac(randomZodiac);
@@ -425,6 +424,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (data.success) {
         addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`, "success");
         
+        // ✅ ახალი: სერვერის ლოგის (User-Agent) დამატება UI-ში
+        if (data.debugInfo) {
+          addLog(data.debugInfo, "debug");
+        }
+        
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
           zodiac_sign: targetZodiac.name,
@@ -439,10 +443,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
-        // ✅ აღარ ვასუფთავებთ ფორმას ავტომატურად!
         return true;
       } else {
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
+        
+        // ✅ ახალი: სერვერის ლოგის დამატება UI-ში შეცდომის დროსაც
+        if (data.debugInfo) {
+          addLog(data.debugInfo, "debug");
+        }
+        
         if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`, "error");
         
         await supabase.from('published_content').insert([{
@@ -574,7 +583,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               {activeFormatOption && <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>}
             </div>
             <div className="flex items-center gap-2">
-              {/* ✅ ახალი: Randomize Image ღილაკი */}
               <button 
                 onClick={handleRandomizeImage} 
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-2 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 hover:text-[var(--p-violet)]"
@@ -643,7 +651,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <button onClick={() => handlePublish()} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>{isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}</button>
               </div>
               
-              {/* ✅ ახალი: Start New Post ღილაკი */}
               <button 
                 onClick={() => {
                   setStep("input");

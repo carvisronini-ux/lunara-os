@@ -24,7 +24,7 @@ export const maxDuration = 60;
 const GEORGIA_TIMEZONE = 'Asia/Tbilisi';
 const GEORGIA_UTC_OFFSET = '+04:00';
 const SCHEDULE_WINDOW_MINUTES = 25;
-const JPEG_QUALITY = 95; // მაღალი ხარისხი Instagram-ისთვის
+const JPEG_QUALITY = 95;
 
 const ASSETS_BASE_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets';
 const DEFAULT_LOGO_URL = `${ASSETS_BASE_URL}/logo.png`;
@@ -191,75 +191,25 @@ async function generatePostJpeg(text1: string, text2: string, zodiacSign: string
   const templateUrl = `${ASSETS_BASE_URL}/templates/${zodiacSign.toLowerCase()}.png`;
   const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: GEORGIA_TIMEZONE, year: 'numeric', month: 'long', day: 'numeric' }).format(date);
 
-  // 1. ვქმნით PNG-ს @vercel/og-ით (ზუსტად ახალი შაბლონის მარცხენა ზონების მიხედვით)
   const imageResponse = new ImageResponse(
     (
       <div style={{ display: 'flex', position: 'relative', width: 1080, height: 1350, backgroundColor: '#fffdf5' }}>
-        {/* 1. შაბლონი */}
         <img src={templateUrl} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-        
-        {/* 2. ლოგო (წაშალე ეს ბლოკი, თუ შენს შაბლონში ლოგო უკვე ჩაშენებულია) */}
         <div style={{ position: 'absolute', left: 923, top: 27, width: 130, height: 130, borderRadius: '50%', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)' }}>
           <img src={DEFAULT_LOGO_URL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
-
-        {/* 3. Text 1 (Hook) - მარცხენა მხარეს */}
         <div style={{ 
-          position: 'absolute', 
-          left: 76, 
-          top: 230, 
-          width: 508, 
-          height: 189,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center', 
-          color: '#1c1b3a', 
-          fontSize: 56, 
-          fontStyle: 'italic', 
-          fontFamily: 'serif', 
-          lineHeight: 1.2,
-          overflow: 'hidden'
+          position: 'absolute', left: 76, top: 230, width: 508, height: 189, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#1c1b3a', fontSize: 56, fontStyle: 'italic', fontFamily: 'serif', lineHeight: 1.2, overflow: 'hidden'
         }}>
           {text1}
         </div>
-
-        {/* 4. Date - მარცხენა მხარეს, Text 1-სა და Text 2-ს შორის */}
         <div style={{ 
-          position: 'absolute', 
-          left: 76, 
-          top: 446, 
-          width: 432, 
-          height: 81,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center', 
-          color: '#1c1b3a', 
-          fontSize: 40, 
-          fontStyle: 'italic', 
-          fontFamily: 'serif', 
-          lineHeight: 1.2
+          position: 'absolute', left: 76, top: 446, width: 432, height: 81, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#1c1b3a', fontSize: 40, fontStyle: 'italic', fontFamily: 'serif', lineHeight: 1.2
         }}>
           {dateLabel}
         </div>
-
-        {/* 5. Text 2 (Body) - მარცხენა მხარეს */}
         <div style={{ 
-          position: 'absolute', 
-          left: 76, 
-          top: 554, 
-          width: 508, 
-          height: 284,
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-          textAlign: 'center', 
-          color: '#1c1b3a', 
-          fontSize: 40,
-          fontFamily: 'serif', 
-          lineHeight: 1.35,
-          overflow: 'hidden'
+          position: 'absolute', left: 76, top: 554, width: 508, height: 284, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', textAlign: 'center', color: '#1c1b3a', fontSize: 40, fontFamily: 'serif', lineHeight: 1.35, overflow: 'hidden'
         }}>
           {text2}
         </div>
@@ -270,13 +220,12 @@ async function generatePostJpeg(text1: string, text2: string, zodiacSign: string
 
   const pngBuffer = Buffer.from(await imageResponse.arrayBuffer());
 
-  // 2. ✅ ვაქციევთ PNG-ს JPEG-ად sharp-ით (ოქროს სტანდარტი Instagram API-სთვის)
   const jpegBuffer = await sharp(pngBuffer)
-    .flatten({ background: '#ffffff' }) // გამჭვირვალობის აღმოფხვრა
+    .flatten({ background: '#ffffff' })
     .jpeg({ 
       quality: JPEG_QUALITY, 
-      mozjpeg: true, // უკეთესი კომპრესია
-      chromaSubsampling: '4:4:4' // მაღალი ხარისხის ფერები
+      mozjpeg: true,
+      chromaSubsampling: '4:4:4'
     })
     .toBuffer();
 
@@ -301,6 +250,21 @@ async function insertSchedulerLogs(supabase: ReturnType<typeof getSupabaseClient
 // ============================================================
 
 export async function GET() {
+  // 🚨 🚨 🚨 KILL SWITCH: სრულად ვბლოკავთ სქედულერის მუშაობას დუბლირების თავიდან ასაცილებლად 🚨 🚨 🚨
+  console.warn("\n⛔ ⛔ ⛔ [SCHEDULER API] დროებით გათიშულია (DISABLED) დუბლირების თავიდან ასაცილებლად! ⛔ ⛔ ⛔\n");
+  
+  return new Response(JSON.stringify({ 
+    success: true, 
+    message: "Scheduler is temporarily disabled for debugging double-posting issue." 
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  /*
+  // ქვემოთ არსებული მთელი შენი არსებული კოდი დატოვე, 
+  // მაგრამ ზემოთ return-ის გამო ის ვეღარ შესრულდება.
+  
   const startTime = Date.now();
 
   try {
@@ -346,7 +310,6 @@ export async function GET() {
         continue;
       }
 
-      // დუბლიკატის შემოწმება
       const { data: alreadyPublished } = await supabase
         .from('published_content')
         .select('id')
@@ -386,13 +349,11 @@ export async function GET() {
 
         logInfo('Rendering Instagram post image.', { zodiacSign: targetZodiac });
         
-        // ✅ ვიყენებთ generatePostJpeg-ს (ახალი კოორდინატებით + JPEG კონვერტაცია)
         const jpegBuffer = await generatePostJpeg(text1, text2, targetZodiac, now);
         
         const fileName = `post-${targetZodiac.toLowerCase()}-${Date.now()}.jpg`;
         const uploadedStoragePath = `posts/${fileName}`;
 
-        // ✅ ვტვირთავთ JPEG-ს
         const { error: uploadError } = await supabase.storage.from('lunara-assets').upload(uploadedStoragePath, jpegBuffer, { 
           contentType: 'image/jpeg', 
           upsert: false 
@@ -403,7 +364,6 @@ export async function GET() {
         const finalImageUrl = urlData.publicUrl;
         if (!finalImageUrl) throw new Error('Supabase did not return a public URL.');
 
-        // ✅ 3 წამიანი დაყოვნება CDN-ისთვის
         logInfo('Waiting 3s for Supabase CDN propagation before sending to Instagram...');
         await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -474,4 +434,5 @@ export async function GET() {
     logError('Critical Instagram Scheduler error.', error);
     return jsonResponse({ success: false, error: errorMessageOf(error), durationMs: Date.now() - startTime }, 500);
   }
+  */
 }

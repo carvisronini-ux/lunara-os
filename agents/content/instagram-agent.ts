@@ -32,7 +32,23 @@ export class InstagramAgent {
     );
   }
 
+  // 🚨 🚨 🚨 KILL SWITCH: დროებით ვთიშავთ ავტომატურ დაპოსტვას დუბლირების თავიდან ასაცილებლად 🚨 🚨 🚨
   async autoCreateAndPublish(onProgress?: (step: string, message: string) => void) {
+    console.warn("\n⛔ ⛔ ⛔ [InstagramAgent] autoCreateAndPublish არის დროებით გათიშული (DISABLED) დუბლირების თავიდან ასაცილებლად! ⛔ ⛔ ⛔\n");
+    
+    if (onProgress) {
+      onProgress('error', '⛔ Auto-publishing is currently DISABLED for debugging.');
+    }
+    
+    return { 
+      success: false, 
+      error: 'Auto-publishing is temporarily disabled to prevent double posting.' 
+    };
+
+    /* 
+    // ქვემოთ მოცემული კოდი დარჩა, მაგრამ ზემოთ return-ის გამო არასდროს შესრულდება.
+    // როცა პრობლემას ვიპოვით, უბრალოდ წავშლით ამ კომენტარებს და Kill Switch-ს.
+    
     console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
     try {
       console.log('[Step 1] 🎲 Selecting random zodiac and period...');
@@ -104,6 +120,7 @@ export class InstagramAgent {
       onProgress?.('error', `❌ Failed: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
+    */
   }
 
   private async addTextAndLogoToImage(
