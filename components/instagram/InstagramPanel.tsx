@@ -141,11 +141,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  // ✅ უნიკალური ID თითოეული პერაციისთვის (ორმაგი გაშვების აღმოსაფხვრელად)
+  // ✅ უნიკალური ID თითოეული ოპერაციისთვის (ორმაგი გაშვების აღმოსაფხვრელად)
   const [operationId, setOperationId] = useState<string | null>(null);
   const operationIdRef = useRef<string | null>(null);
 
-  const addLog = (message: string, type: "info" | "debug" | "error" | "success" = "info") => {
+  const addLog = (message: string, type: "info" | "debug" | "error" | "success" | "warning" = "info") => {
     const timestamp = new Date().toLocaleTimeString();
     const opId = operationIdRef.current || "NO_OP_ID";
     const newLog = `[${timestamp}] [${opId}] ${message}`;
@@ -164,21 +164,19 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
   };
 
-  // ✅ ლოგირება როცა კომპონენტი იცვლება
+  // ✅ ლოგირება როცა კომპონენტის მდგომარეობა იცვლება
   useEffect(() => {
     addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
   }, [step, selectedZodiac, selectedFormat]);
 
-  // ✅ ლოგირება როცა ტექსტი იცვლება
   useEffect(() => {
     if (text1 || text2) {
       addLog(`📝 TEXT UPDATE: Text1="${text1.substring(0, 30)}..." (${text1.length}), Text2="${text2.substring(0, 30)}..." (${text2.length})`, "debug");
     }
   }, [text1, text2]);
 
-  // ✅ ლოგირება როცა ფონტის ზომა იცვლება
   useEffect(() => {
-    addLog(` FONT SIZE: Text1=${text1FontSize}px, Text2=${text2FontSize}px`, "debug");
+    addLog(`🔤 FONT SIZE: Text1=${text1FontSize}px, Text2=${text2FontSize}px`, "debug");
   }, [text1FontSize, text2FontSize]);
 
   const handleZodiacSubmit = () => {
@@ -189,8 +187,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog(`✅ Zodiac selected: ${found.name}`, "success"); 
       setStep("format"); 
       return found; 
-    }
-    else { 
+    } else { 
       addLog(`❌ Zodiac not found for: "${upperInput}"`, "error"); 
       return null; 
     }
@@ -231,7 +228,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return null; 
     }
     setIsGeneratingText2(true);
-    addLog(` ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(`⏳ ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1, config);
       let cleanedText = generatedText;
@@ -270,7 +267,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     // ✅ ბლოკავს მეორე დაჭერას
     if (isPublishing) {
-      addLog(`️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
+      addLog(`⚠️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
       operationIdRef.current = null;
       return null;
     }
@@ -278,7 +275,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
 
-    addLog(` INPUT PARAMETERS:`);
+    addLog(`📋 INPUT PARAMETERS:`);
     addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
     addLog(`   • Format: ${targetFormat || 'NULL'}`);
     addLog(`   • Text1: "${text1.substring(0, 50)}..." (${text1.length} chars)`);
@@ -304,25 +301,25 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // 2. ვიღებთ სქრინშოტს ზუსტად იმ ომაში, რაც ეკრანზეა
-      addLog(` Capturing screenshot with html-to-image...`, "debug");
+      // 2. ვიღებთ სქრინშოტს ზუსტად იმ ზომაში, რაც ეკრანზეა (რაც გარანტირებულია, რომ ვიზუალურად იდეალურია)
+      addLog(`📷 Capturing screenshot with html-to-image...`, "debug");
       const dataUrl = await toJpeg(previewRef.current, {
         quality: 1.0,
         cacheBust: true,
         backgroundColor: '#ffffff',
       });
 
-      addLog(`✅ Screenshot captured! Size: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
+      addLog(`✅ Screenshot captured! Data URL length: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
       
-      addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ომის სურათს...`, "info");
+      addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ზომის სურათს (Canvas Resize)...`, "info");
       
-      // 3. ვქმნით Canvas-ს, რომ სურათი გავადიდოთ 1080x1350-მდე
+      // 3. ვქმნით Canvas-ს, რომ სურათი გავადიდოთ 1080x1350-მდე (ეს ბევრად უფრო ხარისხიანია და არ არღვევს ლეიაუთს)
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
       canvas.height = 1350;
       const ctx = canvas.getContext('2d');
       
-      // თეთრი ფონი
+      // თეთრი ფონი (უსაფრთხოებისთვის)
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1080, 1350);
 
@@ -367,7 +364,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     } catch (error) {
       addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       console.error("Screenshot/Upload Error Details:", error);
-      addLog(`\n ========== UPLOAD PROCESS FAILED ==========\n`);
+      addLog(`\n❌ ========== UPLOAD PROCESS FAILED ==========\n`);
       return null;
     } finally {
       setIsPublishing(false);
@@ -384,7 +381,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   ) => {
     // ✅ ბლოკავს მეორე დაჭერას
     if (isPublishing) {
-      addLog(`️ WARNING: Publish already in progress! Blocking duplicate call.`, "warning");
+      addLog(`⚠️ WARNING: Publish already in progress! Blocking duplicate call.`, "warning");
       return false;
     }
     setIsPublishing(true);
@@ -450,7 +447,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (data.success) {
         addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`, "success");
         
-        // ჩანაწერის დამატება ბაზაში
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
           zodiac_sign: targetZodiac.name,
@@ -463,7 +459,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
         addLog(`✅ Database record created`);
         
-        // ფორმის გასუფთავება
         setStep("input");
         setInputValue("");
         setSelectedZodiac(null);
@@ -479,7 +474,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
         if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`, "error");
         
-        // ჩანაწერის დამატება ბაზაში (failed)
         await supabase.from('published_content').insert([{
           content_type: targetFormat,
           zodiac_sign: targetZodiac.name,
@@ -492,11 +486,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
         
         setIsPublishing(false);
-        addLog(`\n ========== PUBLISH PROCESS FAILED ==========\n`);
+        addLog(`\n❌ ========== PUBLISH PROCESS FAILED ==========\n`);
         return false;
       }
     } catch (error) {
-      addLog(` კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
+      addLog(`💥 კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsPublishing(false);
       addLog(`\n💥 ========== PUBLISH PROCESS CRASHED ==========\n`);
       return false;
@@ -507,7 +501,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     executeAutoPostSequence: async (zodiacName: string) => {
       // ✅ ბლოკავს აგენტის მეორედ გაშვებას
       if (isPublishing) {
-        addLog("️ Agent already running! Blocking duplicate execution.", "warning");
+        addLog("⚠️ Agent already running! Blocking duplicate execution.", "warning");
         return false;
       }
 
@@ -528,7 +522,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         .single();
 
       if (configError || !config) {
-        addLog(`️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
+        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
       } else {
         addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
       }
@@ -542,7 +536,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setStep("preview");
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog(" ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
+      addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
       const t1 = await handleGenerateText1(zodiac, config);
       if (!t1) {
         addLog("❌ Text 1 generation failed. Aborting.", "error");
@@ -572,7 +566,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
-        addLog(" აგენტმა წარმატებით დაასრულა ციკლი!", "success");
+        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
         addLog(`\n🏁 ========== AGENT COMPLETED SUCCESSFULLY ==========\n`);
         return true;
       } else {
@@ -650,8 +644,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
                 </div>
 
-                {/* ✅ DEBUG INFO: აჩვენებს უსტ კოორდინატებს ეკრანზე */}
-                <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono">
+                {/* ✅ DEBUG INFO: აჩვენებს ზუსტ კოორდინატებს ეკრანზე */}
+                <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono border border-[var(--p-line-2)] rounded-lg p-2 bg-[var(--p-ink-2)]">
                   <div className="grid grid-cols-2 gap-2">
                     <div>Text1: top=40%, font={text1FontSize}px, lines≤2</div>
                     <div>Text2: top=66%, font={text2FontSize}px, lines≤5</div>
@@ -691,10 +685,10 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   </div>
                   <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]">
                     {logs.map((log, i) => {
-                      const isError = log.includes('') || log.includes('FAILURE') || log.includes('💥');
+                      const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
