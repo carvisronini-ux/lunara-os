@@ -4,7 +4,7 @@
 import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
-import html2canvas from "html2canvas";
+import { toJpeg } from "html-to-image"; // ✅ სწორი იმპორტი
 
 type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
 type WizardStep = "input" | "format" | "preview";
@@ -231,23 +231,22 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`);
 
     try {
-      const canvas = await html2canvas(previewRef.current, {
+      // ✅ html-to-image იყენებს SVG foreignObject-ს, რაც ბევრად უკეთესად მუშაობს გრადიენტებთან
+      const dataUrl = await toJpeg(previewRef.current, {
         width: 1080,
         height: 1350,
-        scale: 1,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        removeContainer: true,
-        // ✅ ვიგნორებთ backdrop-blur ელემენტებს, რადგან ისინი არღვევენ html2canvas-ს
-        ignoreElements: (element) => element.classList.contains('backdrop-blur-md'),
+        quality: 0.95,
+        cacheBust: true,
+        pixelRatio: 1,
+        style: {
+          transform: 'none', 
+        },
       });
 
-      addLog(`⏳ [2/3] ვაქციევთ JPEG-ად და ვტვირთავთ...`);
+      addLog(`⏳ [2/3] ვტვირთავთ სურათს Supabase-ში...`);
       
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-      if (!blob) throw new Error("Failed to create image blob");
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
 
       const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
@@ -471,7 +470,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <div ref={previewRef} className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center transition-all duration-300" style={{ aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', width: selectedFormat === 'story' ? '300px' : '400px', maxWidth: '100%' }}>
                   <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover" crossOrigin="anonymous" />
                   
-                  {/* ✅ შეცვლილია: Tailwind-ის გრადიენტი შეცვლილია სტანდარტული CSS linear-gradient-ით, რათა html2canvas-მა ზუსტად წაიკითხოს */}
                   <div 
                     className="absolute inset-0 pointer-events-none z-0" 
                     style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} 
