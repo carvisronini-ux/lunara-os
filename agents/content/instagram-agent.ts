@@ -11,7 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const BUCKET_NAME = 'lunara-assets';
 const ZODIAC_SIGNS_FOLDER = 'zodiac-signs';
-// ✅ კომენტარად არის გადაყვანილი, რადგან ამ ეტაპზე არ გამოიყენება და შეცდომას იწვევს
+// ✅ კომენტარად არის გადაყვანილი, რადგან ამ ეტაპზე არ გამოიყენება
 // const LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
 
 const ZODIAC_SIGNS = [
@@ -48,81 +48,12 @@ export class InstagramAgent {
 
     /* 
     // ქვემოთ მოცემული კოდი დარჩა, მაგრამ ზემოთ return-ის გამო არასდროს შესრულდება.
-    
-    console.log('\n🚀 [InstagramAgent] === STARTING AUTO CREATE & PUBLISH ===');
-    try {
-      console.log('[Step 1] 🎲 Selecting random zodiac and period...');
-      const zodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
-      const period = Math.random() > 0.7 ? 'weekly' : 'daily';
-      console.log(`[Step 1] ✅ Selected: ${zodiac.name} (${zodiac.georgian}), Period: ${period}`);
-      onProgress?.('selecting', `🎲 Selected: ${zodiac.name} (${period} forecast)`);
-
-      console.log('[Step 2] ✍️ Generating AI content...');
-      onProgress?.('generating', `✍️ Generating English content for ${zodiac.name}...`);
-      const aiContent = await generateHoroscopeContent(zodiac.name, period);
-      console.log(`[Step 2] ✅ AI Content Generated:`, { text1: aiContent.text1, text2: aiContent.text2, hashtags: aiContent.hashtags });
-
-      console.log('[Step 3] 📥 Fetching base image and logo...');
-      onProgress?.('fetching', `📥 Fetching base image and logo...`);
-      
-      console.log(`[Step 3a] Fetching base image for ${zodiac.name}...`);
-      const baseImageBuffer = await this.getZodiacImage(zodiac.name);
-      console.log(`[Step 3a] ✅ Base image fetched. Size: ${baseImageBuffer.length} bytes`);
-      
-      console.log(`[Step 3b] Fetching logo from ${LOGO_URL}...`);
-      const logoResponse = await fetch(LOGO_URL);
-      const logoBuffer = logoResponse.ok ? Buffer.from(await logoResponse.arrayBuffer()) : null;
-      console.log(`[Step 3b] ✅ Logo fetched. Size: ${logoBuffer ? logoBuffer.length : 0} bytes`);
-
-      console.log('[Step 4] 🎨 Composing final image with sharp SVG...');
-      onProgress?.('composing', `🎨 Composing image...`);
-      const finalImage = await this.addTextAndLogoToImage(baseImageBuffer, logoBuffer, aiContent, zodiac.name, period);
-      console.log(`[Step 4] ✅ Image composed successfully. Final size: ${finalImage.length} bytes`);
-
-      console.log('[Step 5] ☁️ Uploading composed image to Supabase storage...');
-      onProgress?.('uploading', `☁️ Uploading composed image to storage...`);
-      const fileName = `post-${zodiac.name.toLowerCase()}-${Date.now()}.jpg`;
-      const uploadPath = `posts/${fileName}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET_NAME)
-        .upload(uploadPath, finalImage, { contentType: 'image/jpeg', upsert: false });
-        
-      if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
-      console.log(`[Step 5a] ✅ Uploaded to Supabase. Path: ${uploadPath}`);
-      
-      const publicUrl = supabase.storage.from(BUCKET_NAME).getPublicUrl(uploadPath).data.publicUrl;
-      console.log(`[Step 5b] ✅ Public URL generated: ${publicUrl}`);
-      
-      const caption = `${aiContent.text1}\n\n${aiContent.text2}\n\n${aiContent.hashtags.join(' ')}`;
-      console.log(`[Step 5c] ✅ Caption prepared. Length: ${caption.length}`);
-
-      console.log('[Step 6] 📤 Publishing to Instagram via Adapter...');
-      onProgress?.('publishing', `📤 Publishing to Instagram...`);
-      const publishResult = await this.instagramAdapter.publishPost(publicUrl, caption);
-      
-      if (!publishResult.success) {
-        throw new Error(`Publish failed: ${publishResult.error}`);
-      }
-
-      console.log('[Step 7] 🎉 Auto Create & Publish completed successfully!');
-      onProgress?.('done', `✅ Successfully published ${zodiac.name} post!`);
-      return { 
-        success: true, 
-        postId: publishResult.postId, 
-        instagramUrl: `https://www.instagram.com/p/${publishResult.postId}`, 
-        zodiac: zodiac.name 
-      };
-
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      console.error('\n❌ [InstagramAgent] CRITICAL FAILURE:', errorMsg);
-      onProgress?.('error', `❌ Failed: ${errorMsg}`);
-      return { success: false, error: errorMsg };
-    }
+    ... (ადრინდელი კოდი) ...
     */
   }
 
+  // ✅ კომენტარად არის გადაყვანილი, რადგან მხოლოდ გათიშულ autoCreateAndPublish-ში გამოიყენებოდა
+  /*
   private async addTextAndLogoToImage(
     baseBuffer: Buffer, 
     logoBuffer: Buffer | null, 
@@ -200,6 +131,7 @@ export class InstagramAgent {
     console.log(`[addTextAndLogoToImage] Final image composited. Size: ${finalBuffer.length} bytes`);
     return finalBuffer;
   }
+  */
 
   private wrapTextForSvg(text: string, maxCharsPerLine: number): string {
     const lines = this.wrapText(text, maxCharsPerLine);
