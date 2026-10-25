@@ -120,7 +120,6 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ განახლებული FrameBox: დამატებულია 8 resize handle (4 კუთხე + 4 მხარე)
 function FrameBox({ 
   frame, 
   onUpdatePosition,
@@ -229,21 +228,17 @@ function FrameBox({
         let newWidth = resizeStart.width;
         let newHeight = resizeStart.height;
 
-        // მარჯვენა მხარე
         if (resizeHandle.includes('e')) {
           newWidth = Math.max(10, Math.min(100 - newLeft, resizeStart.width + deltaWidthPercent));
         }
-        // მარცხენა მხარე
         if (resizeHandle.includes('w')) {
           const deltaLeft = deltaWidthPercent;
           newLeft = Math.max(0, resizeStart.left + deltaLeft);
           newWidth = Math.max(10, resizeStart.width - deltaLeft);
         }
-        // ქვედა მხარე
         if (resizeHandle.includes('s')) {
           newHeight = Math.max(5, Math.min(100 - newTop, resizeStart.height + deltaHeightPercent));
         }
-        // ზედა მხარე
         if (resizeHandle.includes('n')) {
           const deltaTop = deltaHeightPercent;
           newTop = Math.max(0, resizeStart.top + deltaTop);
@@ -276,20 +271,6 @@ function FrameBox({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, isResizing, resizeHandle, dragStart, resizeStart, frame.position, onUpdatePosition, containerRef, frame.id]);
-
-  const getCursorStyle = (handle: ResizeHandle): string => {
-    const cursors: Record<ResizeHandle, string> = {
-      nw: 'nw-resize',
-      n: 'n-resize',
-      ne: 'ne-resize',
-      w: 'w-resize',
-      e: 'e-resize',
-      sw: 'sw-resize',
-      s: 's-resize',
-      se: 'se-resize',
-    };
-    return cursors[handle];
-  };
 
   const getHandlePosition = (handle: ResizeHandle): React.CSSProperties => {
     const base: React.CSSProperties = {
@@ -328,7 +309,6 @@ function FrameBox({
       }}
       onMouseDown={handleMouseDown}
     >
-      {/* ✅ 8 Resize Handles */}
       {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
         <div
           key={handle}
@@ -601,7 +581,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return null; 
     }
     setIsGeneratingText1(true);
-    addLog(` ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateViralText1(targetZodiac.name, config);
       setText1(generatedText);
@@ -656,7 +636,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
     addLog(`🔖 Operation ID: ${newOpId}`);
-    addLog(` Timestamp: ${new Date().toISOString()}`);
+    addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
 
     if (isPublishing) {
       addLog(`⚠️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
@@ -741,7 +721,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       
       addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`, "success");
       addLog(`✅ URL: ${publicUrl}`, "success");
-      addLog(`\n ========== UPLOAD PROCESS COMPLETED ==========\n`);
+      addLog(`\n🏁 ========== UPLOAD PROCESS COMPLETED ==========\n`);
       
       setUploadedImageUrl(publicUrl);
       return publicUrl;
@@ -829,7 +809,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
 
         addLog(`✅ Database record created`);
-        addLog(` შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
+        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
         return true;
@@ -887,7 +867,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         .single();
 
       if (configError || !config) {
-        addLog(`️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
+        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
       } else {
         addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
       }
@@ -1185,7 +1165,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
