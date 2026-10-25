@@ -250,6 +250,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     align: 'left',
   });
 
+  // ✅ ახალი: ზოდიაქოს ნიშნის სახელის პოზიცია
+  const [zodiacNamePosition, setZodiacNamePosition] = useState<TextPosition>({
+    top: 50,
+    left: 5,
+    width: 50,
+    fontSize: 18,
+    align: 'left',
+  });
+
   const [datePosition, setDatePosition] = useState<TextPosition>({
     top: 92,
     left: 50,
@@ -725,7 +734,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       </div>
                     </div>
                   )}
-                  {(text1 || text2) && (
+                  {(text1 || text2 || selectedZodiac) && (
                     <div className="absolute inset-0 pointer-events-none z-10">
                       {text1 && (
                         <div 
@@ -755,6 +764,30 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                           </div>
                         </div>
                       )}
+                      
+                      {/* ✅ ახალი: ზოდიაქოს ნიშნის სახელი */}
+                      {selectedZodiac && (
+                        <div 
+                          className="absolute transition-all duration-300" 
+                          style={{ 
+                            top: `${zodiacNamePosition.top}%`, 
+                            left: `${zodiacNamePosition.left}%`,
+                            width: `${zodiacNamePosition.width}%`,
+                            textAlign: zodiacNamePosition.align,
+                          }}
+                        >
+                          <div 
+                            className="text-[#000000] font-serif font-bold uppercase tracking-wider" 
+                            style={{ 
+                              fontSize: `${zodiacNamePosition.fontSize}px`,
+                              lineHeight: '1.4',
+                            }}
+                          >
+                            {selectedZodiac.name}
+                          </div>
+                        </div>
+                      )}
+
                       {text2 && (
                         <div 
                           className="absolute transition-all duration-300" 
@@ -815,8 +848,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       }}
                     >
                       <div 
-                        className="text-[#000000] font-serif" 
-                        style={{ fontSize: `${telegramPosition.fontSize}px` }}
+                        className="font-serif font-medium" 
+                        style={{ 
+                          fontSize: `${telegramPosition.fontSize}px`,
+                          color: '#FFFFFF', // ✅ შეცვლილია ღია (თეთრ) ფერზე
+                          textShadow: '0 1px 3px rgba(0,0,0,0.8)', // ✅ ჩრდილი უკეთესი ხილვადობისთვის მუქ ფონზე
+                        }}
                       >
                         {telegramLink}
                       </div>
@@ -828,8 +865,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   <div className="grid grid-cols-2 gap-2">
                     <div>Text1: top={text1Position.top}%, left={text1Position.left}%, font={text1Position.fontSize}px</div>
                     <div>Text2: top={text2Position.top}%, left={text2Position.left}%, font={text2Position.fontSize}px</div>
+                    <div>Zodiac: top={zodiacNamePosition.top}%, font={zodiacNamePosition.fontSize}px</div>
                     <div>Date: top={datePosition.top}%, font={datePosition.fontSize}px</div>
-                    <div>Format: {selectedFormat} ({activeFormatOption?.ratio})</div>
                   </div>
                 </div>
 
@@ -868,6 +905,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 {showDate && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <PositionControl label="Date Position" position={datePosition} onChange={setDatePosition} />
+                  </div>
+                )}
+                {selectedZodiac && (
+                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
+                    <PositionControl label="Zodiac Name Position" position={zodiacNamePosition} onChange={setZodiacNamePosition} />
                   </div>
                 )}
                 {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
