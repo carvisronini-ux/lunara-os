@@ -250,7 +250,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     align: 'left',
   });
 
-  // ✅ ახალი: ზოდიაქოს ნიშნის სახელის პოზიცია
   const [zodiacNamePosition, setZodiacNamePosition] = useState<TextPosition>({
     top: 50,
     left: 5,
@@ -734,91 +733,95 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       </div>
                     </div>
                   )}
-                  {(text1 || text2 || selectedZodiac) && (
-                    <div className="absolute inset-0 pointer-events-none z-10">
-                      {text1 && (
-                        <div 
-                          className="absolute transition-all duration-300" 
-                          style={{ 
-                            top: `${text1Position.top}%`, 
-                            left: `${text1Position.left}%`,
-                            width: `${text1Position.width}%`,
-                            textAlign: text1Position.align,
-                          }}
-                        >
-                          <div 
-                            className="text-[#000000] font-serif italic tracking-wide font-medium" 
-                            style={{ 
-                              fontSize: `${text1Position.fontSize}px`, 
-                              wordWrap: 'break-word', 
-                              overflowWrap: 'break-word', 
-                              wordBreak: 'break-word', 
-                              lineHeight: '1.3',
-                              display: '-webkit-box', 
-                              WebkitLineClamp: 2, 
-                              WebkitBoxOrient: 'vertical', 
-                              overflow: 'hidden' 
-                            }}
-                          >
-                            {text1}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* ✅ ახალი: ზოდიაქოს ნიშნის სახელი */}
-                      {selectedZodiac && (
-                        <div 
-                          className="absolute transition-all duration-300" 
-                          style={{ 
-                            top: `${zodiacNamePosition.top}%`, 
-                            left: `${zodiacNamePosition.left}%`,
-                            width: `${zodiacNamePosition.width}%`,
-                            textAlign: zodiacNamePosition.align,
-                          }}
-                        >
-                          <div 
-                            className="text-[#000000] font-serif font-bold uppercase tracking-wider" 
-                            style={{ 
-                              fontSize: `${zodiacNamePosition.fontSize}px`,
-                              lineHeight: '1.4',
-                            }}
-                          >
-                            {selectedZodiac.name}
-                          </div>
-                        </div>
-                      )}
-
-                      {text2 && (
-                        <div 
-                          className="absolute transition-all duration-300" 
-                          style={{ 
-                            top: `${text2Position.top}%`, 
-                            left: `${text2Position.left}%`,
-                            width: `${text2Position.width}%`,
-                            textAlign: text2Position.align,
-                          }}
-                        >
-                          <div 
-                            className="text-[#000000] font-serif" 
-                            style={{ 
-                              fontSize: `${text2Position.fontSize}px`, 
-                              wordWrap: 'break-word', 
-                              overflowWrap: 'break-word', 
-                              wordBreak: 'break-word', 
-                              lineHeight: '1.4',
-                              whiteSpace: 'normal', 
-                              display: '-webkit-box', 
-                              WebkitLineClamp: 5, 
-                              WebkitBoxOrient: 'vertical', 
-                              overflow: 'hidden' 
-                            }}
-                          >
-                            {text2}
-                          </div>
-                        </div>
-                      )}
+                  
+                  {/* ✅ ახალი: ხილული ჩარჩოები (Text Boxes) პოზიციონირებისთვის */}
+                  <div className="absolute inset-0 pointer-events-none z-10">
+                    
+                    {/* Text 1 Box */}
+                    <div 
+                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-violet)]/60 bg-[var(--p-violet)]/10 rounded-md"
+                      style={{ 
+                        top: `${text1Position.top}%`, 
+                        left: `${text1Position.left}%`,
+                        width: `${text1Position.width}%`,
+                        minHeight: '3em',
+                      }}
+                    >
+                      <div 
+                        className="text-[#000000] font-serif italic tracking-wide font-medium p-2"
+                        style={{ 
+                          fontSize: `${text1Position.fontSize}px`, 
+                          textAlign: text1Position.align,
+                          wordWrap: 'break-word', 
+                          overflowWrap: 'break-word', 
+                          wordBreak: 'break-word', 
+                          lineHeight: '1.3',
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 2, 
+                          WebkitBoxOrient: 'vertical', 
+                          overflow: 'hidden' 
+                        }}
+                      >
+                        {text1 || "Text 1 Hook"}
+                      </div>
                     </div>
-                  )}
+
+                    {/* Zodiac Name Box */}
+                    {selectedZodiac && (
+                      <div 
+                        className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-ok)]/60 bg-[var(--p-ok)]/10 rounded-md"
+                        style={{ 
+                          top: `${zodiacNamePosition.top}%`, 
+                          left: `${zodiacNamePosition.left}%`,
+                          width: `${zodiacNamePosition.width}%`,
+                          minHeight: '2em',
+                        }}
+                      >
+                        <div 
+                          className="text-[#000000] font-serif font-bold uppercase tracking-wider p-2" 
+                          style={{ 
+                            fontSize: `${zodiacNamePosition.fontSize}px`,
+                            textAlign: zodiacNamePosition.align,
+                            lineHeight: '1.4',
+                          }}
+                        >
+                          {selectedZodiac.name}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Text 2 Box */}
+                    <div 
+                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-warn)]/60 bg-[var(--p-warn)]/10 rounded-md"
+                      style={{ 
+                        top: `${text2Position.top}%`, 
+                        left: `${text2Position.left}%`,
+                        width: `${text2Position.width}%`,
+                        minHeight: '4em',
+                      }}
+                    >
+                      <div 
+                        className="text-[#000000] font-serif p-2" 
+                        style={{ 
+                          fontSize: `${text2Position.fontSize}px`, 
+                          textAlign: text2Position.align,
+                          wordWrap: 'break-word', 
+                          overflowWrap: 'break-word', 
+                          wordBreak: 'break-word', 
+                          lineHeight: '1.4',
+                          whiteSpace: 'normal', 
+                          display: '-webkit-box', 
+                          WebkitLineClamp: 5, 
+                          WebkitBoxOrient: 'vertical', 
+                          overflow: 'hidden' 
+                        }}
+                      >
+                        {text2 || "Text 2 Forecast"}
+                      </div>
+                    </div>
+
+                  </div>
+
                   {(showDate || showWeekRange) && (
                     <div 
                       className="absolute z-20 transition-all duration-300" 
@@ -851,8 +854,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                         className="font-serif font-medium" 
                         style={{ 
                           fontSize: `${telegramPosition.fontSize}px`,
-                          color: '#FFFFFF', // ✅ შეცვლილია ღია (თეთრ) ფერზე
-                          textShadow: '0 1px 3px rgba(0,0,0,0.8)', // ✅ ჩრდილი უკეთესი ხილვადობისთვის მუქ ფონზე
+                          color: '#FFFFFF',
+                          textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                         }}
                       >
                         {telegramLink}
