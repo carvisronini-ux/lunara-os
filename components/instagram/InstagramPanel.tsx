@@ -119,10 +119,9 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ განახლებული FrameBox Drag & Drop ფუნქციონალით
+// ✅ გამარტივებული FrameBox: წაშლილია დროფდაუნი, დამატებულია კაშკაშა ჩარჩო
 function FrameBox({ 
   frame, 
-  onUpdateType, 
   onUpdatePosition,
   containerRef,
   text1,
@@ -132,7 +131,6 @@ function FrameBox({
   telegramText,
 }: { 
   frame: Frame;
-  onUpdateType: (id: string, type: FrameType) => void;
   onUpdatePosition: (id: string, pos: TextPosition) => void;
   containerRef: React.RefObject<HTMLDivElement>;
   text1: string;
@@ -141,26 +139,16 @@ function FrameBox({
   dateText: string;
   telegramText: string;
 }) {
-  const [showDropdown, setShowDropdown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, left: 0, top: 0 });
 
-  const frameColors: Record<FrameType, string> = {
-    text1: 'var(--p-violet)',
-    text2: 'var(--p-warn)',
-    zodiac: 'var(--p-ok)',
-    date: '#60a5fa',
-    telegram: '#f472b6',
-    none: 'var(--p-mute)',
-  };
-
   const frameLabels: Record<FrameType, string> = {
-    text1: 'Text 1 (Hook)',
-    text2: 'Text 2 (Forecast)',
+    text1: 'Text 1',
+    text2: 'Text 2',
     zodiac: 'Zodiac Name',
     date: 'Date',
-    telegram: 'Telegram Link',
-    none: 'Empty Frame',
+    telegram: 'Telegram',
+    none: 'Frame',
   };
 
   const currentText = () => {
@@ -174,11 +162,9 @@ function FrameBox({
     }
   };
 
-  const color = frameColors[frame.type];
   const label = frameLabels[frame.type];
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // არ დავიწყოთ dragging თუ ღილაკზე (მაგ. settings) დააჭირა
     if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     if (!containerRef.current) return;
@@ -225,71 +211,23 @@ function FrameBox({
 
   return (
     <div 
-      className={`absolute transition-all duration-75 border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50 shadow-2xl' : 'cursor-grab z-10'}`}
+      className={`absolute transition-all duration-75 border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab z-20'}`}
       style={{ 
         top: `${frame.position.top}%`, 
         left: `${frame.position.left}%`,
         width: `${frame.position.width}%`,
         height: `${frame.position.height}%`,
-        borderColor: `${color}99`,
-        backgroundColor: `${color}15`,
+        borderColor: '#fbbf24', // კაშკაშა ყვითელი/ქარვისფერი კანი
+        backgroundColor: 'rgba(251, 191, 36, 0.1)', // მსუბუქი ფონი
+        boxShadow: '0 0 8px rgba(251, 191, 36, 0.6)', // ნათელი ვარდნა (glow) ფონისგან გამოსაყოფად
       }}
       onMouseDown={handleMouseDown}
     >
-      <div className="absolute top-1 right-1 z-30">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDropdown(!showDropdown);
-          }}
-          className="w-6 h-6 rounded bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors"
-          title="Change frame type"
-        >
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </button>
-
-        {showDropdown && (
-          <div 
-            className="absolute top-8 right-0 bg-[var(--p-ink)] border border-[var(--p-line-2)] rounded-lg shadow-xl z-40 min-w-[160px]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-2 border-b border-[var(--p-line)]">
-              <span className="text-[10px] text-[var(--p-mute)] font-semibold uppercase">Set as:</span>
-            </div>
-            <div className="p-1">
-              {(['text1', 'text2', 'zodiac', 'date', 'telegram', 'none'] as FrameType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    onUpdateType(frame.id, type);
-                    setShowDropdown(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 rounded text-xs transition-colors flex items-center gap-2 ${
-                    frame.type === type 
-                      ? 'bg-[var(--p-violet)]/20 text-[var(--p-moon)]' 
-                      : 'text-[var(--p-mute)] hover:bg-white/5'
-                  }`}
-                >
-                  <span 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: frameColors[type] }}
-                  />
-                  {frameLabels[type]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
       <div 
-        className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold pointer-events-none"
+        className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold pointer-events-none"
         style={{ 
-          backgroundColor: `${color}40`,
-          color: color,
+          backgroundColor: '#fbbf24',
+          color: '#000000',
         }}
       >
         {label}
@@ -464,7 +402,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  // ✅ თავიდან ცარიელია, მომხმარებელი თვითონ ამატებს ჩარჩოებს
   const [frames, setFrames] = useState<Frame[]>([]);
 
   const operationIdRef = useRef<string | null>(null);
@@ -488,7 +425,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
 
-  // ✅ ახალი ჩარჩოს დამატება
   const addFrame = (type: FrameType) => {
     const newFrame: Frame = {
       id: `frame-${Date.now()}`,
@@ -501,11 +437,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const getFrameByType = (type: FrameType): Frame | undefined => {
     return frames.find(f => f.type === type);
-  };
-
-  const updateFrameType = (id: string, newType: FrameType) => {
-    setFrames(prev => prev.map(f => f.id === id ? { ...f, type: newType } : f));
-    addLog(`🔧 Frame type changed to: ${newType}`, "debug");
   };
 
   const updateFramePosition = (id: string, newPosition: TextPosition) => {
@@ -965,13 +896,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                     </div>
                   )}
                   
-                  {/* ✅ Drag & Drop Frames */}
                   <div className="absolute inset-0 z-10">
                     {frames.map((frame) => (
                       <FrameBox
                         key={frame.id}
                         frame={frame}
-                        onUpdateType={updateFrameType}
                         onUpdatePosition={updateFramePosition}
                         containerRef={previewRef}
                         text1={text1}
@@ -1052,27 +981,53 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
               <Section title="Design elements">
                 <div className="divide-y divide-[var(--p-line)]">
-                  <div className="flex items-center justify-between py-2.5 first:pt-0"><span className="text-sm">Today&apos;s date</span><Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} /></div>
-                  <div className="flex items-center justify-between py-2.5"><span className="text-sm">One-week forecast</span><Toggle on={showWeekRange} label="One-week forecast" onClick={() => { setShowWeekRange(!showWeekRange); if (!showWeekRange) setShowDate(true); }} /></div>
-                  <div className="flex items-center justify-between py-2.5"><span className="text-sm">Telegram channel link</span><Toggle on={showTelegramLink} label="Telegram channel link" onClick={() => setShowTelegramLink(!showTelegramLink)} /></div>
-                  <div className="flex items-center justify-between py-2.5 last:pb-0"><span className="text-sm">Channel logo</span><Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} /></div>
+                  <div className="flex items-center justify-between py-2.5 first:pt-0">
+                    <span className="text-sm">Today&apos;s date</span>
+                    <div className="flex items-center gap-2">
+                      <Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} />
+                      <button onClick={() => addFrame('date')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
+                        ＋ ჩარჩო
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <span className="text-sm">Zodiac Name</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => addFrame('zodiac')} disabled={!selectedZodiac} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5 disabled:opacity-30`}>
+                        ＋ ჩარჩო
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5">
+                    <span className="text-sm">Telegram channel link</span>
+                    <div className="flex items-center gap-2">
+                      <Toggle on={showTelegramLink} label="Telegram channel link" onClick={() => setShowTelegramLink(!showTelegramLink)} />
+                      <button onClick={() => addFrame('telegram')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
+                        ＋ ჩარჩო
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between py-2.5 last:pb-0">
+                    <span className="text-sm">Channel logo</span>
+                    <Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} />
+                  </div>
                 </div>
                 
-                {showTelegramLink && (
-                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram Link</label>
-                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/yourchannel" className={`${fieldClass} py-2 font-mono text-xs`} />
-                    {telegramFrame && <div className="mt-3"><PositionControl label="Telegram Frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} /></div>}
-                  </div>
-                )}
-                {showDate && dateFrame && (
+                {dateFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <PositionControl label="Date Frame" position={dateFrame.position} onChange={(pos) => updateFramePosition(dateFrame.id, pos)} />
                   </div>
                 )}
-                {selectedZodiac && zodiacFrame && (
+                {zodiacFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <PositionControl label="Zodiac Name Frame" position={zodiacFrame.position} onChange={(pos) => updateFramePosition(zodiacFrame.id, pos)} />
+                  </div>
+                )}
+                {showTelegramLink && telegramFrame && (
+                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
+                    <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram Link</label>
+                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/yourchannel" className={`${fieldClass} py-2 font-mono text-xs mb-3`} />
+                    <PositionControl label="Telegram Frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} />
                   </div>
                 )}
                 {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
@@ -1093,7 +1048,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   setText2("");
                   setUploadedImageUrl(null);
                   setLogs([]);
-                  setFrames([]); // ✅ ჩარჩოების გასუფთავებაც
+                  setFrames([]);
                   addLog("🔄 ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
                 }} 
                 className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]"
