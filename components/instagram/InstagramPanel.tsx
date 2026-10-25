@@ -11,7 +11,6 @@ type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 type TextAlign = "left" | "center" | "right";
 
-// ✅ ახალი: Frame ტიპები
 type FrameType = "text1" | "text2" | "zodiac" | "date" | "telegram" | "none";
 
 interface TextPosition {
@@ -23,7 +22,6 @@ interface TextPosition {
   align: TextAlign;
 }
 
-// ✅ ახალი: Frame interface
 interface Frame {
   id: string;
   type: FrameType;
@@ -121,11 +119,10 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ ახალი: FrameBox კომპონენტი dropdown-ით
+// ✅ გამოსწორებული: წაშლილია გამოუყენებელი onUpdatePosition
 function FrameBox({ 
   frame, 
   onUpdateType, 
-  onUpdatePosition,
   text1,
   text2,
   zodiacName,
@@ -134,7 +131,6 @@ function FrameBox({
 }: { 
   frame: Frame;
   onUpdateType: (id: string, type: FrameType) => void;
-  onUpdatePosition: (id: string, pos: TextPosition) => void;
   text1: string;
   text2: string;
   zodiacName: string;
@@ -187,7 +183,6 @@ function FrameBox({
         backgroundColor: `${color}15`,
       }}
     >
-      {/* ✅ Settings ღილაკი ზედა მარჯვენა კუთხეში */}
       <div className="absolute top-1 right-1 z-30">
         <button
           onClick={(e) => {
@@ -203,7 +198,6 @@ function FrameBox({
           </svg>
         </button>
 
-        {/* ✅ Dropdown */}
         {showDropdown && (
           <div 
             className="absolute top-8 right-0 bg-[var(--p-ink)] border border-[var(--p-line-2)] rounded-lg shadow-xl z-40 min-w-[160px]"
@@ -238,7 +232,6 @@ function FrameBox({
         )}
       </div>
 
-      {/* ✅ ჩარჩოს ლეიბლი (ზედა მარცხენა) */}
       <div 
         className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
         style={{ 
@@ -249,7 +242,6 @@ function FrameBox({
         {label}
       </div>
 
-      {/* ✅ ტექსტი ჩარჩოში */}
       <div 
         className="h-full flex items-center p-3"
         style={{ 
@@ -419,7 +411,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  // ✅ ახალი: Frames სისტემა
   const [frames, setFrames] = useState<Frame[]>([
     {
       id: 'frame-1',
@@ -469,14 +460,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
 
-  // ✅ Helper functions frames-ის მართვისთვის
   const getFrameByType = (type: FrameType): Frame | undefined => {
     return frames.find(f => f.type === type);
   };
 
   const updateFrameType = (id: string, newType: FrameType) => {
     setFrames(prev => prev.map(f => f.id === id ? { ...f, type: newType } : f));
-    addLog(` Frame ${id} type changed to: ${newType}`, "debug");
+    addLog(`🔧 Frame ${id} type changed to: ${newType}`, "debug");
   };
 
   const updateFramePosition = (id: string, newPosition: TextPosition) => {
@@ -526,7 +516,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return null; 
     }
     setIsGeneratingText1(true);
-    addLog(` ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateViralText1(targetZodiac.name, config);
       setText1(generatedText);
@@ -564,7 +554,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setIsGeneratingText2(false);
       return cleanedText;
     } catch (error) {
-      addLog(` შეცდომა Text 2-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
+      addLog(`❌ შეცდომა Text 2-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsGeneratingText2(false);
       return null;
     }
@@ -592,7 +582,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
 
-    addLog(` INPUT PARAMETERS:`);
+    addLog(`📋 INPUT PARAMETERS:`);
     addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
     addLog(`   • Format: ${targetFormat || 'NULL'}`);
     addLog(`   • Text1: "${text1.substring(0, 50)}..." (${text1.length} chars)`);
@@ -612,7 +602,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      addLog(` Capturing screenshot with html-to-image...`, "debug");
+      addLog(`📷 Capturing screenshot with html-to-image...`, "debug");
       const dataUrl = await toJpeg(previewRef.current, {
         quality: 1.0,
         cacheBust: true,
@@ -620,7 +610,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       });
 
       addLog(`✅ Screenshot captured! Data URL length: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
-      addLog(` [2/3] ვამზადებთ 1080x1350 ომის სურათს (Canvas Resize)...`, "info");
+      addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ზომის სურათს (Canvas Resize)...`, "info");
       
       const canvas = document.createElement('canvas');
       canvas.width = 1080;
@@ -710,7 +700,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return false;
     }
     
-    addLog(` [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
+    addLog(`🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
     
     try {
       const payload = {
@@ -754,7 +744,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
 
         addLog(`✅ Database record created`);
-        addLog(` შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
+        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
         return true;
@@ -826,7 +816,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setStep("preview");
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog(" ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
+      addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
       const t1 = await handleGenerateText1(zodiac, config);
       if (!t1) { addLog("❌ Text 1 generation failed. Aborting.", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
@@ -838,13 +828,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
-      if (!imgUrl) { addLog(" ატვირთვა ვერ მოხერხდა", "error"); return false; }
+      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
       await new Promise(r => setTimeout(r, 7000));
       
-      addLog(" ნაბიჯი 5: გამოქვეყნება...", "info");
+      addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
@@ -858,7 +848,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const activeFormatOption = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
 
-  // ✅ მივიღოთ frames ტიპების მიხედვით
   const text1Frame = getFrameByType('text1');
   const text2Frame = getFrameByType('text2');
   const zodiacFrame = getFrameByType('zodiac');
@@ -937,14 +926,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                     </div>
                   )}
                   
-                  {/* ✅ Smart Frames სისტემა */}
                   <div className="absolute inset-0 z-10">
                     {frames.map((frame) => (
                       <FrameBox
                         key={frame.id}
                         frame={frame}
                         onUpdateType={updateFrameType}
-                        onUpdatePosition={updateFramePosition}
                         text1={text1}
                         text2={text2}
                         zodiacName={selectedZodiac?.name || ''}
@@ -979,7 +966,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 )}
                 {!text1Frame && (
                   <div className="text-xs text-[var(--p-mute)] p-3 border border-dashed border-[var(--p-line-2)] rounded-lg">
-                    ️ No frame assigned to Text 1. Click ⚙️ on a frame in preview and select "Text 1 (Hook)"
+                    ⚠️ No frame assigned to Text 1. Click ⚙️ on a frame in preview and select "Text 1 (Hook)"
                   </div>
                 )}
               </Section>
@@ -1084,7 +1071,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('') || log.includes('⏳') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
