@@ -11,10 +11,12 @@ type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 type TextAlign = "left" | "center" | "right";
 
+// ✅ განახლებული: დამატებულია height ველი
 interface TextPosition {
   top: number;
   left: number;
   width: number;
+  height: number; // ახალი ველი
   fontSize: number;
   align: TextAlign;
 }
@@ -110,6 +112,7 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
+// ✅ განახლებული: დამატებულია Height კონტროლი
 function PositionControl({ 
   label, 
   position, 
@@ -124,7 +127,7 @@ function PositionControl({
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[var(--p-moon)]">{label}</span>
         <button 
-          onClick={() => onChange({ top: 50, left: 50, width: 80, fontSize: 24, align: 'center' })}
+          onClick={() => onChange({ top: 50, left: 50, width: 80, height: 20, fontSize: 24, align: 'center' })}
           className="text-[10px] text-[var(--p-violet)] hover:underline"
         >
           Reset
@@ -161,6 +164,18 @@ function PositionControl({
             onChange={(e) => onChange({ ...position, width: Number(e.target.value) })}
             className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
             min="10"
+            max="100"
+          />
+        </div>
+        {/* ✅ ახალი: Height კონტროლი */}
+        <div>
+          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Height (%)</label>
+          <input
+            type="number"
+            value={position.height}
+            onChange={(e) => onChange({ ...position, height: Number(e.target.value) })}
+            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
+            min="5"
             max="100"
           />
         </div>
@@ -234,10 +249,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
+  // ✅ განახლებული: დამატებულია height საწყის მნიშვნელობებში
   const [text1Position, setText1Position] = useState<TextPosition>({
-    top: 40,
+    top: 10,
     left: 5,
     width: 50,
+    height: 15, // ახალი
     fontSize: 24,
     align: 'left',
   });
@@ -246,6 +263,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     top: 60,
     left: 5,
     width: 50,
+    height: 25, // ახალი
     fontSize: 20,
     align: 'left',
   });
@@ -254,6 +272,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     top: 50,
     left: 5,
     width: 50,
+    height: 10, // ახალი
     fontSize: 18,
     align: 'left',
   });
@@ -262,6 +281,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     top: 92,
     left: 50,
     width: 90,
+    height: 5, // ახალი
     fontSize: 14,
     align: 'center',
   });
@@ -270,6 +290,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     top: 95,
     left: 50,
     width: 90,
+    height: 5, // ახალი
     fontSize: 12,
     align: 'center',
   });
@@ -294,7 +315,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   };
 
   useEffect(() => {
-    addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
+    addLog(` STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
   }, [step, selectedZodiac, selectedFormat]);
 
   useEffect(() => {
@@ -354,7 +375,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
     if (!targetZodiac) { 
-      addLog("❌ Please select a zodiac sign first!", "error"); 
+      addLog(" Please select a zodiac sign first!", "error"); 
       return null; 
     }
     setIsGeneratingText2(true);
@@ -605,7 +626,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         return false;
       }
 
-      addLog(`\n🤖 ========== AGENT STARTED ==========`);
+      addLog(`\n ========== AGENT STARTED ==========`);
       addLog(`🎯 Target Zodiac: ${zodiacName}`);
       
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
@@ -636,7 +657,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       setStep("preview");
       await new Promise(r => setTimeout(r, 1500));
 
-      addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
+      addLog(" ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
       const t1 = await handleGenerateText1(zodiac, config);
       if (!t1) { addLog("❌ Text 1 generation failed. Aborting.", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
@@ -648,13 +669,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
-      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); return false; }
+      if (!imgUrl) { addLog(" ატვირთვა ვერ მოხერხდა", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
       await new Promise(r => setTimeout(r, 7000));
       
-      addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
+      addLog(" ნაბიჯი 5: გამოქვეყნება...", "info");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
         addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
@@ -734,24 +755,25 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                     </div>
                   )}
                   
-                  {/* ✅ ახალი: ხილული ჩარჩოები (Text Boxes) პოზიციონირებისთვის */}
+                  {/* ✅ განახლებული: ხილული ჩარჩოები ფიქსირებული Height-ით */}
                   <div className="absolute inset-0 pointer-events-none z-10">
                     
                     {/* Text 1 Box */}
                     <div 
-                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-violet)]/60 bg-[var(--p-violet)]/10 rounded-md"
+                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-violet)]/60 bg-[var(--p-violet)]/10 rounded-md overflow-hidden"
                       style={{ 
                         top: `${text1Position.top}%`, 
                         left: `${text1Position.left}%`,
                         width: `${text1Position.width}%`,
-                        minHeight: '3em',
+                        height: `${text1Position.height}%`, // ✅ ფიქსირებული სიმაღლე
                       }}
                     >
                       <div 
-                        className="text-[#000000] font-serif italic tracking-wide font-medium p-2"
+                        className="text-[#000000] font-serif italic tracking-wide font-medium p-2 h-full flex items-center"
                         style={{ 
                           fontSize: `${text1Position.fontSize}px`, 
                           textAlign: text1Position.align,
+                          justifyContent: text1Position.align === 'center' ? 'center' : text1Position.align === 'right' ? 'flex-end' : 'flex-start',
                           wordWrap: 'break-word', 
                           overflowWrap: 'break-word', 
                           wordBreak: 'break-word', 
@@ -769,19 +791,20 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                     {/* Zodiac Name Box */}
                     {selectedZodiac && (
                       <div 
-                        className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-ok)]/60 bg-[var(--p-ok)]/10 rounded-md"
+                        className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-ok)]/60 bg-[var(--p-ok)]/10 rounded-md overflow-hidden"
                         style={{ 
                           top: `${zodiacNamePosition.top}%`, 
                           left: `${zodiacNamePosition.left}%`,
                           width: `${zodiacNamePosition.width}%`,
-                          minHeight: '2em',
+                          height: `${zodiacNamePosition.height}%`, // ✅ ფიქსირებული სიმაღლე
                         }}
                       >
                         <div 
-                          className="text-[#000000] font-serif font-bold uppercase tracking-wider p-2" 
+                          className="text-[#000000] font-serif font-bold uppercase tracking-wider p-2 h-full flex items-center" 
                           style={{ 
                             fontSize: `${zodiacNamePosition.fontSize}px`,
                             textAlign: zodiacNamePosition.align,
+                            justifyContent: zodiacNamePosition.align === 'center' ? 'center' : zodiacNamePosition.align === 'right' ? 'flex-end' : 'flex-start',
                             lineHeight: '1.4',
                           }}
                         >
@@ -792,16 +815,16 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
                     {/* Text 2 Box */}
                     <div 
-                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-warn)]/60 bg-[var(--p-warn)]/10 rounded-md"
+                      className="absolute transition-all duration-300 border-2 border-dashed border-[var(--p-warn)]/60 bg-[var(--p-warn)]/10 rounded-md overflow-hidden"
                       style={{ 
                         top: `${text2Position.top}%`, 
                         left: `${text2Position.left}%`,
                         width: `${text2Position.width}%`,
-                        minHeight: '4em',
+                        height: `${text2Position.height}%`, // ✅ ფიქსირებული სიმაღლე
                       }}
                     >
                       <div 
-                        className="text-[#000000] font-serif p-2" 
+                        className="text-[#000000] font-serif p-2 h-full" 
                         style={{ 
                           fontSize: `${text2Position.fontSize}px`, 
                           textAlign: text2Position.align,
@@ -866,9 +889,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
                 <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono border border-[var(--p-line-2)] rounded-lg p-2 bg-[var(--p-ink-2)]">
                   <div className="grid grid-cols-2 gap-2">
-                    <div>Text1: top={text1Position.top}%, left={text1Position.left}%, font={text1Position.fontSize}px</div>
-                    <div>Text2: top={text2Position.top}%, left={text2Position.left}%, font={text2Position.fontSize}px</div>
-                    <div>Zodiac: top={zodiacNamePosition.top}%, font={zodiacNamePosition.fontSize}px</div>
+                    <div>Text1: top={text1Position.top}%, left={text1Position.left}%, w={text1Position.width}%, h={text1Position.height}%</div>
+                    <div>Text2: top={text2Position.top}%, left={text2Position.left}%, w={text2Position.width}%, h={text2Position.height}%</div>
+                    <div>Zodiac: top={zodiacNamePosition.top}%, left={zodiacNamePosition.left}%, w={zodiacNamePosition.width}%, h={zodiacNamePosition.height}%</div>
                     <div>Date: top={datePosition.top}%, font={datePosition.fontSize}px</div>
                   </div>
                 </div>
@@ -878,11 +901,11 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
             <div className="flex min-w-0 flex-col gap-4">
               <Section title="Text 1 · hook (max 2 lines)" actions={<><button onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button></>}>
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none mb-3`} />
-                <PositionControl label="Text 1 Position" position={text1Position} onChange={setText1Position} />
+                <PositionControl label="Text 1 Position (Frame)" position={text1Position} onChange={setText1Position} />
               </Section>
               <Section title="Text 2 · forecast (max 5 lines)" actions={<><button onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button></>}>
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none mb-3`} />
-                <PositionControl label="Text 2 Position" position={text2Position} onChange={setText2Position} />
+                <PositionControl label="Text 2 Position (Frame)" position={text2Position} onChange={setText2Position} />
               </Section>
               <Section title="Design elements">
                 <div className="divide-y divide-[var(--p-line)]">
@@ -912,7 +935,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 )}
                 {selectedZodiac && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <PositionControl label="Zodiac Name Position" position={zodiacNamePosition} onChange={setZodiacNamePosition} />
+                    <PositionControl label="Zodiac Name Position (Frame)" position={zodiacNamePosition} onChange={setZodiacNamePosition} />
                   </div>
                 )}
                 {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
@@ -952,9 +975,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]">
                     {logs.map((log, i) => {
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
-                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
-                      const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
+                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('');
+                      const isWarning = log.includes('️') || log.includes('ცარიელია');
+                      const isDebug = log.includes('') || log.includes('📝') || log.includes('⏳') || log.includes('');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
