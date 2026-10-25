@@ -12,6 +12,7 @@ type PostFormat = "post" | "story" | "carousel";
 type TextAlign = "left" | "center" | "right";
 
 type FrameType = "text1" | "text2" | "zodiac" | "date" | "telegram" | "none";
+type ResizeHandle = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se";
 
 interface TextPosition {
   top: number;
@@ -119,7 +120,7 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ გამარტივებული FrameBox: წაშლილია დროფდაუნი, დამატებულია კაშკაშა ჩარჩო
+// ✅ განახლებული FrameBox: დამატებულია 8 resize handle (4 კუთხე + 4 მხარე)
 function FrameBox({ 
   frame, 
   onUpdatePosition,
@@ -140,7 +141,10 @@ function FrameBox({
   telegramText: string;
 }) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, left: 0, top: 0 });
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, top: 0, left: 0, width: 0, height: 0 });
 
   const frameLabels: Record<FrameType, string> = {
     text1: 'Text 1',
@@ -165,7 +169,7 @@ function FrameBox({
   const label = frameLabels[frame.type];
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('.resize-handle')) return;
     e.preventDefault();
     if (!containerRef.current) return;
     
@@ -178,27 +182,91 @@ function FrameBox({
     });
   };
 
+  const handleResizeMouseDown = (e: React.MouseEvent, handle: ResizeHandle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!containerRef.current) return;
+    
+    setIsResizing(true);
+    setResizeHandle(handle);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      top: frame.position.top,
+      left: frame.position.left,
+      width: frame.position.width,
+      height: frame.position.height,
+    });
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !containerRef.current) return;
+      if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-      const deltaX = e.clientX - dragStart.x;
-      const deltaY = e.clientY - dragStart.y;
-      
-      const deltaLeftPercent = (deltaX / rect.width) * 100;
-      const deltaTopPercent = (deltaY / rect.height) * 100;
 
-      const newLeft = Math.max(0, Math.min(100 - frame.position.width, dragStart.left + deltaLeftPercent));
-      const newTop = Math.max(0, Math.min(100 - frame.position.height, dragStart.top + deltaTopPercent));
+      if (isDragging) {
+        const deltaX = e.clientX - dragStart.x;
+        const deltaY = e.clientY - dragStart.y;
+        
+        const deltaLeftPercent = (deltaX / rect.width) * 100;
+        const deltaTopPercent = (deltaY / rect.height) * 100;
 
-      onUpdatePosition(frame.id, { ...frame.position, left: newLeft, top: newTop });
+        const newLeft = Math.max(0, Math.min(100 - frame.position.width, dragStart.left + deltaLeftPercent));
+        const newTop = Math.max(0, Math.min(100 - frame.position.height, dragStart.top + deltaTopPercent));
+
+        onUpdatePosition(frame.id, { ...frame.position, left: newLeft, top: newTop });
+      }
+
+      if (isResizing && resizeHandle) {
+        const deltaX = e.clientX - resizeStart.x;
+        const deltaY = e.clientY - resizeStart.y;
+        
+        const deltaWidthPercent = (deltaX / rect.width) * 100;
+        const deltaHeightPercent = (deltaY / rect.height) * 100;
+
+        let newLeft = resizeStart.left;
+        let newTop = resizeStart.top;
+        let newWidth = resizeStart.width;
+        let newHeight = resizeStart.height;
+
+        // მარჯვენა მხარე
+        if (resizeHandle.includes('e')) {
+          newWidth = Math.max(10, Math.min(100 - newLeft, resizeStart.width + deltaWidthPercent));
+        }
+        // მარცხენა მხარე
+        if (resizeHandle.includes('w')) {
+          const deltaLeft = deltaWidthPercent;
+          newLeft = Math.max(0, resizeStart.left + deltaLeft);
+          newWidth = Math.max(10, resizeStart.width - deltaLeft);
+        }
+        // ქვედა მხარე
+        if (resizeHandle.includes('s')) {
+          newHeight = Math.max(5, Math.min(100 - newTop, resizeStart.height + deltaHeightPercent));
+        }
+        // ზედა მხარე
+        if (resizeHandle.includes('n')) {
+          const deltaTop = deltaHeightPercent;
+          newTop = Math.max(0, resizeStart.top + deltaTop);
+          newHeight = Math.max(5, resizeStart.height - deltaTop);
+        }
+
+        onUpdatePosition(frame.id, { 
+          ...frame.position, 
+          left: newLeft, 
+          top: newTop, 
+          width: newWidth, 
+          height: newHeight 
+        });
+      }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      setIsResizing(false);
+      setResizeHandle(null);
     };
 
-    if (isDragging) {
+    if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
@@ -207,7 +275,44 @@ function FrameBox({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragStart, frame.position, onUpdatePosition, containerRef, frame.id]);
+  }, [isDragging, isResizing, resizeHandle, dragStart, resizeStart, frame.position, onUpdatePosition, containerRef, frame.id]);
+
+  const getCursorStyle = (handle: ResizeHandle): string => {
+    const cursors: Record<ResizeHandle, string> = {
+      nw: 'nw-resize',
+      n: 'n-resize',
+      ne: 'ne-resize',
+      w: 'w-resize',
+      e: 'e-resize',
+      sw: 'sw-resize',
+      s: 's-resize',
+      se: 'se-resize',
+    };
+    return cursors[handle];
+  };
+
+  const getHandlePosition = (handle: ResizeHandle): React.CSSProperties => {
+    const base: React.CSSProperties = {
+      position: 'absolute',
+      width: '10px',
+      height: '10px',
+      backgroundColor: '#ffffff',
+      border: '2px solid #fbbf24',
+      borderRadius: '2px',
+      zIndex: 30,
+    };
+
+    switch (handle) {
+      case 'nw': return { ...base, top: '-5px', left: '-5px', cursor: 'nw-resize' };
+      case 'n': return { ...base, top: '-5px', left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' };
+      case 'ne': return { ...base, top: '-5px', right: '-5px', cursor: 'ne-resize' };
+      case 'w': return { ...base, top: '50%', left: '-5px', transform: 'translateY(-50%)', cursor: 'w-resize' };
+      case 'e': return { ...base, top: '50%', right: '-5px', transform: 'translateY(-50%)', cursor: 'e-resize' };
+      case 'sw': return { ...base, bottom: '-5px', left: '-5px', cursor: 'sw-resize' };
+      case 's': return { ...base, bottom: '-5px', left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' };
+      case 'se': return { ...base, bottom: '-5px', right: '-5px', cursor: 'se-resize' };
+    }
+  };
 
   return (
     <div 
@@ -217,12 +322,22 @@ function FrameBox({
         left: `${frame.position.left}%`,
         width: `${frame.position.width}%`,
         height: `${frame.position.height}%`,
-        borderColor: '#fbbf24', // კაშკაშა ყვითელი/ქარვისფერი კანი
-        backgroundColor: 'rgba(251, 191, 36, 0.1)', // მსუბუქი ფონი
-        boxShadow: '0 0 8px rgba(251, 191, 36, 0.6)', // ნათელი ვარდნა (glow) ფონისგან გამოსაყოფად
+        borderColor: '#fbbf24',
+        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+        boxShadow: '0 0 8px rgba(251, 191, 36, 0.6)',
       }}
       onMouseDown={handleMouseDown}
     >
+      {/* ✅ 8 Resize Handles */}
+      {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
+        <div
+          key={handle}
+          className="resize-handle"
+          style={getHandlePosition(handle)}
+          onMouseDown={(e) => handleResizeMouseDown(e, handle)}
+        />
+      ))}
+
       <div 
         className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold pointer-events-none"
         style={{ 
@@ -486,7 +601,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return null; 
     }
     setIsGeneratingText1(true);
-    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(` ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateViralText1(targetZodiac.name, config);
       setText1(generatedText);
@@ -541,7 +656,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
     addLog(`🔖 Operation ID: ${newOpId}`);
-    addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
+    addLog(` Timestamp: ${new Date().toISOString()}`);
 
     if (isPublishing) {
       addLog(`⚠️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
@@ -626,7 +741,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       
       addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`, "success");
       addLog(`✅ URL: ${publicUrl}`, "success");
-      addLog(`\n🏁 ========== UPLOAD PROCESS COMPLETED ==========\n`);
+      addLog(`\n ========== UPLOAD PROCESS COMPLETED ==========\n`);
       
       setUploadedImageUrl(publicUrl);
       return publicUrl;
@@ -714,7 +829,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
 
         addLog(`✅ Database record created`);
-        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
+        addLog(` შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
         return true;
@@ -772,7 +887,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         .single();
 
       if (configError || !config) {
-        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
+        addLog(`️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
       } else {
         addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
       }
@@ -880,7 +995,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   <span className="font-semibold">Live preview</span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />
-                    Drag frames to position
+                    Drag & resize frames
                   </span>
                 </div>
                 
@@ -941,7 +1056,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none mb-3`} />
                 {text1Frame && (
                   <PositionControl 
-                    label={`Text 1 Frame (Drag on preview or adjust here)`} 
+                    label={`Text 1 Frame (Drag & resize on preview)`} 
                     position={text1Frame.position} 
                     onChange={(pos) => updateFramePosition(text1Frame.id, pos)} 
                   />
@@ -967,7 +1082,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none mb-3`} />
                 {text2Frame && (
                   <PositionControl 
-                    label={`Text 2 Frame (Drag on preview or adjust here)`} 
+                    label={`Text 2 Frame (Drag & resize on preview)`} 
                     position={text2Frame.position} 
                     onChange={(pos) => updateFramePosition(text2Frame.id, pos)} 
                   />
@@ -1070,7 +1185,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
