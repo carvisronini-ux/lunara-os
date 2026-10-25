@@ -119,10 +119,12 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ გამოსწორებული: წაშლილია გამოუყენებელი onUpdatePosition
+// ✅ განახლებული FrameBox Drag & Drop ფუნქციონალით
 function FrameBox({ 
   frame, 
   onUpdateType, 
+  onUpdatePosition,
+  containerRef,
   text1,
   text2,
   zodiacName,
@@ -131,6 +133,8 @@ function FrameBox({
 }: { 
   frame: Frame;
   onUpdateType: (id: string, type: FrameType) => void;
+  onUpdatePosition: (id: string, pos: TextPosition) => void;
+  containerRef: React.RefObject<HTMLDivElement>;
   text1: string;
   text2: string;
   zodiacName: string;
@@ -138,6 +142,8 @@ function FrameBox({
   telegramText: string;
 }) {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0, left: 0, top: 0 });
 
   const frameColors: Record<FrameType, string> = {
     text1: 'var(--p-violet)',
@@ -171,9 +177,55 @@ function FrameBox({
   const color = frameColors[frame.type];
   const label = frameLabels[frame.type];
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // არ დავიწყოთ dragging თუ ღილაკზე (მაგ. settings) დააჭირა
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    if (!containerRef.current) return;
+    
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX,
+      y: e.clientY,
+      left: frame.position.left,
+      top: frame.position.top,
+    });
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      
+      const deltaLeftPercent = (deltaX / rect.width) * 100;
+      const deltaTopPercent = (deltaY / rect.height) * 100;
+
+      const newLeft = Math.max(0, Math.min(100 - frame.position.width, dragStart.left + deltaLeftPercent));
+      const newTop = Math.max(0, Math.min(100 - frame.position.height, dragStart.top + deltaTopPercent));
+
+      onUpdatePosition(frame.id, { ...frame.position, left: newLeft, top: newTop });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragStart, frame.position, onUpdatePosition, containerRef, frame.id]);
+
   return (
     <div 
-      className="absolute transition-all duration-300 border-2 border-dashed rounded-md overflow-hidden group"
+      className={`absolute transition-all duration-75 border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50 shadow-2xl' : 'cursor-grab z-10'}`}
       style={{ 
         top: `${frame.position.top}%`, 
         left: `${frame.position.left}%`,
@@ -182,6 +234,7 @@ function FrameBox({
         borderColor: `${color}99`,
         backgroundColor: `${color}15`,
       }}
+      onMouseDown={handleMouseDown}
     >
       <div className="absolute top-1 right-1 z-30">
         <button
@@ -233,7 +286,7 @@ function FrameBox({
       </div>
 
       <div 
-        className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold"
+        className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold pointer-events-none"
         style={{ 
           backgroundColor: `${color}40`,
           color: color,
@@ -243,7 +296,7 @@ function FrameBox({
       </div>
 
       <div 
-        className="h-full flex items-center p-3"
+        className="h-full flex items-center p-2 pointer-events-none"
         style={{ 
           justifyContent: frame.position.align === 'center' ? 'center' : frame.position.align === 'right' ? 'flex-end' : 'flex-start',
           textAlign: frame.position.align,
@@ -290,7 +343,7 @@ function PositionControl({
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[var(--p-moon)]">{label}</span>
         <button 
-          onClick={() => onChange({ top: 50, left: 50, width: 80, height: 20, fontSize: 24, align: 'center' })}
+          onClick={() => onChange({ top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: 'center' })}
           className="text-[10px] text-[var(--p-violet)] hover:underline"
         >
           Reset
@@ -411,33 +464,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  const [frames, setFrames] = useState<Frame[]>([
-    {
-      id: 'frame-1',
-      type: 'text1',
-      position: { top: 10, left: 5, width: 50, height: 15, fontSize: 24, align: 'left' },
-    },
-    {
-      id: 'frame-2',
-      type: 'zodiac',
-      position: { top: 30, left: 5, width: 50, height: 10, fontSize: 18, align: 'left' },
-    },
-    {
-      id: 'frame-3',
-      type: 'text2',
-      position: { top: 45, left: 5, width: 50, height: 25, fontSize: 20, align: 'left' },
-    },
-    {
-      id: 'frame-4',
-      type: 'date',
-      position: { top: 85, left: 50, width: 90, height: 5, fontSize: 14, align: 'center' },
-    },
-    {
-      id: 'frame-5',
-      type: 'telegram',
-      position: { top: 92, left: 50, width: 90, height: 5, fontSize: 12, align: 'center' },
-    },
-  ]);
+  // ✅ თავიდან ცარიელია, მომხმარებელი თვითონ ამატებს ჩარჩოებს
+  const [frames, setFrames] = useState<Frame[]>([]);
 
   const operationIdRef = useRef<string | null>(null);
 
@@ -460,13 +488,24 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
 
+  // ✅ ახალი ჩარჩოს დამატება
+  const addFrame = (type: FrameType) => {
+    const newFrame: Frame = {
+      id: `frame-${Date.now()}`,
+      type,
+      position: { top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: 'center' }
+    };
+    setFrames(prev => [...prev, newFrame]);
+    addLog(`🖼️ Added new frame for ${type}`, "success");
+  };
+
   const getFrameByType = (type: FrameType): Frame | undefined => {
     return frames.find(f => f.type === type);
   };
 
   const updateFrameType = (id: string, newType: FrameType) => {
     setFrames(prev => prev.map(f => f.id === id ? { ...f, type: newType } : f));
-    addLog(`🔧 Frame ${id} type changed to: ${newType}`, "debug");
+    addLog(`🔧 Frame type changed to: ${newType}`, "debug");
   };
 
   const updateFramePosition = (id: string, newPosition: TextPosition) => {
@@ -910,7 +949,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   <span className="font-semibold">Live preview</span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />
-                    Click ⚙️ on frames to assign type
+                    Drag frames to position
                   </span>
                 </div>
                 
@@ -926,12 +965,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                     </div>
                   )}
                   
+                  {/* ✅ Drag & Drop Frames */}
                   <div className="absolute inset-0 z-10">
                     {frames.map((frame) => (
                       <FrameBox
                         key={frame.id}
                         frame={frame}
                         onUpdateType={updateFrameType}
+                        onUpdatePosition={updateFramePosition}
+                        containerRef={previewRef}
                         text1={text1}
                         text2={text2}
                         zodiacName={selectedZodiac?.name || ''}
@@ -944,7 +986,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
                 <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono border border-[var(--p-line-2)] rounded-lg p-2 bg-[var(--p-ink-2)]">
                   <div className="grid grid-cols-2 gap-2">
-                    {frames.filter(f => f.type !== 'none').map(frame => (
+                    {frames.length === 0 && <div className="col-span-2 text-center py-2">No frames added yet. Click "＋ ჩარჩო" below.</div>}
+                    {frames.map(frame => (
                       <div key={frame.id}>
                         {frame.type}: top={frame.position.top}%, left={frame.position.left}%, w={frame.position.width}%, h={frame.position.height}%
                       </div>
@@ -955,36 +998,58 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               </div>
             </div>
             <div className="flex min-w-0 flex-col gap-4">
-              <Section title="Text 1 · hook (max 2 lines)" actions={<><button onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button></>}>
+              <Section title="Text 1 · hook (max 2 lines)" actions={
+                <>
+                  <button onClick={() => addFrame('text1')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
+                    ＋ ჩარჩო
+                  </button>
+                  <button onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                    {isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}
+                  </button>
+                  <button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
+                </>
+              }>
                 <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none mb-3`} />
                 {text1Frame && (
                   <PositionControl 
-                    label={`Text 1 Frame (currently at top:${text1Frame.position.top}%, left:${text1Frame.position.left}%)`} 
+                    label={`Text 1 Frame (Drag on preview or adjust here)`} 
                     position={text1Frame.position} 
                     onChange={(pos) => updateFramePosition(text1Frame.id, pos)} 
                   />
                 )}
                 {!text1Frame && (
                   <div className="text-xs text-[var(--p-mute)] p-3 border border-dashed border-[var(--p-line-2)] rounded-lg">
-                    ⚠️ No frame assigned to Text 1. Click ⚙️ on a frame in preview and select "Text 1 (Hook)"
+                    ⚠️ No frame assigned. Click "＋ ჩარჩო" above to add one.
                   </div>
                 )}
               </Section>
-              <Section title="Text 2 · forecast (max 5 lines)" actions={<><button onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}</button><button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button></>}>
+              
+              <Section title="Text 2 · forecast (max 5 lines)" actions={
+                <>
+                  <button onClick={() => addFrame('text2')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
+                    ＋ ჩარჩო
+                  </button>
+                  <button onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
+                    {isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}
+                  </button>
+                  <button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
+                </>
+              }>
                 <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none mb-3`} />
                 {text2Frame && (
                   <PositionControl 
-                    label={`Text 2 Frame (currently at top:${text2Frame.position.top}%, left:${text2Frame.position.left}%)`} 
+                    label={`Text 2 Frame (Drag on preview or adjust here)`} 
                     position={text2Frame.position} 
                     onChange={(pos) => updateFramePosition(text2Frame.id, pos)} 
                   />
                 )}
                 {!text2Frame && (
                   <div className="text-xs text-[var(--p-mute)] p-3 border border-dashed border-[var(--p-line-2)] rounded-lg">
-                    ⚠️ No frame assigned to Text 2. Click ⚙️ on a frame in preview and select "Text 2 (Forecast)"
+                    ⚠️ No frame assigned. Click "＋ ჩარჩო" above to add one.
                   </div>
                 )}
               </Section>
+
               <Section title="Design elements">
                 <div className="divide-y divide-[var(--p-line)]">
                   <div className="flex items-center justify-between py-2.5 first:pt-0"><span className="text-sm">Today&apos;s date</span><Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} /></div>
@@ -992,44 +1057,22 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   <div className="flex items-center justify-between py-2.5"><span className="text-sm">Telegram channel link</span><Toggle on={showTelegramLink} label="Telegram channel link" onClick={() => setShowTelegramLink(!showTelegramLink)} /></div>
                   <div className="flex items-center justify-between py-2.5 last:pb-0"><span className="text-sm">Channel logo</span><Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} /></div>
                 </div>
+                
                 {showTelegramLink && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram Link</label>
-                    <input 
-                      id="telegram-link" 
-                      type="text" 
-                      value={telegramLink} 
-                      onChange={(e) => setTelegramLink(e.target.value)} 
-                      placeholder="t.me/yourchannel" 
-                      className={`${fieldClass} py-2 font-mono text-xs`} 
-                    />
-                    {telegramFrame && (
-                      <div className="mt-3">
-                        <PositionControl 
-                          label={`Telegram Frame`} 
-                          position={telegramFrame.position} 
-                          onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} 
-                        />
-                      </div>
-                    )}
+                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/yourchannel" className={`${fieldClass} py-2 font-mono text-xs`} />
+                    {telegramFrame && <div className="mt-3"><PositionControl label="Telegram Frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} /></div>}
                   </div>
                 )}
                 {showDate && dateFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <PositionControl 
-                      label={`Date Frame`} 
-                      position={dateFrame.position} 
-                      onChange={(pos) => updateFramePosition(dateFrame.id, pos)} 
-                    />
+                    <PositionControl label="Date Frame" position={dateFrame.position} onChange={(pos) => updateFramePosition(dateFrame.id, pos)} />
                   </div>
                 )}
                 {selectedZodiac && zodiacFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <PositionControl 
-                      label={`Zodiac Name Frame`} 
-                      position={zodiacFrame.position} 
-                      onChange={(pos) => updateFramePosition(zodiacFrame.id, pos)} 
-                    />
+                    <PositionControl label="Zodiac Name Frame" position={zodiacFrame.position} onChange={(pos) => updateFramePosition(zodiacFrame.id, pos)} />
                   </div>
                 )}
                 {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
@@ -1050,6 +1093,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   setText2("");
                   setUploadedImageUrl(null);
                   setLogs([]);
+                  setFrames([]); // ✅ ჩარჩოების გასუფთავებაც
                   addLog("🔄 ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
                 }} 
                 className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]"
