@@ -234,7 +234,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
-  // ✅ ახალი: პოზიციების მართვა თითოეული ელემენტისთვის
   const [text1Position, setText1Position] = useState<TextPosition>({
     top: 40,
     left: 5,
@@ -287,7 +286,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   };
 
   useEffect(() => {
-    addLog(` STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
+    addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
   }, [step, selectedZodiac, selectedFormat]);
 
   useEffect(() => {
@@ -382,7 +381,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const newOpId = `OP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     operationIdRef.current = newOpId;
 
-    addLog(`\n ========== STARTING UPLOAD PROCESS ==========`);
+    addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
     addLog(`🔖 Operation ID: ${newOpId}`);
     addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
 
@@ -395,7 +394,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetZodiac = overrideZodiac || selectedZodiac;
     const targetFormat = overrideFormat || selectedFormat;
 
-    addLog(` INPUT PARAMETERS:`);
+    addLog(`📋 INPUT PARAMETERS:`);
     addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
     addLog(`   • Format: ${targetFormat || 'NULL'}`);
     addLog(`   • Text1: "${text1.substring(0, 50)}..." (${text1.length} chars)`);
@@ -412,7 +411,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`, "info");
 
     try {
-      addLog(` Waiting 1000ms for DOM stabilization...`, "debug");
+      addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       addLog(`📷 Capturing screenshot with html-to-image...`, "debug");
@@ -557,7 +556,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         }]);
 
         addLog(`✅ Database record created`);
-        addLog(` შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
+        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
         
         setIsPublishing(false);
         return true;
@@ -585,7 +584,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         return false;
       }
     } catch (error) {
-      addLog(` კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
+      addLog(`💥 კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
       setIsPublishing(false);
       return false;
     }
@@ -615,7 +614,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         .single();
 
       if (configError || !config) {
-        addLog(`️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
+        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
       } else {
         addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
       }
@@ -636,7 +635,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       
       addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...", "info");
       const t2 = await handleGenerateText2(zodiac, t1, config);
-      if (!t2) { addLog(" Text 2 generation failed. Aborting.", "error"); return false; }
+      if (!t2) { addLog("❌ Text 2 generation failed. Aborting.", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
@@ -660,14 +659,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   }));
 
   const activeFormatOption = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
-
-  const getTextAlignCss = (align: TextAlign) => {
-    switch (align) {
-      case 'left': return 'flex-start';
-      case 'right': return 'flex-end';
-      case 'center': return 'center';
-    }
-  };
 
   return (
     <div style={THEME} className="text-[var(--p-moon)]">
@@ -918,7 +909,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('') || log.includes('⏳') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
