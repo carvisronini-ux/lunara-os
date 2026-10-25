@@ -20,13 +20,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY! 
 );
 
+// ✅ განახლებული: დამატებულია imageUrl თითოეული ნიშნისთვის
 const ZODIAC_SIGNS = [
-  { name: 'ARIES', search: 'ARIES ARIES' }, { name: 'TAURUS', search: 'TAURUS TAURUS' },
-  { name: 'GEMINI', search: 'GEMINI GEMINI' }, { name: 'CANCER', search: 'CANCER CANCER' },
-  { name: 'LEO', search: 'LEO LEO' }, { name: 'VIRGO', search: 'VIRGO VIRGO' },
-  { name: 'LIBRA', search: 'LIBRA LIBRA' }, { name: 'SCORPIO', search: 'SCORPIO SCORPIO' },
-  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS' }, { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN' },
-  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS' }, { name: 'PISCES', search: 'PISCES PISCES' },
+  { name: 'ARIES', search: 'ARIES ARIES', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aries.jpeg' },
+  { name: 'TAURUS', search: 'TAURUS TAURUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Taurus.jpeg' },
+  { name: 'GEMINI', search: 'GEMINI GEMINI', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Gemini.jpeg' },
+  { name: 'CANCER', search: 'CANCER CANCER', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Cancer.jpeg' },
+  { name: 'LEO', search: 'LEO LEO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Leo.jpeg' },
+  { name: 'VIRGO', search: 'VIRGO VIRGO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Virgo.jpeg' },
+  { name: 'LIBRA', search: 'LIBRA LIBRA', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Libra.jpeg' },
+  { name: 'SCORPIO', search: 'SCORPIO SCORPIO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Scorpio.jpeg' },
+  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Sagittarius.jpeg' },
+  { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Capricorn.jpeg' },
+  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aquarius.jpeg' },
+  { name: 'PISCES', search: 'PISCES PISCES', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Pisces.jpeg' },
 ];
 
 const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
@@ -152,9 +159,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     pushEvent("system", message);
   };
 
-  const imageUrl = selectedZodiac 
-    ? `https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/zodiac-signs/${selectedZodiac.name.toLowerCase()}.png`
-    : null;
+  // ✅ განახლებული: იღებს პირდაპირ imageUrl-ს ZODIAC_SIGNS მასივიდან
+  const imageUrl = selectedZodiac ? selectedZodiac.imageUrl : null;
 
   const getCurrentDate = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const getWeekRange = () => {
@@ -424,7 +430,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       if (data.success) {
         addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`, "success");
         
-        // ✅ ახალი: სერვერის ლოგის (User-Agent) დამატება UI-ში
         if (data.debugInfo) {
           addLog(data.debugInfo, "debug");
         }
@@ -447,7 +452,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       } else {
         addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
         
-        // ✅ ახალი: სერვერის ლოგის დამატება UI-ში შეცდომის დროსაც
         if (data.debugInfo) {
           addLog(data.debugInfo, "debug");
         }
@@ -612,8 +616,21 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   )}
                   {(text1 || text2) && (
                     <div className="absolute inset-0 flex flex-col pointer-events-none z-10">
-                      {text1 && <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}><div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text1}</div></div>}
-                      {text2 && <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}><div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{text2}</div></div>}
+                      
+                      {/* 🎯 აქ შეცვალე top, left, fontSize ახალი დიზაინის მიხედვით (Text 1) */}
+                      {text1 && <div className="absolute w-full transition-all duration-300" style={{ top: '40%', transform: 'translateY(-50%)', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', maxHeight: '2.6em', overflow: 'hidden' }}>
+                        <div className="text-[#000000] font-serif italic tracking-wide font-medium text-center" style={{ fontSize: `${text1FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.3', margin: '0 auto', maxWidth: '100%', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {text1}
+                        </div>
+                      </div>}
+                      
+                      {/* 🎯 აქ შეცვალე top, left, fontSize ახალი დიზაინის მიხედვით (Text 2) */}
+                      {text2 && <div className="absolute w-full transition-all duration-300" style={{ top: '66%', height: '25%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', maxWidth: '100%', boxSizing: 'border-box', paddingLeft: '5%', paddingRight: '5%', overflow: 'hidden' }}>
+                        <div className="text-[#000000] font-serif text-center" style={{ fontSize: `${text2FontSize}px`, wordWrap: 'break-word', overflowWrap: 'break-word', wordBreak: 'break-word', lineHeight: '1.4', margin: '0 auto', maxWidth: '100%', whiteSpace: 'normal', display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {text2}
+                        </div>
+                      </div>}
+                      
                     </div>
                   )}
                   {(showDate || showWeekRange) && <div className="absolute z-20 text-center transition-all duration-300" style={{ bottom: '3%', left: '50%', transform: 'translateX(-50%)', width: '90%' }}><div className="text-[#000000] font-serif italic text-sm font-medium" style={{ fontSize: '14px' }}>{showWeekRange ? getWeekRange() : getCurrentDate()}</div></div>}
