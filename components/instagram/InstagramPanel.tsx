@@ -156,6 +156,85 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
+// ✅ ჭკვიანი ჰუკი ტექსტის ავტომატური მორგებისთვის ჩარჩოში
+function useTextFit(
+  text: string,
+  containerRef: React.RefObject<HTMLDivElement>,
+  options: {
+    minFontSize?: number;
+    maxFontSize?: number;
+    maxLines?: number;
+    enabled?: boolean;
+  } = {}
+) {
+  const {
+    minFontSize = 8,
+    maxFontSize = 72,
+    maxLines = 1,
+    enabled = true,
+  } = options;
+
+  const [fontSize, setFontSize] = useState<number>(maxFontSize);
+
+  useEffect(() => {
+    if (!enabled || !containerRef.current || !text) {
+      setFontSize(maxFontSize);
+      return;
+    }
+
+    const adjustFontSize = () => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const element = container.querySelector('.text-content') as HTMLElement;
+      if (!element) return;
+
+      let low = minFontSize;
+      let high = maxFontSize;
+      let bestSize = minFontSize;
+
+      const targetLineClamp = maxLines.toString();
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        element.style.fontSize = `${mid}px`;
+        element.style.webkitLineClamp = 'unset'; // დროებით ვხსნით შეზღუდვას რეალური სიმაღლის გასაზომად
+        
+        const lineHeightStr = getComputedStyle(element).lineHeight;
+        const lineHeight = lineHeightStr === 'normal' ? mid * 1.3 : parseFloat(lineHeightStr);
+        const lineCount = Math.ceil(element.scrollHeight / lineHeight);
+        
+        const fitsHorizontally = element.scrollWidth <= container.clientWidth + 2;
+        const fitsVertically = lineCount <= maxLines;
+
+        // ვაბრუნებთ შეზღუდვას შემდეგი იტერაციისთვის ან საბოლოო რენდერისთვის
+        element.style.webkitLineClamp = targetLineClamp;
+
+        if (fitsHorizontally && fitsVertically) {
+          bestSize = mid;
+          low = mid + 1; // ვცდილობთ უფრო დიდ ზომას
+        } else {
+          high = mid - 1; // ზომა დიდია, ვამცირებთ
+        }
+      }
+
+      setFontSize(bestSize);
+    };
+
+    const raf = requestAnimationFrame(() => {
+      adjustFontSize();
+    });
+
+    window.addEventListener('resize', adjustFontSize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', adjustFontSize);
+    };
+  }, [text, containerRef, minFontSize, maxFontSize, maxLines, enabled]);
+
+  return fontSize;
+}
+
 function FrameBox({
   frame,
   onUpdateType,
@@ -183,6 +262,7 @@ function FrameBox({
   showDate?: boolean;
   showTelegramLink?: boolean;
 }) {
+  const textContainerRef = useRef<HTMLDivElement>(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -192,6 +272,15 @@ function FrameBox({
 
   const frameColors: Record<FrameType, string> = { text1: "#9b8cff", text2: "#f6c177", zodiac: "#5fd6a4", date: "#60a5fa", telegram: "#f472b6", none: "#9d9bbd" };
   const frameLabels: Record<FrameType, string> = { text1: "Text 1 (Hook)", text2: "Text 2 (Forecast)", zodiac: "Zodiac Name", date: "Date", telegram: "Telegram Link", none: "Empty Frame" };
+
+  const getMaxLines = () => {
+    switch (frame.type) {
+      case 'text1': return 2;
+      case 'text2': return 5;
+      case 'telegram': return 1;
+      default: return 1;
+    }
+  };
 
   const currentText = () => {
     switch (frame.type) {
@@ -203,6 +292,18 @@ function FrameBox({
       case "none": return "";
     }
   };
+
+  // ✅ ავტომატური ზომის გამოთვლა
+  const autoFontSize = useTextFit(
+    currentText(),
+    textContainerRef,
+    {
+      minFontSize: frame.type === 'zodiac' ? 16 : 12,
+      maxFontSize: frame.position.fontSize,
+      maxLines: getMaxLines(),
+      enabled: true,
+    }
+  );
 
   const color = frameColors[frame.type];
   const label = frameLabels[frame.type];
@@ -286,7 +387,8 @@ function FrameBox({
     <>
       {/* 1. ტექსტის კონტეინერი (დარჩება სურათზე) */}
       <div
-        className="absolute pointer-events-none"
+        ref={textContainerRef}
+        className="absolute pointer-events-none overflow-hidden"
         style={{
           top: `${frame.position.top}%`,
           left: `${frame.position.left}%`,
@@ -295,33 +397,28 @@ function FrameBox({
         }}
       >
         <div
-          className="h-full flex items-center p-3"
+          className="text-content h-full flex items-center p-3"
           style={{
             justifyContent: frame.position.align === "center" ? "center" : frame.position.align === "right" ? "flex-end" : "flex-start",
             textAlign: frame.position.align,
+            fontSize: `${autoFontSize}px`, // ✅ ავტომატურად გამოთვლილი ზომა
+            lineHeight: 1.3,
+            fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal",
+            fontWeight: frame.type === "zodiac" ? "bold" : "normal",
+            textTransform: frame.type === "zodiac" ? "uppercase" : "none",
+            letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal",
+            color: frame.type === "telegram" ? "#FFFFFF" : "#000000",
+            textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none",
+            display: "-webkit-box",
+            WebkitLineClamp: getMaxLines(),
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+            overflowWrap: "break-word",
+            wordBreak: "break-word",
+            hyphens: "auto",
           }}
         >
-          <div
-            className="font-serif"
-            style={{
-              fontSize: `${frame.position.fontSize}px`,
-              lineHeight: 1.3,
-              fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal",
-              fontWeight: frame.type === "zodiac" ? "bold" : "normal",
-              textTransform: frame.type === "zodiac" ? "uppercase" : "none",
-              letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal",
-              color: frame.type === "telegram" ? "#FFFFFF" : "#000000",
-              textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none",
-              display: "-webkit-box",
-              WebkitLineClamp: frame.type === "text1" ? 2 : frame.type === "text2" ? 5 : 1,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
-            }}
-          >
-            {currentText()}
-          </div>
+          {currentText()}
         </div>
       </div>
 
@@ -652,7 +749,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     try {
       if (document.fonts?.ready) await document.fonts.ready;
       
-      // ✅ აქ დაემატა filter ფუნქცია, რომელიც გამორიცხავს data-no-capture ელემენტებს
       const dataUrl = await toJpeg(preview, { 
         quality: 1, 
         cacheBust: true, 
