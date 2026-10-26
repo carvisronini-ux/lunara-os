@@ -283,57 +283,133 @@ function FrameBox({
   };
 
   return (
-    <div
-      className={`absolute border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab z-20'}`}
-      style={{
-        top: `${frame.position.top}%`, left: `${frame.position.left}%`, width: `${frame.position.width}%`, height: `${frame.position.height}%`,
-        borderColor: `${color}99`, backgroundColor: `${color}22`,
-        transition: isDragging || isResizing ? 'none' : 'all 0.2s ease-out',
-      }}
-      onMouseDown={handleMouseDown}
-    >
-      {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
-        <div key={handle} className="resize-handle" style={getHandlePosition(handle)} onMouseDown={(e) => handleResizeMouseDown(e, handle)} />
-      ))}
-
-      <div className="absolute top-1 right-1 z-30 flex gap-1">
-        <button 
-          type="button" 
-          onClick={(e) => { e.stopPropagation(); onRemove(frame.id); }} 
-          className="w-6 h-6 rounded bg-red-500/80 hover:bg-red-600 flex items-center justify-center transition-colors" 
-          title="წაშალე ჩარჩო"
+    <>
+      {/* 1. ტექსტის კონტეინერი (დარჩება სურათზე) */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: `${frame.position.top}%`,
+          left: `${frame.position.left}%`,
+          width: `${frame.position.width}%`,
+          height: `${frame.position.height}%`,
+        }}
+      >
+        <div
+          className="h-full flex items-center p-3"
+          style={{
+            justifyContent: frame.position.align === "center" ? "center" : frame.position.align === "right" ? "flex-end" : "flex-start",
+            textAlign: frame.position.align,
+          }}
         >
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        <button type="button" onClick={(event) => { event.stopPropagation(); setShowDropdown((p) => !p); }} className="w-6 h-6 rounded bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors" title="Change frame type">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-        </button>
-        
-        {showDropdown && (
-          <div className="absolute top-8 right-0 bg-[var(--p-ink)] border border-[var(--p-line-2)] rounded-lg shadow-xl z-40 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-            <div className="p-2 border-b border-[var(--p-line)]"><span className="text-[10px] text-[var(--p-mute)] font-semibold uppercase">Set as:</span></div>
-            <div className="p-1">
-              {(["text1", "text2", "zodiac", "date", "telegram", "none"] as FrameType[]).map((type) => (
-                <button type="button" key={type} onClick={() => { onUpdateType(frame.id, type); setShowDropdown(false); }} className={`w-full text-left px-3 py-2 rounded text-xs transition-colors flex items-center gap-2 ${frame.type === type ? "bg-[var(--p-violet)]/20 text-[var(--p-moon)]" : "text-[var(--p-mute)] hover:bg-white/5"}`}>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: frameColors[type] }} />{frameLabels[type]}
-                </button>
-              ))}
-            </div>
+          <div
+            className="font-serif"
+            style={{
+              fontSize: `${frame.position.fontSize}px`,
+              lineHeight: 1.3,
+              fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal",
+              fontWeight: frame.type === "zodiac" ? "bold" : "normal",
+              textTransform: frame.type === "zodiac" ? "uppercase" : "none",
+              letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal",
+              color: frame.type === "telegram" ? "#FFFFFF" : "#000000",
+              textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none",
+              display: "-webkit-box",
+              WebkitLineClamp: frame.type === "text1" ? 2 : frame.type === "text2" ? 5 : 1,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+            }}
+          >
+            {currentText()}
           </div>
-        )}
-      </div>
-
-      <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold pointer-events-none" style={{ backgroundColor: `${color}55`, color }}>{label}</div>
-
-      <div className="h-full flex items-center p-3 pointer-events-none" style={{ justifyContent: frame.position.align === "center" ? "center" : frame.position.align === "right" ? "flex-end" : "flex-start", textAlign: frame.position.align }}>
-        <div className="font-serif" style={{ fontSize: `${frame.position.fontSize}px`, lineHeight: 1.3, fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal", fontWeight: frame.type === "zodiac" ? "bold" : "normal", textTransform: frame.type === "zodiac" ? "uppercase" : "none", letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal", color: frame.type === "telegram" ? "#FFFFFF" : "#000000", textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none", display: "-webkit-box", WebkitLineClamp: frame.type === "text1" ? 2 : frame.type === "text2" ? 5 : 1, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere", wordBreak: "break-word" }}>
-          {currentText()}
         </div>
       </div>
-    </div>
+
+      {/* 2. მართვის ელემენტების კონტეინერი (წაიშლება სურათიდან data-no-capture-ის წყალობით) */}
+      <div
+        className="absolute border-2 border-dashed rounded-md overflow-hidden group frame-controls"
+        data-no-capture="true"
+        style={{
+          top: `${frame.position.top}%`,
+          left: `${frame.position.left}%`,
+          width: `${frame.position.width}%`,
+          height: `${frame.position.height}%`,
+          borderColor: `${color}99`,
+          backgroundColor: `${color}22`,
+          transition: isDragging || isResizing ? 'none' : 'all 0.2s ease-out',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          zIndex: isDragging ? 50 : 20,
+        }}
+        onMouseDown={handleMouseDown}
+      >
+        {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
+          <div
+            key={handle}
+            className="resize-handle"
+            style={getHandlePosition(handle)}
+            onMouseDown={(e) => handleResizeMouseDown(e, handle)}
+          />
+        ))}
+
+        <div className="absolute top-1 right-1 z-30 flex gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(frame.id); }}
+            className="w-6 h-6 rounded bg-red-500/80 hover:bg-red-600 flex items-center justify-center transition-colors"
+            title="წაშალე ჩარჩო"
+          >
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); setShowDropdown((p) => !p); }}
+            className="w-6 h-6 rounded bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors"
+            title="Change frame type"
+          >
+            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+
+          {showDropdown && (
+            <div
+              className="absolute top-8 right-0 bg-[var(--p-ink)] border border-[var(--p-line-2)] rounded-lg shadow-xl z-40 min-w-[160px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-2 border-b border-[var(--p-line)]">
+                <span className="text-[10px] text-[var(--p-mute)] font-semibold uppercase">Set as:</span>
+              </div>
+              <div className="p-1">
+                {(["text1", "text2", "zodiac", "date", "telegram", "none"] as FrameType[]).map((type) => (
+                  <button
+                    type="button"
+                    key={type}
+                    onClick={() => { onUpdateType(frame.id, type); setShowDropdown(false); }}
+                    className={`w-full text-left px-3 py-2 rounded text-xs transition-colors flex items-center gap-2 ${
+                      frame.type === type ? "bg-[var(--p-violet)]/20 text-[var(--p-moon)]" : "text-[var(--p-mute)] hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: frameColors[type] }} />
+                    {frameLabels[type]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
+          className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold pointer-events-none"
+          style={{ backgroundColor: `${color}55`, color }}
+        >
+          {label}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -496,7 +572,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     if (!found) { addLog(`ზოდიაქოს ნიშანი ვერ მოიძებნა: "${normalizedInput}"`, "error"); return null; }
     setSelectedZodiac(found);
     setUploadedImageUrl(null);
-    addLog(`არჩეულია ოდიაქო: ${found.name}`, "success");
+    addLog(`არჩეულია ზოდიაქო: ${found.name}`, "success");
     setStep("format");
     return found;
   };
@@ -575,7 +651,20 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
     try {
       if (document.fonts?.ready) await document.fonts.ready;
-      const dataUrl = await toJpeg(preview, { quality: 1, cacheBust: true, backgroundColor: "#ffffff", pixelRatio: 2 });
+      
+      // ✅ აქ დაემატა filter ფუნქცია, რომელიც გამორიცხავს data-no-capture ელემენტებს
+      const dataUrl = await toJpeg(preview, { 
+        quality: 1, 
+        cacheBust: true, 
+        backgroundColor: "#ffffff", 
+        pixelRatio: 2,
+        filter: (node: HTMLElement) => {
+          if (node.hasAttribute?.('data-no-capture')) return false;
+          if (node.closest?.('[data-no-capture]')) return false;
+          return true;
+        },
+      });
+      
       const outputDimensions = targetFormat === "story" ? { width: 1080, height: 1920 } : targetFormat === "carousel" ? { width: 1080, height: 1080 } : { width: 1080, height: 1350 };
       
       const canvas = document.createElement("canvas");
@@ -641,7 +730,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetImageUrl = overrideImageUrl ?? uploadedImageUrl;
 
     if (!targetZodiac || !targetFormat || !targetImageUrl || !targetText2.trim()) {
-      addLog("გამოქვეყნებისთვის საჭიროა ოდიაქო, ფორმატი, სურათი და Text 2.", "error");
+      addLog("გამოქვეყნებისთვის საჭიროა ზოდიაქო, ფორმატი, სურათი და Text 2.", "error");
       return false;
     }
 
