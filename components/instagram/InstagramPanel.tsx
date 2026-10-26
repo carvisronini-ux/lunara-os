@@ -496,7 +496,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     if (!found) { addLog(`ზოდიაქოს ნიშანი ვერ მოიძებნა: "${normalizedInput}"`, "error"); return null; }
     setSelectedZodiac(found);
     setUploadedImageUrl(null);
-    addLog(`არჩეულია ზოდიაქო: ${found.name}`, "success");
+    addLog(`არჩეულია ოდიაქო: ${found.name}`, "success");
     setStep("format");
     return found;
   };
@@ -557,12 +557,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     } finally { setIsGeneratingText2(false); }
   };
 
-  const handleReadyAndUpload = async (overrideZodiac?: ZodiacSign, overrideFormat?: PostFormat, overrideText1?: string, overrideText2?: string) => {
+  const handleReadyAndUpload = async (
+    overrideZodiac?: ZodiacSign,
+    overrideFormat?: PostFormat
+  ) => {
     if (publishingLockRef.current) { addLog("ატვირთვის პროცესი უკვე მიმდინარეობს.", "warning"); return null; }
     const targetZodiac = overrideZodiac ?? selectedZodiac;
     const targetFormat = overrideFormat ?? selectedFormat;
-    const targetText1 = overrideText1 ?? text1;
-    const targetText2 = overrideText2 ?? text2;
     const preview = previewRef.current;
     if (!targetZodiac || !targetFormat || !preview) { addLog("ატვირთვისთვის აუცილებელი მონაცემები აკლია.", "error"); return null; }
 
@@ -625,7 +626,13 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     }
   };
 
-  const handlePublish = async (overrideZodiac?: ZodiacSign, overrideFormat?: PostFormat, overrideText1?: string, overrideText2?: string, overrideImageUrl?: string) => {
+  const handlePublish = async (
+    overrideZodiac?: ZodiacSign,
+    overrideFormat?: PostFormat,
+    overrideText1?: string,
+    overrideText2?: string,
+    overrideImageUrl?: string
+  ) => {
     if (publishingLockRef.current) { addLog("გამოქვეყნების პროცესი უკვე მიმდინარეობს.", "warning"); return false; }
     const targetZodiac = overrideZodiac ?? selectedZodiac;
     const targetFormat = overrideFormat ?? selectedFormat;
@@ -634,7 +641,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetImageUrl = overrideImageUrl ?? uploadedImageUrl;
 
     if (!targetZodiac || !targetFormat || !targetImageUrl || !targetText2.trim()) {
-      addLog("გამოქვეყნებისთვის საჭიროა ზოდიაქო, ფორმატი, სურათი და Text 2.", "error");
+      addLog("გამოქვეყნებისთვის საჭიროა ოდიაქო, ფორმატი, სურათი და Text 2.", "error");
       return false;
     }
 
@@ -706,7 +713,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
         if (!generatedText2) { addLog("Text 2-ის გენერაცია ვერ მოხერხდა.", "error"); return false; }
 
         await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
-        const imageUrl = await handleReadyAndUpload(zodiac, "post", generatedText1, generatedText2);
+        const imageUrl = await handleReadyAndUpload(zodiac, "post");
         if (!imageUrl) { addLog("სურათის ატვირთვა ვერ მოხერხდა.", "error"); return false; }
 
         const published = await handlePublish(zodiac, "post", generatedText1, generatedText2, imageUrl);
