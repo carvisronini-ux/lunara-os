@@ -1,16 +1,33 @@
 // /home/carvisronini-ux/lunara-os/components/instagram/InstagramPanel.tsx
 "use client";
 
-import { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+} from "react";
 import { createClient } from "@supabase/supabase-js";
 import { generateViralText1, generateHoroscopeText2 } from "@/lib/instagram/ai-generator";
 import { toJpeg } from "html-to-image";
 
-type EventLogType = "system" | "task" | "agent" | "success" | "warning" | "error" | "resource" | "quality" | "learning" | "emergency" | "approval";
+type EventLogType =
+  | "system"
+  | "task"
+  | "agent"
+  | "success"
+  | "warning"
+  | "error"
+  | "resource"
+  | "quality"
+  | "learning"
+  | "emergency"
+  | "approval";
+
 type WizardStep = "input" | "format" | "preview";
 type PostFormat = "post" | "story" | "carousel";
 type TextAlign = "left" | "center" | "right";
-
 type FrameType = "text1" | "text2" | "zodiac" | "date" | "telegram" | "none";
 type ResizeHandle = "nw" | "n" | "ne" | "w" | "e" | "sw" | "s" | "se";
 
@@ -34,34 +51,52 @@ interface InstagramPanelProps {
   profileUsername: string;
 }
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_OS_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY! 
-);
+let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_OS_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_OS_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Supabase configuration is missing. Check NEXT_PUBLIC_SUPABASE_OS_URL and NEXT_PUBLIC_SUPABASE_OS_ANON_KEY."
+    );
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createClient(url, anonKey);
+  }
+
+  return supabaseClient;
+}
 
 const ZODIAC_SIGNS = [
-  { name: 'ARIES', search: 'ARIES ARIES', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aries.jpeg' },
-  { name: 'TAURUS', search: 'TAURUS TAURUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Taurus.jpeg' },
-  { name: 'GEMINI', search: 'GEMINI GEMINI', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Gemini.jpeg' },
-  { name: 'CANCER', search: 'CANCER CANCER', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Cancer.jpeg' },
-  { name: 'LEO', search: 'LEO LEO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Leo.jpeg' },
-  { name: 'VIRGO', search: 'VIRGO VIRGO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Virgo.jpeg' },
-  { name: 'LIBRA', search: 'LIBRA LIBRA', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Libra.jpeg' },
-  { name: 'SCORPIO', search: 'SCORPIO SCORPIO', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Scorpio.jpeg' },
-  { name: 'SAGITTARIUS', search: 'SAGITTARIUS SAGITTARIUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Sagittarius.jpeg' },
-  { name: 'CAPRICORN', search: 'CAPRICORN CAPRICORN', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Capricorn.jpeg' },
-  { name: 'AQUARIUS', search: 'AQUARIUS AQUARIUS', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aquarius.jpeg' },
-  { name: 'PISCES', search: 'PISCES PISCES', imageUrl: 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Pisces.jpeg' },
-];
+  { name: "ARIES", search: "ARIES ARIES", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aries.jpeg" },
+  { name: "TAURUS", search: "TAURUS TAURUS", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Taurus.jpeg" },
+  { name: "GEMINI", search: "GEMINI GEMINI", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Gemini.jpeg" },
+  { name: "CANCER", search: "CANCER CANCER", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Cancer.jpeg" },
+  { name: "LEO", search: "LEO LEO", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Leo.jpeg" },
+  { name: "VIRGO", search: "VIRGO VIRGO", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Virgo.jpeg" },
+  { name: "LIBRA", search: "LIBRA LIBRA", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Libra.jpeg" },
+  { name: "SCORPIO", search: "SCORPIO SCORPIO", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Scorpio.jpeg" },
+  { name: "SAGITTARIUS", search: "SAGITTARIUS SAGITTARIUS", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Sagittarius.jpeg" },
+  { name: "CAPRICORN", search: "CAPRICORN CAPRICORN", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Capricorn.jpeg" },
+  { name: "AQUARIUS", search: "AQUARIUS AQUARIUS", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Aquarius.jpeg" },
+  { name: "PISCES", search: "PISCES PISCES", imageUrl: "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/instagram/post/Pisces.jpeg" },
+] as const;
 
-const DEFAULT_LOGO_URL = 'https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png';
+type ZodiacSign = (typeof ZODIAC_SIGNS)[number];
+
+const DEFAULT_LOGO_URL = "https://gxdnwelsrsijjbqzwxmk.supabase.co/storage/v1/object/public/lunara-assets/logo.png";
 
 const generateDynamicHashtags = (text2: string, zodiacName: string): string => {
   const baseTags = [`#${zodiacName}`, "#Horoscope", "#Astrology", "#Zodiac", "#LUNARA", "#DailyHoroscope"];
-  if (!text2 || text2.trim().length < 10) return [...baseTags].join(" ");
+  if (!text2 || text2.trim().length < 10) return baseTags.join(" ");
+
   const stopWords = new Set(["the", "is", "at", "which", "on", "and", "a", "to", "of", "in", "for", "with", "your", "today", "be", "are", "it", "this", "that", "will", "can", "you", "we", "they", "have", "has", "had", "do", "does", "did", "was", "were"]);
-  const words = text2.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, "").split(/\s+/);
-  const extractedTags = words.filter(word => word.length > 3).filter(word => !stopWords.has(word)).map(word => `#${word}`);
+  const words = text2.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, "").split(/\s+/);
+  const extractedTags = words.filter((word) => word.length > 3).filter((word) => !stopWords.has(word)).map((word) => `#${word}`);
+
   return [...baseTags, ...Array.from(new Set(extractedTags)).slice(0, 4)].join(" ");
 };
 
@@ -93,18 +128,19 @@ function Spinner({ dark = false }: { dark?: boolean }) {
 }
 
 function Stepper({ current }: { current: WizardStep }) {
-  const currentIndex = STEPS.findIndex(s => s.id === current);
+  const currentIndex = STEPS.findIndex((step) => step.id === current);
   return (
     <ol className="mb-6 flex items-center gap-2" aria-label="Progress">
-      {STEPS.map((s, i) => {
-        const done = i < currentIndex; const active = i === currentIndex;
+      {STEPS.map((step, index) => {
+        const done = index < currentIndex;
+        const active = index === currentIndex;
         return (
-          <li key={s.id} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
+          <li key={step.id} className="flex items-center gap-2" aria-current={active ? "step" : undefined}>
             <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-[var(--p-violet)] text-[var(--p-ink)]" : done ? "bg-[var(--p-ok)] text-[var(--p-ink)]" : "border border-[var(--p-line-2)] text-[var(--p-mute)]"}`}>
-              {done ? "✓" : i + 1}
+              {done ? "✓" : index + 1}
             </span>
-            <span className={`text-sm font-medium ${active ? "text-[var(--p-moon)]" : "text-[var(--p-mute)]"}`}>{s.label}</span>
-            {i < STEPS.length - 1 && <span className="mx-1 h-px w-6 bg-[var(--p-line-2)] sm:w-10" />}
+            <span className={`text-sm font-medium ${active ? "text-[var(--p-moon)]" : "text-[var(--p-mute)]"}`}>{step.label}</span>
+            {index < STEPS.length - 1 && <span className="mx-1 h-px w-6 bg-[var(--p-line-2)] sm:w-10" />}
           </li>
         );
       })}
@@ -114,88 +150,78 @@ function Stepper({ current }: { current: WizardStep }) {
 
 function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {
   return (
-    <button role="switch" aria-checked={on} aria-label={label} onClick={onClick} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-[var(--p-ok)]" : "bg-[var(--p-ink-3)] ring-1 ring-inset ring-[var(--p-line-2)]"}`}>
+    <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={onClick} className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-[var(--p-ok)]" : "bg-[var(--p-ink-3)] ring-1 ring-inset ring-[var(--p-line-2)]"}`}>
       <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${on ? "left-6" : "left-1"}`} />
     </button>
   );
 }
 
-function FrameBox({ 
-  frame, 
+function FrameBox({
+  frame,
+  onUpdateType,
   onUpdatePosition,
+  onRemove,
   containerRef,
   text1,
   text2,
   zodiacName,
   dateText,
   telegramText,
-}: { 
+  showDate = true,
+  showTelegramLink = true,
+}: {
   frame: Frame;
+  onUpdateType: (id: string, type: FrameType) => void;
   onUpdatePosition: (id: string, pos: TextPosition) => void;
+  onRemove: (id: string) => void;
   containerRef: React.RefObject<HTMLDivElement>;
   text1: string;
   text2: string;
   zodiacName: string;
   dateText: string;
   telegramText: string;
+  showDate?: boolean;
+  showTelegramLink?: boolean;
 }) {
+  const [showDropdown, setShowDropdown] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, left: 0, top: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, top: 0, left: 0, width: 0, height: 0 });
 
-  const frameLabels: Record<FrameType, string> = {
-    text1: 'Text 1',
-    text2: 'Text 2',
-    zodiac: 'Zodiac Name',
-    date: 'Date',
-    telegram: 'Telegram',
-    none: 'Frame',
-  };
+  const frameColors: Record<FrameType, string> = { text1: "#9b8cff", text2: "#f6c177", zodiac: "#5fd6a4", date: "#60a5fa", telegram: "#f472b6", none: "#9d9bbd" };
+  const frameLabels: Record<FrameType, string> = { text1: "Text 1 (Hook)", text2: "Text 2 (Forecast)", zodiac: "Zodiac Name", date: "Date", telegram: "Telegram Link", none: "Empty Frame" };
 
   const currentText = () => {
     switch (frame.type) {
-      case 'text1': return text1 || 'Text 1 Hook';
-      case 'text2': return text2 || 'Text 2 Forecast';
-      case 'zodiac': return zodiacName;
-      case 'date': return dateText;
-      case 'telegram': return telegramText;
-      case 'none': return '';
+      case "text1": return text1 || "Text 1 Hook";
+      case "text2": return text2 || "Text 2 Forecast";
+      case "zodiac": return zodiacName;
+      case "date": return showDate ? dateText : "";
+      case "telegram": return showTelegramLink ? telegramText : "";
+      case "none": return "";
     }
   };
 
+  const color = frameColors[frame.type];
   const label = frameLabels[frame.type];
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.resize-handle')) return;
+    if ((e.target as HTMLElement).closest('.resize-handle') || (e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     if (!containerRef.current) return;
-    
     setIsDragging(true);
-    setDragStart({
-      x: e.clientX,
-      y: e.clientY,
-      left: frame.position.left,
-      top: frame.position.top,
-    });
+    setDragStart({ x: e.clientX, y: e.clientY, left: frame.position.left, top: frame.position.top });
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, handle: ResizeHandle) => {
     e.preventDefault();
     e.stopPropagation();
     if (!containerRef.current) return;
-    
     setIsResizing(true);
     setResizeHandle(handle);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      top: frame.position.top,
-      left: frame.position.left,
-      width: frame.position.width,
-      height: frame.position.height,
-    });
+    setResizeStart({ x: e.clientX, y: e.clientY, top: frame.position.top, left: frame.position.left, width: frame.position.width, height: frame.position.height });
   };
 
   useEffect(() => {
@@ -204,68 +230,38 @@ function FrameBox({
       const rect = containerRef.current.getBoundingClientRect();
 
       if (isDragging) {
-        const deltaX = e.clientX - dragStart.x;
-        const deltaY = e.clientY - dragStart.y;
-        
-        const deltaLeftPercent = (deltaX / rect.width) * 100;
-        const deltaTopPercent = (deltaY / rect.height) * 100;
-
+        const deltaLeftPercent = ((e.clientX - dragStart.x) / rect.width) * 100;
+        const deltaTopPercent = ((e.clientY - dragStart.y) / rect.height) * 100;
         const newLeft = Math.max(0, Math.min(100 - frame.position.width, dragStart.left + deltaLeftPercent));
         const newTop = Math.max(0, Math.min(100 - frame.position.height, dragStart.top + deltaTopPercent));
-
         onUpdatePosition(frame.id, { ...frame.position, left: newLeft, top: newTop });
       }
 
       if (isResizing && resizeHandle) {
-        const deltaX = e.clientX - resizeStart.x;
-        const deltaY = e.clientY - resizeStart.y;
-        
-        const deltaWidthPercent = (deltaX / rect.width) * 100;
-        const deltaHeightPercent = (deltaY / rect.height) * 100;
+        const deltaWidthPercent = ((e.clientX - resizeStart.x) / rect.width) * 100;
+        const deltaHeightPercent = ((e.clientY - resizeStart.y) / rect.height) * 100;
+        let { left: newLeft, top: newTop, width: newWidth, height: newHeight } = resizeStart;
 
-        let newLeft = resizeStart.left;
-        let newTop = resizeStart.top;
-        let newWidth = resizeStart.width;
-        let newHeight = resizeStart.height;
-
-        if (resizeHandle.includes('e')) {
-          newWidth = Math.max(10, Math.min(100 - newLeft, resizeStart.width + deltaWidthPercent));
-        }
+        if (resizeHandle.includes('e')) newWidth = Math.max(10, Math.min(100 - newLeft, resizeStart.width + deltaWidthPercent));
         if (resizeHandle.includes('w')) {
-          const deltaLeft = deltaWidthPercent;
-          newLeft = Math.max(0, resizeStart.left + deltaLeft);
-          newWidth = Math.max(10, resizeStart.width - deltaLeft);
+          newLeft = Math.max(0, resizeStart.left + deltaWidthPercent);
+          newWidth = Math.max(10, resizeStart.width - deltaWidthPercent);
         }
-        if (resizeHandle.includes('s')) {
-          newHeight = Math.max(5, Math.min(100 - newTop, resizeStart.height + deltaHeightPercent));
-        }
+        if (resizeHandle.includes('s')) newHeight = Math.max(5, Math.min(100 - newTop, resizeStart.height + deltaHeightPercent));
         if (resizeHandle.includes('n')) {
-          const deltaTop = deltaHeightPercent;
-          newTop = Math.max(0, resizeStart.top + deltaTop);
-          newHeight = Math.max(5, resizeStart.height - deltaTop);
+          newTop = Math.max(0, resizeStart.top + deltaHeightPercent);
+          newHeight = Math.max(5, resizeStart.height - deltaHeightPercent);
         }
-
-        onUpdatePosition(frame.id, { 
-          ...frame.position, 
-          left: newLeft, 
-          top: newTop, 
-          width: newWidth, 
-          height: newHeight 
-        });
+        onUpdatePosition(frame.id, { ...frame.position, left: newLeft, top: newTop, width: newWidth, height: newHeight });
       }
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      setIsResizing(false);
-      setResizeHandle(null);
-    };
+    const handleMouseUp = () => { setIsDragging(false); setIsResizing(false); setResizeHandle(null); };
 
     if (isDragging || isResizing) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     }
-
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -273,16 +269,7 @@ function FrameBox({
   }, [isDragging, isResizing, resizeHandle, dragStart, resizeStart, frame.position, onUpdatePosition, containerRef, frame.id]);
 
   const getHandlePosition = (handle: ResizeHandle): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      position: 'absolute',
-      width: '10px',
-      height: '10px',
-      backgroundColor: '#ffffff',
-      border: '2px solid #fbbf24',
-      borderRadius: '2px',
-      zIndex: 30,
-    };
-
+    const base: React.CSSProperties = { position: 'absolute', width: '10px', height: '10px', backgroundColor: '#ffffff', border: `2px solid ${color}`, borderRadius: '2px', zIndex: 30 };
     switch (handle) {
       case 'nw': return { ...base, top: '-5px', left: '-5px', cursor: 'nw-resize' };
       case 'n': return { ...base, top: '-5px', left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' };
@@ -296,65 +283,53 @@ function FrameBox({
   };
 
   return (
-    <div 
-      className={`absolute transition-all duration-75 border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab z-20'}`}
-      style={{ 
-        top: `${frame.position.top}%`, 
-        left: `${frame.position.left}%`,
-        width: `${frame.position.width}%`,
-        height: `${frame.position.height}%`,
-        borderColor: '#fbbf24',
-        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-        boxShadow: '0 0 8px rgba(251, 191, 36, 0.6)',
+    <div
+      className={`absolute border-2 border-dashed rounded-md overflow-hidden group ${isDragging ? 'cursor-grabbing z-50' : 'cursor-grab z-20'}`}
+      style={{
+        top: `${frame.position.top}%`, left: `${frame.position.left}%`, width: `${frame.position.width}%`, height: `${frame.position.height}%`,
+        borderColor: `${color}99`, backgroundColor: `${color}22`,
+        transition: isDragging || isResizing ? 'none' : 'all 0.2s ease-out',
       }}
       onMouseDown={handleMouseDown}
     >
       {(['nw', 'n', 'ne', 'w', 'e', 'sw', 's', 'se'] as ResizeHandle[]).map((handle) => (
-        <div
-          key={handle}
-          className="resize-handle"
-          style={getHandlePosition(handle)}
-          onMouseDown={(e) => handleResizeMouseDown(e, handle)}
-        />
+        <div key={handle} className="resize-handle" style={getHandlePosition(handle)} onMouseDown={(e) => handleResizeMouseDown(e, handle)} />
       ))}
 
-      <div 
-        className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold pointer-events-none"
-        style={{ 
-          backgroundColor: '#fbbf24',
-          color: '#000000',
-        }}
-      >
-        {label}
+      <div className="absolute top-1 right-1 z-30 flex gap-1">
+        <button 
+          type="button" 
+          onClick={(e) => { e.stopPropagation(); onRemove(frame.id); }} 
+          className="w-6 h-6 rounded bg-red-500/80 hover:bg-red-600 flex items-center justify-center transition-colors" 
+          title="წაშალე ჩარჩო"
+        >
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        <button type="button" onClick={(event) => { event.stopPropagation(); setShowDropdown((p) => !p); }} className="w-6 h-6 rounded bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors" title="Change frame type">
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </button>
+        
+        {showDropdown && (
+          <div className="absolute top-8 right-0 bg-[var(--p-ink)] border border-[var(--p-line-2)] rounded-lg shadow-xl z-40 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+            <div className="p-2 border-b border-[var(--p-line)]"><span className="text-[10px] text-[var(--p-mute)] font-semibold uppercase">Set as:</span></div>
+            <div className="p-1">
+              {(["text1", "text2", "zodiac", "date", "telegram", "none"] as FrameType[]).map((type) => (
+                <button type="button" key={type} onClick={() => { onUpdateType(frame.id, type); setShowDropdown(false); }} className={`w-full text-left px-3 py-2 rounded text-xs transition-colors flex items-center gap-2 ${frame.type === type ? "bg-[var(--p-violet)]/20 text-[var(--p-moon)]" : "text-[var(--p-mute)] hover:bg-white/5"}`}>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: frameColors[type] }} />{frameLabels[type]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      <div 
-        className="h-full flex items-center p-2 pointer-events-none"
-        style={{ 
-          justifyContent: frame.position.align === 'center' ? 'center' : frame.position.align === 'right' ? 'flex-end' : 'flex-start',
-          textAlign: frame.position.align,
-        }}
-      >
-        <div 
-          className="text-[#000000] font-serif"
-          style={{ 
-            fontSize: `${frame.position.fontSize}px`,
-            lineHeight: '1.3',
-            fontStyle: frame.type === 'text1' || frame.type === 'date' ? 'italic' : 'normal',
-            fontWeight: frame.type === 'zodiac' ? 'bold' : 'normal',
-            textTransform: frame.type === 'zodiac' ? 'uppercase' : 'none',
-            letterSpacing: frame.type === 'zodiac' ? '0.05em' : 'normal',
-            color: frame.type === 'telegram' ? '#FFFFFF' : '#000000',
-            textShadow: frame.type === 'telegram' ? '0 1px 3px rgba(0,0,0,0.8)' : 'none',
-            display: '-webkit-box',
-            WebkitLineClamp: frame.type === 'text1' ? 2 : frame.type === 'text2' ? 5 : 1,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word',
-            wordBreak: 'break-word',
-          }}
-        >
+      <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-semibold pointer-events-none" style={{ backgroundColor: `${color}55`, color }}>{label}</div>
+
+      <div className="h-full flex items-center p-3 pointer-events-none" style={{ justifyContent: frame.position.align === "center" ? "center" : frame.position.align === "right" ? "flex-end" : "flex-start", textAlign: frame.position.align }}>
+        <div className="font-serif" style={{ fontSize: `${frame.position.fontSize}px`, lineHeight: 1.3, fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal", fontWeight: frame.type === "zodiac" ? "bold" : "normal", textTransform: frame.type === "zodiac" ? "uppercase" : "none", letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal", color: frame.type === "telegram" ? "#FFFFFF" : "#000000", textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none", display: "-webkit-box", WebkitLineClamp: frame.type === "text1" ? 2 : frame.type === "text2" ? 5 : 1, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere", wordBreak: "break-word" }}>
           {currentText()}
         </div>
       </div>
@@ -362,98 +337,35 @@ function FrameBox({
   );
 }
 
-function PositionControl({ 
-  label, 
-  position, 
-  onChange 
-}: { 
-  label: string; 
-  position: TextPosition; 
-  onChange: (pos: TextPosition) => void;
-}) {
+function PositionControl({ label, position, onChange }: { label: string; position: TextPosition; onChange: (pos: TextPosition) => void }) {
+  const updateNumber = (field: "top" | "left" | "width" | "height" | "fontSize", rawValue: string) => {
+    if (rawValue.trim() === "") return;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) return;
+    const limits = { top: [0, 100], left: [0, 100], width: [10, 100], height: [5, 100], fontSize: [8, 72] } as const;
+    const [min, max] = limits[field];
+    onChange({ ...position, [field]: Math.max(min, Math.min(max, value)) });
+  };
+
   return (
     <div className="rounded-xl border border-[var(--p-line)] bg-[var(--p-ink-2)] p-3 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-[var(--p-moon)]">{label}</span>
-        <button 
-          onClick={() => onChange({ top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: 'center' })}
-          className="text-[10px] text-[var(--p-violet)] hover:underline"
-        >
-          Reset
-        </button>
+        <button type="button" onClick={() => onChange({ top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: "center" })} className="text-[10px] text-[var(--p-violet)] hover:underline">Reset</button>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Top (%)</label>
-          <input
-            type="number"
-            value={position.top}
-            onChange={(e) => onChange({ ...position, top: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
-            min="0"
-            max="100"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Left (%)</label>
-          <input
-            type="number"
-            value={position.left}
-            onChange={(e) => onChange({ ...position, left: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
-            min="0"
-            max="100"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Width (%)</label>
-          <input
-            type="number"
-            value={position.width}
-            onChange={(e) => onChange({ ...position, width: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
-            min="10"
-            max="100"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Height (%)</label>
-          <input
-            type="number"
-            value={position.height}
-            onChange={(e) => onChange({ ...position, height: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
-            min="5"
-            max="100"
-          />
-        </div>
-        <div>
-          <label className="text-[10px] text-[var(--p-mute)] block mb-1">Font Size (px)</label>
-          <input
-            type="number"
-            value={position.fontSize}
-            onChange={(e) => onChange({ ...position, fontSize: Number(e.target.value) })}
-            className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs"
-            min="8"
-            max="72"
-          />
-        </div>
+        {([["top", "Top (%)", 0, 100], ["left", "Left (%)", 0, 100], ["width", "Width (%)", 10, 100], ["height", "Height (%)", 5, 100], ["fontSize", "Font Size (px)", 8, 72]] as const).map(([field, fieldLabel, min, max]) => (
+          <div key={field}>
+            <label className="text-[10px] text-[var(--p-mute)] block mb-1">{fieldLabel}</label>
+            <input type="number" value={position[field]} onChange={(e) => updateNumber(field, e.target.value)} className="w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink)] px-2 py-1 text-xs" min={min} max={max} />
+          </div>
+        ))}
       </div>
       <div>
         <label className="text-[10px] text-[var(--p-mute)] block mb-1">Align</label>
         <div className="flex gap-1">
-          {(['left', 'center', 'right'] as TextAlign[]).map((align) => (
-            <button
-              key={align}
-              onClick={() => onChange({ ...position, align })}
-              className={`flex-1 rounded-lg px-2 py-1 text-xs capitalize ${
-                position.align === align 
-                  ? 'bg-[var(--p-violet)] text-[var(--p-ink)]' 
-                  : 'border border-[var(--p-line-2)] text-[var(--p-mute)]'
-              }`}
-            >
-              {align}
-            </button>
+          {(["left", "center", "right"] as TextAlign[]).map((align) => (
+            <button type="button" key={align} onClick={() => onChange({ ...position, align })} className={`flex-1 rounded-lg px-2 py-1 text-xs capitalize ${position.align === align ? "bg-[var(--p-violet)] text-[var(--p-ink)]" : "border border-[var(--p-line-2)] text-[var(--p-mute)]"}`}>{align}</button>
           ))}
         </div>
       </div>
@@ -476,12 +388,12 @@ function Section({ title, children, actions }: { title: string; children: React.
 const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profileUsername }, ref) => {
   const [step, setStep] = useState<WizardStep>("input");
   const [inputValue, setInputValue] = useState("");
-  const [selectedZodiac, setSelectedZodiac] = useState<typeof ZODIAC_SIGNS[0] | null>(null);
+  const [selectedZodiac, setSelectedZodiac] = useState<ZodiacSign | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<PostFormat | null>(null);
   const [text1, setText1] = useState("");
   const [text2, setText2] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
-  
+
   const [showDate, setShowDate] = useState(true);
   const [showWeekRange, setShowWeekRange] = useState(false);
   const [showLogo, setShowLogo] = useState(true);
@@ -496,489 +408,359 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [isGeneratingText1, setIsGeneratingText1] = useState(false);
   const [isGeneratingText2, setIsGeneratingText2] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
-
   const [frames, setFrames] = useState<Frame[]>([]);
 
   const operationIdRef = useRef<string | null>(null);
+  const publishingLockRef = useRef(false);
 
   const addLog = (message: string, type: "info" | "debug" | "error" | "success" | "warning" = "info") => {
     const timestamp = new Date().toLocaleTimeString();
     const opId = operationIdRef.current || "NO_OP_ID";
-    const newLog = `[${timestamp}] [${opId}] ${message}`;
-    setLogs(prev => [...prev, newLog]);
-    console.log(`[${type.toUpperCase()}] ${newLog}`);
-    pushEvent("system", message);
+    const entry = `[${timestamp}] [${opId}] ${message}`;
+    setLogs((previous) => [...previous, entry]);
+    console.log(`[${type.toUpperCase()}] ${entry}`);
+    try { pushEvent("system", message); } catch (error) { console.error("Failed to push system event:", error); }
   };
 
-  const imageUrl = selectedZodiac ? selectedZodiac.imageUrl : null;
-
-  const getCurrentDate = () => new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const imageUrl = selectedZodiac?.imageUrl ?? null;
+  const getCurrentDate = () => new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const getWeekRange = () => {
-    const startDate = new Date(); const endDate = new Date(); endDate.setDate(startDate.getDate() + 7);
-    return `${startDate.toLocaleDateString('en-US', { day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { day: 'numeric' })} ${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 7);
+    return `${startDate.toLocaleDateString("en-US", { day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric" })} ${startDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
   };
-
   const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
 
   const saveFrameLayout = () => {
-    if (frames.length === 0) {
-      addLog("⚠️ არ არის ჩარჩოები შესანახად!", "warning");
-      return;
-    }
     try {
-      localStorage.setItem('lunara_frame_layout', JSON.stringify(frames));
-      addLog("✅ ჩარჩოების მდებარეობა შენახულია!", "success");
+      localStorage.setItem("lunara_frame_layout", JSON.stringify(frames));
+      addLog("ჩარჩოების მდებარეობა შენახულია.", "success");
     } catch (error) {
-      addLog(`❌ შეცდომა შენახვისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
+      addLog(`ჩარჩოების შენახვა ვერ მოხერხდა: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
     }
   };
 
   const loadFrameLayout = () => {
     try {
-      const saved = localStorage.getItem('lunara_frame_layout');
-      if (saved) {
-        const parsedFrames = JSON.parse(saved);
-        setFrames(parsedFrames);
-        addLog("✅ ჩარჩოების მდებარეობა ჩაიტვირთა!", "success");
-      }
+      const saved = localStorage.getItem("lunara_frame_layout");
+      if (!saved) return;
+      const parsed: unknown = JSON.parse(saved);
+      if (!Array.isArray(parsed)) throw new Error("Saved frame layout has an invalid format.");
+      setFrames(parsed as Frame[]);
+      addLog("ჩარჩოების მდებარეობა ჩაიტვირთა.", "success");
     } catch (error) {
-      addLog(`⚠️ შენახული ჩარჩოების ჩატვირთვა ვერ მოხერხდა: ${error instanceof Error ? error.message : 'Unknown'}`, "warning");
+      addLog(`ჩარჩოების ჩატვირთვა ვერ მოხერხდა: ${error instanceof Error ? error.message : "Unknown error"}`, "warning");
     }
   };
 
-  useEffect(() => {
-    loadFrameLayout();
-  }, []);
+  useEffect(() => { loadFrameLayout(); }, []);
 
   const addFrame = (type: FrameType) => {
-    const newFrame: Frame = {
-      id: `frame-${Date.now()}`,
-      type,
-      position: { top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: 'center' }
-    };
-    setFrames(prev => [...prev, newFrame]);
-    addLog(`🖼️ Added new frame for ${type}`, "success");
+    const newFrame: Frame = { id: `frame-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, type, position: { top: 20, left: 20, width: 60, height: 20, fontSize: 24, align: "center" } };
+    setFrames((previous) => [...previous, newFrame]);
+    addLog(`დაემატა ახალი ჩარჩო: ${type}`, "success");
   };
 
-  const getFrameByType = (type: FrameType): Frame | undefined => {
-    return frames.find(f => f.type === type);
+  const updateFrameType = (id: string, type: FrameType) => {
+    setFrames((previous) => previous.map((frame) => {
+      if (frame.id === id) return { ...frame, type };
+      if (type !== "none" && frame.type === type) return { ...frame, type: "none" };
+      return frame;
+    }));
   };
 
-  const updateFramePosition = (id: string, newPosition: TextPosition) => {
-    setFrames(prev => prev.map(f => f.id === id ? { ...f, position: newPosition } : f));
+  const getFrameByType = (type: FrameType) => frames.find((frame) => frame.type === type);
+  
+  const updateFramePosition = (id: string, position: TextPosition) => {
+    setFrames((previous) => previous.map((frame) => (frame.id === id ? { ...frame, position } : frame)));
+  };
+
+  const removeFrame = (id: string) => {
+    setFrames((previous) => previous.filter((frame) => frame.id !== id));
+    addLog("ჩარჩო წაიშალა.", "info");
   };
 
   useEffect(() => {
-    addLog(`📊 STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name || 'null'}, format=${selectedFormat || 'null'}`, "debug");
+    addLog(`STATE CHANGE: step=${step}, zodiac=${selectedZodiac?.name ?? "null"}, format=${selectedFormat ?? "null"}`, "debug");
   }, [step, selectedZodiac, selectedFormat]);
 
   useEffect(() => {
-    if (text1 || text2) {
-      addLog(`📝 TEXT UPDATE: Text1="${text1.substring(0, 30)}..." (${text1.length}), Text2="${text2.substring(0, 30)}..." (${text2.length})`, "debug");
-    }
+    if (text1 || text2) addLog(`TEXT UPDATE: Text1=${text1.length} chars, Text2=${text2.length} chars`, "debug");
   }, [text1, text2]);
 
   const handleZodiacSubmit = () => {
-    const upperInput = inputValue.trim().toUpperCase();
-    const found = ZODIAC_SIGNS.find(z => z.search.toUpperCase().includes(upperInput));
-    if (found) { 
-      setSelectedZodiac(found); 
-      addLog(`✅ Zodiac selected: ${found.name}`, "success"); 
-      setStep("format"); 
-      return found; 
-    } else { 
-      addLog(`❌ Zodiac not found for: "${upperInput}"`, "error"); 
-      return null; 
-    }
+    const normalizedInput = inputValue.trim().toUpperCase();
+    if (!normalizedInput) { addLog("გთხოვ, შეიყვანე ზოდიაქოს ნიშანი.", "warning"); return null; }
+    const found = ZODIAC_SIGNS.find((sign) => sign.name === normalizedInput);
+    if (!found) { addLog(`ზოდიაქოს ნიშანი ვერ მოიძებნა: "${normalizedInput}"`, "error"); return null; }
+    setSelectedZodiac(found);
+    setUploadedImageUrl(null);
+    addLog(`არჩეულია ზოდიაქო: ${found.name}`, "success");
+    setStep("format");
+    return found;
   };
 
-  const handleFormatSelect = (format: PostFormat) => { 
-    setSelectedFormat(format); 
-    addLog(`✅ Format selected: ${format}`, "success"); 
-    setStep("preview"); 
+  const handleFormatSelect = (format: PostFormat) => {
+    setSelectedFormat(format);
+    setUploadedImageUrl(null);
+    addLog(`არჩეულია ფორმატი: ${format}`, "success");
+    setStep("preview");
   };
 
   const handleRandomizeImage = () => {
-    const randomZodiac = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
-    setSelectedZodiac(randomZodiac);
-    addLog(`🎲 შეიცვალა ზოდიაქოს სურათი: ${randomZodiac.name}`, "info");
+    const randomSign = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)];
+    setSelectedZodiac(randomSign);
+    setInputValue(randomSign.name);
+    setUploadedImageUrl(null);
+    addLog(`შემთხვევით არჩეული ზოდიაქო: ${randomSign.name}`, "info");
   };
 
-  const handleGenerateText1 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], config?: any) => {
-    const targetZodiac = overrideZodiac || selectedZodiac;
-    if (!targetZodiac) { 
-      addLog("❌ Please select a zodiac sign first!", "error"); 
-      return null; 
-    }
+  const handleGenerateText1 = async (overrideZodiac?: ZodiacSign, config?: Record<string, unknown> | null) => {
+    const targetZodiac = overrideZodiac ?? selectedZodiac;
+    if (!targetZodiac) { addLog("ჯერ აირჩიე ზოდიაქოს ნიშანი.", "error"); return null; }
     setIsGeneratingText1(true);
-    addLog(`⏳ ითხოვს Text 1-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(`AI ქმნის Text 1-ს (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateViralText1(targetZodiac.name, config);
-      setText1(generatedText);
-      addLog(`✅ მიიღო Text 1: "${generatedText}" (სიგრძე: ${generatedText.length})`, "success");
-      setIsGeneratingText1(false);
-      return generatedText;
+      if (!generatedText?.trim()) throw new Error("AI-მ ცარიელი Text 1 დააბრუნა.");
+      setText1(generatedText.trim());
+      setUploadedImageUrl(null);
+      addLog("Text 1 წარმატებით შეიქმნა.", "success");
+      return generatedText.trim();
     } catch (error) {
-      addLog(`❌ შეცდომა Text 1-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
-      setIsGeneratingText1(false);
+      addLog(`Text 1-ის გენერაცია ვერ მოხერხდა: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       return null;
-    }
+    } finally { setIsGeneratingText1(false); }
   };
 
-  const handleGenerateText2 = async (overrideZodiac?: typeof ZODIAC_SIGNS[0], overrideText1?: string, config?: any) => {
-    const targetZodiac = overrideZodiac || selectedZodiac;
-    const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
-    if (!targetZodiac) { 
-      addLog("❌ Please select a zodiac sign first!", "error"); 
-      return null; 
-    }
+  const handleGenerateText2 = async (overrideZodiac?: ZodiacSign, overrideText1?: string, config?: Record<string, unknown> | null) => {
+    const targetZodiac = overrideZodiac ?? selectedZodiac;
+    const targetText1 = overrideText1 ?? text1;
+    if (!targetZodiac) { addLog("ჯერ აირჩიე ზოდიაქოს ნიშანი.", "error"); return null; }
     setIsGeneratingText2(true);
-    addLog(`⏳ ითხოვს Text 2-ს AI-დან (${targetZodiac.name})...`, "info");
+    addLog(`AI ქმნის Text 2-ს (${targetZodiac.name})...`, "info");
     try {
       const generatedText = await generateHoroscopeText2(targetZodiac.name, targetText1, config);
-      let cleanedText = generatedText;
-      if (targetText1 && targetText1.trim().length > 0) {
-        const text1Lower = targetText1.toLowerCase().trim();
-        const cleanedLower = cleanedText.toLowerCase().trim();
-        if (cleanedLower.startsWith(text1Lower)) {
-          cleanedText = cleanedText.slice(targetText1.length).trim().replace(/^[:\-\s]+/, '').trim();
-        }
+      if (!generatedText?.trim()) throw new Error("AI-მ ცარიელი Text 2 დააბრუნა.");
+      let cleanedText = generatedText.trim();
+      if (targetText1.trim() && cleanedText.toLowerCase().startsWith(targetText1.trim().toLowerCase())) {
+        cleanedText = cleanedText.slice(targetText1.trim().length).trim().replace(/^[:\-\s]+/, "").trim();
       }
       setText2(cleanedText);
-      addLog(`✅ მიიღო Text 2: "${cleanedText}" (სიგრძე: ${cleanedText.length})`, "success");
-      setIsGeneratingText2(false);
+      setUploadedImageUrl(null);
+      addLog("Text 2 წარმატებით შეიქმნა.", "success");
       return cleanedText;
     } catch (error) {
-      addLog(`❌ შეცდომა Text 2-ის გენერაციისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
-      setIsGeneratingText2(false);
+      addLog(`Text 2-ის გენერაცია ვერ მოხერხდა: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       return null;
-    }
+    } finally { setIsGeneratingText2(false); }
   };
 
-  const handleReadyAndUpload = async (
-    overrideZodiac?: typeof ZODIAC_SIGNS[0], 
-    overrideFormat?: PostFormat,
-    _overrideText1?: string,
-    _overrideText2?: string
-  ) => {
-    const newOpId = `OP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    operationIdRef.current = newOpId;
+  const handleReadyAndUpload = async (overrideZodiac?: ZodiacSign, overrideFormat?: PostFormat, overrideText1?: string, overrideText2?: string) => {
+    if (publishingLockRef.current) { addLog("ატვირთვის პროცესი უკვე მიმდინარეობს.", "warning"); return null; }
+    const targetZodiac = overrideZodiac ?? selectedZodiac;
+    const targetFormat = overrideFormat ?? selectedFormat;
+    const targetText1 = overrideText1 ?? text1;
+    const targetText2 = overrideText2 ?? text2;
+    const preview = previewRef.current;
+    if (!targetZodiac || !targetFormat || !preview) { addLog("ატვირთვისთვის აუცილებელი მონაცემები აკლია.", "error"); return null; }
 
-    addLog(`\n🚀 ========== STARTING UPLOAD PROCESS ==========`);
-    addLog(`🔖 Operation ID: ${newOpId}`);
-    addLog(`⏰ Timestamp: ${new Date().toISOString()}`);
-
-    if (isPublishing) {
-      addLog(`⚠️ WARNING: Upload already in progress! Blocking duplicate call.`, "warning");
-      operationIdRef.current = null;
-      return null;
-    }
-
-    const targetZodiac = overrideZodiac || selectedZodiac;
-    const targetFormat = overrideFormat || selectedFormat;
-
-    addLog(`📋 INPUT PARAMETERS:`);
-    addLog(`   • Zodiac: ${targetZodiac?.name || 'NULL'}`);
-    addLog(`   • Format: ${targetFormat || 'NULL'}`);
-    addLog(`   • Text1: "${text1.substring(0, 50)}..." (${text1.length} chars)`);
-    addLog(`   • Text2: "${text2.substring(0, 50)}..." (${text2.length} chars)`);
-    addLog(`   • Preview Ref Exists: ${!!previewRef.current}`);
-
-    if (!targetZodiac || !targetFormat || !previewRef.current) { 
-      addLog(`❌ VALIDATION FAILED: Missing required parameters`, "error");
-      operationIdRef.current = null;
-      return null; 
-    }
-    
+    publishingLockRef.current = true;
     setIsPublishing(true);
-    addLog(`📸 [1/3] ვიღებთ მაღალი ხარისხის სქრინშოტს (Live Preview)...`, "info");
+    const operationId = `OP_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    operationIdRef.current = operationId;
+    addLog(`ატვირთვის პროცესი დაიწყო (${operationId}).`, "info");
 
     try {
-      addLog(`⏳ Waiting 1000ms for DOM stabilization...`, "debug");
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      addLog(`📷 Capturing screenshot with html-to-image...`, "debug");
-      const dataUrl = await toJpeg(previewRef.current, {
-        quality: 1.0,
-        cacheBust: true,
-        backgroundColor: '#ffffff',
+      if (document.fonts?.ready) await document.fonts.ready;
+      const dataUrl = await toJpeg(preview, { quality: 1, cacheBust: true, backgroundColor: "#ffffff", pixelRatio: 2 });
+      const outputDimensions = targetFormat === "story" ? { width: 1080, height: 1920 } : targetFormat === "carousel" ? { width: 1080, height: 1080 } : { width: 1080, height: 1350 };
+      
+      const canvas = document.createElement("canvas");
+      canvas.width = outputDimensions.width;
+      canvas.height = outputDimensions.height;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Canvas context-ის შექმნა ვერ მოხერხდა.");
+      
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("Preview სურათის ჩატვირთვა ვერ მოხერხდა."));
+        image.src = dataUrl;
       });
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-      addLog(`✅ Screenshot captured! Data URL length: ${(dataUrl.length / 1024).toFixed(1)}KB`, "success");
-      addLog(`⏳ [2/3] ვამზადებთ 1080x1350 ზომის სურათს (Canvas Resize)...`, "info");
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = 1080;
-      canvas.height = 1350;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error("Failed to get canvas context");
-      }
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, 1080, 1350);
-
-      const img = new Image();
-      img.src = dataUrl;
-      await new Promise(resolve => { img.onload = resolve; });
-
-      ctx.drawImage(img, 0, 0, 1080, 1350);
-      addLog(`✅ Canvas resized to 1080x1350`, "success");
-
-      const finalDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      const finalDataUrl = canvas.toDataURL("image/jpeg", 0.95);
       const response = await fetch(finalDataUrl);
+      if (!response.ok) throw new Error("სურათის Blob ფორმატში გარდაქმნა ვერ მოხერხდა.");
+      
       const blob = await response.blob();
-
       const fileName = `post-${targetZodiac.name.toLowerCase()}-${Date.now()}.jpg`;
       const uploadPath = `posts/${fileName}`;
+      addLog(`სურათი იტვირთება Supabase-ში: ${fileName}`, "info");
 
-      addLog(`⏳ [3/3] Uploading to Supabase...`, "info");
-      addLog(`   • File Name: ${fileName}`);
-      addLog(`   • Upload Path: ${uploadPath}`);
-      addLog(`   • Blob Size: ${(blob.size / 1024).toFixed(1)}KB`);
+      const supabase = getSupabase();
+      const { error: uploadError } = await supabase.storage.from("lunara-assets").upload(uploadPath, blob, { contentType: "image/jpeg", upsert: false });
+      if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`);
 
-      const { error: uploadError } = await supabase.storage
-        .from('lunara-assets')
-        .upload(uploadPath, blob, { contentType: 'image/jpeg', upsert: false });
+      const { data: publicUrlData } = supabase.storage.from("lunara-assets").getPublicUrl(uploadPath);
+      if (!publicUrlData.publicUrl) throw new Error("საჯარო URL-ის მიღება ვერ მოხერხდა.");
 
-      if (uploadError) {
-        addLog(`❌ Upload Error: ${uploadError.message}`, "error");
-        throw new Error(`Supabase Upload Failed: ${uploadError.message}`);
-      }
-      
-      const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_OS_URL}/storage/v1/object/public/lunara-assets/${uploadPath}`;
-      
-      addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`, "success");
-      addLog(`✅ URL: ${publicUrl}`, "success");
-      addLog(`\n🏁 ========== UPLOAD PROCESS COMPLETED ==========\n`);
-      
-      setUploadedImageUrl(publicUrl);
-      return publicUrl;
-
+      setUploadedImageUrl(publicUrlData.publicUrl);
+      addLog(`სურათი წარმატებით აიტვირთა (${(blob.size / 1024).toFixed(1)} KB).`, "success");
+      return publicUrlData.publicUrl;
     } catch (error) {
-      addLog(`❌ CRITICAL FAILURE: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
-      console.error("Screenshot/Upload Error Details:", error);
-      addLog(`\n❌ ========== UPLOAD PROCESS FAILED ==========\n`);
+      addLog(`სურათის ატვირთვა ვერ მოხერხდა: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      console.error("Instagram image upload error:", error);
       return null;
     } finally {
+      publishingLockRef.current = false;
       setIsPublishing(false);
       operationIdRef.current = null;
     }
   };
 
-  const handlePublish = async (
-    overrideZodiac?: typeof ZODIAC_SIGNS[0], 
-    overrideFormat?: PostFormat, 
-    overrideText1?: string, 
-    overrideText2?: string, 
-    overrideImageUrl?: string
-  ) => {
-    if (isPublishing) {
-      addLog(`⚠️ WARNING: Publish already in progress! Blocking duplicate call.`, "warning");
+  const handlePublish = async (overrideZodiac?: ZodiacSign, overrideFormat?: PostFormat, overrideText1?: string, overrideText2?: string, overrideImageUrl?: string) => {
+    if (publishingLockRef.current) { addLog("გამოქვეყნების პროცესი უკვე მიმდინარეობს.", "warning"); return false; }
+    const targetZodiac = overrideZodiac ?? selectedZodiac;
+    const targetFormat = overrideFormat ?? selectedFormat;
+    const targetText1 = overrideText1 ?? text1;
+    const targetText2 = overrideText2 ?? text2;
+    const targetImageUrl = overrideImageUrl ?? uploadedImageUrl;
+
+    if (!targetZodiac || !targetFormat || !targetImageUrl || !targetText2.trim()) {
+      addLog("გამოქვეყნებისთვის საჭიროა ზოდიაქო, ფორმატი, სურათი და Text 2.", "error");
       return false;
     }
+
+    publishingLockRef.current = true;
     setIsPublishing(true);
+    operationIdRef.current = operationIdRef.current ?? `PUB_${Date.now()}`;
 
-    const targetZodiac = overrideZodiac || selectedZodiac;
-    const targetFormat = overrideFormat || selectedFormat;
-    const targetText1 = overrideText1 !== undefined ? overrideText1 : text1;
-    const targetText2 = overrideText2 !== undefined ? overrideText2 : text2;
-    const targetImageUrl = overrideImageUrl || uploadedImageUrl;
-
-    addLog(`\n🚀 ========== STARTING PUBLISH PROCESS ==========`);
-    addLog(`🔖 Operation ID: ${operationIdRef.current || 'NO_ID'}`);
-
-    if (!targetImageUrl || !targetText2 || !targetZodiac || !targetFormat) {
-      addLog(`❌ PRE-FLIGHT CHECK FAILED:`, "error");
-      setIsPublishing(false);
-      return false;
-    }
-    
-    addLog(`🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
-    
     try {
       const payload = {
-        zodiacName: targetZodiac.name,
-        format: targetFormat,
-        text1: targetText1,
-        text2: targetText2,
+        zodiacName: targetZodiac.name, format: targetFormat, text1: targetText1, text2: targetText2,
         generatedHashtags: showHashtags ? generateDynamicHashtags(targetText2, targetZodiac.name) : undefined,
-        imageUrl: targetImageUrl,
-        profileUsername: profileUsername
+        imageUrl: targetImageUrl, profileUsername,
       };
 
-      const response = await fetch('/api/instagram/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
+      const response = await fetch("/api/instagram/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const responseText = await response.text();
-      let data;
-      try { data = JSON.parse(responseText); } catch (e) { 
-        addLog(`❌ Invalid JSON response: ${responseText}`, "error");
-        throw new Error(`Invalid JSON: ${responseText}`); 
-      }
-      
-      if (data.success) {
-        addLog(`🎉 წარმატებით გამოქვეყნდა! Post ID: ${data.postId}`, "success");
-        
-        if (data.debugInfo) {
-          addLog(data.debugInfo, "debug");
-        }
-        
-        await supabase.from('published_content').insert([{
-          content_type: targetFormat,
-          zodiac_sign: targetZodiac.name,
-          caption: `${targetText1}\n\n${targetText2}`,
-          image_url: targetImageUrl,
-          instagram_post_id: data.postId,
-          status: 'published',
-          agent_used: 'client_agent'
-        }]);
+      let data: { success?: boolean; postId?: string; error?: string; details?: unknown; debugInfo?: string };
+      try { data = JSON.parse(responseText); } catch { throw new Error(`Instagram API-მ არასწორი JSON დააბრუნა (HTTP ${response.status}).`); }
 
-        addLog(`✅ Database record created`);
-        addLog(`📌 შენიშვნა: ფორმა არ გასუფთავებულა ავტომატურად, რათა შეძლოთ ლოგების ნახვა. გამოიყენეთ "Start New Post" ღილაკი.`);
-        
-        setIsPublishing(false);
-        return true;
-      } else {
-        addLog(`❌ API-მ დააბრუნა შეცდომა: ${data.error}`, "error");
-        
-        if (data.debugInfo) {
-          addLog(data.debugInfo, "debug");
-        }
-        
-        if (data.details) addLog(`🔍 [PUBLISH] Error Details: ${JSON.stringify(data.details)}`, "error");
-        
-        await supabase.from('published_content').insert([{
-          content_type: targetFormat,
-          zodiac_sign: targetZodiac.name,
-          caption: `${targetText1}\n\n${targetText2}`,
-          image_url: targetImageUrl,
-          instagram_post_id: null,
-          status: 'failed',
-          agent_used: 'client_agent',
-          error_message: data.error || 'Unknown error'
-        }]);
-        
-        setIsPublishing(false);
-        return false;
-      }
+      if (!response.ok || !data.success) throw new Error(data.error || `Instagram API request failed with status ${response.status}.`);
+
+      addLog(`Instagram-ზე გამოქვეყნება წარმატებულია. Post ID: ${data.postId ?? "N/A"}`, "success");
+      if (data.debugInfo) addLog(data.debugInfo, "debug");
+
+      const { error: databaseError } = await getSupabase().from("published_content").insert([{
+        content_type: targetFormat, zodiac_sign: targetZodiac.name, caption: `${targetText1}\n\n${targetText2}`,
+        image_url: targetImageUrl, instagram_post_id: data.postId ?? null, status: "published", agent_used: "client_agent",
+      }]);
+
+      if (databaseError) addLog(`Instagram-ზე გამოქვეყნდა, მაგრამ ბაზაში ჩაწერა ვერ მოხერხდა: ${databaseError.message}`, "warning");
+      else addLog("გამოქვეყნებული პოსტი ბაზაში ჩაიწერა.", "success");
+      return true;
     } catch (error) {
-      addLog(`💥 კრიტიკული შეცდომა: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
-      setIsPublishing(false);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      addLog(`გამოქვეყნება ვერ მოხერხდა: ${message}`, "error");
+      try {
+        await getSupabase().from("published_content").insert([{
+          content_type: targetFormat ?? "post", zodiac_sign: targetZodiac?.name ?? "UNKNOWN", caption: `${targetText1}\n\n${targetText2}`,
+          image_url: targetImageUrl ?? null, instagram_post_id: null, status: "failed", agent_used: "client_agent", error_message: message,
+        }]);
+      } catch (databaseError) { console.error("Failed to save publish error:", databaseError); }
       return false;
+    } finally {
+      publishingLockRef.current = false;
+      setIsPublishing(false);
+      operationIdRef.current = null;
     }
   };
 
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
-      if (isPublishing) {
-        addLog("⚠️ Agent already running! Blocking duplicate execution.", "warning");
-        return false;
-      }
+      if (publishingLockRef.current) { addLog("აგენტის ოპერაცია უკვე მიმდინარეობს.", "warning"); return false; }
+      const zodiac = ZODIAC_SIGNS.find((sign) => sign.name === zodiacName.trim().toUpperCase());
+      if (!zodiac) { addLog(`ზოდიაქო ვერ მოიძებნა: ${zodiacName}`, "error"); return false; }
+      addLog(`PostAgent დაიწყო: ${zodiac.name}`, "info");
 
-      addLog(`\n🤖 ========== AGENT STARTED ==========`);
-      addLog(`🎯 Target Zodiac: ${zodiacName}`);
-      
-      const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
-      if (!zodiac) { 
-        addLog(`❌ ზოდიაქო ვერ მოიძებნა: ${zodiacName}`, "error"); 
-        return false; 
-      }
+      try {
+        const { data: config, error: configError } = await getSupabase().from("agent_config").select("master_prompt, thinking_style, skills_constraints").eq("agent_type", "post").single();
+        if (configError) addLog("აგენტის კონფიგურაცია ვერ ჩაიტვირთა. გამოყენებული იქნება ნაგულისხმევი.", "warning");
+        else addLog("აგენტის კონფიგურაცია ჩაიტვირთა.", "success");
 
-      addLog("⏳ იტვირთება PostAgent-ის კონფიგურაცია ბაზიდან...", "info");
-      const { data: config, error: configError } = await supabase
-        .from('agent_config')
-        .select('master_prompt, thinking_style, skills_constraints')
-        .eq('agent_type', 'post')
-        .single();
+        setInputValue(zodiac.name); setSelectedZodiac(zodiac); setSelectedFormat("post"); setStep("preview"); setUploadedImageUrl(null);
+        await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
 
-      if (configError || !config) {
-        addLog(`⚠️ კონფიგურაციის ჩატვირთვა ვერ მოხერხდა, გამოიყენება დეფოლტ ლოგიკა.`, "warning");
-      } else {
-        addLog("✅ კონფიგურაცია წარმატებით ჩაიტვირთა!", "success");
-      }
+        const generatedText1 = await handleGenerateText1(zodiac, config ?? null);
+        if (!generatedText1) { addLog("Text 1-ის გენერაცია ვერ მოხერხდა.", "error"); return false; }
 
-      setInputValue(zodiacName);
-      setSelectedZodiac(zodiac);
-      setStep("format");
-      await new Promise(r => setTimeout(r, 1500));
+        const generatedText2 = await handleGenerateText2(zodiac, generatedText1, config ?? null);
+        if (!generatedText2) { addLog("Text 2-ის გენერაცია ვერ მოხერხდა.", "error"); return false; }
 
-      setSelectedFormat("post");
-      setStep("preview");
-      await new Promise(r => setTimeout(r, 1500));
+        await new Promise<void>((resolve) => { requestAnimationFrame(() => { requestAnimationFrame(() => resolve()); }); });
+        const imageUrl = await handleReadyAndUpload(zodiac, "post", generatedText1, generatedText2);
+        if (!imageUrl) { addLog("სურათის ატვირთვა ვერ მოხერხდა.", "error"); return false; }
 
-      addLog("⏳ ნაბიჯი 1: Text 1-ის გენერაცია...", "info");
-      const t1 = await handleGenerateText1(zodiac, config);
-      if (!t1) { addLog("❌ Text 1 generation failed. Aborting.", "error"); return false; }
-      await new Promise(r => setTimeout(r, 1500));
-      
-      addLog("⏳ ნაბიჯი 2: Text 2-ის გენერაცია...", "info");
-      const t2 = await handleGenerateText2(zodiac, t1, config);
-      if (!t2) { addLog("❌ Text 2 generation failed. Aborting.", "error"); return false; }
-      await new Promise(r => setTimeout(r, 1500));
+        const published = await handlePublish(zodiac, "post", generatedText1, generatedText2, imageUrl);
+        if (!published) { addLog("PostAgent-მა გამოქვეყნება ვერ შეძლო.", "error"); return false; }
 
-      addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
-      const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
-      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); return false; }
-      await new Promise(r => setTimeout(r, 1500));
-
-      addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
-      await new Promise(r => setTimeout(r, 7000));
-      
-      addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
-      const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
-      if (success) {
-        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
+        addLog("PostAgent-მა პროცესი წარმატებით დაასრულა.", "success");
         return true;
-      } else {
-        addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა", "error");
+      } catch (error) {
+        addLog(`PostAgent-ის შეცდომა: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
         return false;
       }
-    }
+    },
   }));
 
-  const activeFormatOption = FORMAT_OPTIONS.find(f => f.id === selectedFormat);
-
-  const text1Frame = getFrameByType('text1');
-  const text2Frame = getFrameByType('text2');
-  const zodiacFrame = getFrameByType('zodiac');
-  const dateFrame = getFrameByType('date');
-  const telegramFrame = getFrameByType('telegram');
+  const activeFormatOption = FORMAT_OPTIONS.find((format) => format.id === selectedFormat);
+  const text1Frame = getFrameByType("text1");
+  const text2Frame = getFrameByType("text2");
+  const zodiacFrame = getFrameByType("zodiac");
+  const dateFrame = getFrameByType("date");
+  const telegramFrame = getFrameByType("telegram");
 
   return (
     <div style={THEME} className="text-[var(--p-moon)]">
       <Stepper current={step} />
+
       {step === "input" && (
         <div className="mx-auto max-w-md py-4 text-center">
           <h3 className="text-xl font-semibold tracking-tight">Choose a zodiac sign</h3>
-          <p className="mt-1.5 text-sm text-[var(--p-mute)]">Type a sign, or let AI prepare everything automatically.</p>
-          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="e.g., ARIES or LEO" aria-label="Zodiac sign" className={`${fieldClass} mt-6 py-4 text-center font-mono text-lg`} onKeyDown={(e) => e.key === 'Enter' && handleZodiacSubmit()} />
+          <p className="mt-1.5 text-sm text-[var(--p-mute)]">Enter a zodiac sign to prepare your Instagram post.</p>
+          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder="e.g. ARIES or LEO" aria-label="Zodiac sign" className={`${fieldClass} mt-6 py-4 text-center font-mono text-lg`} onKeyDown={(e) => { if (e.key === "Enter") handleZodiacSubmit(); }} />
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <button onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue Manually</button>
-            <button onClick={() => { const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; setInputValue(random.name); handleZodiacSubmit(); }} className={`${btnGhost} flex-1`}>🤖 AI Auto-Prepare</button>
+            <button type="button" onClick={handleZodiacSubmit} className={`${btnPrimary} flex-1`}>Continue</button>
+            <button type="button" onClick={() => { const random = ZODIAC_SIGNS[Math.floor(Math.random() * ZODIAC_SIGNS.length)]; setInputValue(random.name); setSelectedZodiac(random); setStep("format"); setUploadedImageUrl(null); }} className={`${btnGhost} flex-1`}>Random zodiac</button>
           </div>
         </div>
       )}
+
       {step === "format" && selectedZodiac && (
         <div>
-          <div className="mb-6 text-center"><h3 className="text-xl font-semibold tracking-tight">Pick a format for {selectedZodiac.name}</h3></div>
+          <div className="mb-6 text-center"><h3 className="text-xl font-semibold tracking-tight">Choose a format for {selectedZodiac.name}</h3></div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {FORMAT_OPTIONS.map((fmt) => (
-              <button key={fmt.id} onClick={() => handleFormatSelect(fmt.id)} className="group flex items-center gap-4 rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4 text-left transition-colors hover:border-[var(--p-violet)] sm:flex-col sm:items-start sm:gap-5 sm:p-5">
+            {FORMAT_OPTIONS.map((format) => (
+              <button type="button" key={format.id} onClick={() => handleFormatSelect(format.id)} className="group flex items-center gap-4 rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4 text-left transition-colors hover:border-[var(--p-violet)] sm:flex-col sm:items-start sm:gap-5 sm:p-5">
                 <span className="flex h-16 w-16 shrink-0 items-center justify-center sm:h-20 sm:w-full sm:justify-start">
-                  <span className="block border-2 border-[var(--p-mute)] transition-colors group-hover:border-[var(--p-violet)]" style={{ aspectRatio: fmt.ratioCss, height: fmt.id === "carousel" ? "75%" : "100%", borderRadius: 8 }} />
+                  <span className="block border-2 border-[var(--p-mute)] transition-colors group-hover:border-[var(--p-violet)]" style={{ aspectRatio: format.ratioCss, height: format.id === "carousel" ? "75%" : "100%", borderRadius: 8 }} />
                 </span>
-                <span><span className="block text-base font-semibold">{fmt.label}</span><span className="mt-0.5 block text-xs text-[var(--p-mute)]">{fmt.size} · {fmt.ratio}</span></span>
+                <span><span className="block text-base font-semibold">{format.label}</span><span className="mt-0.5 block text-xs text-[var(--p-mute)]">{format.size} · {format.ratio}</span></span>
               </button>
             ))}
           </div>
-          <button onClick={() => setStep("input")} className="mt-5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Go back</button>
+          <button type="button" onClick={() => setStep("input")} className="mt-5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Go back</button>
         </div>
       )}
+
       {step === "preview" && selectedZodiac && imageUrl && (
         <div>
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -986,237 +768,166 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               <h3 className="text-xl font-semibold tracking-tight">Compose · {selectedZodiac.name}</h3>
               {activeFormatOption && <p className="mt-1 text-sm text-[var(--p-mute)]">{activeFormatOption.label} · {activeFormatOption.size}</p>}
             </div>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleRandomizeImage} 
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-2 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 hover:text-[var(--p-violet)]"
-                title="შემთხვევითი ზოდიაქოს სურათი"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                Randomize
-              </button>
-              <button 
-                onClick={saveFrameLayout} 
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-2 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 hover:text-[var(--p-ok)]"
-                title="ჩარჩოების მდებარეობის დასეივება"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                ჩარჩოების მდებარეობის დასეივება
-              </button>
-              <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={handleRandomizeImage} className={btnGhost}>Randomize</button>
+              <button type="button" onClick={saveFrameLayout} className={btnGhost}>💾 Save Layout</button>
+              <button type="button" onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
             </div>
           </div>
+
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[auto_minmax(0,1fr)]">
             <div className="xl:sticky xl:top-24 xl:self-start">
               <div className="flex flex-col items-center rounded-2xl border border-[var(--p-line)] bg-[var(--p-ink)] p-4">
                 <div className="mb-3 flex w-full items-center justify-between text-xs text-[var(--p-mute)]">
                   <span className="font-semibold">Live preview</span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--p-ok)]" />
-                    Drag & resize frames
-                  </span>
+                  <span>Design canvas</span>
                 </div>
-                
-                <div 
-                  ref={previewRef} 
-                  className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center flex-shrink-0" 
-                  style={{ 
-                    aspectRatio: selectedFormat === 'story' ? '9/16' : selectedFormat === 'carousel' ? '1/1' : '4/5', 
-                    width: selectedFormat === 'story' ? '300px' : '400px', 
-                    maxWidth: '100%' 
-                  }}
-                >
-                  <img src={imageUrl} alt="Zodiac Base" className="absolute inset-0 w-full h-full object-cover pointer-events-none" crossOrigin="anonymous" />
-                  <div className="absolute inset-0 pointer-events-none z-0" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)' }} />
-                  
+
+                <div ref={previewRef} className="relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/5 bg-slate-900 shadow-2xl" style={{ aspectRatio: selectedFormat === "story" ? "9 / 16" : selectedFormat === "carousel" ? "1 / 1" : "4 / 5", width: selectedFormat === "story" ? "300px" : "400px", maxWidth: "100%" }}>
+                  <img src={imageUrl} alt={`${selectedZodiac.name} background`} className="pointer-events-none absolute inset-0 h-full w-full object-cover" crossOrigin="anonymous" />
+                  <div className="pointer-events-none absolute inset-0 z-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.4) 100%)" }} />
+
                   {showLogo && logoUrl && isLogoValid && (
-                    <div className="absolute z-20 transition-all duration-300" style={{ top: '2%', right: '2%', width: '12%', maxWidth: '50px', aspectRatio: '1/1' }}>
-                      <div className="w-full h-full rounded-full overflow-hidden border-2 border-white/40 shadow-lg bg-white/10">
-                        <img src={logoUrl} alt="Channel Logo" className="w-full h-full object-cover pointer-events-none" crossOrigin="anonymous" onError={() => setIsLogoValid(false)} />
+                    <div className="absolute z-20 transition-all duration-300" style={{ top: "2%", right: "2%", width: "12%", maxWidth: "50px", aspectRatio: "1 / 1" }}>
+                      <div className="h-full w-full overflow-hidden rounded-full border-2 border-white/40 bg-white/10 shadow-lg">
+                        <img src={logoUrl} alt="LUNARA logo" className="pointer-events-none h-full w-full object-cover" crossOrigin="anonymous" onError={() => setIsLogoValid(false)} />
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="absolute inset-0 z-10">
                     {frames.map((frame) => (
-                      <FrameBox
-                        key={frame.id}
-                        frame={frame}
-                        onUpdatePosition={updateFramePosition}
-                        containerRef={previewRef}
-                        text1={text1}
-                        text2={text2}
-                        zodiacName={selectedZodiac?.name || ''}
-                        dateText={dateText}
-                        telegramText={telegramLink}
+                      <FrameBox 
+                        key={frame.id} 
+                        frame={frame} 
+                        onUpdateType={updateFrameType} 
+                        onUpdatePosition={updateFramePosition} 
+                        onRemove={removeFrame}
+                        containerRef={previewRef} 
+                        text1={text1} 
+                        text2={text2} 
+                        zodiacName={selectedZodiac.name} 
+                        dateText={dateText} 
+                        telegramText={telegramLink} 
+                        showDate={showDate} 
+                        showTelegramLink={showTelegramLink} 
                       />
                     ))}
                   </div>
                 </div>
 
-                <div className="mt-3 w-full text-[10px] text-[var(--p-mute)] font-mono border border-[var(--p-line-2)] rounded-lg p-2 bg-[var(--p-ink-2)]">
-                  <div className="grid grid-cols-2 gap-2">
-                    {frames.length === 0 && <div className="col-span-2 text-center py-2">No frames added yet. Click "＋ ჩარჩო" below.</div>}
-                    {frames.map(frame => (
-                      <div key={frame.id}>
-                        {frame.type}: top={frame.position.top}%, left={frame.position.left}%, w={frame.position.width}%, h={frame.position.height}%
-                      </div>
-                    ))}
-                  </div>
+                <div className="mt-3 w-full rounded-lg border border-[var(--p-line-2)] bg-[var(--p-ink-2)] p-2 font-mono text-[10px] text-[var(--p-mute)]">
+                  {frames.length === 0 ? (
+                    <p className="py-2 text-center">No frames yet. Add one using the controls.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {frames.map((frame) => (<div key={frame.id}>{frame.type}: top={frame.position.top}%, left={frame.position.left}%, w={frame.position.width}%, h={frame.position.height}%</div>))}
+                    </div>
+                  )}
                 </div>
-
               </div>
             </div>
+
             <div className="flex min-w-0 flex-col gap-4">
-              <Section title="Text 1 · hook (max 2 lines)" actions={
-                <>
-                  <button onClick={() => addFrame('text1')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
-                    ＋ ჩარჩო
-                  </button>
-                  <button onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
-                    {isGeneratingText1 ? <><Spinner dark /> AI…</> : "Generate"}
-                  </button>
-                  <button onClick={() => setText1("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
-                </>
-              }>
-                <textarea value={text1} onChange={(e) => setText1(e.target.value)} placeholder="e.g., the universe is whispering to" className={`${fieldClass} h-20 resize-none mb-3`} />
-                {text1Frame && (
-                  <PositionControl 
-                    label={`Text 1 Frame (Drag & resize on preview)`} 
-                    position={text1Frame.position} 
-                    onChange={(pos) => updateFramePosition(text1Frame.id, pos)} 
-                  />
-                )}
-                {!text1Frame && (
-                  <div className="text-xs text-[var(--p-mute)] p-3 border border-dashed border-[var(--p-line-2)] rounded-lg">
-                    ⚠️ No frame assigned. Click "＋ ჩარჩო" above to add one.
-                  </div>
-                )}
+              <Section title="Text 1 · Hook" actions={<>
+                <button type="button" onClick={() => addFrame("text1")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>+ Frame</button>
+                <button type="button" onClick={() => handleGenerateText1()} disabled={isGeneratingText1 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText1 ? <><Spinner dark /> Generating…</> : "Generate"}</button>
+                <button type="button" onClick={() => { setText1(""); setUploadedImageUrl(null); }} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5`}>Clear</button>
+              </>}>
+                <textarea value={text1} onChange={(e) => { setText1(e.target.value); setUploadedImageUrl(null); }} placeholder="Write a short, engaging hook..." className={`${fieldClass} mb-3 h-20 resize-none`} />
+                {text1Frame ? <PositionControl label="Text 1 frame" position={text1Frame.position} onChange={(pos) => updateFramePosition(text1Frame.id, pos)} /> : <p className="rounded-lg border border-dashed border-[var(--p-line-2)] p-3 text-xs text-[var(--p-mute)]">Add a Text 1 frame to display the hook on the image.</p>}
               </Section>
-              
-              <Section title="Text 2 · forecast (max 5 lines)" actions={
-                <>
-                  <button onClick={() => addFrame('text2')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
-                    ＋ ჩარჩო
-                  </button>
-                  <button onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>
-                    {isGeneratingText2 ? <><Spinner dark /> AI…</> : "Generate"}
-                  </button>
-                  <button onClick={() => setText2("")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5 hover:text-[var(--p-moon)]`}>Clear</button>
-                </>
-              }>
-                <textarea value={text2} onChange={(e) => setText2(e.target.value)} placeholder="Write warm, personal horoscope text here..." className={`${fieldClass} min-h-[160px] resize-none mb-3`} />
-                {text2Frame && (
-                  <PositionControl 
-                    label={`Text 2 Frame (Drag & resize on preview)`} 
-                    position={text2Frame.position} 
-                    onChange={(pos) => updateFramePosition(text2Frame.id, pos)} 
-                  />
-                )}
-                {!text2Frame && (
-                  <div className="text-xs text-[var(--p-mute)] p-3 border border-dashed border-[var(--p-line-2)] rounded-lg">
-                    ⚠️ No frame assigned. Click "＋ ჩარჩო" above to add one.
-                  </div>
-                )}
+
+              <Section title="Text 2 · Horoscope forecast" actions={<>
+                <button type="button" onClick={() => addFrame("text2")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>+ Frame</button>
+                <button type="button" onClick={() => handleGenerateText2()} disabled={isGeneratingText2 || isPublishing} className={`${btnSmall} bg-[var(--p-violet)] text-[var(--p-ink)] hover:opacity-90`}>{isGeneratingText2 ? <><Spinner dark /> Generating…</> : "Generate"}</button>
+                <button type="button" onClick={() => { setText2(""); setUploadedImageUrl(null); }} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-mute)] hover:bg-white/5`}>Clear</button>
+              </>}>
+                <textarea value={text2} onChange={(e) => { setText2(e.target.value); setUploadedImageUrl(null); }} placeholder="Write the horoscope forecast..." className={`${fieldClass} mb-3 min-h-[160px] resize-none`} />
+                {text2Frame ? <PositionControl label="Text 2 frame" position={text2Frame.position} onChange={(pos) => updateFramePosition(text2Frame.id, pos)} /> : <p className="rounded-lg border border-dashed border-[var(--p-line-2)] p-3 text-xs text-[var(--p-mute)]">Add a Text 2 frame to display the forecast on the image.</p>}
               </Section>
 
               <Section title="Design elements">
                 <div className="divide-y divide-[var(--p-line)]">
-                  <div className="flex items-center justify-between py-2.5 first:pt-0">
-                    <span className="text-sm">Today&apos;s date</span>
+                  <div className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="text-sm">Show date</span>
                     <div className="flex items-center gap-2">
-                      <Toggle on={showDate} label="Today's date" onClick={() => { setShowDate(!showDate); if (!showDate) setShowWeekRange(false); }} />
-                      <button onClick={() => addFrame('date')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
-                        ＋ ჩარჩო
-                      </button>
+                      <Toggle on={showDate} label="Show date" onClick={() => setShowDate((v) => !v)} />
+                      <button type="button" onClick={() => addFrame("date")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)]`}>+ Frame</button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between py-2.5">
-                    <span className="text-sm">Zodiac Name</span>
+                  <div className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="text-sm">Weekly date range</span>
+                    <Toggle on={showWeekRange} label="Show weekly date range" onClick={() => { setShowWeekRange((v) => !v); setUploadedImageUrl(null); }} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="text-sm">Zodiac name</span>
+                    <button type="button" onClick={() => addFrame("zodiac")} disabled={!selectedZodiac} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] disabled:opacity-40`}>+ Frame</button>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-2.5">
+                    <span className="text-sm">Telegram link</span>
                     <div className="flex items-center gap-2">
-                      <button onClick={() => addFrame('zodiac')} disabled={!selectedZodiac} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5 disabled:opacity-30`}>
-                        ＋ ჩარჩო
-                      </button>
+                      <Toggle on={showTelegramLink} label="Show Telegram link" onClick={() => setShowTelegramLink((v) => !v)} />
+                      <button type="button" onClick={() => addFrame("telegram")} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)]`}>+ Frame</button>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between py-2.5">
-                    <span className="text-sm">Telegram channel link</span>
-                    <div className="flex items-center gap-2">
-                      <Toggle on={showTelegramLink} label="Telegram channel link" onClick={() => setShowTelegramLink(!showTelegramLink)} />
-                      <button onClick={() => addFrame('telegram')} className={`${btnSmall} border border-[var(--p-line-2)] text-[var(--p-moon)] hover:bg-white/5`}>
-                        ＋ ჩარჩო
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between py-2.5 last:pb-0">
+                  <div className="flex items-center justify-between gap-3 py-2.5">
                     <span className="text-sm">Channel logo</span>
-                    <Toggle on={showLogo} label="Channel logo" onClick={() => setShowLogo(!showLogo)} />
+                    <Toggle on={showLogo} label="Show channel logo" onClick={() => setShowLogo((v) => !v)} />
                   </div>
                 </div>
-                
-                {dateFrame && (
+
+                {dateFrame && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><PositionControl label="Date frame" position={dateFrame.position} onChange={(pos) => updateFramePosition(dateFrame.id, pos)} /></div>}
+                {zodiacFrame && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><PositionControl label="Zodiac name frame" position={zodiacFrame.position} onChange={(pos) => updateFramePosition(zodiacFrame.id, pos)} /></div>}
+                {telegramFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <PositionControl label="Date Frame" position={dateFrame.position} onChange={(pos) => updateFramePosition(dateFrame.id, pos)} />
+                    <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram link</label>
+                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => { setTelegramLink(e.target.value); setUploadedImageUrl(null); }} placeholder="t.me/lunaraOS" className={`${fieldClass} mb-3 py-2 font-mono text-xs`} />
+                    <PositionControl label="Telegram frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} />
                   </div>
                 )}
-                {zodiacFrame && (
+                {showLogo && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <PositionControl label="Zodiac Name Frame" position={zodiacFrame.position} onChange={(pos) => updateFramePosition(zodiacFrame.id, pos)} />
+                    <label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label>
+                    <input id="logo-url" type="url" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); setUploadedImageUrl(null); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />
+                    {!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">Logo failed to load. Check the image URL.</p>}
                   </div>
                 )}
-                {showTelegramLink && telegramFrame && (
-                  <div className="mt-3 border-t border-[var(--p-line)] pt-3">
-                    <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram Link</label>
-                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/lunaraOS" className={`${fieldClass} py-2 font-mono text-xs mb-3`} />
-                    <PositionControl label="Telegram Frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} />
-                  </div>
-                )}
-                {showLogo && <div className="mt-3 border-t border-[var(--p-line)] pt-3"><label htmlFor="logo-url" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Logo URL</label><input id="logo-url" type="text" value={logoUrl} onChange={(e) => { setLogoUrl(e.target.value); setIsLogoValid(true); }} placeholder="https://example.com/logo.png" className={`${fieldClass} py-2 font-mono text-xs`} />{!isLogoValid && <p className="mt-1.5 text-xs text-[var(--p-bad)]">This image failed to load. Check the URL.</p>}</div>}
               </Section>
-              
+
               <div className="flex flex-col gap-3 sm:flex-row">
-                <button onClick={() => handleReadyAndUpload()} disabled={isPublishing || !text2} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Generating &amp; uploading…</> : <>Ready — upload to Supabase</>}</button>
-                <button onClick={() => handlePublish()} disabled={isPublishing || !text2} className={`${btnOk} flex-1`}>{isPublishing ? <><Spinner dark /> Processing &amp; publishing…</> : <>Confirm &amp; publish</>}</button>
+                <button type="button" onClick={async () => { await handleReadyAndUpload(); }} disabled={isPublishing || !text2.trim()} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Processing…</> : "Render & upload image"}</button>
+                <button type="button" onClick={async () => {
+                  if (!selectedZodiac || !selectedFormat) { addLog("ჯერ აირჩიე ზოდიაქო და ფორმატი.", "warning"); return; }
+                  let imageToPublish = uploadedImageUrl;
+                  if (!imageToPublish) {
+                    imageToPublish = await handleReadyAndUpload();
+                    if (!imageToPublish) { addLog("სურათის ატვირთვა ვერ მოხერხდა; გამოქვეყნება შეჩერდა.", "error"); return; }
+                  }
+                  await handlePublish(selectedZodiac, selectedFormat, text1, text2, imageToPublish);
+                }} disabled={isPublishing || !text2.trim()} className={`${btnOk} flex-1`}>{isPublishing ? <><Spinner dark /> Publishing…</> : "Confirm & publish"}</button>
               </div>
-              
-              <button 
-                onClick={() => {
-                  setStep("input");
-                  setInputValue("");
-                  setSelectedZodiac(null);
-                  setSelectedFormat(null);
-                  setText1("");
-                  setText2("");
-                  setUploadedImageUrl(null);
-                  setLogs([]);
-                  setFrames([]);
-                  addLog("🔄 ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
-                }} 
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+
+              <button type="button" disabled={isPublishing} onClick={() => {
+                setStep("input"); setInputValue(""); setSelectedZodiac(null); setSelectedFormat(null); setText1(""); setText2(""); setUploadedImageUrl(null); setLogs([]); setFrames([]);
+                addLog("მზადაა ახალი პოსტისთვის.", "success");
+              }} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)] disabled:cursor-not-allowed disabled:opacity-40">
                 Start New Post
               </button>
 
               {logs.length > 0 && (
                 <div className="overflow-hidden rounded-2xl border border-[var(--p-line)] bg-[#080a16]">
-                  <div className="flex items-center justify-between border-b border-[var(--p-line)] px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-2 border-b border-[var(--p-line)] px-4 py-2.5">
                     <span className="flex items-center gap-2 text-xs font-semibold text-[var(--p-mute)]"><span className="h-2 w-2 animate-pulse rounded-full bg-[var(--p-ok)]" /> PostAgent Live Logs</span>
-                    <button onClick={() => { navigator.clipboard.writeText(logs.join('\n')); alert("Logs copied!"); }} className="flex items-center gap-1.5 rounded-lg border border-[var(--p-line-2)] px-2.5 py-1 text-xs text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]">
-                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>Copy logs
-                    </button>
+                    <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(logs.join("\n")); addLog("ლოგები დაკოპირდა.", "success"); } catch { addLog("ლოგების კოპირება ვერ მოხერხდა.", "warning"); } }} className="flex items-center gap-1.5 rounded-lg border border-[var(--p-line-2)] px-2.5 py-1 text-xs text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]">Copy logs</button>
                   </div>
-                  <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]">
-                    {logs.map((log, i) => {
-                      const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
-                      const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
-                      const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
+                  <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]" aria-live="polite">
+                    {logs.map((log, index) => {
+                      const isError = log.includes("❌") || log.includes("FAILURE") || log.includes("💥");
+                      const isSuccess = log.includes("✅") || log.includes("SUCCESS") || log.includes("🎉");
+                      const isWarning = log.includes("⚠️");
                       return (
-                        <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
-                          <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
-                          <span>{log.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/, '')}</span>
-                        </div>
+                        <div key={`${index}-${log.slice(0, 20)}`} className={`break-words leading-tight ${isError ? "text-[var(--p-bad)]" : isSuccess ? "font-bold text-[var(--p-ok)]" : isWarning ? "text-[var(--p-warn)]" : "text-[var(--p-moon)]/80"}`}>{log}</div>
                       );
                     })}
                   </div>
