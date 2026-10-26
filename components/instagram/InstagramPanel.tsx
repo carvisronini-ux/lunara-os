@@ -488,7 +488,8 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [showHashtags] = useState(true);
   const [showTelegramLink, setShowTelegramLink] = useState(false);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_LOGO_URL);
-  const [telegramLink, setTelegramLink] = useState("");
+  // ✅ დეფოლტ Telegram link
+  const [telegramLink, setTelegramLink] = useState("t.me/lunaraOS");
   const [isLogoValid, setIsLogoValid] = useState(true);
 
   const [logs, setLogs] = useState<string[]>([]);
@@ -498,6 +499,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   const [frames, setFrames] = useState<Frame[]>([]);
+  const [hasLoadedSavedFrames, setHasLoadedSavedFrames] = useState(false);
 
   const operationIdRef = useRef<string | null>(null);
 
@@ -519,6 +521,40 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   };
 
   const dateText = showWeekRange ? getWeekRange() : getCurrentDate();
+
+  // ✅ შენახვა localStorage-ში
+  const saveFrameLayout = () => {
+    if (frames.length === 0) {
+      addLog("⚠️ არ არის ჩარჩოები შესანახად!", "warning");
+      return;
+    }
+    try {
+      localStorage.setItem('lunara_frame_layout', JSON.stringify(frames));
+      addLog("✅ ჩარჩოების მდებარეობა შენახულია!", "success");
+    } catch (error) {
+      addLog(`❌ შეცდომა შენახვისას: ${error instanceof Error ? error.message : 'Unknown'}`, "error");
+    }
+  };
+
+  // ✅ ჩატვირთვა localStorage-დან
+  const loadFrameLayout = () => {
+    try {
+      const saved = localStorage.getItem('lunara_frame_layout');
+      if (saved) {
+        const parsedFrames = JSON.parse(saved);
+        setFrames(parsedFrames);
+        addLog("✅ ჩარჩოების მდებარეობა ჩაიტვირთა!", "success");
+        setHasLoadedSavedFrames(true);
+      }
+    } catch (error) {
+      addLog(`⚠️ შენახული ჩარჩოების ჩატვირთვა ვერ მოხერხდა: ${error instanceof Error ? error.message : 'Unknown'}`, "warning");
+    }
+  };
+
+  // ✅ ავტომატური ჩატვირთვა კომპონენტის დაწყებისას
+  useEffect(() => {
+    loadFrameLayout();
+  }, []);
 
   const addFrame = (type: FrameType) => {
     const newFrame: Frame = {
@@ -721,7 +757,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       
       addLog(`✅ [3/3] სურათი წარმატებით აიტვირთა! ზომა: ${(blob.size / 1024).toFixed(0)}KB`, "success");
       addLog(`✅ URL: ${publicUrl}`, "success");
-      addLog(`\n🏁 ========== UPLOAD PROCESS COMPLETED ==========\n`);
+      addLog(`\n ========== UPLOAD PROCESS COMPLETED ==========\n`);
       
       setUploadedImageUrl(publicUrl);
       return publicUrl;
@@ -765,7 +801,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       return false;
     }
     
-    addLog(`🚀 [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
+    addLog(` [PUBLISH] გზავნის მონაცემებს Instagram API-ზე...`, "info");
     
     try {
       const payload = {
@@ -846,12 +882,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
       if (isPublishing) {
-        addLog("⚠️ Agent already running! Blocking duplicate execution.", "warning");
+        addLog("️ Agent already running! Blocking duplicate execution.", "warning");
         return false;
       }
 
       addLog(`\n🤖 ========== AGENT STARTED ==========`);
-      addLog(`🎯 Target Zodiac: ${zodiacName}`);
+      addLog(` Target Zodiac: ${zodiacName}`);
       
       const zodiac = ZODIAC_SIGNS.find(z => z.name === zodiacName);
       if (!zodiac) { 
@@ -893,7 +929,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
       addLog("⏳ ნაბიჯი 3: სურათის გენერაცია (სქრინშოთი) და ატვირთვა...", "info");
       const imgUrl = await handleReadyAndUpload(zodiac, "post", t1, t2);
-      if (!imgUrl) { addLog("❌ ატვირთვა ვერ მოხერხდა", "error"); return false; }
+      if (!imgUrl) { addLog(" ატვირთვა ვერ მოხერხდა", "error"); return false; }
       await new Promise(r => setTimeout(r, 1500));
 
       addLog("⏳ ნაბიჯი 4: ლოდინი Instagram API-ს სტაბილურობაზე (7 წმ)...", "info");
@@ -902,7 +938,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
       addLog("⏳ ნაბიჯი 5: გამოქვეყნება...", "info");
       const success = await handlePublish(zodiac, "post", t1, t2, imgUrl);
       if (success) {
-        addLog("🎉 აგენტმა წარმატებით დაასრულა ციკლი!", "success");
+        addLog(" აგენტმა წარმატებით დაასრულა ციკლი!", "success");
         return true;
       } else {
         addLog("❌ აგენტის გამოქვეყნება ვერ მოხერხდა", "error");
@@ -965,6 +1001,15 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 Randomize
               </button>
+              {/* ✅ ახალი: ჩარჩოების შენახვის ღილაკი */}
+              <button 
+                onClick={saveFrameLayout} 
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-[var(--p-ink)] px-4 py-2 text-sm font-semibold text-[var(--p-moon)] transition-colors hover:bg-white/5 hover:text-[var(--p-ok)]"
+                title="ჩარჩოების მდებარეობის დასეივება"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                ჩარჩოების მდებარეობის დასეივება
+              </button>
               <button onClick={() => setStep("format")} className="rounded-full border border-[var(--p-line-2)] px-3.5 py-1.5 text-sm text-[var(--p-mute)] transition-colors hover:text-[var(--p-moon)]">← Change format</button>
             </div>
           </div>
@@ -979,7 +1024,6 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   </span>
                 </div>
                 
-                {/* ✅ განახლებული: წაშლილია transition-all duration-300, დამატებულია flex-shrink-0 */}
                 <div 
                   ref={previewRef} 
                   className="relative bg-slate-900 rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center flex-shrink-0" 
@@ -1130,7 +1174,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                 {showTelegramLink && telegramFrame && (
                   <div className="mt-3 border-t border-[var(--p-line)] pt-3">
                     <label htmlFor="telegram-link" className="mb-1.5 block text-xs font-semibold text-[var(--p-mute)]">Telegram Link</label>
-                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/yourchannel" className={`${fieldClass} py-2 font-mono text-xs mb-3`} />
+                    <input id="telegram-link" type="text" value={telegramLink} onChange={(e) => setTelegramLink(e.target.value)} placeholder="t.me/lunaraOS" className={`${fieldClass} py-2 font-mono text-xs mb-3`} />
                     <PositionControl label="Telegram Frame" position={telegramFrame.position} onChange={(pos) => updateFramePosition(telegramFrame.id, pos)} />
                   </div>
                 )}
@@ -1153,7 +1197,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   setUploadedImageUrl(null);
                   setLogs([]);
                   setFrames([]);
-                  addLog("🔄 ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
+                  addLog(" ფორმა გასუფთავდა. მზადაა ახალი პოსტისთვის!", "success");
                 }} 
                 className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--p-line-2)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--p-mute)] transition-colors hover:bg-white/5 hover:text-[var(--p-moon)]"
               >
@@ -1174,7 +1218,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                       const isError = log.includes('❌') || log.includes('FAILURE') || log.includes('💥');
                       const isSuccess = log.includes('✅') || log.includes('SUCCESS') || log.includes('FINAL RESULT') || log.includes('🎉');
                       const isWarning = log.includes('⚠️') || log.includes('ცარიელია');
-                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('⏳') || log.includes('📸');
+                      const isDebug = log.includes('🔍') || log.includes('📝') || log.includes('') || log.includes('📸');
                       return (
                         <div key={i} className={`flex gap-2 break-words leading-tight ${isError ? 'text-[var(--p-bad)]' : isSuccess ? 'font-bold text-[var(--p-ok)]' : isWarning ? 'text-[var(--p-warn)]' : isDebug ? 'text-[var(--p-violet)]' : 'text-[var(--p-moon)]/80'}`}>
                           <span className="shrink-0 text-[var(--p-mute)]">[{log.match(/\[\d{2}:\d{2}:\d{2}\]/)?.[0] || ''}]</span>
