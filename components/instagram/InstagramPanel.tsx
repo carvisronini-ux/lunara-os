@@ -195,7 +195,7 @@ function useTextFit(
 
       // ვამოწმებთ ეტევა თუ არა
       const checkFits = () => {
-        const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || currentSize * 1.3;
+        const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || currentSize * 1.2;
         const lineCount = Math.ceil(element.scrollHeight / lineHeight);
         const fitsHorizontally = element.scrollWidth <= container.clientWidth;
         const fitsVertically = lineCount <= maxLines;
@@ -208,7 +208,7 @@ function useTextFit(
         return;
       }
 
-      // თუ არ ეტევა, ვეძებთ ოპტიმალურ ზომას
+      // თუ არ ეტევა, ვეძებთ პტიმალურ ზომას
       while (currentSize > minFontSize) {
         currentSize -= 1;
         element.style.fontSize = `${currentSize}px`;
@@ -280,6 +280,8 @@ function FrameBox({
       case 'text1': return 2;
       case 'text2': return 5;
       case 'telegram': return 1;
+      case 'zodiac': return 1;
+      case 'date': return 1;
       default: return 1;
     }
   };
@@ -295,12 +297,12 @@ function FrameBox({
     }
   };
 
-  // ✅ ავტომატური ზომის გამოთვლა - მაქსიმალურად ავსებს ჩარჩოს
+  // ✅ ავტომატური ომის გამოთვლა - მაქსიმალურად ავსებს ჩარჩოს
   const autoFontSize = useTextFit(
     currentText(),
     textContainerRef,
     {
-      minFontSize: frame.type === 'zodiac' ? 16 : 12,
+      minFontSize: frame.type === 'zodiac' ? 20 : frame.type === 'date' ? 16 : 12,
       maxFontSize: frame.position.fontSize,
       maxLines: getMaxLines(),
       enabled: true,
@@ -399,7 +401,7 @@ function FrameBox({
           display: 'flex',
           alignItems: 'center',
           justifyContent: frame.position.align === 'center' ? 'center' : frame.position.align === 'right' ? 'flex-end' : 'flex-start',
-          padding: '0.75rem', // 12px padding
+          padding: frame.type === 'zodiac' ? '0.5rem' : '0.75rem', // Zodiac-ს ნაკლები padding
         }}
       >
         <div
@@ -669,7 +671,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   const handleZodiacSubmit = () => {
     const normalizedInput = inputValue.trim().toUpperCase();
-    if (!normalizedInput) { addLog("გთხოვ, შეიყვანე ზოდიაქოს ნიშანი.", "warning"); return null; }
+    if (!normalizedInput) { addLog("გთხოვ, შეიყვანე ოდიაქოს ნიშანი.", "warning"); return null; }
     const found = ZODIAC_SIGNS.find((sign) => sign.name === normalizedInput);
     if (!found) { addLog(`ზოდიაქოს ნიშანი ვერ მოიძებნა: "${normalizedInput}"`, "error"); return null; }
     setSelectedZodiac(found);
@@ -691,12 +693,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     setSelectedZodiac(randomSign);
     setInputValue(randomSign.name);
     setUploadedImageUrl(null);
-    addLog(`შემთხვევით არჩეული ოდიაქო: ${randomSign.name}`, "info");
+    addLog(`შემთხვევით არჩეული ზოდიაქო: ${randomSign.name}`, "info");
   };
 
   const handleGenerateText1 = async (overrideZodiac?: ZodiacSign, config?: Record<string, unknown> | null) => {
     const targetZodiac = overrideZodiac ?? selectedZodiac;
-    if (!targetZodiac) { addLog("ჯერ აირჩიე ოდიაქოს ნიშანი.", "error"); return null; }
+    if (!targetZodiac) { addLog("ჯერ აირჩიე ზოდიაქოს ნიშანი.", "error"); return null; }
     setIsGeneratingText1(true);
     addLog(`AI ქმნის Text 1-ს (${targetZodiac.name})...`, "info");
     try {
@@ -831,7 +833,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     const targetImageUrl = overrideImageUrl ?? uploadedImageUrl;
 
     if (!targetZodiac || !targetFormat || !targetImageUrl || !targetText2.trim()) {
-      addLog("გამოქვეყნებისთვის საჭიროა ზოდიაქო, ფორმატი, სურათი და Text 2.", "error");
+      addLog("გამოქვეყნებისთვის საჭიროა ოდიაქო, ფორმატი, სურათი და Text 2.", "error");
       return false;
     }
 
@@ -1095,7 +1097,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={async () => { await handleReadyAndUpload(); }} disabled={isPublishing || !text2.trim()} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Processing…</> : "Render & upload image"}</button>
                 <button type="button" onClick={async () => {
-                  if (!selectedZodiac || !selectedFormat) { addLog("ჯერ აირჩიე ოდიაქო და ფორმატი.", "warning"); return; }
+                  if (!selectedZodiac || !selectedFormat) { addLog("ჯერ აირჩიე ზოდიაქო და ფორმატი.", "warning"); return; }
                   let imageToPublish = uploadedImageUrl;
                   if (!imageToPublish) {
                     imageToPublish = await handleReadyAndUpload();
@@ -1120,9 +1122,9 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
                   </div>
                   <div className="h-64 space-y-1.5 overflow-y-auto p-4 font-mono text-[10px]" aria-live="polite">
                     {logs.map((log, index) => {
-                      const isError = log.includes("❌") || log.includes("FAILURE") || log.includes("💥");
-                      const isSuccess = log.includes("✅") || log.includes("SUCCESS") || log.includes("🎉");
-                      const isWarning = log.includes("⚠️");
+                      const isError = log.includes("❌") || log.includes("FAILURE") || log.includes("");
+                      const isSuccess = log.includes("✅") || log.includes("SUCCESS") || log.includes("");
+                      const isWarning = log.includes("️");
                       return (
                         <div key={`${index}-${log.slice(0, 20)}`} className={`break-words leading-tight ${isError ? "text-[var(--p-bad)]" : isSuccess ? "font-bold text-[var(--p-ok)]" : isWarning ? "text-[var(--p-warn)]" : "text-[var(--p-moon)]/80"}`}>{log}</div>
                       );
