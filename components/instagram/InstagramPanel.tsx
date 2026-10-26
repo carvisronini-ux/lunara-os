@@ -156,7 +156,7 @@ function Toggle({ on, onClick, label }: { on: boolean; onClick: () => void; labe
   );
 }
 
-// ✅ ჭკვიანი ჰუკი ტექსტის ავტომატური მორგებისთვის ჩარჩოში
+// ✅ განახლებული ჰუკი - ტექსტი მაქსიმალურად ავსებს ჩარჩოს
 function useTextFit(
   text: string,
   containerRef: React.RefObject<HTMLDivElement>,
@@ -189,36 +189,38 @@ function useTextFit(
       const element = container.querySelector('.text-content') as HTMLElement;
       if (!element) return;
 
-      let low = minFontSize;
-      let high = maxFontSize;
-      let bestSize = minFontSize;
+      // ვიწყებთ მაქსიმალური ზომიდან და ვამცირებთ სანამ არ ჩაეტევა
+      let currentSize = maxFontSize;
+      element.style.fontSize = `${currentSize}px`;
 
-      const targetLineClamp = maxLines.toString();
-
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        element.style.fontSize = `${mid}px`;
-        element.style.webkitLineClamp = 'unset'; // დროებით ვხსნით შეზღუდვას რეალური სიმაღლის გასაზომად
-        
-        const lineHeightStr = getComputedStyle(element).lineHeight;
-        const lineHeight = lineHeightStr === 'normal' ? mid * 1.3 : parseFloat(lineHeightStr);
+      // ვამოწმებთ ეტევა თუ არა
+      const checkFits = () => {
+        const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || currentSize * 1.3;
         const lineCount = Math.ceil(element.scrollHeight / lineHeight);
-        
-        const fitsHorizontally = element.scrollWidth <= container.clientWidth + 2;
+        const fitsHorizontally = element.scrollWidth <= container.clientWidth;
         const fitsVertically = lineCount <= maxLines;
+        return fitsHorizontally && fitsVertically;
+      };
 
-        // ვაბრუნებთ შეზღუდვას შემდეგი იტერაციისთვის ან საბოლოო რენდერისთვის
-        element.style.webkitLineClamp = targetLineClamp;
+      // თუ ეტევა მაქსიმალური ზომა, ვტოვებთ
+      if (checkFits()) {
+        setFontSize(currentSize);
+        return;
+      }
 
-        if (fitsHorizontally && fitsVertically) {
-          bestSize = mid;
-          low = mid + 1; // ვცდილობთ უფრო დიდ ზომას
-        } else {
-          high = mid - 1; // ზომა დიდია, ვამცირებთ
+      // თუ არ ეტევა, ვეძებთ ოპტიმალურ ზომას
+      while (currentSize > minFontSize) {
+        currentSize -= 1;
+        element.style.fontSize = `${currentSize}px`;
+        
+        if (checkFits()) {
+          setFontSize(currentSize);
+          return;
         }
       }
 
-      setFontSize(bestSize);
+      // თუ მაინც არ ეტევა, ვაყენებთ მინიმუმს
+      setFontSize(minFontSize);
     };
 
     const raf = requestAnimationFrame(() => {
@@ -293,7 +295,7 @@ function FrameBox({
     }
   };
 
-  // ✅ ავტომატური ზომის გამოთვლა
+  // ✅ ავტომატური ზომის გამოთვლა - მაქსიმალურად ავსებს ჩარჩოს
   const autoFontSize = useTextFit(
     currentText(),
     textContainerRef,
@@ -385,30 +387,33 @@ function FrameBox({
 
   return (
     <>
-      {/* 1. ტექსტის კონტეინერი (დარჩება სურათზე) */}
+      {/* 1. ტექსტის კონტეინერი - მაქსიმალურად ავსებს სივრცეს */}
       <div
         ref={textContainerRef}
-        className="absolute pointer-events-none overflow-hidden"
+        className="absolute pointer-events-none"
         style={{
           top: `${frame.position.top}%`,
           left: `${frame.position.left}%`,
           width: `${frame.position.width}%`,
           height: `${frame.position.height}%`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: frame.position.align === 'center' ? 'center' : frame.position.align === 'right' ? 'flex-end' : 'flex-start',
+          padding: '0.75rem', // 12px padding
         }}
       >
         <div
-          className="text-content h-full flex items-center p-3"
+          className="text-content w-full"
           style={{
-            justifyContent: frame.position.align === "center" ? "center" : frame.position.align === "right" ? "flex-end" : "flex-start",
-            textAlign: frame.position.align,
-            fontSize: `${autoFontSize}px`, // ✅ ავტომატურად გამოთვლილი ზომა
-            lineHeight: 1.3,
+            fontSize: `${autoFontSize}px`,
+            lineHeight: 1.2, // უფრო მჭიდრო ხაზები
             fontStyle: frame.type === "text1" || frame.type === "date" ? "italic" : "normal",
             fontWeight: frame.type === "zodiac" ? "bold" : "normal",
             textTransform: frame.type === "zodiac" ? "uppercase" : "none",
             letterSpacing: frame.type === "zodiac" ? "0.05em" : "normal",
             color: frame.type === "telegram" ? "#FFFFFF" : "#000000",
             textShadow: frame.type === "telegram" ? "0 1px 3px rgba(0,0,0,0.8)" : "none",
+            textAlign: frame.position.align,
             display: "-webkit-box",
             WebkitLineClamp: getMaxLines(),
             WebkitBoxOrient: "vertical",
@@ -422,7 +427,7 @@ function FrameBox({
         </div>
       </div>
 
-      {/* 2. მართვის ელემენტების კონტეინერი (წაიშლება სურათიდან data-no-capture-ის წყალობით) */}
+      {/* 2. მართვის ელემენტების კონტეინერი */}
       <div
         className="absolute border-2 border-dashed rounded-md overflow-hidden group frame-controls"
         data-no-capture="true"
@@ -686,12 +691,12 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
     setSelectedZodiac(randomSign);
     setInputValue(randomSign.name);
     setUploadedImageUrl(null);
-    addLog(`შემთხვევით არჩეული ზოდიაქო: ${randomSign.name}`, "info");
+    addLog(`შემთხვევით არჩეული ოდიაქო: ${randomSign.name}`, "info");
   };
 
   const handleGenerateText1 = async (overrideZodiac?: ZodiacSign, config?: Record<string, unknown> | null) => {
     const targetZodiac = overrideZodiac ?? selectedZodiac;
-    if (!targetZodiac) { addLog("ჯერ აირჩიე ზოდიაქოს ნიშანი.", "error"); return null; }
+    if (!targetZodiac) { addLog("ჯერ აირჩიე ოდიაქოს ნიშანი.", "error"); return null; }
     setIsGeneratingText1(true);
     addLog(`AI ქმნის Text 1-ს (${targetZodiac.name})...`, "info");
     try {
@@ -710,7 +715,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
   const handleGenerateText2 = async (overrideZodiac?: ZodiacSign, overrideText1?: string, config?: Record<string, unknown> | null) => {
     const targetZodiac = overrideZodiac ?? selectedZodiac;
     const targetText1 = overrideText1 ?? text1;
-    if (!targetZodiac) { addLog("ჯერ აირჩიე ზოდიაქოს ნიშანი.", "error"); return null; }
+    if (!targetZodiac) { addLog("ჯერ აირჩიე ოდიაქოს ნიშანი.", "error"); return null; }
     setIsGeneratingText2(true);
     addLog(`AI ქმნის Text 2-ს (${targetZodiac.name})...`, "info");
     try {
@@ -878,7 +883,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
 
   useImperativeHandle(ref, () => ({
     executeAutoPostSequence: async (zodiacName: string) => {
-      if (publishingLockRef.current) { addLog("აგენტის ოპერაცია უკვე მიმდინარეობს.", "warning"); return false; }
+      if (publishingLockRef.current) { addLog("აგენტის პერაცია უკვე მიმდინარეობს.", "warning"); return false; }
       const zodiac = ZODIAC_SIGNS.find((sign) => sign.name === zodiacName.trim().toUpperCase());
       if (!zodiac) { addLog(`ზოდიაქო ვერ მოიძებნა: ${zodiacName}`, "error"); return false; }
       addLog(`PostAgent დაიწყო: ${zodiac.name}`, "info");
@@ -1090,7 +1095,7 @@ const InstagramPanel = forwardRef<any, InstagramPanelProps>(({ pushEvent, profil
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button type="button" onClick={async () => { await handleReadyAndUpload(); }} disabled={isPublishing || !text2.trim()} className={`${btnPrimary} flex-1 py-3.5`}>{isPublishing ? <><Spinner dark /> Processing…</> : "Render & upload image"}</button>
                 <button type="button" onClick={async () => {
-                  if (!selectedZodiac || !selectedFormat) { addLog("ჯერ აირჩიე ზოდიაქო და ფორმატი.", "warning"); return; }
+                  if (!selectedZodiac || !selectedFormat) { addLog("ჯერ აირჩიე ოდიაქო და ფორმატი.", "warning"); return; }
                   let imageToPublish = uploadedImageUrl;
                   if (!imageToPublish) {
                     imageToPublish = await handleReadyAndUpload();
